@@ -1,0 +1,17 @@
+README.md
+setup.py
+srt_translator/__init__.py
+srt_translator/main.py
+srt_translator.egg-info/PKG-INFO
+srt_translator.egg-info/SOURCES.txt
+srt_translator.egg-info/dependency_links.txt
+srt_translator.egg-info/entry_points.txt
+srt_translator.egg-info/requires.txt
+srt_translator.egg-info/top_level.txt
+srt_translator/translator/__init__.py
+srt_translator/translator/fixer.py
+srt_translator/translator/srt_parser.py
+srt_translator/translator/term_handler.py
+srt_translator/translator/translator.py
+srt_translator/utils/__init__.py
+srt_translator/utils/logging_setup.py

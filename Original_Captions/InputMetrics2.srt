@@ -1,0 +1,299 @@
+1
+00:00:07,200 --> 00:00:11,620
+In this lesson, we'll introduce you to input metrics and explain how we realized their
+
+2
+00:00:11,620 --> 00:00:15,340
+importance at Amazon and how it changed the way we manage the business.
+
+3
+00:00:16,080 --> 00:00:21,120
+Jeff and I once visited a Fortune 500 company to meet privately with the CEO in his office.
+
+4
+00:00:21,820 --> 00:00:25,520
+During our meeting, an assistant dashed in and handed the boss a sheet of paper.
+
+5
+00:00:25,520 --> 00:00:29,260
+The CEO glanced at it and waved at it and proudly said,
+
+6
+00:00:29,700 --> 00:00:34,980
+our stock is up 30 cents this morning. He perked up as if he had personally caused the rise.
+
+7
+00:00:35,400 --> 00:00:40,580
+As we drove to our next meeting, Jeff said, there's nothing the CEO did to cause that 30
+
+8
+00:00:40,580 --> 00:00:45,540
+cent blip in the stock price. I agreed and added that I wouldn't be surprised if the assistant
+
+9
+00:00:45,540 --> 00:00:50,140
+had thrown multiple printouts in the recycle bin that morning when the blip wasn't so big.
+
+10
+00:00:50,580 --> 00:00:54,020
+Would the same scene have played out if the share price had dropped 30 cents?
+
+11
+00:00:54,480 --> 00:00:55,500
+The more proficient the CEO was, the more likely he would have been to win.
+
+12
+00:00:55,500 --> 00:00:59,220
+The profound lesson is that share price is what Amazon calls an output metric.
+
+13
+00:00:59,720 --> 00:01:04,440
+In this chapter, we'll introduce the concept of input metrics, which will enable you to focus
+
+14
+00:01:04,440 --> 00:01:08,300
+on the activities that drive your business in a meaningful and positive direction.
+
+15
+00:01:08,880 --> 00:01:13,460
+The CEO I just mentioned and companies in general can rarely sustainably control
+
+16
+00:01:13,460 --> 00:01:18,680
+output metrics directly. What's important is to focus on the controllable input metrics,
+
+17
+00:01:19,140 --> 00:01:24,320
+the activities you directly control, which ultimately affect output metrics such as share
+
+18
+00:01:24,320 --> 00:01:24,720
+price.
+
+19
+00:01:25,500 --> 00:01:30,920
+Input metrics are controllable and usually customer-facing. Some companies refer to them
+
+20
+00:01:30,920 --> 00:01:37,100
+as leading indicators. We like to use a stronger term, controllable input metrics. That means it's
+
+21
+00:01:37,100 --> 00:01:41,720
+a conscious choice you make whether to devote resources, whether those resources are people,
+
+22
+00:01:41,960 --> 00:01:46,640
+equipment, software, marketing, spending, geographic expansion, or something else,
+
+23
+00:01:46,640 --> 00:01:52,240
+to move the metrics in the desired direction. Thus, input metrics are things that, when done
+
+24
+00:01:52,240 --> 00:01:55,480
+right, improve the customer experience, create value, and improve the business.
+
+25
+00:01:55,480 --> 00:01:55,980
+Input metrics are things that, when done right, improve the business. Thus, input metrics are things that, when done right,
+
+26
+00:01:55,980 --> 00:02:00,680
+create value, and bring about the desired results in your output metrics like sales, profit, and share price.
+
+27
+00:02:01,340 --> 00:02:06,940
+Your team's actions, organizational decisions, and where and how you invest money are controllable
+
+28
+00:02:06,940 --> 00:02:12,580
+inputs. Input metrics are ways to measure the impact and status of all these elements that you
+
+29
+00:02:12,580 --> 00:02:18,620
+control. Output metrics are lagging indicators. They measure the results of the inputs, which are
+
+30
+00:02:18,620 --> 00:02:23,820
+leading indicators. Output metrics include financial metrics like revenue, gross profit,
+
+31
+00:02:23,820 --> 00:02:24,880
+and free cash flow.
+
+32
+00:02:25,480 --> 00:02:30,780
+As well as metrics like active customers, new subscribers, and churn rate. They're very important,
+
+33
+00:02:31,060 --> 00:02:36,240
+but they generally can't be directly manipulated in a sustainable way over a long period of time.
+
+34
+00:02:37,140 --> 00:02:43,080
+Most, but not all, input metrics are customer-facing. Customer-facing input metrics measure factors
+
+35
+00:02:43,080 --> 00:02:48,500
+that positively improve the customer experience. Factors that make your service or product better,
+
+36
+00:02:48,700 --> 00:02:53,560
+faster, cheaper, or some combination of all three. Each sustained improvement in the customer
+
+37
+00:02:53,560 --> 00:02:55,460
+experience creates long-term value for the customer. And that's why input metrics are
+
+38
+00:02:55,480 --> 00:03:01,420
+for customers. It pays dividends for the next several years. While most input metrics are
+
+39
+00:03:01,420 --> 00:03:06,760
+customer-facing, many do not directly relate to the customer experience. An example of an input
+
+40
+00:03:06,760 --> 00:03:12,140
+metric that's not customer-facing and that we paid close attention to at Amazon is inventory
+
+41
+00:03:12,140 --> 00:03:19,140
+record accuracy, or IRA percentage. 100% inventory record accuracy means that all of the retail
+
+42
+00:03:19,140 --> 00:03:25,120
+goods, item quantity, and bin location in the fulfillment center perfectly match what's in the
+
+43
+00:03:25,120 --> 00:03:25,460
+electronic store. So, if you're a customer, you're going to have to pay close attention to the
+
+44
+00:03:25,480 --> 00:03:31,120
+records of the warehouse management system. When Amazon accepts a customer order, the warehouse
+
+45
+00:03:31,120 --> 00:03:37,540
+management system must accurately indicate the in-stock status and location, which fulfillment
+
+46
+00:03:37,540 --> 00:03:42,700
+center, aisle, shelf, and bin location to fulfill the items within the promised delivery date and
+
+47
+00:03:42,700 --> 00:03:48,600
+time. As a result, a lower IRA percentage will result in a lower rate of on-time order fulfillment,
+
+48
+00:03:49,140 --> 00:03:54,920
+higher inventory costs, and higher fulfillment costs. Some other examples of input metrics that
+
+49
+00:03:54,920 --> 00:03:55,120
+are not customer-facing are the inventory record accuracy, or the warehouse management system.
+
+50
+00:03:55,120 --> 00:03:58,600
+The metrics that are not customer-facing include average days accounts payable,
+
+51
+00:03:59,260 --> 00:04:04,460
+workplace safety incidents, online marketing dollars spent per month. You may have noticed
+
+52
+00:04:04,460 --> 00:04:09,920
+that many of these metrics will indirectly affect customers. For example, inventory record accuracy
+
+53
+00:04:09,920 --> 00:04:16,080
+appears to be a purely operational internal metric. However, when you consider the implications of a
+
+54
+00:04:16,080 --> 00:04:21,060
+low IRA percentage, not knowing whether you have an item or not, or where it is located,
+
+55
+00:04:21,060 --> 00:04:24,520
+this would have a significant negative impact on customers.
+
+56
+00:04:25,120 --> 00:04:30,300
+At Amazon, we took to heart the lesson that we could only forecast and observe our outputs,
+
+57
+00:04:30,680 --> 00:04:35,480
+but we had a high degree of control over the inputs. This realization was the cumulative
+
+58
+00:04:35,480 --> 00:04:40,520
+effect of years of operating experience. Our efforts to hit revenue targets at the end of
+
+59
+00:04:40,520 --> 00:04:44,720
+each quarter and our first few years as a public company firmly informed this.
+
+60
+00:04:45,460 --> 00:04:49,000
+If we are trending to miss our financial goals as we neared the end of the quarter,
+
+61
+00:04:49,000 --> 00:04:54,860
+a fire drill would ensue. Finance and category leaders would send frantic emails leading to
+
+62
+00:04:55,120 --> 00:05:00,780
+meetings to discuss emergency plans to hit our goals. Then teams would scramble to enact these
+
+63
+00:05:00,780 --> 00:05:05,500
+hastily conceived ideas to boost revenue and profit for the quarter's remaining few weeks.
+
+64
+00:05:06,080 --> 00:05:10,480
+Most of our activities involved promotions, slashing prices, and getting rid of excess
+
+65
+00:05:10,480 --> 00:05:16,160
+inventory. Sometimes these promotions provided a small boost to sales, but in most cases,
+
+66
+00:05:16,160 --> 00:05:20,880
+their real impact was that they distracted us from improving the customer experience,
+
+67
+00:05:21,140 --> 00:05:25,000
+the long-term driver of growth. We learned that instead of reacting to the
+
+68
+00:05:25,000 --> 00:05:25,100
+outcomes of our actions, we should be more focused on the results of our actions.
+
+69
+00:05:25,120 --> 00:05:31,000
+We should focus on controlling the inputs. This approach is one of the reasons why Amazon is now
+
+70
+00:05:31,000 --> 00:05:36,580
+one of the world's most valuable companies. Every process emits lots of data, whether you
+
+71
+00:05:36,580 --> 00:05:41,580
+measured or not. Most teams do a good job measuring a process's output. We've noticed
+
+72
+00:05:41,580 --> 00:05:45,900
+that most people do not do nearly as well measuring their inputs, which means they're
+
+73
+00:05:45,900 --> 00:05:50,720
+at a disadvantage. In the next few sections, we'll show you how you can define and discover
+
+74
+00:05:50,720 --> 00:05:55,000
+your inputs. Thanks for watching today. You can follow us on LinkedIn or visit us at
+
+75
+00:05:55,000 --> 00:06:00,340
+visit our website, workingbackwards.com, to find more content in our library that's part of this course.
