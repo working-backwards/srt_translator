@@ -1,0 +1,2 @@
+[console_scripts]
+srt-translator = main:batch_translate_srt_files
