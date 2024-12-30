@@ -4,15 +4,15 @@ import os
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Path to the source directory containing .srt files
-SOURCE_DIR = os.path.join(BASE_DIR, 'Original_Captions')
+SOURCE_DIR = os.path.join(BASE_DIR, 'original_captions')
 
 # Path to the output directory for translated .srt files
 OUTPUT_BASE_DIR = os.path.join(BASE_DIR, 'Translated_SRT_Files')
 
+LOG_DIRECTORY = os.path.join(BASE_DIR, 'translation_logs')
+
 print(f"BASE_DIR: {os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))}")
 print(f"SOURCE_DIR: {SOURCE_DIR}")
-
-
 
 # General settings
 SOURCE_LANG = 'EN'  # Default source language

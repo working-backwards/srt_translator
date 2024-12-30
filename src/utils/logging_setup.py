@@ -1,18 +1,17 @@
-# utils/logging_setup.py
-
-import os
 import logging
+import os
 from datetime import datetime
-from srt_translator.config.settings import LOG_MODE
+
+from src.config.settings import LOG_MODE, LOG_DIRECTORY
+
 
 def setup_logging():
     """Configure logging settings for translation issues"""
-    log_dir = 'translation_logs'
-    os.makedirs(log_dir, exist_ok=True)
-    
+    os.makedirs(LOG_DIRECTORY, exist_ok=True)
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = os.path.join(log_dir, f'translation_issues_{timestamp}.log')
-    
+    log_file = os.path.join(LOG_DIRECTORY, f'translation_issues_{timestamp}.log')
+
     class HTTPFilter(logging.Filter):
         def filter(self, record):
             if LOG_MODE == 'Standard':
@@ -22,22 +21,23 @@ def setup_logging():
 
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     console_handler = logging.StreamHandler()
-    
+
     http_filter = HTTPFilter()
     file_handler.addFilter(http_filter)
     console_handler.addFilter(http_filter)
-    
+
     log_format = '%(asctime)s - %(levelname)s - %(message)s'
     formatter = logging.Formatter(log_format)
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
-    
+
     logging.basicConfig(
         level=logging.INFO,
         handlers=[file_handler, console_handler]
     )
-    
+
     return log_file
+
 
 def log_placeholder_issue(issue_type, issue_details):
     """Log placeholder issues with a reason description"""

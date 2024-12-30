@@ -1,10 +1,11 @@
-# main.py
-
 import os
 from datetime import datetime
-from srt_translator.translator.translator import SRTTranslator
-from srt_translator.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, FIX_AGGRESSIVENESS
-from srt_translator.translator.fixer import SRTFixer
+
+from config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
+    FIX_AGGRESSIVENESS, LOG_DIRECTORY
+from translator.fixer import SRTFixer
+from translator.translator import SRTTranslator
+
 
 def batch_translate_srt_files():
     """Batch translate all SRT files in the source directory"""
@@ -13,12 +14,11 @@ def batch_translate_srt_files():
         return
 
     # Ensure translation logs directory exists
-    log_dir = os.path.join(os.path.dirname(OUTPUT_BASE_DIR), "translation_logs")
-    os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(LOG_DIRECTORY, exist_ok=True)
 
     # Create a timestamped log file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(log_dir, f"translation_issues_{timestamp}.log")
+    log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
 
     print(f"Log file created at: {log_file}")
 
@@ -55,6 +55,7 @@ def batch_translate_srt_files():
         fixer.fix_srt_files(aggressiveness=FIX_AGGRESSIVENESS)
 
     fixer.report_status()
+
 
 if __name__ == '__main__':
     batch_translate_srt_files()

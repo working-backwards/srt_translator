@@ -2,7 +2,7 @@ import os
 import re
 from dataclasses import dataclass
 from typing import List
-from datetime import datetime
+
 
 @dataclass
 class PlaceholderIssue:
@@ -12,6 +12,7 @@ class PlaceholderIssue:
     placeholder: str
     original_context: str
     translated_context: str
+
 
 class SRTFixer:
     def __init__(self, log_file: str, translations_dir: str):
@@ -42,8 +43,8 @@ class SRTFixer:
             original_context_match = re.search(r'Original Context: (.+?)(?:\n|$)', entry)
             translated_context_match = re.search(r'Translated Context: (.+?)(?:\n|$)', entry)
 
-            if all([timestamp_match, language_match, original_term_match, 
-                   placeholder_match, original_context_match, translated_context_match]):
+            if all([timestamp_match, language_match, original_term_match,
+                    placeholder_match, original_context_match, translated_context_match]):
                 issue = PlaceholderIssue(
                     timestamp=timestamp_match.group(1),
                     language=language_match.group(1).strip(),
@@ -62,7 +63,7 @@ class SRTFixer:
                 continue
 
             language_issues = [
-                issue for issue in self.issues 
+                issue for issue in self.issues
                 if self._should_fix_issue(issue, aggressiveness)
             ]
 
@@ -94,11 +95,8 @@ class SRTFixer:
 
     def _should_fix_issue(self, issue: PlaceholderIssue, aggressiveness: float) -> bool:
         """Decide if an issue should be fixed based on aggressiveness level"""
-        if aggressiveness >= 0.75 and "does not match its original context" in issue.translated_context:
-            return True
-        if aggressiveness >= 0.5 and "missing" in issue.translated_context:
-            return True
-        return False
+        return ((aggressiveness >= 0.75 and "does not match its original context" in issue.translated_context) or
+                (aggressiveness >= 0.5 and "missing" in issue.translated_context))
 
     def report_status(self):
         print(f"Total issues found: {len(self.issues)}")

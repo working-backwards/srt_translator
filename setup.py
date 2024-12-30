@@ -11,7 +11,7 @@ setup(
     include_package_data=True,  # Include non-Python files specified in MANIFEST.in
     entry_points={
         'console_scripts': [
-            'srt-translator=main:batch_translate_srt_files',  # Optional: Command-line entry point
+            'srt-src=main:batch_translate_srt_files',  # Optional: Command-line entry point
         ],
     },
     description='A tool for batch-translating SRT subtitle files using OpenAI models.',

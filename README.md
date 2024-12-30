@@ -67,7 +67,7 @@ srt_translator/
 1. Clone this repository:
    ```bash
    git clone [repository-url]
-   cd srt-translator
+   cd srt-src
    ```
 
 2. Install required packages:

@@ -1,8 +1,8 @@
-# translator/term_handler.py
-
-import re
 import logging
-from srt_translator.config.settings import EXCLUDED_TERMS
+import re
+
+from src.config.settings import EXCLUDED_TERMS
+
 
 class TermHandler:
     def __init__(self):
@@ -12,19 +12,19 @@ class TermHandler:
         """Replace excluded terms with placeholders"""
         term_map = {}
         placeholder_count = 0
-        
+
         for term in self.excluded_terms:
             pattern = r'\b{}\b'.format(re.escape(term))
-            
+
             def replace_term(match):
                 nonlocal placeholder_count
                 placeholder = f"__EXCLUDED_TERM_{placeholder_count}__"
                 term_map[placeholder] = match.group(0)
                 placeholder_count += 1
                 return placeholder
-            
+
             text = re.sub(pattern, replace_term, text)
-        
+
         return text, term_map
 
     def restore_excluded_terms(self, text, term_map, filename):
@@ -38,7 +38,7 @@ class TermHandler:
                     f"\nPlaceholder: {placeholder}"
                     f"\nOriginal Term: {original_term}"
                     f"\nText: {text}"
-                    f"\n{'='*50}"
+                    f"\n{'=' * 50}"
                 )
             restored_text = restored_text.replace(placeholder, original_term)
         return restored_text
@@ -60,15 +60,15 @@ class TermHandler:
         """Check if contexts are similar in terms of position"""
         orig_words = original_context.split()
         trans_words = translated_context.split()
-        
+
         orig_pos = None
         trans_pos = None
-        
+
         for i, word in enumerate(orig_words):
             if '__EXCLUDED_TERM_' in word:
                 orig_pos = i
                 break
-                
+
         for i, word in enumerate(trans_words):
             if '__EXCLUDED_TERM_' in word:
                 trans_pos = i
@@ -76,12 +76,12 @@ class TermHandler:
 
         if orig_pos is not None and trans_pos is not None:
             if (orig_pos == 0 and trans_pos == len(trans_words) - 1) or \
-               (trans_pos == 0 and orig_pos == len(orig_words) - 1):
+                    (trans_pos == 0 and orig_pos == len(orig_words) - 1):
                 return False
-                
+
             max_allowed_shift = min(3, len(orig_words) // 2)
             position_shift = abs(orig_pos / len(orig_words) - trans_pos / len(trans_words))
-            
+
             return position_shift < (max_allowed_shift / len(orig_words))
-            
+
         return False
