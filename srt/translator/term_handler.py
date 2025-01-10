@@ -1,7 +1,7 @@
 import logging
 import re
 
-from src.config.settings import EXCLUDED_TERMS
+from srt.config.settings import EXCLUDED_TERMS
 
 
 class TermHandler:

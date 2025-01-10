@@ -34,9 +34,10 @@ Currently supports translation to:
 
 ## Project Structure
 ```
-srt_translator/
+srt/
 ├── config/
-│   └── settings.py         # Configuration settings
+│   │── settings.py         # Configuration settings
+│   └── __init__.py
 ├── translator/
 │   ├── fixer.py            # Fixes subtitle errors
 │   ├── srt_parser.py       # Parses .srt files
@@ -67,7 +68,7 @@ srt_translator/
 1. Clone this repository:
    ```bash
    git clone [repository-url]
-   cd srt-src
+   cd srt-translator
    ```
 
 2. Install required packages:
@@ -80,11 +81,22 @@ srt_translator/
    OPENAI_API_KEY=your_api_key_here
    ```
 
-4. Create the necessary directories:
-   ```
-   Original_Captions/
-   Translated_SRT_Files/
-   ```
+---
+
+## Environment Variables
+
+### Required
+1. OPENAI_API_KEY: OpenAI API key.
+2. SOURCE_DIR: Source directory where the input srt files are located.
+3. TARGET_LANGUAGES: A dictionary of target languages. 
+
+### Optional
+1. OUTPUT_BASE_DIR: The location where the application should save the translated srt files, defaults to `Translated_SRT_Files` directory in the project directory.
+2. LOG_DIRECTORY: The location where the translation logs files should be saved, defaults to `translation_logs` directory in the project directory.
+3. EXCLUDED_TERMS: Terms that you want to exclude from translation.
+4. SOURCE_LANG: Source language, defaults to EN
+5. LOG_MODE: Can be 'Standard' or 'Verbose', defaults to standard
+6. AGGRESSIVENESS: Aggressiveness of automatic placeholder fixes (0 to 1 scale), defaults to 0.75 
 
 ---
 
@@ -93,7 +105,7 @@ srt_translator/
 
 2. Run the application:
    ```bash
-   python srt_translator/main.py
+   python run.py
    ```
 
 3. Translated files will be saved in language-specific subdirectories under `Translated_SRT_Files`:
@@ -145,7 +157,6 @@ This project is licensed under the [MIT License](LICENSE).
 ---
 
 ## Notes
-- Uses GPT-3.5-Turbo for translations.
 - API costs vary based on the length and number of subtitles.
 - Translation quality should be reviewed for critical content.
 

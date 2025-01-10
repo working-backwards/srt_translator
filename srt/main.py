@@ -1,10 +1,14 @@
 import os
 from datetime import datetime
 
-from config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
+from dotenv import load_dotenv
+
+from srt.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
     FIX_AGGRESSIVENESS, LOG_DIRECTORY
-from translator.fixer import SRTFixer
-from translator.translator import SRTTranslator
+from srt.translator.fixer import SRTFixer
+from srt.translator.translator import SRTTranslator
+
+load_dotenv()
 
 
 def batch_translate_srt_files():

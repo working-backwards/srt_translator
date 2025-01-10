@@ -5,10 +5,10 @@ import time
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.config.settings import OPENAI_MODEL, LANGUAGE_MAP
-from src.translator.srt_parser import SRTParser
-from src.translator.term_handler import TermHandler
-from src.utils.logging_setup import setup_logging, log_placeholder_issue
+from srt.config.settings import OPENAI_MODEL, LANGUAGE_MAP
+from srt.translator.srt_parser import SRTParser
+from srt.translator.term_handler import TermHandler
+from srt.utils.logging_setup import setup_logging, log_placeholder_issue
 
 
 class SRTTranslator:
