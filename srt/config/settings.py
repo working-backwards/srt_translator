@@ -26,7 +26,7 @@ print(f"SOURCE_DIR: {SOURCE_DIR}")
 SOURCE_LANG = os.environ["SOURCE_LANG"] if "SOURCE_LANG" in os.environ else 'EN'  # Default source language
 LOG_MODE = os.environ["LOG_MODE"] if "LOG_MODE" in os.environ else 'Standard'  # Can be 'Standard' or 'Verbose'
 OPENAI_MODEL = os.environ[
-    "OPENAI_MODEL"] if "OPENAI_MODEL" in os.environ else 'gpt-3.5-turbo'  # OpenAI model to use for translations
+    "OPENAI_MODEL"] if "OPENAI_MODEL" in os.environ else 'gpt-4o-mini'  # OpenAI model to use for translations
 
 # Aggressiveness of automatic placeholder fixes (0 to 1 scale)
 # - 0.0: No automatic fixes, all issues require manual intervention
