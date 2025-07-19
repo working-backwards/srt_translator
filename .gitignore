@@ -4,6 +4,7 @@
 /.idea/
 /Translated_SRT_Files/
 /translation_logs/
+/original_captions/
 /.env
 /.idea/misc.xml
 *.pyc
