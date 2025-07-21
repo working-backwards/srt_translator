@@ -29,8 +29,26 @@ class SRTTranslator:
         self.parser = SRTParser()
 
     def get_translation_prompt(self, source_lang, target_lang):
-        """Get the translation prompt from environment or use built-in default"""
-        # Get custom prompt from .env
+        """Get the translation prompt from external file, environment, or use built-in default"""
+
+        # First try to load from external prompt file
+        prompt_file_path = os.getenv(
+            "TRANSLATION_PROMPT_FILE", "translation_prompt.txt"
+        )
+        if os.path.exists(prompt_file_path):
+            try:
+                with open(prompt_file_path, "r", encoding="utf-8") as f:
+                    custom_prompt = f.read().strip()
+                if custom_prompt:
+                    return custom_prompt.format(
+                        source_lang=source_lang, target_lang=target_lang
+                    )
+            except Exception as e:
+                logging.warning(
+                    f"Error reading prompt file {prompt_file_path}: {e}. Using fallback."
+                )
+
+        # Fall back to environment variable (single line)
         custom_prompt = os.getenv("TRANSLATION_PROMPT")
         if custom_prompt:
             try:
@@ -42,21 +60,21 @@ class SRTTranslator:
                     f"Invalid template variable in TRANSLATION_PROMPT: {e}. Using built-in default."
                 )
 
-        # Built-in fallback if no .env prompt is provided
+        # Built-in fallback if no custom prompt is provided
         return f"""You are a professional translator. Translate the following text from {source_lang} to {target_lang}.
 
-CRITICAL INSTRUCTIONS:
-1. Do NOT create, add, or invent any placeholders like __EXCLUDED_TERM_X__
-2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
-3. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
-4. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
-5. Only translate regular text - never modify or create placeholder patterns
+    CRITICAL INSTRUCTIONS:
+    1. Do NOT create, add, or invent any placeholders like __EXCLUDED_TERM_X__
+    2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
+    3. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
+    4. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
+    5. Only translate regular text - never modify or create placeholder patterns
 
-Example:
-- Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
-- Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
+    Example:
+    - Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
+    - Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
 
-Preserve all formatting and translate naturally."""
+    Preserve all formatting and translate naturally."""
 
     def translate_subtitle(self, text, target_lang, filename, subtitle_number=None):
         """Translate a single subtitle text"""

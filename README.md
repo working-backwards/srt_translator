@@ -106,7 +106,6 @@ TARGET_LANGUAGES={"Spanish": "ES", "French": "FR", "German": "DE", "Japanese": "
 ```
 srt_translator/
 ├── scripts/                    # Utility scripts
-│   ├── debug_log_parser.py    # Debug log file parsing
 │   ├── run_fixer_only.py      # Run placeholder fixer only
 │   └── __init__.py
 ├── srt/                       # Main application package
