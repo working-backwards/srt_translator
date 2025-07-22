@@ -6,7 +6,7 @@ import time
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt.config.settings import LANGUAGE_MAP, OPENAI_MODEL
+from srt.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms
 from srt.translator.srt_parser import SRTParser
 from srt.translator.term_handler import TermHandler
 from srt.utils.logging_setup import log_placeholder_issue, setup_logging
@@ -29,7 +29,11 @@ class SRTTranslator:
         self.parser = SRTParser()
 
     def get_translation_prompt(self, source_lang, target_lang):
-        """Get the translation prompt from external file, environment, or use built-in default"""
+        """Get the translation prompt with injected glossary from external file, environment, or use built-in default"""
+
+        # Get glossary for this language
+        glossary_block = self._format_glossary_block(target_lang)
+        mapped_target_lang = LANGUAGE_MAP.get(target_lang, target_lang)
 
         # First try to load from external prompt file
         prompt_file_path = os.getenv(
@@ -41,7 +45,9 @@ class SRTTranslator:
                     custom_prompt = f.read().strip()
                 if custom_prompt:
                     return custom_prompt.format(
-                        source_lang=source_lang, target_lang=target_lang
+                        source_lang=source_lang,
+                        target_lang=mapped_target_lang,
+                        glossary_block=glossary_block,
                     )
             except Exception as e:
                 logging.warning(
@@ -53,28 +59,50 @@ class SRTTranslator:
         if custom_prompt:
             try:
                 return custom_prompt.format(
-                    source_lang=source_lang, target_lang=target_lang
+                    source_lang=source_lang,
+                    target_lang=mapped_target_lang,
+                    glossary_block=glossary_block,
                 )
             except KeyError as e:
                 logging.warning(
                     f"Invalid template variable in TRANSLATION_PROMPT: {e}. Using built-in default."
                 )
 
-        # Built-in fallback if no custom prompt is provided
+        # Built-in fallback with glossary injection
+        return self._get_builtin_prompt(source_lang, mapped_target_lang, glossary_block)
+
+    def _format_glossary_block(self, target_lang):
+        """Format glossary terms for injection into prompt"""
+        terms = get_glossary_terms(target_lang)
+        if not terms:
+            return "No specific glossary terms - use professional business terminology."
+
+        glossary_lines = [
+            f'- "{english}" → "{translation}"' for english, translation in terms.items()
+        ]
+        return "\n".join(glossary_lines)
+
+    def _get_builtin_prompt(self, source_lang, target_lang, glossary_block):
+        """Built-in fallback prompt with glossary injection"""
         return f"""You are a professional translator. Translate the following text from {source_lang} to {target_lang}.
 
-    CRITICAL INSTRUCTIONS:
-    1. Do NOT create, add, or invent any placeholders like __EXCLUDED_TERM_X__
-    2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
-    3. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
-    4. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
-    5. Only translate regular text - never modify or create placeholder patterns
+IMPORTANT: Use these consistent translations for key business terms:
+{glossary_block}
 
-    Example:
-    - Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
-    - Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
+CRITICAL INSTRUCTIONS:
+1. Do NOT create, add, or invent any placeholders like __EXCLUDED_TERM_X__
+2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
+3. Use the glossary terms above for consistent translation of business concepts
+4. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
+5. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
+6. Only translate regular text - never modify or create placeholder patterns
 
-    Preserve all formatting and translate naturally."""
+Example:
+- Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
+- Input: "The operating plan shows..." → Output: "El plan operativo muestra..." (using glossary)
+- Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
+
+Preserve all formatting and translate naturally."""
 
     def translate_subtitle(self, text, target_lang, filename, subtitle_number=None):
         """Translate a single subtitle text"""
@@ -84,9 +112,7 @@ class SRTTranslator:
             time.sleep(0.5)
             processed_text, term_map = self.term_handler.replace_excluded_terms(text)
 
-            system_prompt = self.get_translation_prompt(
-                self.source_lang, mapped_target_lang
-            )
+            system_prompt = self.get_translation_prompt(self.source_lang, target_lang)
 
             response = self.client.chat.completions.create(
                 model=OPENAI_MODEL,
@@ -105,17 +131,17 @@ class SRTTranslator:
                 if phantom not in term_map:
                     logging.warning(
                         f"""
-        ==================================================
-        PHANTOM PLACEHOLDER DETECTED:
-        File: {filename}
-        Subtitle Number: {subtitle_number}
-        Language: {target_lang}
-        Phantom Placeholder: {phantom}
-        Original Text: {text}
-        Translated Text: {translated_text}
-        Status: AI Hallucination - Remove this placeholder
-        ==================================================
-        """
+==================================================
+PHANTOM PLACEHOLDER DETECTED:
+File: {filename}
+Subtitle Number: {subtitle_number}
+Language: {target_lang}
+Phantom Placeholder: {phantom}
+Original Text: {text}
+Translated Text: {translated_text}
+Status: AI Hallucination - Remove this placeholder
+==================================================
+"""
                     )
 
             placeholder_issues = self._check_placeholder_issues(

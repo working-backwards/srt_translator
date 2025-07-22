@@ -56,37 +56,12 @@ TARGET_LANGUAGES_TEXT = (
     os.environ["TARGET_LANGUAGES"] if "TARGET_LANGUAGES" in os.environ else "{}"
 )
 TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
-# {
-#     'Spanish': 'ES',
-#     # Uncomment additional languages as needed:
-#     # 'French': 'FR',
-#     # 'German': 'DE',
-#     # 'Italian': 'IT',
-#     # 'Azerbaijani': 'AZ',
-#     # 'Turkish': 'TR',
-#     # 'Portuguese - Brazilian': 'PT-BR',
-#     # 'Portuguese - European': 'PT-EU',
-#     # 'Chinese (Simplified)': 'ZH-HANS',
-#     # 'Chinese (Traditional)': 'ZH-HANT',
-#     # 'Arabic': 'AR',
-#     'Japanese': 'JA',
-# }
 
 # Excluded terms that will not be translated
 EXCLUDED_TERMS_TEXT = (
     os.environ["EXCLUDED_TERMS"] if "EXCLUDED_TERMS" in os.environ else ""
 )
 EXCLUDED_TERMS = EXCLUDED_TERMS_TEXT.split(",")
-# [
-#     "Colin",
-#     "Bill",
-#     "Colin Bryar",
-#     "Bill Carr",
-#     "Jeff",
-#     "Jeff Bezos",
-#     "Amazon",
-#     "LinkedIn",
-# ]
 
 # Language mapping for special variants
 LANGUAGE_MAP = {
@@ -95,3 +70,31 @@ LANGUAGE_MAP = {
     "Chinese Simplified": "Simplified Chinese",
     "Chinese Traditional": "Traditional Chinese",
 }
+
+# Business Glossary Support
+BUSINESS_GLOSSARY_PATH = os.path.join(BASE_DIR, "business_glossary.json")
+BUSINESS_GLOSSARY = {}
+
+
+def load_business_glossary():
+    """Load business glossary from JSON file if it exists"""
+    global BUSINESS_GLOSSARY
+    if os.path.exists(BUSINESS_GLOSSARY_PATH):
+        try:
+            with open(BUSINESS_GLOSSARY_PATH, "r", encoding="utf-8") as f:
+                BUSINESS_GLOSSARY = json.load(f)
+            print(f"Loaded business glossary with {len(BUSINESS_GLOSSARY)} languages")
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            print(f"Warning: Could not load business glossary: {e}")
+            BUSINESS_GLOSSARY = {}
+    else:
+        print("No business glossary found - using default translations")
+
+
+# Load glossary on import
+load_business_glossary()
+
+
+def get_glossary_terms(target_lang):
+    """Get glossary terms for a specific language"""
+    return BUSINESS_GLOSSARY.get(target_lang, {})

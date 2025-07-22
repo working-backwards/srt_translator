@@ -62,3 +62,6 @@ Thumbs.db
 .coverage
 htmlcov/
 .tox/
+
+# prompt text files
+translation_prompt.txt
