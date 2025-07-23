@@ -8,10 +8,13 @@ CRITICAL INSTRUCTIONS:
 2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
 3. Use the glossary terms above for consistent translation of business concepts
 4. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
-5. Translate naturally while maintaining professional terminology
+5. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
+6. Only translate regular text - never modify or create placeholder patterns
+7. If you cannot translate, respond ONLY in English with the exact phrase: "I cannot translate because <reason>." Replace <reason> with a clear, specific explanation. Do NOT translate this phrase or provide any other output.
 
 Example:
 - Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
 - Input: "The operating plan shows..." → Output: "El plan operativo muestra..." (using glossary)
+- Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
 
 Preserve all formatting and translate naturally.

@@ -1,7 +1,7 @@
 import logging
 import re
 
-from srt.config.settings import EXCLUDED_TERMS
+from srt_app.config.settings import EXCLUDED_TERMS
 
 
 class TermHandler:
@@ -27,7 +27,7 @@ class TermHandler:
 
         return text, term_map
 
-    def restore_excluded_terms(self, text, term_map, filename):
+    def restore_excluded_terms(self, text, term_map, filename, subtitle_number=None, source_lang=None, target_lang=None):
         """Restore excluded terms from placeholders"""
         restored_text = text
         for placeholder, original_term in term_map.items():
@@ -35,6 +35,9 @@ class TermHandler:
                 logging.error(
                     f"\nTERM RESTORATION FAILED:"
                     f"\nFile: {filename}"
+                    f"\nSubtitle Number: {subtitle_number if subtitle_number is not None else 'Unknown'}"
+                    f"\nSource Language: {source_lang if source_lang is not None else 'Unknown'}"
+                    f"\nTarget Language: {target_lang if target_lang is not None else 'Unknown'}"
                     f"\nPlaceholder: {placeholder}"
                     f"\nOriginal Term: {original_term}"
                     f"\nText: {text}"

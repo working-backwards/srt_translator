@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 
-from srt.config.settings import LOG_DIRECTORY, LOG_MODE
+from srt_app.config.settings import LOG_DIRECTORY, LOG_MODE
 
 
 def setup_logging():

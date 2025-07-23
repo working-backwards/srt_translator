@@ -2,7 +2,7 @@ import os
 import re
 from dataclasses import dataclass
 from typing import List
-from srt.translator.srt_parser import SRTParser
+from srt_app.translator.srt_parser import SRTParser
 import srt
 
 
@@ -128,7 +128,7 @@ class SRTFixer:
     def fix_srt_files(self, aggressiveness: float):
         """Process and fix all SRT files in the translations directory"""
         # Create a mapping from full language names to language codes
-        from srt.config.settings import LANGUAGE_MAP, TARGET_LANGUAGES
+        from srt_app.config.settings import LANGUAGE_MAP, TARGET_LANGUAGES
 
         # Create reverse mapping: "Vietnamese" -> "VI", "Indonesian" -> "ID"
         lang_name_to_code = {}

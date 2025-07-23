@@ -2,15 +2,31 @@ import logging
 import os
 import re
 import time
+import srt
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
-from srt.translator.srt_parser import SRTParser
-from srt.translator.term_handler import TermHandler
-from srt.utils.logging_setup import log_placeholder_issue, setup_logging
+from srt_app.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
+from srt_app.translator.srt_parser import SRTParser
+from srt_app.translator.term_handler import TermHandler
+from srt_app.utils.logging_setup import log_placeholder_issue, setup_logging
 
+
+# Update BAD_RESPONSE_PATTERNS to only check for the new phrase
+BAD_RESPONSE_PATTERNS = [
+    "I cannot translate because"
+]
+
+def contains_bad_response(text, patterns=BAD_RESPONSE_PATTERNS):
+    text_lower = text.lower()
+    return any(pattern.lower() in text_lower for pattern in patterns)
+
+def extract_translation_failure_reason(ai_response):
+    prefix = "I cannot translate because"
+    if ai_response.lower().startswith(prefix.lower()):
+        return ai_response[len(prefix):].strip(" .")
+    return ai_response
 
 class SRTTranslator:
     def __init__(self, source_lang="EN"):
@@ -94,17 +110,28 @@ CRITICAL INSTRUCTIONS:
 2. Only preserve placeholders that are ALREADY in the text (like __EXCLUDED_TERM_0__, __EXCLUDED_TERM_1__)
 3. Use the glossary terms above for consistent translation of business concepts
 4. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written
-5. Do NOT replace normal words like "the", "a", "an", etc. with placeholders
+5. Do NOT replace normal words like 'the', 'a', 'an', etc. with placeholders
 6. Only translate regular text - never modify or create placeholder patterns
 
-Example:
+ERROR REPORTING:
+If you cannot translate the text for ANY reason, respond with EXACTLY this format in English:
+"I cannot translate because [specific reason]"
+
+Examples of when you cannot translate:
+- "I cannot translate because the text contains inappropriate content"
+- "I cannot translate because the text is corrupted or unreadable"
+- "I cannot translate because the text exceeds length limits"
+- "I cannot translate because the text contains technical errors"
+
+NEVER use any other error format. Always explain the specific reason.
+
+Example successful translation:
 - Input: "Hello __EXCLUDED_TERM_0__ world" → Output: "Hola __EXCLUDED_TERM_0__ mundo"
 - Input: "The operating plan shows..." → Output: "El plan operativo muestra..." (using glossary)
-- Input: "Hello the world" → Output: "Hola el mundo" (NOT "Hola __EXCLUDED_TERM_0__ mundo")
 
 Preserve all formatting and translate naturally."""
 
-    def translate_subtitle(self, text, target_lang, filename, subtitle_number=None):
+    def translate_subtitle(self, text, target_lang, filename, subtitle_number=None, summary=None):
         """Translate a single subtitle text"""
         mapped_target_lang = LANGUAGE_MAP.get(target_lang, target_lang)
 
@@ -114,19 +141,77 @@ Preserve all formatting and translate naturally."""
 
             system_prompt = self.get_translation_prompt(self.source_lang, target_lang)
 
-            response = self.client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": processed_text},
-                ],
-                temperature=0.1,  # Lower temperature for more consistent behavior
-            )
+            max_retries = 2
+            retries = 0
+            final_text = ""
+            while retries <= max_retries:
+                response = self.client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": processed_text},
+                    ],
+                    temperature=0.1,  # Lower temperature for more consistent behavior
+                )
+                translated_text = response.choices[0].message.content.strip()
+                final_text = self.term_handler.restore_excluded_terms(
+                    translated_text, term_map, filename, subtitle_number=subtitle_number, source_lang=self.source_lang, target_lang=target_lang
+                )
+                if not contains_bad_response(final_text):
+                    break
+                logging.warning(
+                    f"Translation refused at index {subtitle_number} in file {filename}. "
+                    f"Retrying (attempt {retries + 1}/{max_retries + 1}). "
+                    f"Reason: '{extract_translation_failure_reason(final_text)}'"
+                )
+                retries += 1
+            if contains_bad_response(final_text):
+                failure_reason = extract_translation_failure_reason(final_text)
+                logging.error(f"""
+{'='*80}
+TRANSLATION FAILURE - INSTRUCTOR ACTION NEEDED
+{'='*80}
+SUMMARY: OpenAI refused to translate after {max_retries + 1} attempts
 
-            translated_text = response.choices[0].message.content.strip()
+COPY THIS ENTIRE SECTION TO AN AI CHAT FOR HELP:
+----------------------------------------
+File: {filename}
+Subtitle Number: {subtitle_number}
+Source Language: {self.source_lang}
+Target Language: {target_lang}
+
+ORIGINAL TEXT:
+\"{text}\"
+
+AI REFUSAL MESSAGE:
+\"{final_text}\"
+
+EXTRACTED REASON:
+\"{failure_reason}\"
+
+QUESTION FOR AI CHAT:
+\"I'm translating educational content about business operations. The AI translator
+refused to translate the above subtitle. The original text is educational content
+about Amazon's business practices. Why might the AI refuse this translation and
+how can I modify the text to make it translatable while preserving the educational
+value? Please suggest an alternative wording that would be acceptable.\"
+
+TECHNICAL DETAILS:
+- Translation attempts: {max_retries + 1}
+- Model: {OPENAI_MODEL}
+- Processed text sent to AI: \"{processed_text}\"
+- Full AI response: \"{final_text}\"
+----------------------------------------
+
+RESULT: Subtitle left untranslated to mark failure.
+{'='*80}
+""")
+                if summary is not None and isinstance(summary, dict):
+                    summary["bad_translations"] = summary.get("bad_translations", 0) + 1
+                return final_text  # Keep the AI refusal message in the SRT output
 
             # Check for phantom placeholders (AI hallucinations)
-            phantom_placeholders = re.findall(r"__EXCLUDED_TERM_\d+__", translated_text)
+            phantom_placeholders = re.findall(r"__EXCLUDED_TERM_\d+__", final_text)
             for phantom in phantom_placeholders:
                 if phantom not in term_map:
                     logging.warning(
@@ -138,23 +223,26 @@ Subtitle Number: {subtitle_number}
 Language: {target_lang}
 Phantom Placeholder: {phantom}
 Original Text: {text}
-Translated Text: {translated_text}
+Translated Text: {final_text}
 Status: AI Hallucination - Remove this placeholder
 ==================================================
 """
                     )
 
             placeholder_issues = self._check_placeholder_issues(
-                text, translated_text, term_map, target_lang, filename, subtitle_number
+                text, final_text, term_map, target_lang, filename, subtitle_number
             )
 
             if placeholder_issues:
                 for issue in placeholder_issues:
                     log_placeholder_issue(issue["type"], issue)
 
-            final_text = self.term_handler.restore_excluded_terms(
-                translated_text, term_map, filename
-            )
+            # ADDED: Warn if a non-empty source subtitle becomes empty after translation
+            if text.strip() and not final_text.strip():
+                logging.warning(
+                    f"Subtitle at index {subtitle_number} in file {filename} became empty after translation. "
+                    f"Original: '{text}'"
+                )
 
             return final_text
         except Exception as e:
@@ -237,9 +325,8 @@ Status: AI Hallucination - Remove this placeholder
             return
 
         subtitles = list(srt.sort_and_reindex(subtitles))
-        overlaps = list(srt.find_overlaps(subtitles))
-        if overlaps:
-            logging.warning(f"Overlapping subtitles detected in {input_filepath}.")
+        # Overlap detection removed: srt.find_overlaps is not available in the srt package
+        # If needed, implement custom overlap detection here
 
         batch_size = BATCH_SIZE
         translated_subtitles = []
@@ -249,6 +336,7 @@ Status: AI Hallucination - Remove this placeholder
             batch = subtitles[i:i+batch_size]
             batch_srt = srt.compose(batch)
             translated_batch_srt = self.translate_srt_block(batch_srt, target_lang, filename, i)
+            translated_batch_srt = clean_srt_output(translated_batch_srt)
             try:
                 translated_batch = list(srt.parse(translated_batch_srt))
                 if len(translated_batch) != len(batch):
@@ -294,3 +382,15 @@ Status: AI Hallucination - Remove this placeholder
     def translate_file(self, input_filepath, output_filepath, target_lang):
         """Translate an entire SRT file using batching."""
         return self.batch_translate_file(input_filepath, output_filepath, target_lang)
+
+
+def clean_srt_output(text):
+    """Remove Markdown code fences (``` or ```srt) from model output if present."""
+    text = text.strip()
+    if text.startswith('```srt'):
+        text = text[len('```srt'):].strip()
+    if text.startswith('```'):
+        text = text[len('```'):].strip()
+    if text.endswith('```'):
+        text = text[:-3].strip()
+    return text

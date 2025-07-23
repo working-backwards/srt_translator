@@ -2,13 +2,13 @@ import glob
 import os
 import sys
 
-# Add parent directory to path so we can import srt module
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add parent directory to path so we can import srt_app module
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from dotenv import load_dotenv
 
-from srt.config.settings import FIX_AGGRESSIVENESS, LOG_DIRECTORY, OUTPUT_BASE_DIR
-from srt.translator.fixer import SRTFixer
+from srt_app.config.settings import FIX_AGGRESSIVENESS, LOG_DIRECTORY, OUTPUT_BASE_DIR
+from srt_app.translator.fixer import SRTFixer
 
 load_dotenv()
 
@@ -43,4 +43,11 @@ def run_fixer_only():
 
 
 if __name__ == "__main__":
-    run_fixer_only()
+    fixer = SRTFixer(
+        log_file=os.path.join(LOG_DIRECTORY, "latest_translation_issues.log"),
+        translations_dir=OUTPUT_BASE_DIR
+    )
+    fixer.parse_log_file()
+    if FIX_AGGRESSIVENESS > 0:
+        fixer.fix_srt_files(aggressiveness=FIX_AGGRESSIVENESS)
+    fixer.report_status()
