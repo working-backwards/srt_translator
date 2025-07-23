@@ -2,6 +2,8 @@ import os
 import re
 from dataclasses import dataclass
 from typing import List
+from srt.translator.srt_parser import SRTParser
+import srt
 
 
 @dataclass
@@ -33,6 +35,7 @@ class SRTFixer:
         self.phantoms = []
         self.fixed_count = 0
         self.phantom_fixed_count = 0
+        self.parser = SRTParser()
 
     def parse_log_file(self):
         """Parse the log file and extract placeholder issues and phantom placeholders"""
@@ -181,33 +184,31 @@ class SRTFixer:
     def _fix_srt_file_regular_issues(
         self, file_path: str, issues: List[PlaceholderIssue]
     ):
-        """Fix regular placeholder issues in a single SRT file"""
+        """Fix regular placeholder issues in a single SRT file using srt package"""
         if not issues:
             return
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
+        subtitles = self.parser.parse_file(file_path)
         backup_path = file_path + ".bak"
         if not os.path.exists(backup_path):
             with open(backup_path, "w", encoding="utf-8") as f:
-                f.write(content)
+                f.write(srt.compose(subtitles))
 
-        fixed_content = content
+        changed = False
         for issue in issues:
-            if issue.placeholder in fixed_content:
-                fixed_content = fixed_content.replace(
-                    issue.placeholder, issue.original_term
-                )
-                self.fixed_count += 1
+            for subtitle in subtitles:
+                if issue.placeholder in subtitle.content:
+                    subtitle.content = subtitle.content.replace(issue.placeholder, issue.original_term)
+                    self.fixed_count += 1
+                    changed = True
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(fixed_content)
+        if changed:
+            self.parser.write_file(file_path, subtitles)
 
     def _fix_srt_file_phantoms(
         self, file_path: str, phantoms: List[PhantomPlaceholder], filename: str
     ):
-        """Fix phantom placeholders in a single SRT file"""
+        """Fix phantom placeholders in a single SRT file using srt package"""
         if not phantoms:
             return
 
@@ -218,52 +219,30 @@ class SRTFixer:
             if len(parts) == 2 and parts[1].endswith(".srt"):
                 base_filename = parts[0] + ".srt"
 
-        print(f"    Looking for phantoms in {filename} (base: {base_filename})")
-
         # Filter phantoms for this specific file
         file_phantoms = [p for p in phantoms if p.filename == base_filename]
         if not file_phantoms:
             print(f"    No phantoms found for {base_filename}")
             return
 
-        print(f"    Found {len(file_phantoms)} phantoms to remove")
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
+        subtitles = self.parser.parse_file(file_path)
         backup_path = file_path + ".bak"
         if not os.path.exists(backup_path):
             with open(backup_path, "w", encoding="utf-8") as f:
-                f.write(content)
+                f.write(srt.compose(subtitles))
 
-        fixed_content = content
-        original_length = len(fixed_content)
-
-        # Get unique phantom placeholders to avoid multiple attempts on same placeholder
+        changed = False
         unique_phantoms = set(phantom.phantom_placeholder for phantom in file_phantoms)
+        for subtitle in subtitles:
+            for phantom_placeholder in unique_phantoms:
+                if phantom_placeholder in subtitle.content:
+                    count = subtitle.content.count(phantom_placeholder)
+                    subtitle.content = subtitle.content.replace(phantom_placeholder, "")
+                    self.phantom_fixed_count += count
+                    changed = True
 
-        # Remove each unique placeholder and count actual occurrences removed
-        for phantom_placeholder in unique_phantoms:
-            if phantom_placeholder in fixed_content:
-                # Count how many times this placeholder appears
-                count = fixed_content.count(phantom_placeholder)
-                fixed_content = fixed_content.replace(phantom_placeholder, "")
-                self.phantom_fixed_count += (
-                    count  # Add actual count of occurrences removed
-                )
-                print(
-                    f"    Removed {count} occurrence(s) of {phantom_placeholder} from {filename}"
-                )
-
-        # Only write back if we made changes
-        if fixed_content != content:
-            print(
-                f"    Writing updated content ({original_length} -> {len(fixed_content)} chars)"
-            )
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(fixed_content)
-        else:
-            print(f"    No changes made to {filename}")
+        if changed:
+            self.parser.write_file(file_path, subtitles)
 
     def _should_fix_issue(self, issue: PlaceholderIssue, aggressiveness: float) -> bool:
         """Decide if a regular issue should be fixed based on aggressiveness level"""

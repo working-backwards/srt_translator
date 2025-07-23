@@ -6,7 +6,7 @@ import time
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms
+from srt.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
 from srt.translator.srt_parser import SRTParser
 from srt.translator.term_handler import TermHandler
 from srt.utils.logging_setup import log_placeholder_issue, setup_logging
@@ -227,20 +227,70 @@ Status: AI Hallucination - Remove this placeholder
 
         return issues
 
-    def translate_file(self, input_filepath, output_filepath, target_lang):
-        """Translate an entire SRT file"""
+    def batch_translate_file(self, input_filepath, output_filepath, target_lang):
+        """Translate an entire SRT file in batches for efficiency and context."""
         filename = os.path.basename(input_filepath)
         subtitles = self.parser.parse_file(input_filepath)
 
-        for subtitle in subtitles:
-            subtitle["translated_text"] = self.translate_subtitle(
-                subtitle["text"], target_lang, filename, subtitle["number"]
-            )
+        if not subtitles:
+            logging.warning(f"No subtitles found in {input_filepath}. Skipping translation.")
+            return
 
-        # Ensure the output directory exists
-        if not os.path.exists(os.path.dirname(output_filepath)):
-            os.makedirs(os.path.dirname(output_filepath))
+        subtitles = list(srt.sort_and_reindex(subtitles))
+        overlaps = list(srt.find_overlaps(subtitles))
+        if overlaps:
+            logging.warning(f"Overlapping subtitles detected in {input_filepath}.")
 
-        self.parser.write_file(output_filepath, subtitles)
+        batch_size = BATCH_SIZE
+        translated_subtitles = []
+        total = len(subtitles)
+
+        for i in range(0, total, batch_size):
+            batch = subtitles[i:i+batch_size]
+            batch_srt = srt.compose(batch)
+            translated_batch_srt = self.translate_srt_block(batch_srt, target_lang, filename, i)
+            try:
+                translated_batch = list(srt.parse(translated_batch_srt))
+                if len(translated_batch) != len(batch):
+                    logging.warning(
+                        f"Batch at index {i} returned {len(translated_batch)} subtitles, expected {len(batch)}. Falling back to single translation."
+                    )
+                    for sub in batch:
+                        sub.content = self.translate_subtitle(sub.content, target_lang, filename, sub.index)
+                        translated_subtitles.append(sub)
+                else:
+                    for orig, trans in zip(batch, translated_batch):
+                        orig.content = trans.content
+                        translated_subtitles.append(orig)
+            except Exception as e:
+                logging.error(f"Failed to parse translated SRT batch at index {i}: {e}")
+                for sub in batch:
+                    sub.content = self.translate_subtitle(sub.content, target_lang, filename, sub.index)
+                    translated_subtitles.append(sub)
+
+        self.parser.write_file(output_filepath, translated_subtitles)
         logging.info(f"Translated SRT saved to: {output_filepath}")
         return output_filepath
+
+    def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index):
+        """Translate a block of SRT subtitles as a batch."""
+        prompt = (
+            f"Translate the following SRT subtitles from {self.source_lang} to {target_lang}.\n"
+            "Preserve the SRT structure, numbering, and timestamps exactly. Only translate the subtitle text.\n"
+            "Return the result as a valid SRT block.\n\n"
+            f"{srt_block}"
+        )
+        time.sleep(0.5)  # Respect rate limits
+        response = self.client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": prompt},
+            ],
+            temperature=0.1,
+        )
+        return response.choices[0].message.content.strip()
+
+    # Optionally, update translate_file to call batch_translate_file by default
+    def translate_file(self, input_filepath, output_filepath, target_lang):
+        """Translate an entire SRT file using batching."""
+        return self.batch_translate_file(input_filepath, output_filepath, target_lang)

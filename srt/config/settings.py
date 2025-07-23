@@ -98,3 +98,5 @@ load_business_glossary()
 def get_glossary_terms(target_lang):
     """Get glossary terms for a specific language"""
     return BUSINESS_GLOSSARY.get(target_lang, {})
+
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 5))  # Number of subtitles per translation batch

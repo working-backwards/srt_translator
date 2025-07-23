@@ -1,46 +1,40 @@
 import os
-
+import srt
+from typing import List
 
 class SRTParser:
     @staticmethod
-    def parse_file(filepath):
-        """Parse an SRT file into a list of subtitle entries"""
-        with open(filepath, "r", encoding="utf-8") as file:
-            content = file.read()
-
-        subtitle_blocks = content.strip().split("\n\n")
-        parsed_subtitles = []
-
-        for block in subtitle_blocks:
-            lines = block.split("\n")
-
-            if len(lines) < 3:
+    def parse_file(filepath: str) -> List[srt.Subtitle]:
+        """Parse an SRT file into a list of srt.Subtitle objects."""
+        encodings = ['utf-8', 'utf-16', 'iso-8859-1']
+        for enc in encodings:
+            try:
+                with open(filepath, "r", encoding=enc) as file:
+                    content = file.read()
+                break
+            except UnicodeDecodeError:
                 continue
+            except Exception as e:
+                print(f"Error reading {filepath}: {e}")
+                return []
+        else:
+            print(f"Could not decode {filepath} with supported encodings.")
+            return []
 
-            subtitle_number = lines[0]
-            timestamp = lines[1]
-            subtitle_text = " ".join(lines[2:])
-
-            parsed_subtitles.append(
-                {
-                    "number": subtitle_number,
-                    "timestamp": timestamp,
-                    "text": subtitle_text,
-                }
-            )
-
-        return parsed_subtitles
+        try:
+            subtitles = list(srt.parse(content))
+            return subtitles
+        except Exception as e:
+            print(f"Error parsing SRT content in {filepath}: {e}")
+            return []
 
     @staticmethod
-    def write_file(filepath, subtitles):
-        """Write subtitles to an SRT file"""
+    def write_file(filepath: str, subtitles: List[srt.Subtitle]):
+        """Write a list of srt.Subtitle objects to an SRT file."""
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-        with open(filepath, "w", encoding="utf-8") as file:
-            for subtitle in subtitles:
-                # Clean up the translated text to remove extra line feeds and normalize whitespace
-                cleaned_text = " ".join(subtitle["translated_text"].split())
-
-                file.write(f"{subtitle['number']}\n")
-                file.write(f"{subtitle['timestamp']}\n")
-                file.write(f"{cleaned_text}\n\n")
+        try:
+            srt_content = srt.compose(subtitles)
+            with open(filepath, "w", encoding="utf-8") as file:
+                file.write(srt_content)
+        except Exception as e:
+            print(f"Error writing {filepath}: {e}")
