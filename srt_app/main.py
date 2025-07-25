@@ -2,6 +2,8 @@ import os
 import logging
 from datetime import datetime
 
+logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
+
 from dotenv import load_dotenv
 
 from srt_app.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \

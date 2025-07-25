@@ -41,6 +41,12 @@ def setup_logging():
 
     logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
 
+    # Suppress HTTP request logs from httpx and openai libraries
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+
     return log_file
 
 
