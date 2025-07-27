@@ -30,20 +30,14 @@ class TermHandler:
     def restore_excluded_terms(self, text, term_map, filename, subtitle_number=None, source_lang=None, target_lang=None):
         """Restore excluded terms from placeholders"""
         restored_text = text
+        
+        # Only process placeholders that are actually in the text
         for placeholder, original_term in term_map.items():
-            if placeholder not in restored_text:
-                logging.error(
-                    f"\nTERM RESTORATION FAILED:"
-                    f"\nFile: {filename}"
-                    f"\nSubtitle Number: {subtitle_number if subtitle_number is not None else 'Unknown'}"
-                    f"\nSource Language: {source_lang if source_lang is not None else 'Unknown'}"
-                    f"\nTarget Language: {target_lang if target_lang is not None else 'Unknown'}"
-                    f"\nPlaceholder: {placeholder}"
-                    f"\nOriginal Term: {original_term}"
-                    f"\nText: {text}"
-                    f"\n{'=' * 50}"
-                )
-            restored_text = restored_text.replace(placeholder, original_term)
+            if placeholder in restored_text:
+                restored_text = restored_text.replace(placeholder, original_term)
+            # Silently skip placeholders that weren't used in this text
+            # This is normal behavior - not all excluded terms appear in every subtitle
+        
         return restored_text
 
     def get_context(self, text, term, context_words=2):
