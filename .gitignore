@@ -65,3 +65,8 @@ htmlcov/
 
 # prompt text files
 translation_prompt.txt
+
+# Design documents (temporary)
+design_docs/
+*.design.md
+gui_design*.md
