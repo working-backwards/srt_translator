@@ -1,14 +1,18 @@
-import glob
-import os
-import sys
+#!/usr/bin/env python3
+"""
+Standalone script to run the SRT fixer on existing translated files.
+This script can be run independently to fix issues in already-translated SRT files.
+"""
 
-# Add parent directory to path so we can import srt_app module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import sys
+import os
+# Add parent directory to path so we can import srt_core module
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 
-from srt_app.config.settings import FIX_AGGRESSIVENESS, LOG_DIRECTORY, OUTPUT_BASE_DIR
-from srt_app.translator.fixer import SRTFixer
+from srt_core.config.settings import FIX_AGGRESSIVENESS, LOG_DIRECTORY, OUTPUT_BASE_DIR
+from srt_core.translator.fixer import SRTFixer
 
 load_dotenv()
 

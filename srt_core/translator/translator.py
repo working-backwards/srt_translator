@@ -7,10 +7,10 @@ import srt
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt_app.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
-from srt_app.translator.srt_parser import SRTParser
-from srt_app.translator.term_handler import TermHandler
-from srt_app.utils.logging_setup import log_placeholder_issue, setup_logging
+from srt_core.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
+from srt_core.translator.srt_parser import SRTParser
+from srt_core.translator.term_handler import TermHandler
+from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
 
 
 # Update BAD_RESPONSE_PATTERNS to only check for the new phrase

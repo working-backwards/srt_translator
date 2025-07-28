@@ -6,10 +6,10 @@ logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the wh
 
 from dotenv import load_dotenv
 
-from srt_app.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
+from srt_core.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
     FIX_AGGRESSIVENESS, LOG_DIRECTORY
-from srt_app.translator.fixer import SRTFixer
-from srt_app.translator.translator import SRTTranslator
+from srt_core.translator.fixer import SRTFixer
+from srt_core.translator.translator import SRTTranslator
 
 load_dotenv()
 
@@ -27,7 +27,7 @@ def batch_translate_srt_files():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
 
-    from srt_app.config.settings import BATCH_SIZE
+    from srt_core.config.settings import BATCH_SIZE
     print(f"Log file created at: {log_file}")
     print(f"Translating with batch size: {BATCH_SIZE}")
 

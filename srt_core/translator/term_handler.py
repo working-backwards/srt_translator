@@ -1,7 +1,7 @@
 import logging
 import re
-
-from srt_app.config.settings import EXCLUDED_TERMS
+from typing import List, Dict
+from srt_core.config.settings import EXCLUDED_TERMS
 
 
 class TermHandler:

@@ -1,8 +1,8 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import List
-from srt_app.translator.srt_parser import SRTParser
+from typing import List, Dict, Tuple
+from srt_core.translator.srt_parser import SRTParser
 import srt
 
 
@@ -128,7 +128,7 @@ class SRTFixer:
     def fix_srt_files(self, aggressiveness: float):
         """Process and fix all SRT files in the translations directory"""
         # Create a mapping from full language names to language codes
-        from srt_app.config.settings import LANGUAGE_MAP, TARGET_LANGUAGES
+        from srt_core.config.settings import LANGUAGE_MAP, TARGET_LANGUAGES
 
         # Create reverse mapping: "Vietnamese" -> "VI", "Indonesian" -> "ID"
         lang_name_to_code = {}
@@ -140,9 +140,16 @@ class SRTFixer:
 
         print(f"Language mapping: {lang_name_to_code}")
 
+        # Only process language directories that correspond to TARGET_LANGUAGES
+        target_language_codes = set(TARGET_LANGUAGES.values())
+        
         for lang_dir in os.listdir(self.translations_dir):
             lang_path = os.path.join(self.translations_dir, lang_dir)
             if not os.path.isdir(lang_path):
+                continue
+                
+            # Skip directories that don't correspond to languages being translated in this session
+            if lang_dir not in target_language_codes:
                 continue
 
             print(f"Processing language directory: {lang_dir}")
