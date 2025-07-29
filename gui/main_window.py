@@ -39,6 +39,10 @@ class TranslationWorker(QThread):
     def run(self):
         """Run the translation process"""
         try:
+            # Debug logging
+            logging.info(f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages")
+            self.progress_updated.emit(f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages")
+            
             # Set up environment for translation
             self.prepare_translation_environment()
             
@@ -67,6 +71,8 @@ class TranslationWorker(QThread):
             self.translation_completed.emit(results)
             
         except Exception as e:
+            logging.error(f"Translation error: {str(e)}")
+            self.progress_updated.emit(f"Translation error: {str(e)}")
             self.translation_error.emit(str(e))
     
     def prepare_translation_environment(self):
@@ -124,43 +130,47 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.apply_styles()
     
     def setup_window(self):
-        """Set up window properties"""
+        """Set up window properties according to style guide"""
         self.setWindowTitle("SRT Translator")
-        self.setFixedSize(800, 700)
+        self.setFixedSize(800, 700)  # Fixed size as per style guide
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
         # Removed problematic icon setting - will use default icon
     
     def setup_ui(self):
-        """Set up the user interface"""
+        """Set up the user interface according to style guide"""
         # Create central widget with scroll area
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(10, 10, 10, 10)  # 10px margin from window edges
+        main_layout.setSpacing(20)  # 20px vertical spacing between sections
         
         # Create title bar
         title_bar = self.create_title_bar()
         main_layout.addWidget(title_bar)
         
-        # Create main content container
+        # Create main content container (780px × 620px as per style guide)
         content_container = QFrame()
         content_container.setObjectName("contentContainer")
         content_layout = QVBoxLayout(content_container)
-        content_layout.setContentsMargins(30, 20, 30, 20)
-        content_layout.setSpacing(20)
+        content_layout.setContentsMargins(30, 20, 30, 20)  # 30px from left edge, 20px other margins
+        content_layout.setSpacing(20)  # 20px vertical spacing between sections
         
         # Create sections
         api_section = self.create_api_section()
         file_section = self.create_file_section()
         language_section = self.create_language_section()
+        ai_config_section = self.create_ai_config_section()
         translation_section = self.create_translation_section()
         
         content_layout.addWidget(api_section)
         content_layout.addWidget(file_section)
         content_layout.addWidget(language_section)
+        content_layout.addWidget(ai_config_section)
         content_layout.addWidget(translation_section)
         
         main_layout.addWidget(content_container)
@@ -168,10 +178,10 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.setCentralWidget(scroll_area)
     
     def create_title_bar(self) -> QFrame:
-        """Create the title bar"""
+        """Create the title bar according to style guide"""
         title_bar = QFrame()
         title_bar.setObjectName("titleBar")
-        title_bar.setFixedHeight(60)
+        title_bar.setFixedHeight(60)  # 60px height as per style guide
         
         layout = QHBoxLayout(title_bar)
         layout.setContentsMargins(20, 0, 20, 0)
@@ -184,15 +194,17 @@ class SRTTranslatorMainWindow(QMainWindow):
         return title_bar
     
     def create_api_section(self) -> QGroupBox:
-        """Create the API key section"""
+        """Create the API key section with status bar style"""
         group = QGroupBox("OpenAI API Configuration")
         group.setObjectName("apiSection")
         
         layout = QVBoxLayout(group)
         layout.setSpacing(15)
+        layout.setContentsMargins(15, 15, 15, 15)  # Standard margins for input mode
         
-        # API Key input
-        api_layout = QHBoxLayout()
+        # API Key input (initially visible)
+        self.api_input_widget = QWidget()
+        self.api_input_layout = QHBoxLayout(self.api_input_widget)
         api_label = QLabel("API Key:")
         self.api_key_input = QLineEdit()
         self.api_key_input.setEchoMode(QLineEdit.Password)
@@ -203,16 +215,46 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.test_connection_btn.setObjectName("primaryButton")
         self.test_connection_btn.clicked.connect(self.test_api_connection)
         
-        api_layout.addWidget(api_label)
-        api_layout.addWidget(self.api_key_input)
-        api_layout.addWidget(self.test_connection_btn)
+        self.api_input_layout.addWidget(api_label)
+        self.api_input_layout.addWidget(self.api_key_input)
+        self.api_input_layout.addWidget(self.test_connection_btn)
         
-        # Status label
+        # Status bar (initially hidden)
+        self.api_status_widget = QWidget()
+        self.api_status_widget.setFixedHeight(32)  # Compact height
+        self.api_status_layout = QHBoxLayout(self.api_status_widget)
+        self.api_status_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Status icon
+        self.status_icon = QLabel("✓")
+        self.status_icon.setObjectName("statusIcon")
+        self.status_icon.setFixedSize(20, 20)
+        
+        # Status text
+        self.api_status_text = QLabel("OpenAI API Connected")
+        self.api_status_text.setObjectName("apiStatusText")
+        
+        # Edit button
+        self.edit_key_btn = QPushButton("Edit Key")
+        self.edit_key_btn.setObjectName("secondaryButton")
+        self.edit_key_btn.clicked.connect(self.show_api_input)
+        
+        self.api_status_layout.addWidget(self.status_icon)
+        self.api_status_layout.addWidget(self.api_status_text)
+        self.api_status_layout.addStretch()
+        self.api_status_layout.addWidget(self.edit_key_btn)
+        
+        # Status label (for error messages)
         self.api_status_label = QLabel("")
         self.api_status_label.setObjectName("statusLabel")
         
-        layout.addLayout(api_layout)
+        # Add layouts to main layout
+        layout.addWidget(self.api_input_widget)
+        layout.addWidget(self.api_status_widget)
         layout.addWidget(self.api_status_label)
+        
+        # Initially hide status bar
+        self.api_status_widget.setVisible(False)
         
         return group
     
@@ -242,11 +284,15 @@ class SRTTranslatorMainWindow(QMainWindow):
         button_layout.addWidget(self.select_all_btn)
         button_layout.addWidget(self.clear_all_btn)
         button_layout.addStretch()
+        button_layout.setSpacing(10)  # 10px horizontal gaps as per style guide
         
         # File list
         self.file_list = QListWidget()
         self.file_list.setObjectName("fileList")
         self.file_list.setSelectionMode(QListWidget.MultiSelection)
+        self.file_list.setMinimumHeight(100)  # 100-120px as per style guide
+        self.file_list.setMaximumHeight(120)
+        self.file_list.itemSelectionChanged.connect(self.update_file_count_from_selection)
         
         # File count label
         self.file_count_label = QLabel("No files selected")
@@ -272,6 +318,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         layout.addWidget(popular_label)
         
         popular_grid = QGridLayout()
+        popular_grid.setVerticalSpacing(25)  # 25px between checkbox rows as per style guide
         popular_languages = [
             ("Spanish", "es"), ("French", "fr"), ("German", "de"),
             ("Italian", "it"), ("Portuguese", "pt"), ("Russian", "ru"),
@@ -306,7 +353,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.language_list = QListWidget()
         self.language_list.setObjectName("languageList")
         self.language_list.setSelectionMode(QListWidget.MultiSelection)
-        self.language_list.setMaximumHeight(150)
+        self.language_list.setMinimumHeight(100)  # 100-120px as per style guide
+        self.language_list.setMaximumHeight(120)
         self.language_list.itemSelectionChanged.connect(self.on_language_list_selection_changed)
         
         # Populate full language list
@@ -320,6 +368,77 @@ class SRTTranslatorMainWindow(QMainWindow):
         layout.addWidget(self.language_count_label)
         
         return group
+    
+    def create_ai_config_section(self) -> QGroupBox:
+        """Create the AI Configuration section according to style guide"""
+        group = QGroupBox("AI Configuration")
+        group.setObjectName("aiConfigSection")
+        
+        layout = QVBoxLayout(group)
+        layout.setSpacing(15)
+        
+        # Collapsible section (initially collapsed to 70px height)
+        self.ai_config_expanded = False
+        
+        # Header with toggle button
+        header_layout = QHBoxLayout()
+        header_label = QLabel("AI Terms & Glossary")
+        header_label.setObjectName("subHeaderLabel")
+        
+        self.ai_toggle_btn = QPushButton("▼")
+        self.ai_toggle_btn.setObjectName("secondaryButton")
+        self.ai_toggle_btn.setFixedSize(30, 30)
+        self.ai_toggle_btn.clicked.connect(self.toggle_ai_config)
+        
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
+        header_layout.addWidget(self.ai_toggle_btn)
+        
+        # Content area (initially hidden)
+        self.ai_content = QFrame()
+        self.ai_content.setVisible(False)
+        ai_content_layout = QVBoxLayout(self.ai_content)
+        ai_content_layout.setSpacing(10)
+        
+        # AI-generated terms display
+        terms_label = QLabel("AI-Generated Terms:")
+        self.terms_display = QTextEdit()
+        self.terms_display.setObjectName("aiTermsDisplay")
+        self.terms_display.setReadOnly(True)
+        self.terms_display.setPlaceholderText("AI-generated terms will appear here...")
+        self.terms_display.setMaximumHeight(60)
+        
+        # Glossary display
+        glossary_label = QLabel("Glossary:")
+        self.glossary_display = QTextEdit()
+        self.glossary_display.setObjectName("glossaryDisplay")
+        self.glossary_display.setReadOnly(True)
+        self.glossary_display.setPlaceholderText("Glossary will appear here...")
+        self.glossary_display.setMaximumHeight(60)
+        
+        ai_content_layout.addWidget(terms_label)
+        ai_content_layout.addWidget(self.terms_display)
+        ai_content_layout.addWidget(glossary_label)
+        ai_content_layout.addWidget(self.glossary_display)
+        
+        layout.addLayout(header_layout)
+        layout.addWidget(self.ai_content)
+        
+        return group
+    
+    def toggle_ai_config(self):
+        """Toggle the AI configuration section expansion"""
+        self.ai_config_expanded = not self.ai_config_expanded
+        self.ai_content.setVisible(self.ai_config_expanded)
+        
+        if self.ai_config_expanded:
+            self.ai_toggle_btn.setText("▲")
+            # Expand to 150px height as per style guide
+            self.ai_content.setMaximumHeight(150)
+        else:
+            self.ai_toggle_btn.setText("▼")
+            # Collapse to 70px height as per style guide
+            self.ai_content.setMaximumHeight(70)
     
     def create_translation_section(self) -> QGroupBox:
         """Create the translation section"""
@@ -343,6 +462,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Log output
         self.log_output = QTextEdit()
         self.log_output.setObjectName("logOutput")
+        self.log_output.setMinimumHeight(80)  # Minimum height as per style guide
         self.log_output.setMaximumHeight(200)
         self.log_output.setReadOnly(True)
         self.log_output.setPlaceholderText("Translation progress will appear here...")
@@ -377,29 +497,36 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.language_list.addItem(item)
     
     def apply_styles(self):
-        """Apply the style guide to the application"""
+        """Apply the complete style guide to the application"""
         self.setStyleSheet("""
+            /* Main Window */
             QMainWindow {
                 background-color: #F8FAFC;
             }
             
+            /* Title Bar */
             #titleBar {
                 background-color: #2563EB;
                 border-radius: 0px;
+                height: 60px;
             }
             
             #titleLabel {
                 color: white;
                 font-size: 20px;
                 font-weight: bold;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
+            /* Main Content Container */
             #contentContainer {
-                background-color: white;
+                background-color: #FFFFFF;
                 border-radius: 8px;
                 border: 1px solid #E5E7EB;
+                margin: 10px;
             }
             
+            /* Section Headers */
             QGroupBox {
                 font-size: 16px;
                 font-weight: 600;
@@ -408,32 +535,43 @@ class SRTTranslatorMainWindow(QMainWindow):
                 border-radius: 6px;
                 margin-top: 10px;
                 padding-top: 10px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px 0 5px;
+                color: #1E293B;
+                font-size: 16px;
+                font-weight: 600;
             }
             
+            /* Sub-headers */
             #subHeaderLabel {
                 font-size: 14px;
                 font-weight: 600;
                 color: #374151;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
+            /* Body Text */
             QLabel {
                 color: #374151;
                 font-size: 13px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
+            /* Input Fields */
             #apiKeyInput, #searchInput {
-                background-color: white;
+                background-color: #FFFFFF;
                 border: 1px solid #E5E7EB;
                 border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 13px;
                 height: 40px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: #374151;
             }
             
             #apiKeyInput:focus, #searchInput:focus {
@@ -441,6 +579,12 @@ class SRTTranslatorMainWindow(QMainWindow):
                 outline: none;
             }
             
+            #apiKeyInput::placeholder, #searchInput::placeholder {
+                color: #9CA3AF;
+                font-size: 13px;
+            }
+            
+            /* Primary Buttons */
             #primaryButton, #mainActionButton {
                 background-color: #2563EB;
                 color: white;
@@ -450,6 +594,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 font-size: 13px;
                 font-weight: 500;
                 height: 40px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             #mainActionButton {
@@ -462,6 +607,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                 background-color: #1D4ED8;
             }
             
+            #primaryButton:pressed, #mainActionButton:pressed {
+                background-color: #1E40AF;
+            }
+            
+            /* Secondary Buttons */
             #secondaryButton {
                 background-color: #F3F4F6;
                 color: #374151;
@@ -471,23 +621,34 @@ class SRTTranslatorMainWindow(QMainWindow):
                 font-size: 13px;
                 font-weight: 500;
                 height: 36px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             #secondaryButton:hover {
                 background-color: #E5E7EB;
             }
             
+            #secondaryButton:pressed {
+                background-color: #D1D5DB;
+            }
+            
+            /* File List Areas */
             #fileList, #languageList {
                 background-color: #F9FAFB;
                 border: 1px solid #E5E7EB;
                 border-radius: 6px;
                 padding: 5px;
                 font-size: 13px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: #374151;
+                min-height: 100px;
+                max-height: 120px;
             }
             
             #fileList::item, #languageList::item {
-                padding: 5px;
+                padding: 8px;
                 border-radius: 4px;
+                margin: 2px;
             }
             
             #fileList::item:selected, #languageList::item:selected {
@@ -495,10 +656,16 @@ class SRTTranslatorMainWindow(QMainWindow):
                 color: #1E293B;
             }
             
+            #fileList::item:hover, #languageList::item:hover {
+                background-color: #EFF6FF;
+            }
+            
+            /* Language Checkboxes */
             #languageCheckbox {
                 font-size: 13px;
                 color: #374151;
                 spacing: 8px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             #languageCheckbox::indicator {
@@ -518,11 +685,17 @@ class SRTTranslatorMainWindow(QMainWindow):
                 background-color: #2563EB;
             }
             
+            #languageCheckbox::indicator:hover {
+                border-color: #2563EB;
+            }
+            
+            /* Progress Bar */
             #progressBar {
                 border: 1px solid #E5E7EB;
                 border-radius: 6px;
                 text-align: center;
                 background-color: #F9FAFB;
+                height: 20px;
             }
             
             #progressBar::chunk {
@@ -530,25 +703,94 @@ class SRTTranslatorMainWindow(QMainWindow):
                 border-radius: 5px;
             }
             
+            /* Log Output */
             #logOutput {
                 background-color: #F9FAFB;
                 border: 1px solid #E5E7EB;
                 border-radius: 6px;
                 padding: 10px;
-                font-family: "Consolas", "Monaco", monospace;
+                font-family: "Consolas", "Monaco", "Courier New", monospace;
                 font-size: 12px;
                 color: #374151;
+                min-height: 80px;
             }
             
+            /* Status Labels */
             #statusLabel {
                 font-size: 12px;
                 color: #6B7280;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            }
+            
+            #statusIcon {
+                font-size: 14px;
+                font-weight: bold;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            }
+            
+            #apiStatusText {
+                font-size: 12px;
+                font-weight: 500;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             #fileCountLabel, #languageCountLabel {
                 font-size: 12px;
                 color: #6B7280;
                 font-style: italic;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            }
+            
+            /* AI Configuration Section */
+            #aiConfigSection {
+                background-color: #EFF6FF;
+                border: 1px solid #DBEAFE;
+                border-radius: 6px;
+            }
+            
+            #aiTermsDisplay, #glossaryDisplay {
+                background-color: #FFFFFF;
+                border: 1px solid #E5E7EB;
+                border-radius: 6px;
+                padding: 8px;
+                font-family: "Consolas", "Monaco", "Courier New", monospace;
+                font-size: 12px;
+                color: #374151;
+            }
+            
+            /* Success/Error Colors */
+            .success {
+                color: #065F46;
+            }
+            
+            .error {
+                color: #DC2626;
+            }
+            
+            /* Scroll Areas */
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            
+            QScrollBar:vertical {
+                background-color: #F3F4F6;
+                width: 12px;
+                border-radius: 6px;
+            }
+            
+            QScrollBar::handle:vertical {
+                background-color: #D1D5DB;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            
+            QScrollBar::handle:vertical:hover {
+                background-color: #9CA3AF;
+            }
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
             }
         """)
     
@@ -558,6 +800,30 @@ class SRTTranslatorMainWindow(QMainWindow):
         api_key = self.settings_manager.load_api_key()
         if api_key:
             self.api_key_input.setText(api_key)
+            # Check if the saved API key is valid and show status bar
+            if api_key.startswith("sk-") and len(api_key) > 20:
+                self.api_input_widget.setVisible(False)
+                self.api_status_widget.setVisible(True)
+                self.api_status_label.setVisible(False)
+                
+                # Switch to compact status mode spacing
+                api_section = self.findChild(QGroupBox, "apiSection")
+                if api_section:
+                    layout = api_section.layout()
+                    layout.setSpacing(5)  # Reduced spacing
+                    layout.setContentsMargins(10, 8, 10, 8)  # Reduced margins
+                
+                # Update status icon and text
+                self.status_icon.setText("✓")
+                self.status_icon.setProperty("class", "success")
+                self.api_status_text.setText("OpenAI API Connected")
+                self.api_status_text.setProperty("class", "success")
+                
+                # Apply styling
+                self.status_icon.style().unpolish(self.status_icon)
+                self.status_icon.style().polish(self.status_icon)
+                self.api_status_text.style().unpolish(self.api_status_text)
+                self.api_status_text.style().polish(self.api_status_text)
         
         # Load selected files
         saved_files = self.settings_manager.load_selected_files()
@@ -573,15 +839,36 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.language_checkboxes[code].setChecked(True)
             # Note: List items will be handled by the checkbox logic
         
-        self.update_file_count()
-        self.update_language_count()
+        # Update the target_languages dictionary from UI state
+        self.update_target_languages_from_ui()
+        
+        # Update file count based on visual selection
+        self.update_file_count_from_selection()
+    
+    def show_api_input(self):
+        """Show the API input field when Edit Key is clicked"""
+        self.api_input_widget.setVisible(True)
+        self.api_status_widget.setVisible(False)
+        self.api_status_label.setText("")
+        self.api_status_label.setVisible(False)
+        self.api_key_input.setFocus()
+        
+        # Switch to input mode spacing
+        api_section = self.findChild(QGroupBox, "apiSection")
+        if api_section:
+            layout = api_section.layout()
+            layout.setSpacing(15)
+            layout.setContentsMargins(15, 15, 15, 15)
     
     def test_api_connection(self):
         """Test the OpenAI API connection"""
         api_key = self.api_key_input.text().strip()
         if not api_key:
             self.api_status_label.setText("Please enter an API key")
-            self.api_status_label.setStyleSheet("color: #DC2626;")
+            self.api_status_label.setProperty("class", "error")
+            self.api_status_label.style().unpolish(self.api_status_label)
+            self.api_status_label.style().polish(self.api_status_label)
+            self.api_status_label.setVisible(True)
             return
         
         # Save API key
@@ -589,11 +876,35 @@ class SRTTranslatorMainWindow(QMainWindow):
         
         # Test connection (simplified - just check if key is valid format)
         if api_key.startswith("sk-") and len(api_key) > 20:
-            self.api_status_label.setText("✓ API key format is valid")
-            self.api_status_label.setStyleSheet("color: #065F46;")
+            # Show status bar and hide input
+            self.api_input_widget.setVisible(False)
+            self.api_status_widget.setVisible(True)
+            self.api_status_label.setVisible(False)
+            
+            # Switch to compact status mode spacing
+            api_section = self.findChild(QGroupBox, "apiSection")
+            if api_section:
+                layout = api_section.layout()
+                layout.setSpacing(5)  # Reduced spacing
+                layout.setContentsMargins(10, 8, 10, 8)  # Reduced margins
+            
+            # Update status icon and text
+            self.status_icon.setText("✓")
+            self.status_icon.setProperty("class", "success")
+            self.api_status_text.setText("OpenAI API Connected")
+            self.api_status_text.setProperty("class", "success")
+            
+            # Apply styling
+            self.status_icon.style().unpolish(self.status_icon)
+            self.status_icon.style().polish(self.status_icon)
+            self.api_status_text.style().unpolish(self.api_status_text)
+            self.api_status_text.style().polish(self.api_status_text)
         else:
             self.api_status_label.setText("✗ Invalid API key format")
-            self.api_status_label.setStyleSheet("color: #DC2626;")
+            self.api_status_label.setProperty("class", "error")
+            self.api_status_label.style().unpolish(self.api_status_label)
+            self.api_status_label.style().polish(self.api_status_label)
+            self.api_status_label.setVisible(True)
     
     def browse_files(self):
         """Browse for SRT files"""
@@ -622,7 +933,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.settings_manager.save_last_input_directory(os.path.dirname(selected_files[0]))
             
             logging.info(f"Total selected files: {self.selected_files}")
-            self.update_file_count()
+            self.update_file_count_from_selection()
             self.settings_manager.save_selected_files(self.selected_files)
     
     def add_file_to_list(self, file_path: str):
@@ -640,12 +951,26 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Clear all selected files"""
         self.selected_files.clear()
         self.file_list.clear()
-        self.update_file_count()
+        self.update_file_count_from_selection()
         self.settings_manager.save_selected_files([])
     
     def update_file_count(self):
-        """Update the file count label"""
+        """Update the file count label based on selected_files list"""
         count = len(self.selected_files)
+        if count == 0:
+            self.file_count_label.setText("No files selected")
+        elif count == 1:
+            self.file_count_label.setText("1 file selected")
+        else:
+            self.file_count_label.setText(f"{count} files selected")
+    
+    def update_file_count_from_selection(self):
+        """Update the file count label based on visual selection in list widget"""
+        count = 0
+        for i in range(self.file_list.count()):
+            if self.file_list.item(i).isSelected():
+                count += 1
+        
         if count == 0:
             self.file_count_label.setText("No files selected")
         elif count == 1:
@@ -669,13 +994,16 @@ class SRTTranslatorMainWindow(QMainWindow):
         for code, checkbox in self.language_checkboxes.items():
             if checkbox.isChecked():
                 self.target_languages[checkbox.text()] = code
+                logging.info(f"Added checkbox language: {checkbox.text()} -> {code}")
         
         # Add languages from list selection
         for item in self.language_list.selectedItems():
             name = item.text()
             code = item.data(Qt.UserRole)
             self.target_languages[name] = code
+            logging.info(f"Added list language: {name} -> {code}")
         
+        logging.info(f"Total target languages: {self.target_languages}")
         self.update_language_count()
         self.settings_manager.save_target_languages(self.target_languages)
     
@@ -699,6 +1027,17 @@ class SRTTranslatorMainWindow(QMainWindow):
     
     def start_translation(self):
         """Start the translation process"""
+        # Get currently selected files from the list widget
+        selected_files = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            if item.isSelected():
+                file_path = item.data(Qt.UserRole)
+                selected_files.append(file_path)
+        
+        # Update self.selected_files to match visual selection
+        self.selected_files = selected_files
+        
         # Validate inputs
         if not self.validate_translation_inputs():
             return
@@ -710,8 +1049,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.log_output.clear()
         
         # Start translation worker
+        api_key = self.settings_manager.load_api_key()
         self.translation_worker = TranslationWorker(
-            self.api_key_input.text().strip(),
+            api_key,
             self.selected_files,
             self.target_languages
         )
@@ -724,14 +1064,20 @@ class SRTTranslatorMainWindow(QMainWindow):
     
     def validate_translation_inputs(self) -> bool:
         """Validate translation inputs"""
-        if not self.api_key_input.text().strip():
+        # Get API key from settings manager instead of input field
+        api_key = self.settings_manager.load_api_key()
+        logging.info(f"API key loaded: {'Yes' if api_key else 'No'}")
+        
+        if not api_key:
             QMessageBox.warning(self, "Missing API Key", "Please enter your OpenAI API key.")
             return False
         
+        logging.info(f"Selected files: {len(self.selected_files)}")
         if not self.selected_files:
             QMessageBox.warning(self, "No Files Selected", "Please select at least one SRT file to translate.")
             return False
         
+        logging.info(f"Target languages: {self.target_languages}")
         if not self.target_languages:
             QMessageBox.warning(self, "No Languages Selected", "Please select at least one target language.")
             return False
@@ -791,6 +1137,13 @@ class SRTTranslatorMainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event"""
+        # Stop any running translation thread
+        if self.translation_worker and self.translation_worker.isRunning():
+            self.translation_worker.quit()
+            self.translation_worker.wait(1000)  # Wait up to 1 second
+            if self.translation_worker.isRunning():
+                self.translation_worker.terminate()  # Force terminate if needed
+        
         # Save current settings
         self.settings_manager.save_api_key(self.api_key_input.text().strip())
         self.settings_manager.save_selected_files(self.selected_files)

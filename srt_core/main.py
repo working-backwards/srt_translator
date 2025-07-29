@@ -62,10 +62,10 @@ def translate_srt_files(file_paths=None):
         for lang_name, lang_code in TARGET_LANGUAGES.items():
             summary["total_languages"] += 1
             file_base, file_ext = os.path.splitext(filename)
-            new_filename = f"{file_base} - {lang_code}{file_ext}"
+            new_filename = f"{file_base} - {lang_code.upper()}{file_ext}"  # Convert language code to uppercase for filename
             output_filepath = os.path.join(
                 OUTPUT_BASE_DIR,
-                lang_code,
+                lang_code.upper(),  # Convert language code to uppercase for folder name
                 new_filename
             )
 

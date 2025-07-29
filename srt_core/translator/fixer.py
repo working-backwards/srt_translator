@@ -141,7 +141,7 @@ class SRTFixer:
         print(f"Language mapping: {lang_name_to_code}")
 
         # Only process language directories that correspond to TARGET_LANGUAGES
-        target_language_codes = set(TARGET_LANGUAGES.values())
+        target_language_codes = set(code.upper() for code in TARGET_LANGUAGES.values())
         
         for lang_dir in os.listdir(self.translations_dir):
             lang_path = os.path.join(self.translations_dir, lang_dir)
