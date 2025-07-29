@@ -14,11 +14,24 @@ from srt_core.translator.translator import SRTTranslator
 load_dotenv()
 
 
-def batch_translate_srt_files():
-    """Batch translate all SRT files in the source directory using batching for efficiency and context."""
-    if not os.path.exists(SOURCE_DIR):
-        print(f"Source directory {SOURCE_DIR} does not exist.")
-        return
+def translate_srt_files(file_paths=None):
+    """Translate SRT files. If file_paths is None, process all files in SOURCE_DIR."""
+    if file_paths is None:
+        if not os.path.exists(SOURCE_DIR):
+            print(f"Source directory {SOURCE_DIR} does not exist.")
+            return {
+                "success": False,
+                "total_files": 0,
+                "completed": 0,
+                "failed": 0,
+                "skipped": 0,
+                "error_details": ["Source directory does not exist"]
+            }
+        file_paths = [
+            os.path.join(SOURCE_DIR, f)
+            for f in os.listdir(SOURCE_DIR)
+            if f.endswith('.srt')
+        ]
 
     # Ensure translation logs directory exists
     os.makedirs(LOG_DIRECTORY, exist_ok=True)
@@ -42,37 +55,36 @@ def batch_translate_srt_files():
         "error_details": []
     }
 
-    for filename in os.listdir(SOURCE_DIR):
-        if filename.endswith('.srt'):
-            input_filepath = os.path.join(SOURCE_DIR, filename)
-            summary["total_files"] += 1
+    for input_filepath in file_paths:
+        filename = os.path.basename(input_filepath)
+        summary["total_files"] += 1
 
-            for lang_name, lang_code in TARGET_LANGUAGES.items():
-                summary["total_languages"] += 1
-                file_base, file_ext = os.path.splitext(filename)
-                new_filename = f"{file_base} - {lang_code}{file_ext}"
-                output_filepath = os.path.join(
-                    OUTPUT_BASE_DIR,
-                    lang_code,
-                    new_filename
+        for lang_name, lang_code in TARGET_LANGUAGES.items():
+            summary["total_languages"] += 1
+            file_base, file_ext = os.path.splitext(filename)
+            new_filename = f"{file_base} - {lang_code}{file_ext}"
+            output_filepath = os.path.join(
+                OUTPUT_BASE_DIR,
+                lang_code,
+                new_filename
+            )
+
+            try:
+                result = translator.translate_file(
+                    input_filepath=input_filepath,
+                    output_filepath=output_filepath,
+                    target_lang=lang_name
                 )
-
-                try:
-                    result = translator.translate_file(
-                        input_filepath=input_filepath,
-                        output_filepath=output_filepath,
-                        target_lang=lang_name
-                    )
-                    if result is None:
-                        summary["skipped"] += 1
-                    else:
-                        summary["successes"] += 1
-                except Exception as e:
-                    summary["errors"] += 1
-                    summary["error_details"].append(
-                        f"{filename} ({lang_name}): {e}"
-                    )
-                    print(f"Error translating {filename} to {lang_name}: {e}")
+                if result is None:
+                    summary["skipped"] += 1
+                else:
+                    summary["successes"] += 1
+            except Exception as e:
+                summary["errors"] += 1
+                summary["error_details"].append(
+                    f"{filename} ({lang_name}): {e}"
+                )
+                print(f"Error translating {filename} to {lang_name}: {e}")
 
     # Perform fixes based on the aggressiveness level
     fixer = SRTFixer(log_file, OUTPUT_BASE_DIR)
@@ -96,6 +108,16 @@ def batch_translate_srt_files():
             logging.info(f"  - {detail}")
     logging.info("==========================\n")
 
+    # Return results for GUI integration
+    return {
+        "success": summary["errors"] == 0,
+        "total_files": summary["total_files"],
+        "completed": summary["successes"],
+        "failed": summary["errors"],
+        "skipped": summary["skipped"],
+        "error_details": summary["error_details"]
+    }
+
 
 if __name__ == '__main__':
-    batch_translate_srt_files()
+    translate_srt_files()
