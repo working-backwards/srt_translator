@@ -17,11 +17,12 @@ class TranslationWorker(QThread):
     translation_completed = pyqtSignal(dict)
     translation_error = pyqtSignal(str)
     
-    def __init__(self, api_key: str, selected_files: List[str], target_languages: Dict[str, str]):
+    def __init__(self, api_key: str, selected_files: List[str], target_languages: Dict[str, str], config_manager=None):
         super().__init__()
         self.api_key = api_key
         self.selected_files = selected_files
         self.target_languages = target_languages
+        self.config_manager = config_manager
     
     def run(self):
         """Run the translation process"""
@@ -92,11 +93,99 @@ class TranslationWorker(QThread):
         """Prepare the environment for translation"""
         # Set API key in environment
         os.environ['OPENAI_API_KEY'] = self.api_key
+        
+        # Use AI configuration if available
+        if self.config_manager:
+            self.setup_ai_configuration()
+        
         # The translation function will use the selected files directly.
         logging.info("Using selected files for translation")
         self.progress_updated.emit("Using selected files for translation")
+        
         # Update .env file with target languages
         self.update_env_languages()
+    
+    def setup_ai_configuration(self):
+        """Set up AI-generated configuration for translation"""
+        try:
+            # Get excluded terms from config manager
+            excluded_terms = self.config_manager.get_excluded_terms()
+            if excluded_terms:
+                self.progress_updated.emit(f"Using AI-generated excluded terms: {', '.join(excluded_terms)}")
+                
+                # Update .env file with excluded terms
+                self.update_env_excluded_terms(excluded_terms)
+            
+            # Get business glossary for each target language
+            for language_name in self.target_languages.keys():
+                glossary = self.config_manager.get_business_glossary(language_name)
+                if glossary:
+                    self.progress_updated.emit(f"Using AI-generated business glossary for {language_name}: {len(glossary)} terms")
+                    
+                    # Update business_glossary.json with AI-generated terms
+                    self.update_business_glossary(language_name, glossary)
+            
+        except Exception as e:
+            logging.error(f"Error setting up AI configuration: {e}")
+            self.progress_updated.emit(f"Warning: Could not set up AI configuration: {e}")
+    
+    def update_env_excluded_terms(self, excluded_terms: List[str]):
+        """Update .env file with excluded terms"""
+        env_path = Path(".env")
+        
+        # Read existing .env file
+        lines = []
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                lines = f.readlines()
+        
+        # Update EXCLUDED_TERMS line
+        new_lines = []
+        excluded_terms_str = ", ".join([f'"{term}"' for term in excluded_terms])
+        excluded_terms_line = f'EXCLUDED_TERMS = [{excluded_terms_str}]'
+        
+        found = False
+        for line in lines:
+            if line.startswith('EXCLUDED_TERMS'):
+                new_lines.append(excluded_terms_line + '\n')
+                found = True
+            else:
+                new_lines.append(line)
+        
+        if not found:
+            new_lines.append(excluded_terms_line + '\n')
+        
+        # Write back to .env file
+        with open(env_path, 'w') as f:
+            f.writelines(new_lines)
+    
+    def update_business_glossary(self, language: str, glossary: Dict[str, str]):
+        """Update business_glossary.json with AI-generated terms"""
+        glossary_file = Path("business_glossary.json")
+        
+        # Load existing glossary
+        existing_glossary = {}
+        if glossary_file.exists():
+            try:
+                import json
+                with open(glossary_file, 'r', encoding='utf-8') as f:
+                    existing_glossary = json.load(f)
+            except Exception as e:
+                logging.warning(f"Could not load existing business_glossary.json: {e}")
+        
+        # Update with AI-generated terms
+        if language not in existing_glossary:
+            existing_glossary[language] = {}
+        
+        existing_glossary[language].update(glossary)
+        
+        # Write back to file
+        try:
+            import json
+            with open(glossary_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_glossary, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logging.error(f"Could not write business_glossary.json: {e}")
     
     def update_env_languages(self):
         """Update .env file with selected target languages"""

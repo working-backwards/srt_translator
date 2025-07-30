@@ -1,14 +1,14 @@
 {
   "Spanish": {
     "operating plan": "plan operativo",
-    "business review": "revisión de negocio", 
+    "business review": "revisión de negocio",
     "input metrics": "métricas de entrada",
     "thrash": "confusión"
   },
   "French": {
     "operating plan": "plan opérationnel",
     "business review": "revue d'affaires",
-    "input metrics": "indicateurs d'entrée", 
+    "input metrics": "indicateurs d'entrée",
     "thrash": "agitation"
   },
   "German": {
@@ -25,7 +25,7 @@
   },
   "Japanese": {
     "operating plan": "運営計画",
-    "annual planning": "年間計画", 
+    "annual planning": "年間計画",
     "input metrics": "入力指標",
     "thrash": "混乱"
   },
@@ -62,12 +62,12 @@
   "Turkish": {
     "operating plan": "işletme planı",
     "annual planning": "yıllık planlama",
-    "input metrics": "girdi metrikleri", 
+    "input metrics": "girdi metrikleri",
     "resource allocation": "kaynak tahsisi"
   },
   "Azerbaijani": {
     "operating plan": "əməliyyat planı",
-    "annual planning": "illik planlaşdırma", 
+    "annual planning": "illik planlaşdırma",
     "input metrics": "giriş göstəriciləri",
     "resource allocation": "resurs bölgüsü"
   }

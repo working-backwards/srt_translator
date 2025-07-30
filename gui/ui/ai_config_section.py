@@ -5,7 +5,8 @@ Handles AI-powered configuration generation and display
 
 from PySide6.QtWidgets import (
     QGroupBox, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextEdit, QFrame
+    QLabel, QPushButton, QTextEdit, QFrame,
+    QProgressBar
 )
 from PySide6.QtCore import Qt
 
@@ -44,6 +45,16 @@ class AIConfigSection(QGroupBox):
         ai_content_layout = QVBoxLayout(self.ai_content)
         ai_content_layout.setSpacing(10)
         
+        # Generate Configuration button
+        self.generate_btn = QPushButton("Generate Configuration")
+        self.generate_btn.setObjectName("primaryButton")
+        self.generate_btn.setEnabled(False)  # Will be enabled when files are selected
+        
+        # Progress bar (initially hidden)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        
         # AI-generated terms display
         terms_label = QLabel("AI-Generated Terms:")
         self.terms_display = QTextEdit()
@@ -60,6 +71,8 @@ class AIConfigSection(QGroupBox):
         self.glossary_display.setPlaceholderText("Glossary will appear here...")
         self.glossary_display.setMaximumHeight(60)
         
+        ai_content_layout.addWidget(self.generate_btn)
+        ai_content_layout.addWidget(self.progress_bar)
         ai_content_layout.addWidget(terms_label)
         ai_content_layout.addWidget(self.terms_display)
         ai_content_layout.addWidget(glossary_label)
@@ -68,9 +81,10 @@ class AIConfigSection(QGroupBox):
         layout.addLayout(header_layout)
         layout.addWidget(self.ai_content)
     
-    def connect_signals(self, toggle_callback):
+    def connect_signals(self, toggle_callback, generate_callback):
         """Connect button signals to callbacks"""
         self.ai_toggle_btn.clicked.connect(toggle_callback)
+        self.generate_btn.clicked.connect(generate_callback)
     
     def toggle_expansion(self):
         """Toggle the AI configuration section expansion"""
@@ -97,4 +111,35 @@ class AIConfigSection(QGroupBox):
     def clear_displays(self):
         """Clear both terms and glossary displays"""
         self.terms_display.clear()
-        self.glossary_display.clear() 
+        self.glossary_display.clear()
+    
+    def set_generate_button_enabled(self, enabled: bool):
+        """Enable or disable the generate configuration button"""
+        self.generate_btn.setEnabled(enabled)
+    
+    def show_progress(self, show: bool):
+        """Show or hide the progress bar"""
+        self.progress_bar.setVisible(show)
+        self.generate_btn.setEnabled(not show)
+    
+    def update_terms_display(self, terms: list):
+        """Update the terms display with a list of terms"""
+        if terms:
+            terms_text = ", ".join(terms)
+            self.terms_display.setText(terms_text)
+        else:
+            self.terms_display.setText("No terms generated")
+    
+    def update_glossary_display(self, glossary: dict):
+        """Update the glossary display with glossary data"""
+        if glossary:
+            # Show a summary of the glossary
+            total_terms = sum(len(lang_glossary) for lang_glossary in glossary.values())
+            languages = list(glossary.keys())
+            summary = f"Generated for {len(languages)} languages: {', '.join(languages[:3])}"
+            if len(languages) > 3:
+                summary += f" (+{len(languages) - 3} more)"
+            summary += f"\nTotal terms: {total_terms}"
+            self.glossary_display.setText(summary)
+        else:
+            self.glossary_display.setText("No glossary generated") 

@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from .settings_manager import SettingsManager
+from .config_manager import GUIConfigManager
+from .ai_config import AIConfigGenerator
 from .workers.translation_worker import TranslationWorker
 from .styles.main_styles import MAIN_STYLESHEET
 from .ui.api_section import APISection
@@ -32,6 +34,8 @@ class SRTTranslatorMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.settings_manager = SettingsManager()
+        self.config_manager = GUIConfigManager(self.settings_manager)
+        self.ai_config_generator = None
         self.translation_worker = None
         
         self.setup_window()
@@ -128,7 +132,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         
         # AI Config Section signals
         self.ai_config_section.connect_signals(
-            self.toggle_ai_config
+            self.toggle_ai_config,
+            self.generate_ai_configuration
         )
         
         # Translation Section signals
@@ -210,6 +215,10 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Handle file selection changes"""
         self.file_section.update_file_count_from_selection()
         self.file_section.sync_selection_with_visual()
+        
+        # Enable/disable AI config generation based on file selection
+        selected_files = self.file_section.get_selected_files()
+        self.ai_config_section.set_generate_button_enabled(len(selected_files) > 0)
     
     # Language Section Handlers
     def on_language_toggled(self):
@@ -228,6 +237,114 @@ class SRTTranslatorMainWindow(QMainWindow):
     def toggle_ai_config(self):
         """Toggle the AI configuration section expansion"""
         self.ai_config_section.toggle_expansion()
+    
+    def generate_ai_configuration(self):
+        """Generate AI configuration for the selected files"""
+        # Get selected files and target languages
+        selected_files = self.file_section.get_selected_files()
+        target_languages = self.language_section.get_target_languages()
+        api_key = self.settings_manager.load_api_key()
+        
+        # Validate inputs
+        if not selected_files:
+            show_validation_error(self, "No Files Selected", "Please select SRT files for AI analysis.")
+            return
+        
+        if not api_key:
+            show_validation_error(self, "No API Key", "Please enter an OpenAI API key to generate AI configuration.")
+            return
+        
+        if not target_languages:
+            show_validation_error(self, "No Target Languages", "Please select at least one target language.")
+            return
+        
+        # Initialize AI config generator if not already done
+        if not self.ai_config_generator:
+            self.ai_config_generator = AIConfigGenerator(api_key)
+        
+        # Show progress and disable button
+        self.ai_config_section.show_progress(True)
+        
+        # Start AI configuration generation in a separate thread
+        from PySide6.QtCore import QThread, Signal, QObject
+        
+        class AIConfigWorker(QObject):
+            finished = Signal(tuple)  # (excluded_terms, business_glossary)
+            error = Signal(str)
+            
+            def __init__(self, ai_generator, files, languages):
+                super().__init__()
+                self.ai_generator = ai_generator
+                self.files = files
+                self.languages = languages
+            
+            def run(self):
+                try:
+                    # Extract content from SRT files
+                    content = self.ai_generator.extract_subtitle_content(self.files)
+                    
+                    # Generate excluded terms
+                    excluded_terms = self.ai_generator.generate_excluded_terms(content)
+                    
+                    # Generate business glossary
+                    business_glossary = self.ai_generator.generate_business_glossary(content, self.languages)
+                    
+                    self.finished.emit((excluded_terms, business_glossary))
+                    
+                except Exception as e:
+                    self.error.emit(str(e))
+        
+        # Create and start worker thread
+        self.ai_config_thread = QThread()
+        self.ai_config_worker = AIConfigWorker(self.ai_config_generator, selected_files, list(target_languages.keys()))
+        self.ai_config_worker.moveToThread(self.ai_config_thread)
+        
+        self.ai_config_thread.started.connect(self.ai_config_worker.run)
+        self.ai_config_worker.finished.connect(self.ai_config_generation_finished)
+        self.ai_config_worker.error.connect(self.ai_config_generation_error)
+        self.ai_config_worker.finished.connect(self.ai_config_thread.quit)
+        self.ai_config_worker.error.connect(self.ai_config_thread.quit)
+        
+        self.ai_config_thread.start()
+    
+    def ai_config_generation_finished(self, result):
+        """Handle AI configuration generation completion"""
+        excluded_terms, business_glossary = result
+        
+        # Hide progress
+        self.ai_config_section.show_progress(False)
+        
+        # Save AI configuration
+        self.settings_manager.save_ai_config(excluded_terms, business_glossary)
+        
+        # Update displays
+        self.ai_config_section.update_terms_display(excluded_terms)
+        self.ai_config_section.update_glossary_display(business_glossary)
+        
+        # Show success message
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self,
+            "AI Configuration Generated",
+            f"Successfully generated AI configuration:\n"
+            f"• {len(excluded_terms)} excluded terms\n"
+            f"• Business glossary for {len(business_glossary)} languages\n\n"
+            f"The configuration will be used automatically for translation."
+        )
+    
+    def ai_config_generation_error(self, error_message):
+        """Handle AI configuration generation error"""
+        # Hide progress
+        self.ai_config_section.show_progress(False)
+        
+        # Show error message
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.warning(
+            self,
+            "AI Configuration Failed",
+            f"Failed to generate AI configuration:\n{error_message}\n\n"
+            f"The system will fall back to manual configuration or defaults."
+        )
     
     # Translation Section Handlers
     def start_translation(self):
@@ -257,7 +374,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker = TranslationWorker(
             api_key,
             selected_files,
-            target_languages
+            target_languages,
+            self.config_manager
         )
         
         self.translation_worker.progress_updated.connect(self.translation_section.update_log_output)
