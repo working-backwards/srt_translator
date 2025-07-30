@@ -54,6 +54,9 @@ def translate_srt_files(file_paths=None):
         "errors": 0,
         "error_details": []
     }
+    
+    # Track which files were actually translated in this session
+    translated_files = []
 
     for input_filepath in file_paths:
         filename = os.path.basename(input_filepath)
@@ -79,6 +82,8 @@ def translate_srt_files(file_paths=None):
                     summary["skipped"] += 1
                 else:
                     summary["successes"] += 1
+                    # Track successfully translated files
+                    translated_files.append(output_filepath)
             except Exception as e:
                 summary["errors"] += 1
                 summary["error_details"].append(
@@ -86,12 +91,13 @@ def translate_srt_files(file_paths=None):
                 )
                 print(f"Error translating {filename} to {lang_name}: {e}")
 
-    # Perform fixes based on the aggressiveness level
+    # Perform fixes only on files that were translated in this session
     fixer = SRTFixer(log_file, OUTPUT_BASE_DIR)
     fixer.parse_log_file()
 
-    if FIX_AGGRESSIVENESS > 0:
-        fixer.fix_srt_files(aggressiveness=FIX_AGGRESSIVENESS)
+    if FIX_AGGRESSIVENESS > 0 and translated_files:
+        # Only fix files that were actually translated in this session
+        fixer.fix_specific_srt_files(translated_files, aggressiveness=FIX_AGGRESSIVENESS)
 
     fixer.report_status()
 

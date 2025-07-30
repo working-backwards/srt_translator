@@ -188,6 +188,58 @@ class SRTFixer:
                 # Fix phantom placeholders (always)
                 self._fix_srt_file_phantoms(file_path, language_phantoms, filename)
 
+    def fix_specific_srt_files(self, file_paths: List[str], aggressiveness: float):
+        """Process and fix only the specified SRT files"""
+        # Create a mapping from full language names to language codes
+        from srt_core.config.settings import LANGUAGE_MAP, TARGET_LANGUAGES
+
+        # Create reverse mapping: "Vietnamese" -> "VI", "Indonesian" -> "ID"
+        lang_name_to_code = {}
+        for lang_name, lang_code in TARGET_LANGUAGES.items():
+            lang_name_to_code[lang_name] = lang_code
+            # Also handle LANGUAGE_MAP entries
+            mapped_name = LANGUAGE_MAP.get(lang_name, lang_name)
+            lang_name_to_code[mapped_name] = lang_code
+
+        print(f"Language mapping: {lang_name_to_code}")
+
+        # Process only the specified files
+        for file_path in file_paths:
+            if not os.path.exists(file_path):
+                print(f"File not found: {file_path}")
+                continue
+                
+            # Extract language directory and filename from the full path
+            lang_dir = os.path.basename(os.path.dirname(file_path))
+            filename = os.path.basename(file_path)
+            
+            print(f"Processing specific file: {filename} in {lang_dir}")
+
+            # Get regular issues for this language that should be fixed based on aggressiveness
+            language_issues = [
+                issue
+                for issue in self.issues
+                if lang_name_to_code.get(issue.language, issue.language) == lang_dir
+                and self._should_fix_issue(issue, aggressiveness)
+            ]
+
+            # Get all phantom placeholders for this language (always fix these)
+            # Match both by language code (VI) and full name (Vietnamese)
+            language_phantoms = [
+                phantom
+                for phantom in self.phantoms
+                if lang_name_to_code.get(phantom.language, phantom.language) == lang_dir
+                or phantom.language == lang_dir
+            ]
+
+            print(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
+
+            # Fix regular issues
+            self._fix_srt_file_regular_issues(file_path, language_issues)
+
+            # Fix phantom placeholders (always)
+            self._fix_srt_file_phantoms(file_path, language_phantoms, filename)
+
     def _fix_srt_file_regular_issues(
         self, file_path: str, issues: List[PlaceholderIssue]
     ):
