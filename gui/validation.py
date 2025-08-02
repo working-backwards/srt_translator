@@ -43,28 +43,28 @@ class ConfigurationValidator:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def validate_excluded_terms(
-        self, excluded_terms: List[str], source_files: List[str]
+    def validate_dnt_terms(
+        self, dnt_terms: List[str], source_files: List[str]
     ) -> ValidationResult:
-        """Validate that excluded terms actually exist in the source files."""
+        """Validate that DNT terms actually exist in the source files."""
         issues = []
         suggestions = []
         valid_terms = 0
-        total_terms = len(excluded_terms)
+        total_terms = len(dnt_terms)
 
         if total_terms == 0:
             return ValidationResult(
                 is_valid=True,
                 score=1.0,
-                issues=["No excluded terms to validate"],
+                issues=["No DNT terms to validate"],
                 suggestions=[
-                    "Consider adding some excluded terms for better translation control"
+                    "Consider adding some DNT terms for better translation control"
                 ],
                 confidence=0.5,
             )
 
         # Check each term
-        for term in excluded_terms:
+        for term in dnt_terms:
             term_found = False
             for file_path in source_files:
                 try:
@@ -175,39 +175,107 @@ class ConfigurationValidator:
             confidence=confidence,
         )
 
+    def validate_dnt_terms(
+        self, dnt_terms: List[str], source_files: List[str]
+    ) -> ValidationResult:
+        """
+        Validate that DNT terms exist in source files
+
+        Args:
+            dnt_terms: List of DNT terms to validate
+            source_files: List of source file paths
+
+        Returns:
+            ValidationResult with validation status and issues
+        """
+        if not dnt_terms:
+            return ValidationResult(
+                is_valid=True,
+                score=1.0,
+                issues=["No DNT terms to validate"],
+                suggestions=[
+                    "Consider adding some DNT terms for better translation control"
+                ],
+                confidence=0.5,
+            )
+
+        total_terms = len(dnt_terms)
+        found_terms = []
+        missing_terms = []
+
+        # Read all source files
+        all_content = ""
+        for file_path in source_files:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    all_content += f.read() + " "
+            except Exception as e:
+                self.logger.warning(f"Could not read file {file_path}: {e}")
+
+        # Check each term
+        for term in dnt_terms:
+            if term in all_content:
+                found_terms.append(term)
+            else:
+                missing_terms.append(term)
+
+        # Calculate confidence based on found vs missing terms
+        if total_terms == 0:
+            confidence = 1.0
+        else:
+            confidence = len(found_terms) / total_terms
+
+        # Generate issues
+        issues = []
+        if missing_terms:
+            issues.append(
+                f"Missing DNT terms in source files: {', '.join(missing_terms)}"
+            )
+
+        if not found_terms and total_terms > 0:
+            issues.append("No DNT terms found in any source files")
+
+        return ValidationResult(
+            is_valid=len(missing_terms) == 0,
+            score=confidence,
+            issues=issues,
+            suggestions=["Consider adding some DNT terms for better translation control"],
+            confidence=confidence,
+        )
+
     def calculate_confidence_score(
-        self, excluded_terms_result: ValidationResult, glossary_result: ValidationResult
+        self, dnt_terms_result: ValidationResult, glossary_result: ValidationResult
     ) -> float:
         """Calculate overall confidence score for the configuration."""
-        # Weight the scores (excluded terms are more important)
-        excluded_weight = 0.6
+        # Weight the scores (DNT terms are more important)
+        dnt_weight = 0.6
         glossary_weight = 0.4
 
         weighted_score = (
-            excluded_terms_result.confidence * excluded_weight
+            dnt_terms_result.confidence * dnt_weight
             + glossary_result.confidence * glossary_weight
         )
 
         return min(weighted_score, 1.0)
 
     def validate_configuration_quality(
-        self, excluded_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
     ) -> ValidationResult:
         """Validate overall configuration quality."""
         issues = []
         suggestions = []
 
         # Check for reasonable number of terms
-        if len(excluded_terms) > 50:
+        if len(dnt_terms) > 50:
             issues.append(
-                "Too many excluded terms (50+) may impact translation quality"
+                "Too many DNT terms (50+) may impact translation quality"
             )
             suggestions.append(
-                "Consider reducing excluded terms to the most important ones"
+                "Consider reducing DNT terms to the most important ones"
             )
 
-        if len(excluded_terms) < 3:
-            issues.append("Very few excluded terms may not provide enough control")
+        if len(dnt_terms) < 3:
+            issues.append("Very few DNT terms may not provide enough control")
             suggestions.append(
                 "Consider adding more important terms to exclude from translation"
             )
@@ -219,7 +287,7 @@ class ConfigurationValidator:
             suggestions.append("Consider focusing on the most important business terms")
 
         # Check for common patterns
-        for term in excluded_terms:
+        for term in dnt_terms:
             if len(term) < 2:
                 issues.append(f"Very short term '{term}' may cause over-exclusion")
                 suggestions.append(
@@ -228,9 +296,9 @@ class ConfigurationValidator:
 
         # Calculate quality score
         quality_score = 1.0
-        if len(excluded_terms) > 50:
+        if len(dnt_terms) > 50:
             quality_score -= 0.3
-        if len(excluded_terms) < 3:
+        if len(dnt_terms) < 3:
             quality_score -= 0.2
         if total_glossary_terms > 100:
             quality_score -= 0.2
@@ -247,29 +315,29 @@ class ConfigurationValidator:
 
     def get_validation_summary(
         self,
-        excluded_terms: List[str],
+        dnt_terms: List[str],
         business_glossary: Dict[str, Dict[str, str]],
         source_files: List[str],
     ) -> Dict[str, any]:
         """Get comprehensive validation summary."""
 
         # Run all validations
-        excluded_validation = self.validate_excluded_terms(excluded_terms, source_files)
+        dnt_validation = self.validate_dnt_terms(dnt_terms, source_files)
         glossary_validation = self.validate_business_glossary(
             business_glossary, source_files
         )
         quality_validation = self.validate_configuration_quality(
-            excluded_terms, business_glossary
+            dnt_terms, business_glossary
         )
 
         # Calculate overall confidence
         overall_confidence = self.calculate_confidence_score(
-            excluded_validation, glossary_validation
+            dnt_validation, glossary_validation
         )
 
         # Determine overall status
         all_valid = (
-            excluded_validation.is_valid
+            dnt_validation.is_valid
             and glossary_validation.is_valid
             and quality_validation.is_valid
         )
@@ -277,12 +345,12 @@ class ConfigurationValidator:
         return {
             "overall_valid": all_valid,
             "overall_confidence": overall_confidence,
-            "excluded_terms": {
-                "valid": excluded_validation.is_valid,
-                "score": excluded_validation.score,
-                "confidence": excluded_validation.confidence,
-                "issues": excluded_validation.issues,
-                "suggestions": excluded_validation.suggestions,
+            "dnt_terms": {
+                "valid": dnt_validation.is_valid,
+                "score": dnt_validation.score,
+                "confidence": dnt_validation.confidence,
+                "issues": dnt_validation.issues,
+                "suggestions": dnt_validation.suggestions,
             },
             "business_glossary": {
                 "valid": glossary_validation.is_valid,
@@ -299,7 +367,7 @@ class ConfigurationValidator:
                 "suggestions": quality_validation.suggestions,
             },
             "statistics": {
-                "excluded_terms_count": len(excluded_terms),
+                "dnt_terms_count": len(dnt_terms),
                 "glossary_languages": len(business_glossary),
                 "total_glossary_terms": sum(
                     len(terms) for terms in business_glossary.values()

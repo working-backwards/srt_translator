@@ -114,10 +114,10 @@ BUSINESS TERMINOLOGY: When you see these specific business terms, use these tran
 {glossary_block}
 
 PLACEHOLDER RULES:
-1. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
+1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
 2. Do NOT create any new placeholders
 3. Do NOT replace normal words with placeholders
-4. CRITICAL: Placeholders like __EXCLUDED_TERM_0__ must appear in your translation exactly as __EXCLUDED_TERM_0__
+4. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your translation exactly as __DNT_TERM_0__
 
 TRANSLATION APPROACH:
 - Translate ALL text naturally and completely
@@ -131,7 +131,7 @@ Only refuse translation if the text is genuinely untranslatable (corrupted, inap
 If you cannot translate, respond EXACTLY: "I cannot translate because [specific reason]"
 
 Examples:
-- "Hello __EXCLUDED_TERM_0__ world" → "你好 __EXCLUDED_TERM_0__ 世界"
+- "Hello __DNT_TERM_0__ world" → "你好 __DNT_TERM_0__ 世界"
 - "The operating plan shows results" → "运营计划显示结果" (using glossary)
 - "They met at the time" → "他们当时见面了" (normal translation)
 
@@ -155,10 +155,10 @@ SRT TRANSLATION RULES:
 5. Do not skip or omit any subtitle content unless it is genuinely untranslatable
 
 PLACEHOLDER RULES:
-1. If you see __EXCLUDED_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
+1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
 2. Do NOT create any new placeholders
 3. Do NOT replace normal words with placeholders
-4. CRITICAL: Placeholders like __EXCLUDED_TERM_0__ must appear in your translation exactly as __EXCLUDED_TERM_0__
+4. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your translation exactly as __DNT_TERM_0__
 
 ERROR HANDLING:
 Only refuse if content is genuinely untranslatable. Otherwise, translate everything.
@@ -175,7 +175,7 @@ Return a complete, valid SRT block with all content translated. Do not change su
 
         try:
             time.sleep(0.5)
-            processed_text, term_map = self.term_handler.replace_excluded_terms(text)
+            processed_text, term_map = self.term_handler.replace_dnt_terms(text)
 
             system_prompt = self.get_translation_prompt(self.source_lang, target_lang)
 
@@ -192,7 +192,7 @@ Return a complete, valid SRT block with all content translated. Do not change su
                     temperature=0.1,  # Lower temperature for more consistent behavior
                 )
                 translated_text = response.choices[0].message.content.strip()
-                final_text = self.term_handler.restore_excluded_terms(
+                final_text = self.term_handler.restore_dnt_terms(
                     translated_text,
                     term_map,
                     filename,
@@ -260,7 +260,7 @@ RESULT: Subtitle left untranslated to mark failure.
                 return final_text  # Keep the AI refusal message in the SRT output
 
             # Check for phantom placeholders (AI hallucinations)
-            phantom_placeholders = re.findall(r"__EXCLUDED_TERM_\d+__", final_text)
+            phantom_placeholders = re.findall(r"__DNT_TERM_\d+__", final_text)
             for phantom in phantom_placeholders:
                 if phantom not in term_map:
                     logging.warning(
@@ -421,7 +421,7 @@ Status: AI Hallucination - Remove this placeholder
 
             # Check for phantom placeholders in batch translation
             phantom_placeholders = re.findall(
-                r"__EXCLUDED_TERM_\d+__", translated_batch_srt
+                r"__DNT_TERM_\d+__", translated_batch_srt
             )
             batch_term_map = getattr(self, "_last_batch_term_map", {})
             for phantom in phantom_placeholders:
@@ -478,8 +478,8 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 
     def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index):
         """Translate a block of SRT subtitles as a batch."""
-        # Process excluded terms for the entire SRT block
-        processed_srt_block, term_map = self.term_handler.replace_excluded_terms(
+        # Process DNT terms for the entire SRT block
+        processed_srt_block, term_map = self.term_handler.replace_dnt_terms(
             srt_block
         )
 
@@ -500,8 +500,8 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 
         translated_srt = response.choices[0].message.content.strip()
 
-        # Restore excluded terms in the translated SRT block
-        restored_srt = self.term_handler.restore_excluded_terms(
+        # Restore DNT terms in the translated SRT block
+        restored_srt = self.term_handler.restore_dnt_terms(
             translated_srt,
             term_map,
             filename,

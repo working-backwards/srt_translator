@@ -82,11 +82,11 @@ try:
 except json.JSONDecodeError as e:
     raise ValueError(f"Invalid TARGET_LANGUAGES format in .env file: {e}")
 
-# Excluded terms that will not be translated
-EXCLUDED_TERMS_TEXT = (
-    os.environ["EXCLUDED_TERMS"] if "EXCLUDED_TERMS" in os.environ else ""
+# DNT terms that will not be translated
+DNT_TERMS_TEXT = (
+    os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""
 )
-EXCLUDED_TERMS = EXCLUDED_TERMS_TEXT.split(",")
+DNT_TERMS = DNT_TERMS_TEXT.split(",")
 
 # Language configuration is now handled by the unified system in config/languages.json
 

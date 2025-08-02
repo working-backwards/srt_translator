@@ -33,7 +33,7 @@ class TestWindow(QMainWindow):
         self.glossary_editor = BusinessGlossaryEditor()
 
         # Test data - Business glossary with language-specific translations
-        # Note: EXCLUDED_TERMS would be separate and language-agnostic
+        # Note: DNT_TERMS would be separate and language-agnostic
         test_glossary = {
             "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO", "Amazon": "Amazon"},
             "French": {

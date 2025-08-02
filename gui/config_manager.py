@@ -25,7 +25,7 @@ class GUIConfigManager:
         self.logger = logging.getLogger(__name__)
 
         # Built-in defaults
-        self.DEFAULT_EXCLUDED_TERMS = [
+        self.DEFAULT_DNT_TERMS = [
             "API",
             "CEO",
             "CFO",
@@ -56,28 +56,28 @@ class GUIConfigManager:
             },
         }
 
-    def get_excluded_terms(self) -> List[str]:
+    def get_dnt_terms(self) -> List[str]:
         """
-        Get excluded terms using three-tier fallback system
+        Get DNT terms using three-tier fallback system
 
         Returns:
             List of terms to exclude from translation
         """
         # Priority 1: GUI AI-generated config
-        ai_excluded_terms, _ = self.settings_manager.load_ai_config()
-        if ai_excluded_terms:
-            self.logger.info("Using AI-generated excluded terms")
-            return ai_excluded_terms
+        ai_dnt_terms, _ = self.settings_manager.load_ai_config()
+        if ai_dnt_terms:
+            self.logger.info("Using AI-generated DNT terms")
+            return ai_dnt_terms
 
         # Priority 2: Manual .env file fallback
-        env_excluded_terms = self._load_excluded_terms_from_env()
-        if env_excluded_terms:
-            self.logger.info("Using excluded terms from .env file")
-            return env_excluded_terms
+        env_dnt_terms = self._load_dnt_terms_from_env()
+        if env_dnt_terms:
+            self.logger.info("Using DNT terms from .env file")
+            return env_dnt_terms
 
         # Priority 3: Built-in defaults
-        self.logger.info("Using default excluded terms")
-        return self.DEFAULT_EXCLUDED_TERMS.copy()
+        self.logger.info("Using default DNT terms")
+        return self.DEFAULT_DNT_TERMS.copy()
 
     def get_business_glossary(self, target_language: str) -> Dict[str, str]:
         """
@@ -143,18 +143,18 @@ class GUIConfigManager:
         Get information about which configuration source is being used
 
         Returns:
-            Dictionary with source information for excluded terms and business glossary
+            Dictionary with source information for DNT terms and business glossary
         """
         info = {}
 
-        # Check excluded terms source
-        ai_excluded_terms, _ = self.settings_manager.load_ai_config()
-        if ai_excluded_terms:
-            info["excluded_terms_source"] = "AI Generated"
-        elif self._load_excluded_terms_from_env():
-            info["excluded_terms_source"] = "Manual (.env)"
+        # Check DNT terms source
+        ai_dnt_terms, _ = self.settings_manager.load_ai_config()
+        if ai_dnt_terms:
+            info["dnt_terms_source"] = "AI Generated"
+        elif self._load_dnt_terms_from_env():
+            info["dnt_terms_source"] = "Manual (.env)"
         else:
-            info["excluded_terms_source"] = "Default"
+            info["dnt_terms_source"] = "Default"
 
         # Check business glossary source
         _, ai_business_glossary = self.settings_manager.load_ai_config()
@@ -167,33 +167,62 @@ class GUIConfigManager:
 
         return info
 
-    def _load_excluded_terms_from_env(self) -> List[str]:
-        """Load excluded terms from .env file"""
+    def _load_dnt_terms_from_env(self) -> List[str]:
+        """Load DNT terms from .env file"""
         try:
             env_file = ".env"
             if not os.path.exists(env_file):
                 return []
 
-            excluded_terms = []
+            dnt_terms = []
             with open(env_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith("EXCLUDED_TERMS="):
+                    if line.startswith("DNT_TERMS="):
                         # Parse comma-separated terms
                         terms_str = line.split("=", 1)[1].strip()
                         if terms_str.startswith('"') and terms_str.endswith('"'):
                             terms_str = terms_str[1:-1]
-                        excluded_terms = [
+                        dnt_terms = [
                             term.strip()
                             for term in terms_str.split(",")
                             if term.strip()
                         ]
                         break
 
-            return excluded_terms
+            return dnt_terms
 
         except Exception as e:
-            self.logger.error(f"Error loading excluded terms from .env: {e}")
+            self.logger.error(f"Error loading DNT terms from .env: {e}")
+            return []
+
+    def _load_dnt_terms_from_env(self) -> List[str]:
+        """Load DNT terms from .env file"""
+        try:
+            env_file = ".env"
+            if not os.path.exists(env_file):
+                return []
+
+            dnt_terms = []
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("DNT_TERMS="):
+                        # Parse comma-separated terms
+                        terms_str = line.split("=", 1)[1].strip()
+                        if terms_str.startswith('"') and terms_str.endswith('"'):
+                            terms_str = terms_str[1:-1]
+                        dnt_terms = [
+                            term.strip()
+                            for term in terms_str.split(",")
+                            if term.strip()
+                        ]
+                        break
+
+            return dnt_terms
+
+        except Exception as e:
+            self.logger.error(f"Error loading DNT terms from .env: {e}")
             return []
 
     def _load_business_glossary_from_file(self) -> Dict[str, Dict[str, str]]:
@@ -244,10 +273,10 @@ class GUIConfigManager:
                 "Selected files have changed since AI configuration was generated"
             )
 
-        # Validate excluded terms
-        excluded_terms, _ = self.settings_manager.load_ai_config()
-        if not excluded_terms:
-            issues.append("No excluded terms in AI configuration")
+        # Validate DNT terms
+        dnt_terms, _ = self.settings_manager.load_ai_config()
+        if not dnt_terms:
+            issues.append("No DNT terms in AI configuration")
 
         # Validate business glossary
         _, business_glossary = self.settings_manager.load_ai_config()
@@ -263,13 +292,13 @@ class GUIConfigManager:
         Returns:
             Dictionary with configuration summary information
         """
-        excluded_terms = self.get_excluded_terms()
+        dnt_terms = self.get_dnt_terms()
         business_glossaries = self.get_all_business_glossaries()
         source_info = self.get_config_source_info()
         is_valid, issues = self.validate_ai_config()
 
         return {
-            "excluded_terms_count": len(excluded_terms),
+            "dnt_terms_count": len(dnt_terms),
             "business_glossary_languages": list(business_glossaries.keys()),
             "total_glossary_terms": sum(
                 len(glossary) for glossary in business_glossaries.values()

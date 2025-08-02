@@ -2,24 +2,24 @@ import logging
 import re
 from typing import Dict, List
 
-from srt_core.config.settings import EXCLUDED_TERMS
+from srt_core.config.settings import DNT_TERMS
 
 
 class TermHandler:
     def __init__(self):
-        self.excluded_terms = sorted(EXCLUDED_TERMS, key=len, reverse=True)
+        self.dnt_terms = sorted(DNT_TERMS, key=len, reverse=True)
 
-    def replace_excluded_terms(self, text):
-        """Replace excluded terms with placeholders"""
+    def replace_dnt_terms(self, text):
+        """Replace DNT terms with placeholders"""
         term_map = {}
         placeholder_count = 0
 
-        for term in self.excluded_terms:
+        for term in self.dnt_terms:
             pattern = r"\b{}\b".format(re.escape(term))
 
             def replace_term(match):
                 nonlocal placeholder_count
-                placeholder = f"__EXCLUDED_TERM_{placeholder_count}__"
+                placeholder = f"__DNT_TERM_{placeholder_count}__"
                 term_map[placeholder] = match.group(0)
                 placeholder_count += 1
                 return placeholder
@@ -28,7 +28,7 @@ class TermHandler:
 
         return text, term_map
 
-    def restore_excluded_terms(
+    def restore_dnt_terms(
         self,
         text,
         term_map,
@@ -37,7 +37,7 @@ class TermHandler:
         source_lang=None,
         target_lang=None,
     ):
-        """Restore excluded terms from placeholders"""
+        """Restore DNT terms from placeholders"""
         restored_text = text
 
         # Only process placeholders that are actually in the text
@@ -45,7 +45,7 @@ class TermHandler:
             if placeholder in restored_text:
                 restored_text = restored_text.replace(placeholder, original_term)
             # Silently skip placeholders that weren't used in this text
-            # This is normal behavior - not all excluded terms appear in every subtitle
+            # This is normal behavior - not all DNT terms appear in every subtitle
 
         return restored_text
 
@@ -71,12 +71,12 @@ class TermHandler:
         trans_pos = None
 
         for i, word in enumerate(orig_words):
-            if "__EXCLUDED_TERM_" in word:
+            if "__DNT_TERM_" in word:
                 orig_pos = i
                 break
 
         for i, word in enumerate(trans_words):
-            if "__EXCLUDED_TERM_" in word:
+            if "__DNT_TERM_" in word:
                 trans_pos = i
                 break
 

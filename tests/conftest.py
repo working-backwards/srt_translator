@@ -19,8 +19,8 @@ logging.basicConfig(level=logging.WARNING)  # Reduce noise during tests
 
 
 @pytest.fixture
-def sample_excluded_terms():
-    """Sample excluded terms for testing"""
+def sample_dnt_terms():
+    """Sample DNT terms for testing"""
     return ["API", "CEO", "CFO", "Amazon", "GDPR", "ROI"]
 
 

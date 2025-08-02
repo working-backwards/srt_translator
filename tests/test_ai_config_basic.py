@@ -28,7 +28,7 @@ def test_ai_config_system():
     settings_manager = SettingsManager()
 
     # Test saving and loading AI config
-    test_excluded_terms = ["API", "CEO", "CFO", "Amazon"]
+    test_dnt_terms = ["API", "CEO", "CFO", "Amazon"]
     test_business_glossary = {
         "Spanish": {
             "operating plan": "plan operativo",
@@ -40,12 +40,12 @@ def test_ai_config_system():
         },
     }
 
-    settings_manager.save_ai_config(test_excluded_terms, test_business_glossary)
+    settings_manager.save_ai_config(test_dnt_terms, test_business_glossary)
     loaded_terms, loaded_glossary = settings_manager.load_ai_config()
 
-    print(f"Saved excluded terms: {test_excluded_terms}")
-    print(f"Loaded excluded terms: {loaded_terms}")
-    print(f"Terms match: {test_excluded_terms == loaded_terms}")
+    print(f"Saved DNT terms: {test_dnt_terms}")
+    print(f"Loaded DNT terms: {loaded_terms}")
+    print(f"Terms match: {test_dnt_terms == loaded_terms}")
 
     print(f"Saved glossary languages: {list(test_business_glossary.keys())}")
     print(f"Loaded glossary languages: {list(loaded_glossary.keys())}")
@@ -55,9 +55,9 @@ def test_ai_config_system():
     print("\n2. Testing Config Manager...")
     config_manager = GUIConfigManager(settings_manager)
 
-    # Test getting excluded terms (should return AI-generated ones)
-    excluded_terms = config_manager.get_excluded_terms()
-    print(f"Config manager excluded terms: {excluded_terms}")
+    # Test getting DNT terms (should return AI-generated ones)
+    dnt_terms = config_manager.get_dnt_terms()
+    print(f"Config manager DNT terms: {dnt_terms}")
 
     # Test getting business glossary
     spanish_glossary = config_manager.get_business_glossary("Spanish")

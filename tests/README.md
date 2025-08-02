@@ -14,7 +14,7 @@ tests/
     ├── __init__.py
     ├── test_business_glossary_editor.py
     ├── test_editors_integration.py
-    └── test_excluded_terms_editor.py
+    └── test_dnt_terms_editor.py
 ```
 
 ## Running Tests
@@ -50,7 +50,7 @@ pytest tests/test_ai_config_integration.py -v
 ### GUI Tests
 - **`test_business_glossary_editor.py`**: Tests the business glossary editor widget
 - **`test_editors_integration.py`**: Tests the integrated editors dialog
-- **`test_excluded_terms_editor.py`**: Tests the excluded terms editor widget
+- **`test_dnt_terms_editor.py`**: Tests the DNT terms editor widget
 
 ## Notes
 

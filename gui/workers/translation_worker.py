@@ -121,15 +121,15 @@ class TranslationWorker(QThread):
     def setup_ai_configuration(self):
         """Set up AI-generated configuration for translation"""
         try:
-            # Get excluded terms from config manager
-            excluded_terms = self.config_manager.get_excluded_terms()
-            if excluded_terms:
+            # Get DNT terms from config manager
+            dnt_terms = self.config_manager.get_dnt_terms()
+            if dnt_terms:
                 self.progress_updated.emit(
-                    f"Using AI-generated excluded terms: {', '.join(excluded_terms)}"
+                    f"Using AI-generated DNT terms: {', '.join(dnt_terms)}"
                 )
 
-                # Update .env file with excluded terms
-                self.update_env_excluded_terms(excluded_terms)
+                # Update .env file with DNT terms
+                self.update_env_dnt_terms(dnt_terms)
 
             # Get business glossary for each target language
             for language_name in self.target_languages.keys():
@@ -142,14 +142,23 @@ class TranslationWorker(QThread):
                     # Update business_glossary.json with AI-generated terms
                     self.update_business_glossary(language_name, glossary)
 
+            # Get DNT terms from config manager
+            dnt_terms = self.config_manager.get_dnt_terms()
+            if dnt_terms:
+                self.progress_updated.emit(
+                    f"Using AI-generated DNT terms: {', '.join(dnt_terms)}"
+                )
+                # Update .env file with DNT terms
+                self.update_env_dnt_terms(dnt_terms)
+
         except Exception as e:
             logging.error(f"Error setting up AI configuration: {e}")
             self.progress_updated.emit(
                 f"Warning: Could not set up AI configuration: {e}"
             )
 
-    def update_env_excluded_terms(self, excluded_terms: List[str]):
-        """Update .env file with excluded terms"""
+    def update_env_dnt_terms(self, dnt_terms: List[str]):
+        """Update .env file with DNT terms"""
         env_path = Path(".env")
 
         # Read existing .env file
@@ -158,21 +167,21 @@ class TranslationWorker(QThread):
             with open(env_path, "r") as f:
                 lines = f.readlines()
 
-        # Update EXCLUDED_TERMS line
+        # Update DNT_TERMS line
         new_lines = []
-        excluded_terms_str = ", ".join([f'"{term}"' for term in excluded_terms])
-        excluded_terms_line = f"EXCLUDED_TERMS = [{excluded_terms_str}]"
+        dnt_terms_str = ", ".join([f'"{term}"' for term in dnt_terms])
+        dnt_terms_line = f"DNT_TERMS = [{dnt_terms_str}]"
 
         found = False
         for line in lines:
-            if line.startswith("EXCLUDED_TERMS"):
-                new_lines.append(excluded_terms_line + "\n")
+            if line.startswith("DNT_TERMS"):
+                new_lines.append(dnt_terms_line + "\n")
                 found = True
             else:
                 new_lines.append(line)
 
         if not found:
-            new_lines.append(excluded_terms_line + "\n")
+            new_lines.append(dnt_terms_line + "\n")
 
         # Write back to .env file
         with open(env_path, "w") as f:
@@ -207,6 +216,36 @@ class TranslationWorker(QThread):
                 json.dump(existing_glossary, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logging.error(f"Could not write business_glossary.json: {e}")
+
+    def update_env_dnt_terms(self, dnt_terms: List[str]):
+        """Update .env file with DNT terms"""
+        env_path = Path(".env")
+
+        # Read existing .env file
+        lines = []
+        if env_path.exists():
+            with open(env_path, "r") as f:
+                lines = f.readlines()
+
+        # Update DNT_TERMS line
+        new_lines = []
+        dnt_terms_str = ", ".join([f'"{term}"' for term in dnt_terms])
+        dnt_terms_line = f"DNT_TERMS = [{dnt_terms_str}]"
+
+        found = False
+        for line in lines:
+            if line.startswith("DNT_TERMS"):
+                new_lines.append(dnt_terms_line + "\n")
+                found = True
+            else:
+                new_lines.append(line)
+
+        if not found:
+            new_lines.append(dnt_terms_line + "\n")
+
+        # Write back to .env file
+        with open(env_path, "w") as f:
+            f.writelines(new_lines)
 
     def update_env_languages(self):
         """Update .env file with selected target languages"""

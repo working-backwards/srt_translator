@@ -89,7 +89,7 @@ def main():
         "tests/conftest.py",
         "tests/gui/test_business_glossary_editor.py",
         "tests/gui/test_editors_integration.py", 
-        "tests/gui/test_excluded_terms_editor.py",
+        "tests/gui/test_dnt_terms_editor.py",
         "tests/test_ai_config_basic.py",
         "tests/test_ai_config_integration.py",
         "tests/test_performance_optimization.py",

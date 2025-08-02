@@ -1,14 +1,11 @@
+#!/usr/bin/env python3
+"""
+Test script for DNT Terms Editor
+"""
+
 import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-from gui.ui.excluded_terms_editor import ExcludedTermsEditor
-
-#!/usr/bin/env python3
-"""
-Test script for Excluded Terms Editor
-"""
-
-
     QApplication,
     QMainWindow,
     QPushButton,
@@ -19,12 +16,13 @@ Test script for Excluded Terms Editor
 # Add the gui directory to the path
 sys.path.insert(0, "gui")
 
+from gui.ui.dnt_terms_editor import DNTTermsEditor
 
 
 class TestWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Excluded Terms Editor Test")
+        self.setWindowTitle("DNT Terms Editor Test")
         self.setGeometry(100, 100, 600, 400)
 
         # Create central widget
@@ -32,8 +30,8 @@ class TestWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Create the excluded terms editor
-        self.terms_editor = ExcludedTermsEditor()
+        # Create the DNT terms editor
+        self.terms_editor = DNTTermsEditor()
 
         # Add some test terms
         test_terms = ["API", "CEO", "CFO", "Amazon", "Google", "Microsoft"]

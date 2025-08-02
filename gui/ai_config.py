@@ -94,7 +94,7 @@ class AIConfigGenerator:
             self.logger.error(f"Error extracting subtitle content: {e}")
             raise
 
-    def generate_excluded_terms(
+    def generate_dnt_terms(
         self, content: str, source_lang: str = "English"
     ) -> List[str]:
         """
@@ -147,19 +147,19 @@ EXAMPLE FORMAT:
             )
 
             result_text = response.choices[0].message.content.strip()
-            excluded_terms = self._parse_excluded_terms_response(result_text)
-            self.logger.info(f"Generated {len(excluded_terms)} excluded terms")
-            return excluded_terms
+            dnt_terms = self._parse_dnt_terms_response(result_text)
+            self.logger.info(f"Generated {len(dnt_terms)} DNT terms")
+            return dnt_terms
 
         except Exception as e:
-            self.logger.error(f"Error generating excluded terms: {e}")
+            self.logger.error(f"Error generating DNT terms: {e}")
             raise
 
     def generate_business_glossary(
         self,
         content: str,
         target_languages: List[str],
-        excluded_terms: List[str] = None,
+        dnt_terms: List[str] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
         Generate business glossary for all target languages using systematic analysis framework
@@ -167,7 +167,7 @@ EXAMPLE FORMAT:
         Args:
             content: Clean text content from SRT files
             target_languages: List of target languages for translation
-            excluded_terms: List of terms that should not be included in the glossary
+            dnt_terms: List of terms that should not be included in the glossary
 
         Returns:
             Dictionary with language keys and term-translation pairs
@@ -213,7 +213,7 @@ EXAMPLE FORMAT:
 
             # Generate comprehensive termbase for all languages at once
             business_glossary = self._generate_comprehensive_glossary(
-                content, language_names, excluded_terms
+                content, language_names, dnt_terms
             )
 
             self.logger.info(
@@ -229,7 +229,7 @@ EXAMPLE FORMAT:
         self,
         content: str,
         language_names: List[Dict[str, str]],
-        excluded_terms: List[str] = None,
+        dnt_terms: List[str] = None,
     ) -> Dict[str, Dict[str, str]]:
         """Generate comprehensive glossary for all target languages using systematic analysis framework"""
         try:
@@ -239,8 +239,8 @@ EXAMPLE FORMAT:
 
             lang_json = json.dumps(language_names, ensure_ascii=False)
 
-            # Prepare excluded terms JSON
-            excluded_json = json.dumps(excluded_terms or [], ensure_ascii=False)
+            # Prepare DNT terms JSON
+            dnt_json = json.dumps(dnt_terms or [], ensure_ascii=False)
 
             prompt = f"""
 You are an expert in terminology extraction and localization.
@@ -251,8 +251,8 @@ INPUT:
 TARGET_LANGUAGES:
 {lang_json}
 
-EXCLUDED_TERMS:
-{excluded_json}
+DNT_TERMS:
+{dnt_json}
 
 TASK:
 1. Carefully analyze the transcript in `document_1`.
@@ -268,9 +268,9 @@ TASK:
    AVOID if they:
    - Are obvious, literal, or easily translatable without risk of confusion
    - Are purely stylistic idioms or colorful language with little instructional value
-   - Are listed in EXCLUDED_TERMS
+   - Are listed in DNT_TERMS
 
-3. Pass 2: Identify 5 additional English, words or phrases, not in EXCLUDED_TERMS, from the transcript that are likely to be:
+3. Pass 2: Identify 5 additional English, words or phrases, not in DNT_TERMS, from the transcript that are likely to be:
    - mistranslated,
    - interpreted too literally,
    - or misunderstood without context.
@@ -282,7 +282,7 @@ TASK:
    ➤ Add these 5 to your list of 20 extracted terms, for a total of 25.
 
 4. Return both:
-   - The extracted list of 25 terms, none of which appear in EXCLUDED_TERMS, with a brief reason for each
+   - The extracted list of 25 terms, none of which appear in DNT_TERMS, with a brief reason for each
    - A per-language glossary of 4–6 of the most important or difficult terms, based on difficulty, relevance, or risk of mistranslation
 
 5. You should expect heavy overlap of key terms across languages that are central to understanding the course’s subject matter, but there should also be language-specific variations when a term poses a unique translation risk in that language (e.g., cultural mismatch, ambiguity, idiomatic differences).
@@ -293,7 +293,7 @@ TASK:
    - Only include terms in the glossary that appear in the "extracted_terms" list.
    - Each glossary must include translations for all selected terms — even if no direct equivalent exists, provide a concise, localized explanation.
    - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or an explanation that would work in subtitle context.
-   - Do not include any terms from EXCLUDED_TERMS, even if they appear in the extracted list.
+   - Do not include any terms from DNT_TERMS, even if they appear in the extracted list.
 
 
 7. Output MUST use this JSON format:
@@ -346,13 +346,13 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             raise
 
     def _generate_language_glossary(
-        self, content: str, language: str, excluded_terms: List[str] = None
+        self, content: str, language: str, dnt_terms: List[str] = None
     ) -> Dict[str, str]:
         """Generate glossary for a specific language (legacy method - kept for compatibility)"""
         # This method is now deprecated in favor of _generate_comprehensive_glossary
         # But kept for backward compatibility
         comprehensive = self._generate_comprehensive_glossary(
-            content, [language], excluded_terms
+            content, [language], dnt_terms
         )
         return comprehensive.get(language, {})
 
@@ -408,8 +408,8 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             else:
                 return truncated
 
-    def _parse_excluded_terms_response(self, response_text: str) -> List[str]:
-        """Parse the AI response for excluded terms"""
+    def _parse_dnt_terms_response(self, response_text: str) -> List[str]:
+        """Parse the AI response for DNT terms"""
         try:
             # Extract JSON array from response
 
@@ -431,7 +431,7 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                 return []
 
         except Exception as e:
-            self.logger.error(f"Error parsing excluded terms response: {e}")
+            self.logger.error(f"Error parsing DNT terms response: {e}")
             self.logger.debug(f"Raw response: {response_text}")
             return []
 

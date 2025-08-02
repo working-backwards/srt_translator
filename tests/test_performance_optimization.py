@@ -47,7 +47,7 @@ class TestCacheManager:
     def test_cache_set_and_get(self):
         """Test basic cache set and get operations."""
         files = [self.test_file1, self.test_file2]
-        test_data = {"excluded_terms": ["CEO", "CFO"], "business_glossary": {}}
+        test_data = {"dnt_terms": ["CEO", "CFO"], "business_glossary": {}}
 
         # Set cache
         success = self.cache_manager.set("ai_analysis", files, test_data)

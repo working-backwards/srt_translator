@@ -66,9 +66,9 @@ def test_config_manager():
     settings_manager = SettingsManager()
     config_manager = GUIConfigManager(settings_manager)
 
-    # Test getting excluded terms (should prioritize AI config)
-    excluded_terms = config_manager.get_excluded_terms()
-    print(f"✓ Excluded terms: {excluded_terms}")
+    # Test getting DNT terms (should prioritize AI config)
+    dnt_terms = config_manager.get_dnt_terms()
+    print(f"✓ DNT terms: {dnt_terms}")
 
     # Test getting business glossary
     spanish_glossary = config_manager.get_business_glossary("Spanish")

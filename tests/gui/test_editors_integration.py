@@ -6,7 +6,7 @@ from gui.ui.ai_config_section import EditConfigurationDialog
 
 #!/usr/bin/env python3
 """
-Integration test for both Excluded Terms Editor and Business Glossary Editor
+Integration test for both DNT Terms Editor and Business Glossary Editor
 """
 
     QApplication,
@@ -32,8 +32,8 @@ class TestWindow(QMainWindow):
         layout = QVBoxLayout(central_widget)
 
         # Test data
-        # EXCLUDED_TERMS: Language-agnostic terms that should not be translated
-        self.test_excluded_terms = [
+        # DNT_TERMS: Language-agnostic terms that should not be translated
+        self.test_dnt_terms = [
             "API",
             "CEO",
             "CFO",
@@ -62,7 +62,7 @@ class TestWindow(QMainWindow):
         # Instructions
         instructions = QLabel(
             "Click 'Open Edit Dialog' to test the integrated editors.\n"
-            "The dialog will show both Excluded Terms and Business Glossary editors in tabs."
+            "The dialog will show both DNT Terms and Business Glossary editors in tabs."
         )
         instructions.setStyleSheet(
             "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
@@ -96,7 +96,7 @@ class TestWindow(QMainWindow):
         self.status_label.setText("Opening edit dialog...")
 
         dialog = EditConfigurationDialog(
-            self.test_excluded_terms, self.test_business_glossary, self
+            self.test_dnt_terms, self.test_business_glossary, self
         )
 
         if dialog.exec():
@@ -106,7 +106,7 @@ class TestWindow(QMainWindow):
             if has_changes:
                 self.status_label.setText(
                     f"Dialog closed with changes:\n"
-                    f"Terms: {len(modified_terms)} (was {len(self.test_excluded_terms)})\n"
+                    f"Terms: {len(modified_terms)} (was {len(self.test_dnt_terms)})\n"
                     f"Glossary languages: {len(modified_glossary)} (was {len(self.test_business_glossary)})"
                 )
                 print(f"Modified terms: {modified_terms}")
@@ -120,7 +120,7 @@ class TestWindow(QMainWindow):
         """Display the test data being used."""
         print("=== Test Data ===")
         print(
-            f"Excluded Terms ({len(self.test_excluded_terms)}): {self.test_excluded_terms}"
+            f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}"
         )
         print(f"Business Glossary ({len(self.test_business_glossary)} languages):")
         for language, terms in self.test_business_glossary.items():

@@ -61,16 +61,16 @@ If you’ve used basic command-line tools before (or followed setup instructions
 
 ## Two-Pass Translation System
 
-The SRT Translator uses a **two-pass system** to ensure high-quality translations while reliably preserving important terms such as names, product names, and technical phrases. These excluded terms are temporarily replaced with special **placeholders** like `__EXCLUDED_TERM_0__` during translation, and then restored afterward.
+The SRT Translator uses a **two-pass system** to ensure high-quality translations while reliably preserving important terms such as names, product names, and technical phrases. These DNT terms are temporarily replaced with special **placeholders** like `__DNT_TERM_0__` during translation, and then restored afterward.
 
 ### Pass 1: Real-Time Translation Fixes
 
-During translation, the system automatically detects and fixes **missing placeholder** issues. If OpenAI omits a required placeholder in the output, the translator immediately adds it back to preserve the excluded term.
+During translation, the system automatically detects and fixes **missing placeholder** issues. If OpenAI omits a required placeholder in the output, the translator immediately adds it back to preserve the DNT term.
 
 **Example:**
-- **Original**: "We use the same infrastructure as __EXCLUDED_TERM_0__"
+- **Original**: "We use the same infrastructure as __DNT_TERM_0__"
 - **OpenAI returns**: "我们使用相同的基础设施" (placeholder is missing)
-- **Immediate fix**: "__EXCLUDED_TERM_0__ 我们使用相同的基础设施" (placeholder restored)
+- **Immediate fix**: "__DNT_TERM_0__ 我们使用相同的基础设施" (placeholder restored)
 
 ### Pass 2: Batch Placeholder Fixing
 
@@ -78,7 +78,7 @@ Once all translations are complete, the fixer scans the output files for **posit
 
 **Example:**
 - **Original**: "Amazon's retail business model"
-- **Translation**: "小売業__EXCLUDED_TERM_0__のビジネスモデル" (placeholder placement sounds unnatural)
+- **Translation**: "小売業__DNT_TERM_0__のビジネスモデル" (placeholder placement sounds unnatural)
 - **Batch fix**: "Amazonの小売業ビジネスモデル" (term is placed more naturally)
 
 ### Why Two Passes Are Necessary
@@ -225,7 +225,7 @@ srt_translator/
 - `TARGET_LANGUAGES`: Dictionary of target languages (must specify which languages to translate to)
 
 **Optional (with defaults):**
-- `EXCLUDED_TERMS`: Comma-separated list of terms to preserve
+- `DNT_TERMS`: Comma-separated list of terms to preserve
 - `INPUT_DIRECTORY`: Input folder name (default: `original_captions`)
 - `OUTPUT_DIRECTORY`: Output folder name (default: `translated_srt_files`)
 - `LOGS_DIRECTORY`: Logs folder name (default: `translation_logs`)
@@ -240,15 +240,15 @@ srt_translator/
 ```bash
 OPENAI_API_KEY=your_api_key_here
 TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de", "Japanese": "ja"}
-EXCLUDED_TERMS=YourName,YourCompany,YourProduct,CEO,CFO
+DNT_TERMS=YourName,YourCompany,YourProduct,CEO,CFO
 SOURCE_LANG=en
 INPUT_DIRECTORY=original_captions
 OUTPUT_DIRECTORY=translated_srt_files
 AGGRESSIVENESS=0.75
 ```
 
-### Excluded Terms
-Customize terms that should not be translated by editing the `EXCLUDED_TERMS` in your `.env` file:
+### DNT Terms
+Customize terms that should not be translated by editing the `DNT_TERMS` in your `.env` file:
 
 **Examples of terms to exclude:**
 - Instructor names: `YourName,CoInstructorName`
@@ -261,7 +261,7 @@ Customize terms that should not be translated by editing the `EXCLUDED_TERMS` in
 
 ## Customizing the Translation Prompt
 
-The SRT Translator uses OpenAI's GPT models with a carefully crafted prompt to ensure high-quality translations while preserving excluded terms. You can customize this prompt if needed.
+The SRT Translator uses OpenAI's GPT models with a carefully crafted prompt to ensure high-quality translations while preserving Do Not Translate (DNT) terms. You can customize this prompt if needed.
 
 ### When to Customize the Prompt
 
@@ -290,7 +290,7 @@ Consider customizing the prompt if you experience:
 
    CRITICAL REQUIREMENTS:
    - Maintain formal business tone throughout
-   - Do NOT create any new placeholders like __EXCLUDED_TERM_X__
+   - Do NOT create any new placeholders like __DNT_TERM_X__
    - Preserve existing placeholders exactly as written
    - Use industry-standard terminology when available
    
@@ -299,7 +299,7 @@ Consider customizing the prompt if you experience:
 
 ### Best Practices for Prompt Customization
 
-- **Keep placeholder instructions** - Always include instructions about not creating new `__EXCLUDED_TERM_X__` placeholders
+- **Keep placeholder instructions** - Always include instructions about not creating new `__DNT_TERM_X__` placeholders
 - **Test incrementally** - Try small changes first, then evaluate translation quality
 - **Use specific language** - Vague instructions like "translate well" are less effective than specific requirements
 - **Consider your content type** - Business documents need different handling than casual content
@@ -379,7 +379,7 @@ tests/
 └── gui/                        # GUI component tests
     ├── test_business_glossary_editor.py
     ├── test_editors_integration.py
-    └── test_excluded_terms_editor.py
+    └── test_dnt_terms_editor.py
 ```
 
 ### Test Types
@@ -413,7 +413,7 @@ The translator includes intelligent error fixing with configurable aggressivenes
 **Common Issues:**
 - **"Source directory does not exist"**: Create the input directory (`mkdir original_captions`)
 - **"OpenAI API key not found"**: Check your `.env` file has the correct API key
-- **Translation quality issues**: Review and adjust `EXCLUDED_TERMS` for your content
+- **Translation quality issues**: Review and adjust `DNT_TERMS` for your content
 - **Placeholder errors**: Adjust `AGGRESSIVENESS` setting (try 0.5 for more conservative fixes)
 
 
@@ -441,7 +441,7 @@ The project includes several utility scripts in the `scripts/` directory for mai
 
 ### Fix Placeholders Only (`scripts/run_fixer_only.py`)
 
-Run only the placeholder fixer without re-translating files. Useful when you need to fix remaining `__EXCLUDED_TERM_X__` placeholders after translation is complete.
+Run only the placeholder fixer without re-translating files. Useful when you need to fix remaining `__DNT_TERM_X__` placeholders after translation is complete.
 
 ```bash
 python scripts/run_fixer_only.py
@@ -449,7 +449,7 @@ python scripts/run_fixer_only.py
 
 **When to use:**
 - After translations are complete but some placeholders remain unfixed
-- When you've updated your excluded terms and want to apply fixes
+- When you've updated your DNT terms and want to apply fixes
 - To avoid re-running hours of translation just to fix placeholders
 
 ### Debug Log Parser (`scripts/debug_log_parser.py`)

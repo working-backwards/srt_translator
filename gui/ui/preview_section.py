@@ -36,13 +36,13 @@ class PreviewWorker(QThread):
     def __init__(
         self,
         sample_text: str,
-        excluded_terms: List[str],
+        dnt_terms: List[str],
         business_glossary: Dict[str, Dict[str, str]],
         target_language: str,
     ):
         super().__init__()
         self.sample_text = sample_text
-        self.excluded_terms = excluded_terms
+        self.dnt_terms = dnt_terms
         self.business_glossary = business_glossary
         self.target_language = target_language
 
@@ -60,17 +60,17 @@ class PreviewWorker(QThread):
         # This is a simplified preview - in a real implementation,
         # you might call the actual translation API with a small sample
 
-        # For now, we'll simulate the effect of excluded terms and glossary
+        # For now, we'll simulate the effect of DNT terms and glossary
         original_text = self.sample_text
         configured_text = self._apply_configuration(original_text)
 
         return {
             "original": original_text,
             "configured": configured_text,
-            "excluded_terms_applied": len(
+            "dnt_terms_applied": len(
                 [
                     term
-                    for term in self.excluded_terms
+                    for term in self.dnt_terms
                     if term.lower() in original_text.lower()
                 ]
             ),
@@ -78,16 +78,16 @@ class PreviewWorker(QThread):
         }
 
     def _apply_configuration(self, text: str) -> str:
-        """Apply excluded terms and glossary to the text."""
+        """Apply DNT terms and glossary to the text."""
         # This simulates how the configuration would affect translation
 
         result = text
         processed_positions = set()  # Track which positions have been processed
 
-        # Apply excluded terms first (mark them to stay in English)
-        for term in self.excluded_terms:
+        # Apply DNT terms first (mark them to stay in English)
+        for term in self.dnt_terms:
             if term.lower() in result.lower():
-                # Mark excluded terms with [brackets] to show they won't be translated
+                # Mark DNT terms with [brackets] to show they won't be translated
                 result, processed_positions = self._highlight_term_with_tracking(
                     result, term, "[", "]", processed_positions
                 )
@@ -280,17 +280,17 @@ class PreviewSection(QWidget):
         self.sample_text_edit.textChanged.connect(self.on_sample_text_changed)
 
     def set_configuration(
-        self, excluded_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
     ):
         """Set the configuration to preview."""
-        self.excluded_terms = excluded_terms
+        self.dnt_terms = dnt_terms
         self.business_glossary = business_glossary
         self.preview_btn.setEnabled(True)
 
     def on_sample_text_changed(self):
         """Handle sample text changes."""
         text = self.sample_text_edit.toPlainText().strip()
-        self.preview_btn.setEnabled(bool(text) and hasattr(self, "excluded_terms"))
+        self.preview_btn.setEnabled(bool(text) and hasattr(self, "dnt_terms"))
 
     def generate_preview(self):
         """Generate translation preview."""
@@ -301,7 +301,7 @@ class PreviewSection(QWidget):
             )
             return
 
-        if not hasattr(self, "excluded_terms"):
+        if not hasattr(self, "dnt_terms"):
             QMessageBox.warning(
                 self,
                 "No Configuration",
@@ -316,7 +316,7 @@ class PreviewSection(QWidget):
         # Start preview worker
         self.preview_worker = PreviewWorker(
             sample_text,
-            self.excluded_terms,
+            self.dnt_terms,
             self.business_glossary,
             "Spanish",  # Default target language for preview
         )
@@ -335,13 +335,13 @@ class PreviewSection(QWidget):
         self.configured_text.setText(result["configured"])
 
         # Update statistics
-        excluded_count = result["excluded_terms_applied"]
+        dnt_count = result["dnt_terms_applied"]
         glossary_count = result["glossary_terms_applied"]
 
         # Create more detailed statistics
-        total_terms = excluded_count + glossary_count
+        total_terms = dnt_count + glossary_count
         if total_terms > 0:
-            stats_text = f"Configuration Impact: {excluded_count} excluded terms (stay in English), {glossary_count} glossary terms (will be translated)"
+            stats_text = f"Configuration Impact: {dnt_count} DNT terms (stay in English), {glossary_count} glossary terms (will be translated)"
         else:
             stats_text = "Configuration Impact: No terms from your configuration found in this sample text"
 

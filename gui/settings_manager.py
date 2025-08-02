@@ -204,47 +204,39 @@ class SettingsManager:
 
     # AI Configuration Methods
     def save_ai_config(
-        self, excluded_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
     ) -> None:
         """
-        Save AI-generated configuration persistently
+        Save AI-generated configuration to settings
 
         Args:
-            excluded_terms: List of terms to exclude from translation
+            dnt_terms: List of terms to exclude from translation
             business_glossary: Dictionary with language keys and term-translation pairs
         """
-        # Save excluded terms
-        self.settings.setValue("ai_excluded_terms", excluded_terms)
+        self.settings.setValue("ai_dnt_terms", dnt_terms)
+        self.settings.setValue("ai_business_glossary", business_glossary)
+        self.settings.sync()
+        logging.info(f"Saved AI config: {len(dnt_terms)} DNT terms, {len(business_glossary)} languages")
 
-        # Save business glossary as JSON string
-        glossary_json = json.dumps(business_glossary, ensure_ascii=False)
-        self.settings.setValue("ai_business_glossary", glossary_json)
-
-        # Save timestamp
-        timestamp = datetime.now().isoformat()
-        self.settings.setValue("ai_config_timestamp", timestamp)
-
-        # Save file hash to detect changes
-        self.settings.setValue("ai_config_file_hash", self._calculate_file_hash())
-
-    def load_ai_config(self) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
+    def load_ai_config(
+        self,
+    ) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
         """
-        Load last AI-generated configuration
+        Load AI-generated configuration from settings
 
         Returns:
-            Tuple of (excluded_terms, business_glossary)
+            Tuple of (dnt_terms, business_glossary)
         """
-        # Load excluded terms
-        excluded_terms = self.settings.value("ai_excluded_terms", [])
+        dnt_terms = self.settings.value("ai_dnt_terms", [])
+        business_glossary = self.settings.value("ai_business_glossary", {})
 
-        # Load business glossary
-        glossary_json = self.settings.value("ai_business_glossary", "{}")
-        try:
-            business_glossary = json.loads(glossary_json)
-        except (json.JSONDecodeError, TypeError):
+        # Ensure we have the correct types
+        if not isinstance(dnt_terms, list):
+            dnt_terms = []
+        if not isinstance(business_glossary, dict):
             business_glossary = {}
 
-        return excluded_terms, business_glossary
+        return dnt_terms, business_glossary
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
         """
@@ -268,16 +260,16 @@ class SettingsManager:
             return False
 
     def has_ai_config(self) -> bool:
-        """Check if any AI configuration exists"""
-        excluded_terms, business_glossary = self.load_ai_config()
-        return bool(excluded_terms or business_glossary)
+        """Check if AI configuration exists"""
+        dnt_terms, business_glossary = self.load_ai_config()
+        return bool(dnt_terms or business_glossary)
 
     def clear_ai_config(self) -> None:
-        """Clear all AI configuration data"""
-        self.settings.remove("ai_excluded_terms")
+        """Clear AI configuration from settings"""
+        self.settings.remove("ai_dnt_terms")
         self.settings.remove("ai_business_glossary")
-        self.settings.remove("ai_config_timestamp")
-        self.settings.remove("ai_config_file_hash")
+        self.settings.sync()
+        logging.info("Cleared AI configuration")
 
     def get_ai_config_age_days(self) -> Optional[int]:
         """

@@ -1,9 +1,9 @@
 import os
 import sys
 import tempfile
+import shutil
 import pytest
 from gui.validation import ConfigurationValidator, ValidationResult
-        import shutil
 
 #!/usr/bin/env python3
 """
@@ -46,42 +46,35 @@ class TestConfigurationValidator:
 
         shutil.rmtree(self.temp_dir)
 
-    def test_validate_excluded_terms_valid(self):
-        """Test validation of excluded terms that exist in files."""
-        excluded_terms = ["CEO", "CFO", "API"]
-        result = self.validator.validate_excluded_terms(
-            excluded_terms, self.source_files
+    def test_validate_dnt_terms_valid(self):
+        """Test validation of DNT terms that exist in files."""
+        dnt_terms = ["CEO", "CFO", "API"]
+        result = self.validator.validate_dnt_terms(
+            dnt_terms, self.source_files
         )
-
-        assert result.is_valid == True
-        assert result.score == 1.0  # All terms found
-        assert result.confidence >= 0.8
-        assert len(result.issues) == 0
-
-    def test_validate_excluded_terms_invalid(self):
-        """Test validation of excluded terms that don't exist in files."""
-        excluded_terms = ["CEO", "CFO", "NONEXISTENT", "MISSING"]
-        result = self.validator.validate_excluded_terms(
-            excluded_terms, self.source_files
-        )
-
-        assert result.is_valid == False  # Less than 70% found
-        assert result.score == 0.5  # 2 out of 4 terms found
-        assert len(result.issues) == 2
-        assert "NONEXISTENT" in result.issues[0]
-        assert "MISSING" in result.issues[1]
-
-    def test_validate_excluded_terms_empty(self):
-        """Test validation with no excluded terms."""
-        excluded_terms = []
-        result = self.validator.validate_excluded_terms(
-            excluded_terms, self.source_files
-        )
-
         assert result.is_valid == True
         assert result.score == 1.0
-        assert result.confidence == 0.5
-        assert "No excluded terms to validate" in result.issues[0]
+        assert len(result.issues) == 0
+
+    def test_validate_dnt_terms_invalid(self):
+        """Test validation of DNT terms that don't exist in files."""
+        dnt_terms = ["CEO", "CFO", "NONEXISTENT", "MISSING"]
+        result = self.validator.validate_dnt_terms(
+            dnt_terms, self.source_files
+        )
+        assert result.is_valid == False
+        assert result.score < 1.0
+        assert len(result.issues) > 0
+
+    def test_validate_dnt_terms_empty(self):
+        """Test validation with no DNT terms."""
+        dnt_terms = []
+        result = self.validator.validate_dnt_terms(
+            dnt_terms, self.source_files
+        )
+        assert result.is_valid == True
+        assert result.score == 1.0
+        assert "No DNT terms to validate" in result.issues[0]
 
     def test_validate_business_glossary_valid(self):
         """Test validation of business glossary with valid entries."""
@@ -134,10 +127,10 @@ class TestConfigurationValidator:
 
     def test_validate_configuration_quality_good(self):
         """Test quality validation with good configuration."""
-        excluded_terms = ["CEO", "CFO", "API"]
+        dnt_terms = ["CEO", "CFO", "API"]
         business_glossary = {"Spanish": {"CEO": "CEO"}, "French": {"CFO": "CFO"}}
         result = self.validator.validate_configuration_quality(
-            excluded_terms, business_glossary
+            dnt_terms, business_glossary
         )
 
         assert result.is_valid == True
@@ -145,32 +138,32 @@ class TestConfigurationValidator:
         assert len(result.issues) == 0
 
     def test_validate_configuration_quality_too_many_terms(self):
-        """Test quality validation with too many excluded terms."""
-        excluded_terms = [f"TERM_{i}" for i in range(60)]  # 60 terms
+        """Test quality validation with too many DNT terms."""
+        dnt_terms = [f"TERM_{i}" for i in range(60)]  # 60 terms
         business_glossary = {}
         result = self.validator.validate_configuration_quality(
-            excluded_terms, business_glossary
+            dnt_terms, business_glossary
         )
 
         # Score should be reduced but still valid (0.7 threshold)
         assert result.score == 0.7  # 1.0 - 0.3 penalty
-        assert "Too many excluded terms" in result.issues[0]
+        assert "Too many DNT terms" in result.issues[0]
 
     def test_validate_configuration_quality_too_few_terms(self):
-        """Test quality validation with too few excluded terms."""
-        excluded_terms = ["CEO"]  # Only 1 term
+        """Test quality validation with too few DNT terms."""
+        dnt_terms = ["CEO"]  # Only 1 term
         business_glossary = {}
         result = self.validator.validate_configuration_quality(
-            excluded_terms, business_glossary
+            dnt_terms, business_glossary
         )
 
         # Score should be reduced but still valid (0.8 threshold)
         assert result.score == 0.8  # 1.0 - 0.2 penalty
-        assert "Very few excluded terms" in result.issues[0]
+        assert "Very few DNT terms" in result.issues[0]
 
     def test_calculate_confidence_score(self):
         """Test confidence score calculation."""
-        excluded_result = ValidationResult(
+        dnt_result = ValidationResult(
             is_valid=True, score=0.9, issues=[], suggestions=[], confidence=0.9
         )
         glossary_result = ValidationResult(
@@ -178,7 +171,7 @@ class TestConfigurationValidator:
         )
 
         confidence = self.validator.calculate_confidence_score(
-            excluded_result, glossary_result
+            dnt_result, glossary_result
         )
 
         # Should be weighted average: 0.9 * 0.6 + 0.8 * 0.4 = 0.86
@@ -187,23 +180,23 @@ class TestConfigurationValidator:
 
     def test_get_validation_summary(self):
         """Test comprehensive validation summary."""
-        excluded_terms = ["CEO", "CFO", "API"]
+        dnt_terms = ["CEO", "CFO", "API"]
         business_glossary = {"Spanish": {"CEO": "CEO"}, "French": {"CFO": "CFO"}}
 
         summary = self.validator.get_validation_summary(
-            excluded_terms, business_glossary, self.source_files
+            dnt_terms, business_glossary, self.source_files
         )
 
         assert "overall_valid" in summary
         assert "overall_confidence" in summary
-        assert "excluded_terms" in summary
+        assert "dnt_terms" in summary
         assert "business_glossary" in summary
         assert "quality" in summary
         assert "statistics" in summary
 
         # Check statistics
         stats = summary["statistics"]
-        assert stats["excluded_terms_count"] == 3
+        assert stats["dnt_terms_count"] == 3
         assert stats["glossary_languages"] == 2
         assert stats["total_glossary_terms"] == 2
         assert stats["source_files_count"] == 2

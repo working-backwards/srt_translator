@@ -190,9 +190,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.language_section.load_saved_languages()
 
         # Load and display existing Translation Settings if available
-        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
-        if excluded_terms or business_glossary:
-            self.ai_config_section.update_dnt_display(excluded_terms)
+        dnt_terms, business_glossary = self.settings_manager.load_ai_config()
+        if dnt_terms or business_glossary:
+            self.ai_config_section.update_dnt_display(dnt_terms)
             self.ai_config_section.update_termbase_display(business_glossary)
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
@@ -273,8 +273,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.set_generate_button_enabled(len(selected_files) > 0)
 
         # Check if we have existing Translation Settings and enable action buttons
-        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
-        has_translation_settings = bool(excluded_terms or business_glossary)
+        dnt_terms, business_glossary = self.settings_manager.load_ai_config()
+        has_translation_settings = bool(dnt_terms or business_glossary)
         self.ai_config_section.set_action_buttons_enabled(has_translation_settings)
 
         # Update cost estimate
@@ -353,7 +353,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Start AI configuration generation in a separate thread
 
         class AIConfigWorker(QObject):
-            finished = Signal(tuple)  # (excluded_terms, business_glossary)
+            finished = Signal(tuple)  # (dnt_terms, business_glossary)
             error = Signal(str)
 
             def __init__(self, ai_generator, files, languages):
@@ -372,13 +372,13 @@ class SRTTranslatorMainWindow(QMainWindow):
                         f"AI Config Worker: Extracted {len(content)} characters of content"
                     )
 
-                    self.logger.info("AI Config Worker: Generating excluded terms")
-                    # Generate excluded terms
-                    excluded_terms = self.ai_generator.generate_excluded_terms(
+                    self.logger.info("AI Config Worker: Generating DNT terms")
+                    # Generate DNT terms
+                    dnt_terms = self.ai_generator.generate_dnt_terms(
                         content, SOURCE_LANG
                     )
                     self.logger.info(
-                        f"AI Config Worker: Generated {len(excluded_terms)} excluded terms"
+                        f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
                     )
 
                     self.logger.info("AI Config Worker: Generating business glossary")
@@ -390,7 +390,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                         f"AI Config Worker: Generated business glossary for {len(business_glossary)} languages"
                     )
 
-                    self.finished.emit((excluded_terms, business_glossary))
+                    self.finished.emit((dnt_terms, business_glossary))
 
                 except Exception as e:
                     self.logger.error(f"AI Config Worker: Error during generation: {e}")
@@ -413,21 +413,21 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def ai_config_generation_finished(self, result):
         """Handle AI configuration generation completion"""
-        excluded_terms, business_glossary = result
+        dnt_terms, business_glossary = result
 
         self.logger.info(
-            f"AI configuration generation completed: {len(excluded_terms)} DNT terms, {len(business_glossary)} languages in termbase"
+            f"AI configuration generation completed: {len(dnt_terms)} DNT terms, {len(business_glossary)} languages in termbase"
         )
 
         # Hide progress
         self.ai_config_section.show_progress(False)
 
         # Save AI configuration
-        self.settings_manager.save_ai_config(excluded_terms, business_glossary)
+        self.settings_manager.save_ai_config(dnt_terms, business_glossary)
         self.logger.info("AI configuration saved to settings")
 
         # Update displays
-        self.ai_config_section.update_dnt_display(excluded_terms)
+        self.ai_config_section.update_dnt_display(dnt_terms)
         self.ai_config_section.update_termbase_display(business_glossary)
 
         # Enable action buttons and set configured status
@@ -439,7 +439,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self,
             "Translation Settings Generated",
             f"Successfully generated Translation Settings:\n"
-            f"• {len(excluded_terms)} DNT terms\n"
+            f"• {len(dnt_terms)} DNT terms\n"
             f"• Termbase for {len(business_glossary)} languages\n\n"
             f"The settings will be used automatically for translation.\n"
             f"You can now click 'Edit Settings' to review and modify the results.",
@@ -476,9 +476,9 @@ class SRTTranslatorMainWindow(QMainWindow):
     def edit_translation_settings(self):
         """Open the Translation Settings editor dialog."""
         # Get current Translation Settings
-        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        dnt_terms, business_glossary = self.settings_manager.load_ai_config()
 
-        if not excluded_terms and not business_glossary:
+        if not dnt_terms and not business_glossary:
             QMessageBox.warning(
                 self,
                 "No Translation Settings",
@@ -492,7 +492,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Create and show the edit dialog
         dialog = EditConfigurationDialog(
-            excluded_terms, business_glossary, self, SOURCE_LANG
+            dnt_terms, business_glossary, self, SOURCE_LANG
         )
 
         if dialog.exec():
@@ -528,9 +528,9 @@ class SRTTranslatorMainWindow(QMainWindow):
     def view_translation_settings_details(self):
         """View detailed Translation Settings"""
         # Get current configuration
-        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        dnt_terms, business_glossary = self.settings_manager.load_ai_config()
 
-        if not excluded_terms and not business_glossary:
+        if not dnt_terms and not business_glossary:
             QMessageBox.warning(
                 self,
                 "No Translation Settings",
@@ -543,7 +543,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.toggle_expansion()
 
         # Show detailed information
-        dnt_text = ", ".join(excluded_terms) if excluded_terms else "No DNT terms"
+        dnt_text = ", ".join(dnt_terms) if dnt_terms else "No DNT terms"
         termbase_text = ""
         if business_glossary:
             for language, terms in business_glossary.items():
@@ -567,7 +567,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 <h3>What AI Configuration Does</h3>
 <p>Analyzes your course content and automatically generates optimal translation settings:</p>
 
-<h4>📝 Excluded Terms</h4>
+<h4>📝 DNT Terms</h4>
 <ul>
 <li>Company names (Amazon, Google, Microsoft)</li>
 <li>People's names (Jeff Bezos, instructor names)</li>
@@ -618,8 +618,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         estimated_cost = (estimated_tokens / 1000) * 0.002
 
         # Add AI configuration cost if not already generated
-        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
-        if not excluded_terms and not business_glossary:
+        dnt_terms, business_glossary = self.settings_manager.load_ai_config()
+        if not dnt_terms and not business_glossary:
             estimated_cost += 0.10  # AI configuration cost
 
         cost_text = f"${estimated_cost:.2f}"

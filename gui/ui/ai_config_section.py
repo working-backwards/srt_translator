@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .business_glossary_editor import BusinessGlossaryEditor
-from .excluded_terms_editor import ExcludedTermsEditor
+from .dnt_terms_editor import DNTTermsEditor
 from .toggle_button import AnimatedToggleButton
 
 
@@ -271,15 +271,15 @@ class EditConfigurationDialog(QDialog):
 
     def __init__(
         self,
-        excluded_terms: list,
+        dnt_terms: list,
         business_glossary: dict,
         parent=None,
         source_lang="EN",
     ):
         super().__init__(parent)
-        self.excluded_terms = excluded_terms.copy()
+        self.dnt_terms = dnt_terms.copy()
         self.business_glossary = business_glossary.copy()
-        self.modified_terms = excluded_terms.copy()
+        self.modified_terms = dnt_terms.copy()
         self.modified_glossary = business_glossary.copy()
         self.source_lang = source_lang
 
@@ -304,8 +304,8 @@ class EditConfigurationDialog(QDialog):
         self.tab_widget = QTabWidget()
 
         # DNT Tab
-        self.terms_editor = ExcludedTermsEditor(source_lang=self.source_lang)
-        self.terms_editor.set_terms(self.excluded_terms)
+        self.terms_editor = DNTTermsEditor(source_lang=self.source_lang)
+        self.terms_editor.set_terms(self.dnt_terms)
         self.tab_widget.addTab(self.terms_editor, "DNT")
 
         # Termbase Tab
@@ -343,5 +343,5 @@ class EditConfigurationDialog(QDialog):
     def has_changes(self) -> bool:
         """Check if any changes were made."""
         return self.terms_editor.is_modified(
-            self.excluded_terms
+            self.dnt_terms
         ) or self.glossary_editor.is_modified(self.business_glossary)

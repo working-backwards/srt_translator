@@ -37,12 +37,12 @@ class ValidationWorker(QThread):
 
     def __init__(
         self,
-        excluded_terms: List[str],
+        dnt_terms: List[str],
         business_glossary: Dict[str, Dict[str, str]],
         source_files: List[str],
     ):
         super().__init__()
-        self.excluded_terms = excluded_terms
+        self.dnt_terms = dnt_terms
         self.business_glossary = business_glossary
         self.source_files = source_files
 
@@ -51,7 +51,7 @@ class ValidationWorker(QThread):
         try:
             validator = ConfigurationValidator()
             results = validator.get_validation_summary(
-                self.excluded_terms, self.business_glossary, self.source_files
+                self.dnt_terms, self.business_glossary, self.source_files
             )
             self.validation_complete.emit(results)
         except Exception as e:
@@ -174,10 +174,10 @@ class ValidationSection(QWidget):
         self.validate_btn.clicked.connect(self.run_validation)
 
     def set_configuration(
-        self, excluded_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
     ):
         """Set the configuration to validate."""
-        self.excluded_terms = excluded_terms
+        self.dnt_terms = dnt_terms
         self.business_glossary = business_glossary
         self.validate_btn.setEnabled(True)
 
@@ -187,7 +187,7 @@ class ValidationSection(QWidget):
 
     def run_validation(self):
         """Run configuration validation."""
-        if not hasattr(self, "excluded_terms") or not hasattr(self, "source_files"):
+        if not hasattr(self, "dnt_terms") or not hasattr(self, "source_files"):
             QMessageBox.warning(
                 self,
                 "No Configuration",
@@ -201,7 +201,7 @@ class ValidationSection(QWidget):
 
         # Start validation worker
         self.validation_worker = ValidationWorker(
-            self.excluded_terms, self.business_glossary, self.source_files
+            self.dnt_terms, self.business_glossary, self.source_files
         )
         self.validation_worker.validation_complete.connect(self.on_validation_complete)
         self.validation_worker.validation_error.connect(self.on_validation_error)
@@ -242,13 +242,13 @@ class ValidationSection(QWidget):
         # Update statistics
         stats = results["statistics"]
         stats_text = f"""Configuration Statistics:
-• Excluded Terms: {stats['excluded_terms_count']}
+• DNT Terms: {stats['dnt_terms_count']}
 • Glossary Languages: {stats['glossary_languages']}
 • Total Glossary Terms: {stats['total_glossary_terms']}
 • Source Files: {stats['source_files_count']}
 
 Validation Scores:
-• Excluded Terms: {results['excluded_terms']['score']:.1%} ({results['excluded_terms']['confidence']:.1%} confidence)
+• DNT Terms: {results['dnt_terms']['score']:.1%} ({results['dnt_terms']['confidence']:.1%} confidence)
 • Business Glossary: {results['business_glossary']['score']:.1%} ({results['business_glossary']['confidence']:.1%} confidence)
 • Overall Quality: {results['quality']['score']:.1%} ({results['quality']['confidence']:.1%} confidence)"""
 
@@ -256,11 +256,11 @@ Validation Scores:
 
         # Update issues
         all_issues = []
-        if results["excluded_terms"]["issues"]:
+        if results["dnt_terms"]["issues"]:
             all_issues.extend(
                 [
-                    f"Excluded Terms: {issue}"
-                    for issue in results["excluded_terms"]["issues"]
+                    f"DNT Terms: {issue}"
+                    for issue in results["dnt_terms"]["issues"]
                 ]
             )
         if results["business_glossary"]["issues"]:
@@ -282,11 +282,11 @@ Validation Scores:
 
         # Update suggestions
         all_suggestions = []
-        if results["excluded_terms"]["suggestions"]:
+        if results["dnt_terms"]["suggestions"]:
             all_suggestions.extend(
                 [
                     f"• {suggestion}"
-                    for suggestion in results["excluded_terms"]["suggestions"]
+                    for suggestion in results["dnt_terms"]["suggestions"]
                 ]
             )
         if results["business_glossary"]["suggestions"]:

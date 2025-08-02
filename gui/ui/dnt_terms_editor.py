@@ -1,7 +1,7 @@
 """
-Excluded Terms Editor Widget
+DNT Terms Editor Widget
 
-Provides a user-friendly interface for editing AI-generated excluded terms.
+Provides a user-friendly interface for editing AI-generated DNT terms.
 Allows users to add, remove, and modify terms that should remain in English.
 """
 
@@ -25,8 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 
-class ExcludedTermsEditor(QWidget):
-    """Widget for editing excluded terms that should remain in English."""
+class DNTTermsEditor(QWidget):
+    """Widget for editing DNT terms that should remain in English."""
 
     # Signal emitted when terms are modified
     terms_changed = Signal(list)
@@ -202,13 +202,13 @@ class ExcludedTermsEditor(QWidget):
         self.terms_list_widget.itemSelectionChanged.connect(self.update_button_states)
 
     def set_terms(self, terms: List[str]):
-        """Set the list of excluded terms."""
+        """Set the list of DNT terms."""
         self.terms_list = terms.copy()
         self.refresh_display()
         self.terms_changed.emit(self.terms_list)
 
     def get_terms(self) -> List[str]:
-        """Get the current list of excluded terms."""
+        """Get the current list of DNT terms."""
         return self.terms_list.copy()
 
     def refresh_display(self):
@@ -246,7 +246,7 @@ class ExcludedTermsEditor(QWidget):
         """Add a new term to the list."""
         term, ok = QInputDialog.getText(
             self,
-            "Add Excluded Term",
+            "Add DNT Term",
             "Enter a term that should remain in English:",
             text="",
         )
@@ -270,7 +270,7 @@ class ExcludedTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Added excluded term: {term}")
+            self.logger.info(f"Added DNT term: {term}")
 
     def edit_selected_term(self):
         """Edit the currently selected term."""
@@ -280,7 +280,7 @@ class ExcludedTermsEditor(QWidget):
 
         old_term = selected_items[0].text()
         new_term, ok = QInputDialog.getText(
-            self, "Edit Excluded Term", "Edit the term:", text=old_term
+            self, "Edit DNT Term", "Edit the term:", text=old_term
         )
 
         if ok and new_term.strip():
@@ -306,7 +306,7 @@ class ExcludedTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Edited excluded term: '{old_term}' -> '{new_term}'")
+            self.logger.info(f"Edited DNT term: '{old_term}' -> '{new_term}'")
 
     def remove_selected_term(self):
         """Remove the currently selected term."""
@@ -319,7 +319,7 @@ class ExcludedTermsEditor(QWidget):
         reply = QMessageBox.question(
             self,
             "Remove Term",
-            f"Are you sure you want to remove '{term}' from the excluded terms?",
+            f"Are you sure you want to remove '{term}' from the DNT terms?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -329,7 +329,7 @@ class ExcludedTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Removed excluded term: {term}")
+            self.logger.info(f"Removed DNT term: {term}")
 
     def clear_all_terms(self):
         """Clear all terms from the list."""
@@ -339,7 +339,7 @@ class ExcludedTermsEditor(QWidget):
         reply = QMessageBox.question(
             self,
             "Clear All Terms",
-            f"Are you sure you want to remove all {len(self.terms_list)} excluded terms?",
+            f"Are you sure you want to remove all {len(self.terms_list)} DNT terms?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -349,7 +349,7 @@ class ExcludedTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info("Cleared all excluded terms")
+            self.logger.info("Cleared all DNT terms")
 
     def _validate_term(self, term: str) -> bool:
         """Validate a term before adding/editing."""
