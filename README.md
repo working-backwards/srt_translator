@@ -92,13 +92,49 @@ This two-pass approach ensures that key terms like company names, technical jarg
 
 
 ## Supported Languages
-The SRT Translator can translate to **any language supported by OpenAI's GPT models**. You configure your target languages in the `.env` file using the `TARGET_LANGUAGES` setting.
 
-**Example configuration:**
+The SRT Translator supports **78 languages** through a unified language configuration system. You **must** specify which languages to translate to using the `TARGET_LANGUAGES` setting in your `.env` file.
+
+**This is required to prevent accidentally translating to all 78 languages, which would be expensive.**
+
+### Popular Languages (12)
+- Spanish (ES), French (FR), German (DE), Italian (IT)
+- Portuguese (Brazil) (PT-BR), Chinese Simplified (ZH-HANS)
+- Japanese (JA), Korean (KO), Arabic (AR), Hindi (HI)
+- Russian (RU), Dutch (NL)
+
+### All Available Languages (78 total)
+The system includes languages from Albanian to Zulu, covering major world languages and many regional variants.
+
+### Language Management CLI
+
+Use the built-in language manager to explore available languages:
 
 ```bash
-TARGET_LANGUAGES={"Spanish": "ES", "French": "FR", "German": "DE", "Japanese": "JA"}
+# List all available languages
+python run_language_manager.py list-all
+
+# List popular languages only
+python run_language_manager.py popular
+
+# Search for specific languages
+python run_language_manager.py search spanish
+
+# Get information about a language
+python run_language_manager.py info es
+
+# Show language statistics
+python run_language_manager.py stats
+
+
 ```
+
+### Language Codes
+
+The system uses standard ISO language codes:
+- **Simple codes**: `es` (Spanish), `fr` (French), `de` (German)
+- **Regional variants**: `pt-BR` (Portuguese Brazil), `zh-Hans` (Chinese Simplified)
+- **Full support**: All 78 languages use proper ISO codes for maximum compatibility
 
 ---
 
@@ -185,22 +221,27 @@ srt_translator/
 **Required:**
 - `OPENAI_API_KEY`: Your OpenAI API key
 
+**Required:**
+- `TARGET_LANGUAGES`: Dictionary of target languages (must specify which languages to translate to)
+
 **Optional (with defaults):**
-- `TARGET_LANGUAGES`: Dictionary of target languages (default: Spanish, French, German)
 - `EXCLUDED_TERMS`: Comma-separated list of terms to preserve
 - `INPUT_DIRECTORY`: Input folder name (default: `original_captions`)
 - `OUTPUT_DIRECTORY`: Output folder name (default: `translated_srt_files`)
 - `LOGS_DIRECTORY`: Logs folder name (default: `translation_logs`)
-- `SOURCE_LANG`: Source language code (default: `EN`)
+- `SOURCE_LANG`: Source language code (default: `en`) - **Case-insensitive**
 - `OPENAI_MODEL`: OpenAI model to use (default: `gpt-4o-mini`)
 - `AGGRESSIVENESS`: Auto-fix aggressiveness 0-1 (default: `0.75`)
+
+**Note:** Language codes are case-insensitive. You can enter `SOURCE_LANG=EN` or `SOURCE_LANG=en`, and `TARGET_LANGUAGES={"Spanish": "ES"}` or `TARGET_LANGUAGES={"Spanish": "es"}` - the system will normalize them to lowercase internally.
 
 ### Example .env Configuration
 
 ```bash
 OPENAI_API_KEY=your_api_key_here
-TARGET_LANGUAGES={"Spanish": "ES", "French": "FR", "German": "DE"}
+TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de", "Japanese": "ja"}
 EXCLUDED_TERMS=YourName,YourCompany,YourProduct,CEO,CFO
+SOURCE_LANG=en
 INPUT_DIRECTORY=original_captions
 OUTPUT_DIRECTORY=translated_srt_files
 AGGRESSIVENESS=0.75
@@ -240,7 +281,7 @@ Consider customizing the prompt if you experience:
    ```
 
 2. **Required template variables:**
-   - `{source_lang}` - Will be replaced with source language (e.g., "EN")
+   - `{source_lang}` - Will be replaced with source language (e.g., "en")
    - `{target_lang}` - Will be replaced with target language (e.g., "Spanish")
 
 3. **Example customization for formal business content:**
@@ -300,6 +341,56 @@ The default prompt is designed to work well for most content types. Only customi
 4. **Check logs** in the `translation_logs` directory for any issues or fixes applied.
 
 
+## Testing
+
+The project includes a comprehensive test suite to ensure reliability and functionality.
+
+### Running Tests
+
+**All Tests:**
+```bash
+python run_tests.py
+```
+
+**GUI Tests Only:**
+```bash
+python run_tests.py gui
+```
+
+**Using pytest directly:**
+```bash
+# All tests
+pytest tests/ -v
+
+# GUI tests only  
+pytest tests/gui/ -v
+
+# Specific test file
+pytest tests/test_ai_config_integration.py -v
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py                 # Pytest configuration and fixtures
+├── test_ai_config_basic.py     # Basic AI configuration tests
+├── test_ai_config_integration.py # Integration tests for AI config system
+└── gui/                        # GUI component tests
+    ├── test_business_glossary_editor.py
+    ├── test_editors_integration.py
+    └── test_excluded_terms_editor.py
+```
+
+### Test Types
+
+- **Unit Tests**: Test individual components and functions
+- **Integration Tests**: Test how components work together
+- **GUI Tests**: Test user interface components (standalone applications)
+
+For more details, see `tests/README.md`.
+
+
 ## Automatic Error Fixing
 
 The translator includes intelligent error fixing with configurable aggressiveness:
@@ -332,7 +423,7 @@ The translator includes intelligent error fixing with configurable aggressivenes
 A: No. Just place them in `original_captions/` as-is.
 
 **Q: Can I translate to more than one language at a time?**\
-A: Yes. Use the `TARGET_LANGUAGES` dictionary in `.env` to list as many as you like.
+A: Yes! You can translate to multiple languages by specifying them in the `TARGET_LANGUAGES` setting in your `.env` file. You must specify which languages you want to translate to.
 
 **Q: What if my subtitles break or translate the wrong terms?**\
 A: Check the logs. The fixer will attempt auto-corrections, but logs will report issues.

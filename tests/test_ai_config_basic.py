@@ -71,7 +71,7 @@ def test_ai_config_system():
         ai_generator = AIConfigGenerator("test-key")
         print("AI Config Generator created successfully")
         print(f"Max content length: {ai_generator.MAX_CONTENT_LENGTH}")
-        print(f"Supported languages: {len(ai_generator.SUPPORTED_LANGUAGES)}")
+        print(f"Supported languages: {len(ai_generator.get_supported_languages())}")
     except Exception as e:
         print(f"AI Config Generator test (expected error): {e}")
     

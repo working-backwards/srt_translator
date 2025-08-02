@@ -12,12 +12,13 @@ from PySide6.QtCore import Qt
 
 
 class APISection(QGroupBox):
-    """API key configuration section with status bar style"""
+    """API Configuration section with collapsible content"""
     
     def __init__(self, settings_manager):
-        super().__init__("OpenAI API Configuration")
+        super().__init__("API Configuration")
         self.settings_manager = settings_manager
         self.setObjectName("apiSection")
+        self.is_connected = False
         
         self.setup_ui()
     
@@ -25,11 +26,36 @@ class APISection(QGroupBox):
         """Set up the API section UI"""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)  # Standard margins for input mode
+        layout.setContentsMargins(15, 15, 15, 15)
         
-        # API Key input (initially visible)
-        self.api_input_widget = QWidget()
-        self.api_input_layout = QHBoxLayout(self.api_input_widget)
+        # Header with status and toggle button
+        header_layout = QHBoxLayout()
+        
+        # Status indicator and title
+        self.status_label = QLabel("🔑 API Configuration")
+        self.status_label.setObjectName("subHeaderLabel")
+        
+        # Status indicator (✅ Connected or ⏳ Not Connected)
+        self.status_indicator = QLabel("⏳ Not Connected")
+        self.status_indicator.setObjectName("statusIndicator")
+        
+        # Toggle button
+        self.toggle_btn = QPushButton("▼")
+        self.toggle_btn.setObjectName("secondaryButton")
+        self.toggle_btn.setFixedSize(30, 30)
+        
+        header_layout.addWidget(self.status_label)
+        header_layout.addWidget(self.status_indicator)
+        header_layout.addStretch()
+        header_layout.addWidget(self.toggle_btn)
+        
+        # Content area (initially visible for setup)
+        self.content = QWidget()
+        content_layout = QVBoxLayout(self.content)
+        content_layout.setSpacing(10)
+        
+        # API Key input
+        api_input_layout = QHBoxLayout()
         api_label = QLabel("API Key:")
         self.api_key_input = QLineEdit()
         self.api_key_input.setEchoMode(QLineEdit.Password)
@@ -39,50 +65,43 @@ class APISection(QGroupBox):
         self.test_connection_btn = QPushButton("Test Connection")
         self.test_connection_btn.setObjectName("primaryButton")
         
-        self.api_input_layout.addWidget(api_label)
-        self.api_input_layout.addWidget(self.api_key_input)
-        self.api_input_layout.addWidget(self.test_connection_btn)
+        api_input_layout.addWidget(api_label)
+        api_input_layout.addWidget(self.api_key_input)
+        api_input_layout.addWidget(self.test_connection_btn)
         
-        # Status bar (initially hidden)
-        self.api_status_widget = QWidget()
-        self.api_status_widget.setFixedHeight(32)  # Compact height
-        self.api_status_layout = QHBoxLayout(self.api_status_widget)
-        self.api_status_layout.setContentsMargins(0, 0, 0, 0)
+        # Action buttons for connected state
+        self.action_buttons = QHBoxLayout()
         
-        # Status icon
-        self.status_icon = QLabel("✓")
-        self.status_icon.setObjectName("statusIcon")
-        self.status_icon.setFixedSize(20, 20)
-        
-        # Status text
-        self.api_status_text = QLabel("OpenAI API Connected")
-        self.api_status_text.setObjectName("apiStatusText")
-        
-        # Edit button
-        self.edit_key_btn = QPushButton("Edit Key")
+        self.edit_key_btn = QPushButton("Edit Settings")
         self.edit_key_btn.setObjectName("secondaryButton")
+        self.edit_key_btn.setVisible(False)  # Initially hidden
         
-        self.api_status_layout.addWidget(self.status_icon)
-        self.api_status_layout.addWidget(self.api_status_text)
-        self.api_status_layout.addStretch()
-        self.api_status_layout.addWidget(self.edit_key_btn)
+        self.test_connection_btn_connected = QPushButton("Test Connection")
+        self.test_connection_btn_connected.setObjectName("secondaryButton")
+        self.test_connection_btn_connected.setVisible(False)  # Initially hidden
+        
+        self.action_buttons.addWidget(self.edit_key_btn)
+        self.action_buttons.addWidget(self.test_connection_btn_connected)
+        self.action_buttons.addStretch()
         
         # Status label (for error messages)
-        self.api_status_label = QLabel("")
-        self.api_status_label.setObjectName("statusLabel")
+        self.status_label = QLabel("")
+        self.status_label.setObjectName("statusLabel")
         
         # Add layouts to main layout
-        layout.addWidget(self.api_input_widget)
-        layout.addWidget(self.api_status_widget)
-        layout.addWidget(self.api_status_label)
+        content_layout.addLayout(api_input_layout)
+        content_layout.addLayout(self.action_buttons)
+        content_layout.addWidget(self.status_label)
         
-        # Initially hide status bar
-        self.api_status_widget.setVisible(False)
+        layout.addLayout(header_layout)
+        layout.addWidget(self.content)
     
-    def connect_signals(self, test_connection_callback, edit_key_callback):
+    def connect_signals(self, test_connection_callback, edit_key_callback, toggle_callback):
         """Connect button signals to callbacks"""
         self.test_connection_btn.clicked.connect(test_connection_callback)
+        self.test_connection_btn_connected.clicked.connect(test_connection_callback)
         self.edit_key_btn.clicked.connect(edit_key_callback)
+        self.toggle_btn.clicked.connect(toggle_callback)
     
     def get_api_key(self) -> str:
         """Get the current API key from input field"""
@@ -92,49 +111,53 @@ class APISection(QGroupBox):
         """Set the API key in the input field"""
         self.api_key_input.setText(api_key)
     
-    def show_input_mode(self):
-        """Show the API input field"""
-        self.api_input_widget.setVisible(True)
-        self.api_status_widget.setVisible(False)
-        self.api_status_label.setText("")
-        self.api_status_label.setVisible(False)
-        self.api_key_input.setFocus()
-        
-        # Switch to input mode spacing
-        layout = self.layout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)
+    def toggle_expansion(self):
+        """Toggle the API Configuration section expansion"""
+        if self.is_connected:
+            # If connected, toggle between collapsed and expanded
+            self.content.setVisible(not self.content.isVisible())
+            self.toggle_btn.setText("▲" if self.content.isVisible() else "▼")
+        else:
+            # If not connected, always show content for setup
+            self.content.setVisible(True)
+            self.toggle_btn.setText("▲")
     
-    def show_status_mode(self, api_key: str):
-        """Show the status bar when API key is valid"""
-        self.api_input_widget.setVisible(False)
-        self.api_status_widget.setVisible(True)
-        self.api_status_label.setVisible(False)
-        
-        # Switch to compact status mode spacing
-        layout = self.layout()
-        layout.setSpacing(5)  # Reduced spacing
-        layout.setContentsMargins(10, 8, 10, 8)  # Reduced margins
-        
-        # Update status icon and text
-        self.status_icon.setText("✓")
-        self.status_icon.setProperty("class", "success")
-        self.api_status_text.setText("OpenAI API Connected")
-        self.api_status_text.setProperty("class", "success")
-        
-        # Apply styling
-        self.status_icon.style().unpolish(self.status_icon)
-        self.status_icon.style().polish(self.status_icon)
-        self.api_status_text.style().unpolish(self.api_status_text)
-        self.api_status_text.style().polish(self.api_status_text)
+    def set_connected_status(self, connected: bool):
+        """Set the connected status and update UI accordingly"""
+        self.is_connected = connected
+        if connected:
+            self.status_indicator.setText("✅ Connected")
+            self.status_indicator.setStyleSheet("color: green; font-weight: bold;")
+            # Show action buttons, hide input
+            self.test_connection_btn.setVisible(False)
+            self.api_key_input.setVisible(False)
+            self.edit_key_btn.setVisible(True)
+            self.test_connection_btn_connected.setVisible(True)
+            # Collapse content by default
+            self.content.setVisible(False)
+            self.toggle_btn.setText("▼")
+        else:
+            self.status_indicator.setText("⏳ Not Connected")
+            self.status_indicator.setStyleSheet("color: orange; font-weight: bold;")
+            # Show input, hide action buttons
+            self.test_connection_btn.setVisible(True)
+            self.api_key_input.setVisible(True)
+            self.edit_key_btn.setVisible(False)
+            self.test_connection_btn_connected.setVisible(False)
+            # Show content for setup
+            self.content.setVisible(True)
+            self.toggle_btn.setText("▲")
     
     def show_error(self, error_message: str):
         """Show error message"""
-        self.api_status_label.setText(error_message)
-        self.api_status_label.setProperty("class", "error")
-        self.api_status_label.style().unpolish(self.api_status_label)
-        self.api_status_label.style().polish(self.api_status_label)
-        self.api_status_label.setVisible(True)
+        self.status_label.setText(error_message)
+        self.status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.status_label.setVisible(True)
+    
+    def clear_error(self):
+        """Clear error message"""
+        self.status_label.setText("")
+        self.status_label.setVisible(False)
     
     def load_saved_api_key(self):
         """Load and validate saved API key"""

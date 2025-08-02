@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from srt_core.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
     FIX_AGGRESSIVENESS, LOG_DIRECTORY
+from srt_core.config.language_config import language_config
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
 
@@ -45,6 +46,16 @@ def translate_srt_files(file_paths=None):
     print(f"Translating with batch size: {BATCH_SIZE}")
 
     translator = SRTTranslator(source_lang=SOURCE_LANG)
+
+    # Log language configuration information
+    logging.info(f"Source language: {SOURCE_LANG}")
+    logging.info(f"Target languages: {len(TARGET_LANGUAGES)} languages configured")
+    if len(TARGET_LANGUAGES) <= 10:
+        logging.info(f"Languages: {', '.join(TARGET_LANGUAGES.keys())}")
+    else:
+        popular_langs = language_config.get_popular_languages()
+        logging.info(f"Popular languages: {', '.join(popular_langs)}")
+        logging.info(f"Total available languages: {len(TARGET_LANGUAGES)}")
 
     summary = {
         "total_files": 0,

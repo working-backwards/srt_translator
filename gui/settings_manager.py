@@ -8,6 +8,8 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from PySide6.QtCore import QSettings
+from .config.language_config import language_config
+import logging
 
 
 class SettingsManager:
@@ -31,6 +33,135 @@ class SettingsManager:
     def load_target_languages(self) -> Dict[str, str]:
         """Load target languages dictionary"""
         return self.settings.value("target_languages", {})
+    
+    def save_target_languages_from_codes(self, language_codes: List[str]) -> None:
+        """Save target languages from list of language codes using unified config"""
+        languages = {}
+        for code in language_codes:
+            if language_config.validate_language_code(code):
+                name = language_config.get_language_name(code)
+                languages[name] = code
+        
+        self.save_target_languages(languages)
+    
+    def load_target_language_codes(self) -> List[str]:
+        """Load target languages as list of codes"""
+        languages = self.load_target_languages()
+        return list(languages.values())
+    
+    def get_popular_languages(self) -> List[str]:
+        """Get popular languages from unified config"""
+        return language_config.get_popular_languages()
+    
+    def get_adaptive_popular_languages(self) -> List[str]:
+        """
+        Get adaptive popular languages based on user preferences and usage
+        
+        Returns:
+            List of language codes for popular languages, combining:
+            - User's frequently used languages
+            - Default popular languages to fill remaining slots
+        """
+        popular_limit = language_config.get_popular_limit()
+        user_preferences = self.load_user_popular_languages()
+        default_popular = language_config.get_popular_languages()
+        
+        # If user has no preferences, use default popular languages
+        if not user_preferences:
+            return default_popular[:popular_limit]
+        
+        # If user has preferences but they're fewer than the limit, 
+        # fill the remaining slots with default popular languages
+        if len(user_preferences) < popular_limit:
+            # Get default languages that aren't already in user preferences
+            remaining_defaults = [code for code in default_popular if code not in user_preferences]
+            # Fill up to the limit
+            additional_languages = remaining_defaults[:popular_limit - len(user_preferences)]
+            return user_preferences + additional_languages
+        
+        # If user has enough preferences, use them (up to the limit)
+        return user_preferences[:popular_limit]
+    
+    def save_user_popular_languages(self, language_codes: List[str]) -> None:
+        """Save user's preferred popular languages"""
+        self.settings.setValue("user_popular_languages", language_codes)
+    
+    def load_user_popular_languages(self) -> List[str]:
+        """Load user's preferred popular languages"""
+        return self.settings.value("user_popular_languages", [])
+    
+    def reset_adaptive_popular_languages(self) -> None:
+        """Reset adaptive popular languages to default values"""
+        self.settings.remove("user_popular_languages")
+        self.settings.remove("language_usage_data")
+        logging.info("Reset adaptive popular languages to defaults")
+    
+    def track_language_usage(self, language_code: str) -> None:
+        """
+        Track when a user selects a language to improve adaptive popular languages
+        
+        Args:
+            language_code: The language code that was selected
+        """
+        if not language_config.validate_language_code(language_code):
+            return
+        
+        # Get current usage tracking
+        usage_data = self.load_language_usage_data()
+        
+        # Update usage count and last used timestamp
+        current_time = datetime.now().isoformat()
+        if language_code in usage_data:
+            usage_data[language_code]['count'] += 1
+            usage_data[language_code]['last_used'] = current_time
+        else:
+            usage_data[language_code] = {
+                'count': 1,
+                'last_used': current_time
+            }
+        
+        # Save updated usage data
+        self.save_language_usage_data(usage_data)
+        
+        # Update popular languages if needed
+        self._update_adaptive_popular_languages(usage_data)
+    
+    def load_language_usage_data(self) -> Dict[str, Dict]:
+        """Load language usage tracking data"""
+        return self.settings.value("language_usage_data", {})
+    
+    def save_language_usage_data(self, usage_data: Dict[str, Dict]) -> None:
+        """Save language usage tracking data"""
+        self.settings.setValue("language_usage_data", usage_data)
+    
+    def _update_adaptive_popular_languages(self, usage_data: Dict[str, Dict]) -> None:
+        """
+        Update adaptive popular languages based on usage data
+        
+        Args:
+            usage_data: Dictionary of language usage statistics
+        """
+        popular_limit = language_config.get_popular_limit()
+        current_popular = self.load_user_popular_languages()
+        
+        # Sort languages by usage count (descending) and then by last used (descending)
+        sorted_languages = sorted(
+            usage_data.items(),
+            key=lambda x: (x[1]['count'], x[1]['last_used']),
+            reverse=True
+        )
+        
+        # Get top used languages
+        top_used_codes = [code for code, _ in sorted_languages[:popular_limit]]
+        
+        # If the top used languages are different from current popular, update them
+        if top_used_codes != current_popular:
+            self.save_user_popular_languages(top_used_codes)
+            logging.info(f"Updated adaptive popular languages: {top_used_codes}")
+    
+    def get_all_languages(self) -> Dict[str, str]:
+        """Get all available languages from unified config"""
+        return language_config.get_language_names()
     
     def save_last_input_directory(self, directory: str) -> None:
         """Save last used input directory"""

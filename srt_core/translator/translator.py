@@ -7,10 +7,16 @@ import srt
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt_core.config.settings import LANGUAGE_MAP, OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
+from srt_core.config.settings import OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
 from srt_core.translator.srt_parser import SRTParser
 from srt_core.translator.term_handler import TermHandler
 from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
+
+# Import unified language configuration
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from gui.config.language_config import language_config
 
 
 # Update BAD_RESPONSE_PATTERNS to only check for the new phrase
@@ -49,7 +55,8 @@ class SRTTranslator:
 
         # Get glossary for this language
         glossary_block = self._format_glossary_block(target_lang)
-        mapped_target_lang = LANGUAGE_MAP.get(target_lang, target_lang)
+        # Use unified language config for mapping (no mapping needed for standard ISO codes)
+        mapped_target_lang = target_lang
 
         # First try to load from external prompt file
         prompt_file_path = os.getenv(
@@ -132,7 +139,8 @@ Translate completely and naturally."""
     def get_batch_translation_prompt(self, source_lang, target_lang):
         """Get the batch translation prompt with glossary integration"""
         glossary_block = self._format_glossary_block(target_lang)
-        mapped_target_lang = LANGUAGE_MAP.get(target_lang, target_lang)
+        # Use unified language config (no mapping needed for standard ISO codes)
+        mapped_target_lang = target_lang
         return f"""You are a professional translator. Translate the following SRT subtitles from {source_lang} to {mapped_target_lang}.
 
 BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
@@ -159,7 +167,8 @@ Return a complete, valid SRT block with all content translated. Do not change su
 
     def translate_subtitle(self, text, target_lang, filename, subtitle_number=None, summary=None):
         """Translate a single subtitle text"""
-        mapped_target_lang = LANGUAGE_MAP.get(target_lang, target_lang)
+        # Use unified language config (no mapping needed for standard ISO codes)
+        mapped_target_lang = target_lang
 
         try:
             time.sleep(0.5)

@@ -4,13 +4,15 @@ Uses modular components for better maintainability
 """
 
 import os
+import sys
 import logging
 from typing import List, Dict
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QFrame, QScrollArea, QFileDialog
+    QLabel, QFrame, QScrollArea, QFileDialog, QMessageBox
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal, QObject
+from PySide6.QtGui import QFont, QIcon
 
 from .settings_manager import SettingsManager
 from .config_manager import GUIConfigManager
@@ -26,6 +28,8 @@ from .utils.validation import (
     validate_translation_inputs, show_validation_error,
     show_translation_results, show_translation_error
 )
+from srt_core.config.settings import SOURCE_LANG
+from srt_core.utils.logging_setup import setup_logging
 
 
 class SRTTranslatorMainWindow(QMainWindow):
@@ -33,11 +37,22 @@ class SRTTranslatorMainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # Set up logging for the GUI application
+        self.log_file = setup_logging()
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("SRT Translator GUI started")
+        
+        # Initialize components
         self.settings_manager = SettingsManager()
         self.config_manager = GUIConfigManager(self.settings_manager)
         self.ai_config_generator = None
+        self.ai_config_thread = None
+        self.ai_config_worker = None
         self.translation_worker = None
+        self.translation_thread = None
         
+        # Set up the window
         self.setup_window()
         self.setup_ui()
         self.connect_signals()
@@ -81,9 +96,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section = AIConfigSection()
         self.translation_section = TranslationSection()
         
-        content_layout.addWidget(self.api_section)
         content_layout.addWidget(self.file_section)
         content_layout.addWidget(self.language_section)
+        content_layout.addWidget(self.api_section)
         content_layout.addWidget(self.ai_config_section)
         content_layout.addWidget(self.translation_section)
         
@@ -112,7 +127,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         # API Section signals
         self.api_section.connect_signals(
             self.test_api_connection,
-            self.show_api_input
+            self.show_api_input,
+            self.toggle_api_configuration
         )
         
         # File Section signals
@@ -130,10 +146,14 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.on_language_search_changed
         )
         
-        # AI Config Section signals
+        # Translation Settings Section signals
         self.ai_config_section.connect_signals(
-            self.toggle_ai_config,
-            self.generate_ai_configuration
+            self.toggle_translation_settings,
+            self.generate_translation_settings,
+            self.edit_translation_settings,
+            self.regenerate_translation_settings,
+            self.view_translation_settings_details,
+            self.show_ai_config_help
         )
         
         # Translation Section signals
@@ -143,20 +163,38 @@ class SRTTranslatorMainWindow(QMainWindow):
     
     def load_previous_settings(self):
         """Load previous settings from storage"""
-        # Load API key
-        self.api_section.load_saved_api_key()
+        # Load API key and set connection status
+        api_key = self.settings_manager.load_api_key()
+        if api_key and api_key.startswith("sk-") and len(api_key) > 20:
+            self.api_section.set_api_key(api_key)
+            self.api_section.set_connected_status(True)
+        else:
+            self.api_section.load_saved_api_key()
+            self.api_section.set_connected_status(False)
         
         # Load selected files
         self.file_section.load_saved_files()
         
         # Load target languages
         self.language_section.load_saved_languages()
+        
+        # Load and display existing Translation Settings if available
+        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        if excluded_terms or business_glossary:
+            self.ai_config_section.update_dnt_display(excluded_terms)
+            self.ai_config_section.update_termbase_display(business_glossary)
+            self.ai_config_section.set_action_buttons_enabled(True)
+            self.ai_config_section.set_configured_status(True)
     
     def apply_styles(self):
         """Apply the complete style guide to the application"""
         self.setStyleSheet(MAIN_STYLESHEET)
     
     # API Section Handlers
+    def toggle_api_configuration(self):
+        """Toggle the API Configuration section expansion"""
+        self.api_section.toggle_expansion()
+    
     def test_api_connection(self):
         """Test the OpenAI API connection"""
         api_key = self.api_section.get_api_key()
@@ -169,13 +207,14 @@ class SRTTranslatorMainWindow(QMainWindow):
         
         # Test connection (simplified - just check if key is valid format)
         if api_key.startswith("sk-") and len(api_key) > 20:
-            self.api_section.show_status_mode(api_key)
+            self.api_section.set_connected_status(True)
+            self.api_section.clear_error()
         else:
-            self.api_section.show_error("✗ Invalid API key format")
+            self.api_section.show_error("Invalid API key format")
     
     def show_api_input(self):
-        """Show the API input field when Edit Key is clicked"""
-        self.api_section.show_input_mode()
+        """Show the API input field when Edit Settings is clicked"""
+        self.api_section.set_connected_status(False)  # Switch to input mode
     
     # File Section Handlers
     def browse_files(self):
@@ -216,34 +255,50 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.file_section.update_file_count_from_selection()
         self.file_section.sync_selection_with_visual()
         
-        # Enable/disable AI config generation based on file selection
+        # Enable/disable Translation Settings generation based on file selection
         selected_files = self.file_section.get_selected_files()
         self.ai_config_section.set_generate_button_enabled(len(selected_files) > 0)
+        
+        # Check if we have existing Translation Settings and enable action buttons
+        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        has_translation_settings = bool(excluded_terms or business_glossary)
+        self.ai_config_section.set_action_buttons_enabled(has_translation_settings)
+        
+        # Update cost estimate
+        self.update_cost_estimate()
     
     # Language Section Handlers
     def on_language_toggled(self):
         """Handle language checkbox toggling"""
         self.language_section.update_target_languages_from_ui()
+        # Check for adaptive updates after language selection
+        self.language_section.check_for_adaptive_updates()
+        self.update_cost_estimate()
     
     def on_language_list_selection_changed(self):
         """Handle language list selection changes"""
         self.language_section.update_target_languages_from_ui()
+        # Check for adaptive updates after language selection
+        self.language_section.check_for_adaptive_updates()
+        self.update_cost_estimate()
     
     def on_language_search_changed(self):
         """Handle language search text changes"""
         self.language_section.filter_languages()
     
     # AI Config Section Handlers
-    def toggle_ai_config(self):
-        """Toggle the AI configuration section expansion"""
+    def toggle_translation_settings(self):
+        """Toggle the Translation Settings section expansion"""
         self.ai_config_section.toggle_expansion()
     
-    def generate_ai_configuration(self):
-        """Generate AI configuration for the selected files"""
+    def generate_translation_settings(self):
+        """Generate Translation Settings for the selected files"""
         # Get selected files and target languages
         selected_files = self.file_section.get_selected_files()
         target_languages = self.language_section.get_target_languages()
         api_key = self.settings_manager.load_api_key()
+        
+        self.logger.info(f"Starting AI configuration generation with {len(selected_files)} files and {len(target_languages)} languages")
         
         # Validate inputs
         if not selected_files:
@@ -251,12 +306,15 @@ class SRTTranslatorMainWindow(QMainWindow):
             return
         
         if not api_key:
-            show_validation_error(self, "No API Key", "Please enter an OpenAI API key to generate AI configuration.")
+            show_validation_error(self, "No API Key", "Please enter an OpenAI API key to generate Translation Settings.")
             return
         
         if not target_languages:
             show_validation_error(self, "No Target Languages", "Please select at least one target language.")
             return
+        
+        self.logger.info(f"Selected files: {[os.path.basename(f) for f in selected_files]}")
+        self.logger.info(f"Target languages: {list(target_languages.values())}")
         
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
@@ -266,7 +324,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.show_progress(True)
         
         # Start AI configuration generation in a separate thread
-        from PySide6.QtCore import QThread, Signal, QObject
         
         class AIConfigWorker(QObject):
             finished = Signal(tuple)  # (excluded_terms, business_glossary)
@@ -277,26 +334,34 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.ai_generator = ai_generator
                 self.files = files
                 self.languages = languages
+                self.logger = logging.getLogger(__name__)
             
             def run(self):
                 try:
+                    self.logger.info("AI Config Worker: Starting content extraction")
                     # Extract content from SRT files
                     content = self.ai_generator.extract_subtitle_content(self.files)
+                    self.logger.info(f"AI Config Worker: Extracted {len(content)} characters of content")
                     
+                    self.logger.info("AI Config Worker: Generating excluded terms")
                     # Generate excluded terms
-                    excluded_terms = self.ai_generator.generate_excluded_terms(content)
+                    excluded_terms = self.ai_generator.generate_excluded_terms(content, SOURCE_LANG)
+                    self.logger.info(f"AI Config Worker: Generated {len(excluded_terms)} excluded terms")
                     
+                    self.logger.info("AI Config Worker: Generating business glossary")
                     # Generate business glossary
                     business_glossary = self.ai_generator.generate_business_glossary(content, self.languages)
+                    self.logger.info(f"AI Config Worker: Generated business glossary for {len(business_glossary)} languages")
                     
                     self.finished.emit((excluded_terms, business_glossary))
                     
                 except Exception as e:
+                    self.logger.error(f"AI Config Worker: Error during generation: {e}")
                     self.error.emit(str(e))
         
         # Create and start worker thread
         self.ai_config_thread = QThread()
-        self.ai_config_worker = AIConfigWorker(self.ai_config_generator, selected_files, list(target_languages.keys()))
+        self.ai_config_worker = AIConfigWorker(self.ai_config_generator, selected_files, list(target_languages.values()))
         self.ai_config_worker.moveToThread(self.ai_config_thread)
         
         self.ai_config_thread.started.connect(self.ai_config_worker.run)
@@ -311,40 +376,209 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Handle AI configuration generation completion"""
         excluded_terms, business_glossary = result
         
+        self.logger.info(f"AI configuration generation completed: {len(excluded_terms)} DNT terms, {len(business_glossary)} languages in termbase")
+        
         # Hide progress
         self.ai_config_section.show_progress(False)
         
         # Save AI configuration
         self.settings_manager.save_ai_config(excluded_terms, business_glossary)
+        self.logger.info("AI configuration saved to settings")
         
         # Update displays
-        self.ai_config_section.update_terms_display(excluded_terms)
-        self.ai_config_section.update_glossary_display(business_glossary)
+        self.ai_config_section.update_dnt_display(excluded_terms)
+        self.ai_config_section.update_termbase_display(business_glossary)
+        
+        # Enable action buttons and set configured status
+        self.ai_config_section.set_action_buttons_enabled(True)
+        self.ai_config_section.set_configured_status(True)
         
         # Show success message
-        from PySide6.QtWidgets import QMessageBox
         QMessageBox.information(
             self,
-            "AI Configuration Generated",
-            f"Successfully generated AI configuration:\n"
-            f"• {len(excluded_terms)} excluded terms\n"
-            f"• Business glossary for {len(business_glossary)} languages\n\n"
-            f"The configuration will be used automatically for translation."
+            "Translation Settings Generated",
+            f"Successfully generated Translation Settings:\n"
+            f"• {len(excluded_terms)} DNT terms\n"
+            f"• Termbase for {len(business_glossary)} languages\n\n"
+            f"The settings will be used automatically for translation.\n"
+            f"You can now click 'Edit Settings' to review and modify the results."
         )
     
-    def ai_config_generation_error(self, error_message):
-        """Handle AI configuration generation error"""
+    def ai_config_generation_error(self, error_message: str):
+        """Handle AI configuration generation errors"""
+        self.logger.error(f"AI configuration generation failed: {error_message}")
+        
         # Hide progress
         self.ai_config_section.show_progress(False)
         
-        # Show error message
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.warning(
+        # Get detailed error information
+        try:
+            error_details = self.ai_config_generator.get_error_details(Exception(error_message))
+            title = error_details.get("title", "AI Configuration Failed")
+            message = error_details.get("message", error_message)
+            suggestion = error_details.get("suggestion", "")
+            
+            # Show detailed error message
+            QMessageBox.warning(
+                self,
+                title,
+                f"{message}\n\n{suggestion}" if suggestion else message
+            )
+        except Exception:
+            # Fallback to simple error message
+            QMessageBox.warning(
+                self,
+                "AI Configuration Failed",
+                f"An error occurred while generating translation settings:\n\n{error_message}"
+            )
+    
+    def edit_translation_settings(self):
+        """Open the Translation Settings editor dialog."""
+        # Get current Translation Settings
+        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        
+        if not excluded_terms and not business_glossary:
+            QMessageBox.warning(
+                self,
+                "No Translation Settings",
+                "No Translation Settings have been generated yet.\n"
+                "Please generate settings first."
+            )
+            return
+        
+        # Import the dialog class
+        from .ui.ai_config_section import EditConfigurationDialog
+        
+        # Create and show the edit dialog
+        dialog = EditConfigurationDialog(excluded_terms, business_glossary, self, SOURCE_LANG)
+        
+        if dialog.exec():
+            # User clicked OK, get modified configuration
+            modified_terms, modified_glossary = dialog.get_modified_config()
+            
+            if dialog.has_changes():
+                # Save the modified configuration
+                self.settings_manager.save_ai_config(modified_terms, modified_glossary)
+                
+                # Update displays
+                self.ai_config_section.update_dnt_display(modified_terms)
+                self.ai_config_section.update_termbase_display(modified_glossary)
+                
+                # Show confirmation
+                QMessageBox.information(
+                    self,
+                    "Translation Settings Updated",
+                    "Your changes have been saved and will be used for translation."
+                )
+                
+                logging.info(f"Translation Settings updated: {len(modified_terms)} terms, {len(modified_glossary)} languages")
+    
+    def regenerate_translation_settings(self):
+        """Regenerate Translation Settings for selected files"""
+        # This is essentially the same as generate, but we'll expand the section first
+        if not self.ai_config_section.is_expanded:
+            self.ai_config_section.toggle_expansion()  # Ensure section is expanded
+        self.generate_translation_settings()
+    
+    def view_translation_settings_details(self):
+        """View detailed Translation Settings"""
+        # Get current configuration
+        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        
+        if not excluded_terms and not business_glossary:
+            QMessageBox.warning(
+                self,
+                "No Translation Settings",
+                "No Translation Settings have been generated yet.\nPlease generate settings first."
+            )
+            return
+        
+        # Expand the section to show details
+        if not self.ai_config_section.is_expanded:
+            self.ai_config_section.toggle_expansion()
+        
+        # Show detailed information
+        dnt_text = ", ".join(excluded_terms) if excluded_terms else "No DNT terms"
+        termbase_text = ""
+        if business_glossary:
+            for language, terms in business_glossary.items():
+                termbase_text += f"{language}:\n"
+                for english_term, translation in terms.items():
+                    termbase_text += f"  • {english_term} → {translation}\n"
+                termbase_text += "\n"
+        else:
+            termbase_text = "No termbase entries"
+        
+        # Update displays with full details
+        self.ai_config_section.set_dnt_display(dnt_text)
+        self.ai_config_section.set_termbase_display(termbase_text)
+    
+    def show_ai_config_help(self):
+        """Show help dialog for AI Configuration"""
+        QMessageBox.information(
             self,
-            "AI Configuration Failed",
-            f"Failed to generate AI configuration:\n{error_message}\n\n"
-            f"The system will fall back to manual configuration or defaults."
+            "AI Configuration Help",
+            """
+<h3>What AI Configuration Does</h3>
+<p>Analyzes your course content and automatically generates optimal translation settings:</p>
+
+<h4>📝 Excluded Terms</h4>
+<ul>
+<li>Company names (Amazon, Google, Microsoft)</li>
+<li>People's names (Jeff Bezos, instructor names)</li>
+<li>Technical terms (API, CEO, Excel)</li>
+<li>Brands better known in English internationally</li>
+</ul>
+
+<h4>📚 Business Glossary</h4>
+<ul>
+<li>Consistent professional translations for key terms</li>
+<li>Business vocabulary specific to your course</li>
+<li>Industry terminology that needs standardization</li>
+</ul>
+
+<h3>What You Need</h3>
+<ul>
+<li><strong>OpenAI API Key:</strong> Get one at platform.openai.com (~$2-10 per course)</li>
+<li><strong>Multiple Files:</strong> 2-5 subtitle files work best for analysis</li>
+<li><strong>Representative Content:</strong> Files containing your key terminology</li>
+</ul>
+
+<h3>Best For</h3>
+<ul>
+<li>Business courses with case studies</li>
+<li>Technical training with software names</li>
+<li>Professional development courses</li>
+<li>Any course with specialized vocabulary</li>
+</ul>
+
+<p><em>Analysis takes 30-60 seconds and significantly improves translation quality.</em></p>
+"""
         )
+    
+    def update_cost_estimate(self):
+        """Update the cost estimate based on current selection"""
+        selected_files = self.file_section.get_selected_files()
+        target_languages = self.language_section.get_target_languages()
+        
+        if not selected_files or not target_languages:
+            self.translation_section.update_cost_estimate("$0.00")
+            return
+        
+        # Simple cost estimation: $0.002 per 1K tokens
+        # Assume average of 1000 tokens per SRT file per language
+        total_files = len(selected_files)
+        total_languages = len(target_languages)
+        estimated_tokens = total_files * total_languages * 1000
+        estimated_cost = (estimated_tokens / 1000) * 0.002
+        
+        # Add AI configuration cost if not already generated
+        excluded_terms, business_glossary = self.settings_manager.load_ai_config()
+        if not excluded_terms and not business_glossary:
+            estimated_cost += 0.10  # AI configuration cost
+        
+        cost_text = f"${estimated_cost:.2f}"
+        self.translation_section.update_cost_estimate(cost_text)
     
     # Translation Section Handlers
     def start_translation(self):
@@ -354,6 +588,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         
         # Update target languages from UI state to ensure synchronization
         self.language_section.update_target_languages_from_ui()
+        # Check for adaptive updates after language selection
+        self.language_section.check_for_adaptive_updates()
         
         # Get target languages from the language section
         target_languages = self.language_section.get_target_languages()

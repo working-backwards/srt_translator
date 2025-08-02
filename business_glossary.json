@@ -1,71 +1,71 @@
 {
-  "Spanish": {
+  "es": {
     "operating plan": "plan operativo",
     "business review": "revisión de negocio",
     "input metrics": "métricas de entrada",
     "thrash": "confusión"
   },
-  "French": {
+  "fr": {
     "operating plan": "plan opérationnel",
     "business review": "revue d'affaires",
     "input metrics": "indicateurs d'entrée",
     "thrash": "agitation"
   },
-  "German": {
+  "de": {
     "operating plan": "Betriebsplan",
     "business review": "Geschäftsüberprüfung",
     "input metrics": "Eingangskennzahlen",
     "thrash": "Durcheinander"
   },
-  "Italian": {
+  "it": {
     "operating plan": "piano operativo",
     "annual planning": "pianificazione annuale",
     "input metrics": "metriche di input",
     "thrash": "confusione"
   },
-  "Japanese": {
+  "ja": {
     "operating plan": "運営計画",
     "annual planning": "年間計画",
     "input metrics": "入力指標",
     "thrash": "混乱"
   },
-  "Chinese Simplified": {
+  "zh-Hans": {
     "operating plan": "运营计划",
     "annual planning": "年度规划",
     "input metrics": "输入指标",
     "thrash": "混乱"
   },
-  "Vietnamese": {
+  "vi": {
     "operating plan": "kế hoạch hoạt động",
     "business review": "đánh giá kinh doanh",
     "input metrics": "chỉ số đầu vào",
     "thrash": "hỗn loạn"
   },
-  "Portuguese - Brazilian": {
+  "pt-BR": {
     "operating plan": "plano operacional",
     "business review": "revisão de negócios",
     "input metrics": "métricas de entrada",
     "thrash": "confusão"
   },
-  "Indonesian": {
+  "id": {
     "operating plan": "rencana operasional",
     "business review": "tinjauan bisnis",
     "input metrics": "metrik masukan",
     "thrash": "kekacauan"
   },
-  "Arabic": {
+  "ar": {
     "operating plan": "خطة التشغيل",
     "business review": "مراجعة الأعمال",
     "input metrics": "مقاييس المدخلات",
     "thrash": "فوضى"
   },
-  "Turkish": {
+  "tr": {
     "operating plan": "işletme planı",
     "annual planning": "yıllık planlama",
     "input metrics": "girdi metrikleri",
     "resource allocation": "kaynak tahsisi"
   },
-  "Azerbaijani": {
+  "az": {
     "operating plan": "əməliyyat planı",
     "annual planning": "illik planlaşdırma",
     "input metrics": "giriş göstəriciləri",

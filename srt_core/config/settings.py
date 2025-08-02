@@ -33,8 +33,8 @@ print(f"SOURCE_DIR: {SOURCE_DIR}")
 
 # General settings
 SOURCE_LANG = (
-    os.environ["SOURCE_LANG"] if "SOURCE_LANG" in os.environ else "EN"
-)  # Default source language
+    os.environ["SOURCE_LANG"].lower() if "SOURCE_LANG" in os.environ else "en"
+)  # Default source language (normalized to lowercase)
 LOG_MODE = (
     os.environ["LOG_MODE"] if "LOG_MODE" in os.environ else "Standard"
 )  # Can be 'Standard' or 'Verbose'
@@ -51,11 +51,33 @@ FIX_AGGRESSIVENESS = float(
     os.environ.get("AGGRESSIVENESS", "0.75")
 )  # Default level: conservative fixes
 
+# Import the unified language configuration
+from .language_config import language_config
+
 # Dictionary of target languages with their ISO codes
-TARGET_LANGUAGES_TEXT = (
-    os.environ["TARGET_LANGUAGES"] if "TARGET_LANGUAGES" in os.environ else "{}"
-)
-TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
+# TARGET_LANGUAGES must be explicitly configured in .env file
+if "TARGET_LANGUAGES" not in os.environ:
+    raise ValueError(
+        "TARGET_LANGUAGES must be configured in your .env file. "
+        "This setting is required to specify which languages to translate to. "
+        "See env_example_language_configs.txt for configuration examples."
+    )
+
+TARGET_LANGUAGES_TEXT = os.environ["TARGET_LANGUAGES"]
+try:
+    TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
+    if not TARGET_LANGUAGES:
+        raise ValueError("TARGET_LANGUAGES cannot be empty. Please specify at least one language.")
+    
+    # Normalize all language codes to lowercase for consistency
+    normalized_target_languages = {}
+    for lang_name, lang_code in TARGET_LANGUAGES.items():
+        normalized_target_languages[lang_name] = lang_code.lower()
+    
+    TARGET_LANGUAGES = normalized_target_languages
+    print(f"Using TARGET_LANGUAGES from .env file with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)")
+except json.JSONDecodeError as e:
+    raise ValueError(f"Invalid TARGET_LANGUAGES format in .env file: {e}")
 
 # Excluded terms that will not be translated
 EXCLUDED_TERMS_TEXT = (
@@ -63,13 +85,7 @@ EXCLUDED_TERMS_TEXT = (
 )
 EXCLUDED_TERMS = EXCLUDED_TERMS_TEXT.split(",")
 
-# Language mapping for special variants
-LANGUAGE_MAP = {
-    "Portuguese - Brazilian": "Brazilian Portuguese",
-    "Portuguese - European": "European Portuguese",
-    "Chinese Simplified": "Simplified Chinese",
-    "Chinese Traditional": "Traditional Chinese",
-}
+# Language configuration is now handled by the unified system in config/languages.json
 
 # Business Glossary Support
 BUSINESS_GLOSSARY_PATH = os.path.join(BASE_DIR, "business_glossary.json")

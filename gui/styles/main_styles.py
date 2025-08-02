@@ -137,6 +137,26 @@ MAIN_STYLESHEET = """
         background-color: #D1D5DB;
     }
     
+    /* Help Button */
+    #helpButton {
+        background-color: #EFF6FF;
+        color: #2563EB;
+        border: 1px solid #DBEAFE;
+        border-radius: 15px;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    #helpButton:hover {
+        background-color: #DBEAFE;
+        border-color: #93C5FD;
+    }
+    
+    #helpButton:pressed {
+        background-color: #BFDBFE;
+    }
+    
     /* File List Areas */
     #fileList, #languageList {
         background-color: #F9FAFB;

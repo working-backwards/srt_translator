@@ -4,8 +4,8 @@ Handles translation controls and progress display
 """
 
 from PySide6.QtWidgets import (
-    QGroupBox, QVBoxLayout,
-    QPushButton, QProgressBar, QTextEdit
+    QGroupBox, QVBoxLayout, QHBoxLayout,
+    QPushButton, QProgressBar, QTextEdit, QLabel
 )
 
 
@@ -22,6 +22,18 @@ class TranslationSection(QGroupBox):
         """Set up the translation section UI"""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
+        
+        # Cost estimation
+        cost_layout = QHBoxLayout()
+        cost_label = QLabel("Estimated Cost:")
+        cost_label.setObjectName("costLabel")
+        self.cost_estimate = QLabel("$0.00")
+        self.cost_estimate.setObjectName("costEstimate")
+        self.cost_estimate.setStyleSheet("color: #2563EB; font-weight: 600;")
+        
+        cost_layout.addWidget(cost_label)
+        cost_layout.addWidget(self.cost_estimate)
+        cost_layout.addStretch()
         
         # Translate button
         self.translate_btn = QPushButton("Translate All Files")
@@ -41,6 +53,7 @@ class TranslationSection(QGroupBox):
         self.log_output.setReadOnly(True)
         self.log_output.setPlaceholderText("Translation progress will appear here...")
         
+        layout.addLayout(cost_layout)
         layout.addWidget(self.translate_btn)
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.log_output)
@@ -70,4 +83,8 @@ class TranslationSection(QGroupBox):
     
     def clear_log_output(self):
         """Clear the log output"""
-        self.log_output.clear() 
+        self.log_output.clear()
+    
+    def update_cost_estimate(self, cost: str):
+        """Update the cost estimate display"""
+        self.cost_estimate.setText(cost) 

@@ -1,6 +1,6 @@
 """
 Language Selection Section
-Handles target language selection and management
+Handles target language selection and management using unified language configuration
 """
 
 import logging
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem, QCheckBox
 )
 from PySide6.QtCore import Qt
+from ..config.language_config import language_config
 
 
 class LanguageSection(QGroupBox):
@@ -25,7 +26,7 @@ class LanguageSection(QGroupBox):
         self.populate_language_list()
     
     def setup_ui(self):
-        """Set up the language section UI"""
+        """Set up the language section UI using unified language configuration"""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         
@@ -36,17 +37,16 @@ class LanguageSection(QGroupBox):
         
         popular_grid = QGridLayout()
         popular_grid.setVerticalSpacing(25)  # 25px between checkbox rows as per style guide
-        popular_languages = [
-            ("Spanish", "es"), ("French", "fr"), ("German", "de"),
-            ("Italian", "it"), ("Portuguese", "pt"), ("Russian", "ru"),
-            ("Japanese", "ja"), ("Korean", "ko"), ("Chinese", "zh"),
-            ("Arabic", "ar"), ("Hindi", "hi"), ("Dutch", "nl")
-        ]
+        
+        # Get adaptive popular languages from settings manager
+        popular_language_codes = self.settings_manager.get_adaptive_popular_languages()
         
         self.language_checkboxes = {}
-        for i, (name, code) in enumerate(popular_languages):
+        for i, code in enumerate(popular_language_codes):
+            name = language_config.get_language_name(code)
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
+            checkbox.setProperty("language_code", code)  # Store language code for tracking
             self.language_checkboxes[code] = checkbox
             popular_grid.addWidget(checkbox, i // 3, i % 3)
         
@@ -91,27 +91,19 @@ class LanguageSection(QGroupBox):
         self.search_input.textChanged.connect(search_changed_callback)
     
     def populate_language_list(self):
-        """Populate the full language list"""
-        all_languages = {
-            "Spanish": "es", "French": "fr", "German": "de", "Italian": "it",
-            "Portuguese": "pt", "Russian": "ru", "Japanese": "ja", "Korean": "ko",
-            "Chinese": "zh", "Arabic": "ar", "Hindi": "hi", "Dutch": "nl",
-            "Swedish": "sv", "Norwegian": "no", "Danish": "da", "Finnish": "fi",
-            "Polish": "pl", "Czech": "cs", "Hungarian": "hu", "Romanian": "ro",
-            "Bulgarian": "bg", "Greek": "el", "Turkish": "tr", "Hebrew": "he",
-            "Thai": "th", "Vietnamese": "vi", "Indonesian": "id", "Malay": "ms",
-            "Filipino": "fil", "Ukrainian": "uk", "Belarusian": "be", "Slovak": "sk",
-            "Slovenian": "sl", "Croatian": "hr", "Serbian": "sr", "Macedonian": "mk",
-            "Albanian": "sq", "Estonian": "et", "Latvian": "lv", "Lithuanian": "lt",
-            "Icelandic": "is", "Irish": "ga", "Welsh": "cy", "Breton": "br",
-            "Catalan": "ca", "Galician": "gl", "Basque": "eu", "Occitan": "oc"
-        }
+        """Populate the full language list using unified language configuration"""
+        # Get all languages from unified config
+        all_languages = language_config.get_language_names()
         
-        for name, code in all_languages.items():
-            if code not in self.language_checkboxes:  # Don't duplicate popular languages
-                item = QListWidgetItem(name)
-                item.setData(Qt.UserRole, code)
-                self.language_list.addItem(item)
+        # Sort languages alphabetically by display name
+        sorted_languages = sorted(all_languages.items(), key=lambda x: x[1])
+        
+        # Add all languages to the list (including popular ones) in alphabetical order
+        # Users should be able to see and select any language
+        for code, name in sorted_languages:
+            item = QListWidgetItem(name)
+            item.setData(Qt.UserRole, code)
+            self.language_list.addItem(item)
     
     def get_target_languages(self) -> Dict[str, str]:
         """Get the current target languages"""
@@ -125,14 +117,19 @@ class LanguageSection(QGroupBox):
         for code, checkbox in self.language_checkboxes.items():
             if checkbox.isChecked():
                 self.target_languages[checkbox.text()] = code
+                # Track usage for adaptive popular languages
+                self.settings_manager.track_language_usage(code)
                 logging.info(f"Added checkbox language: {checkbox.text()} -> {code}")
         
         # Add languages from list selection
         for item in self.language_list.selectedItems():
             name = item.text()
             code = item.data(Qt.UserRole)
-            self.target_languages[name] = code
-            logging.info(f"Added list language: {name} -> {code}")
+            if code and name not in self.target_languages:  # Avoid duplicates
+                self.target_languages[name] = code
+                # Track usage for adaptive popular languages
+                self.settings_manager.track_language_usage(code)
+                logging.info(f"Added list language: {name} -> {code}")
         
         logging.info(f"Total target languages: {self.target_languages}")
         self.update_language_count()
@@ -157,11 +154,112 @@ class LanguageSection(QGroupBox):
             self.language_count_label.setText(f"{count} languages selected")
     
     def load_saved_languages(self):
-        """Load previously selected languages"""
+        """Load previously selected languages using unified language configuration"""
         saved_languages = self.settings_manager.load_target_languages()
+        
+        # Clear existing selections
+        for checkbox in self.language_checkboxes.values():
+            checkbox.setChecked(False)
+        
+        # Load saved languages
         for name, code in saved_languages.items():
             if code in self.language_checkboxes:
                 self.language_checkboxes[code].setChecked(True)
+            else:
+                # If it's not in popular languages, try to select it in the list
+                # This handles cases where languages were moved from popular to non-popular
+                for i in range(self.language_list.count()):
+                    item = self.language_list.item(i)
+                    if item.data(Qt.UserRole) == code:
+                        item.setSelected(True)
+                        break
         
-        # Update the target_languages dictionary from UI state
-        self.update_target_languages_from_ui() 
+        # Update the target_languages dictionary from UI state (without triggering adaptive updates)
+        self.target_languages.clear()
+        
+        # Add languages from checkboxes
+        for code, checkbox in self.language_checkboxes.items():
+            if checkbox.isChecked():
+                self.target_languages[checkbox.text()] = code
+        
+        # Add languages from list selection
+        for item in self.language_list.selectedItems():
+            name = item.text()
+            code = item.data(Qt.UserRole)
+            if code and name not in self.target_languages:  # Avoid duplicates
+                self.target_languages[name] = code
+        
+        # Update the display without triggering adaptive updates
+        self.update_language_count()
+    
+    def refresh_popular_languages(self):
+        """
+        Refresh the popular languages section when adaptive preferences change
+        This is called when the adaptive system updates the popular languages
+        """
+        # Get current adaptive popular languages
+        new_popular_codes = self.settings_manager.get_adaptive_popular_languages()
+        current_popular_codes = list(self.language_checkboxes.keys())
+        
+        # If popular languages haven't changed, no need to refresh
+        if new_popular_codes == current_popular_codes:
+            return
+        
+        # Store ALL current selections (both from checkboxes and list)
+        current_selections = {}
+        
+        # Get selections from current checkboxes
+        for code, checkbox in self.language_checkboxes.items():
+            if checkbox.isChecked():
+                current_selections[code] = checkbox.text()
+        
+        # Get selections from list items
+        for item in self.language_list.selectedItems():
+            code = item.data(Qt.UserRole)
+            if code:
+                current_selections[code] = item.text()
+        
+        # Clear the current popular languages grid
+        layout = self.layout()
+        popular_grid = layout.itemAt(1)  # Popular languages grid is at index 1
+        
+        # Remove all widgets from the grid
+        while popular_grid.count():
+            child = popular_grid.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        
+        # Clear the checkboxes dictionary
+        self.language_checkboxes.clear()
+        
+        # Recreate popular languages grid with new languages
+        for i, code in enumerate(new_popular_codes):
+            name = language_config.get_language_name(code)
+            checkbox = QCheckBox(name)
+            checkbox.setObjectName("languageCheckbox")
+            checkbox.setProperty("language_code", code)
+            
+            # Restore previous selection if this language was selected
+            if code in current_selections:
+                checkbox.setChecked(True)
+            
+            self.language_checkboxes[code] = checkbox
+            popular_grid.addWidget(checkbox, i // 3, i % 3)
+        
+        # Update target languages to reflect the changes
+        self.update_target_languages_from_ui()
+        
+        logging.info(f"Refreshed popular languages: {new_popular_codes}")
+    
+    def check_for_adaptive_updates(self):
+        """
+        Check if adaptive popular languages have been updated and refresh if needed
+        This should be called periodically or after language selections
+        """
+        # Get current adaptive popular languages
+        current_adaptive = self.settings_manager.get_adaptive_popular_languages()
+        current_displayed = list(self.language_checkboxes.keys())
+        
+        # If they don't match, refresh the display
+        if current_adaptive != current_displayed:
+            self.refresh_popular_languages() 
