@@ -2,8 +2,8 @@
   "version": "1.0",
   "default_popular_limit": 12,
   "default_popular_languages": [
-    "es", "fr", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", 
-    "ar", "vi", "id", "az"
+    "es", "fr", "de", "it", "pt-BR", "zh-Hans", "ja", 
+    "ar", "vi", "id", "tr","az"
   ],
   "languages": {
     "sq": {"name": "Albanian", "popular": false},

@@ -1,1 +1,1 @@
-# GUI Configuration Package 
+# GUI Configuration Package

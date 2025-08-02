@@ -1,0 +1,149 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "srt-translator"
+version = "1.0.0"
+description = "A subtitle translation tool with CLI and GUI interfaces"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "openai>=1.0.0",
+    "python-dotenv>=0.19.0",
+    "srt>=3.5.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "pylint>=2.17.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | venv
+  | build
+  | dist
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+known_first_party = ["srt_core", "gui"]
+known_third_party = ["openai", "srt", "dotenv"]
+skip = ["venv", ".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache"]
+
+# Pylint configuration
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "R0915",  # too-many-statements
+    "W0621",  # redefined-outer-name (common in tests)
+    "W0622",  # redefined-builtin
+    "W0703",  # broad-except
+    "W0612",  # unused-variable
+    "W0611",  # unused-import
+]
+
+[tool.pylint.master]
+ignore = ["venv", ".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache"]
+
+[tool.pylint.format]
+max-line-length = 88
+good-names = ["i", "j", "k", "ex", "Run", "_", "id", "db"]
+
+[tool.pylint.design]
+max-args = 10
+max-locals = 20
+max-returns = 10
+max-branches = 15
+max-statements = 60
+max-parents = 7
+max-attributes = 10
+min-public-methods = 0
+max-public-methods = 30
+
+[tool.pylint.similarities]
+min-similarity-lines = 4
+ignore-comments = "yes"
+ignore-docstrings = "yes"
+ignore-imports = "yes"
+
+# Flake8 configuration
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",  # whitespace before ':'
+    "W503",  # line break before binary operator
+    "E501",  # line too long (handled by black)
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    ".mypy_cache",
+]
+
+# MyPy configuration (optional but recommended)
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Relaxed for existing codebase
+disallow_incomplete_defs = false  # Relaxed for existing codebase
+check_untyped_defs = true
+disallow_untyped_decorators = false  # Relaxed for existing codebase
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "srt.*",
+    "openai.*",
+    "PySide6.*",
+    "PySide6.QtCore.*",
+    "PySide6.QtWidgets.*",
+    "PySide6.QtGui.*",
+]
+ignore_missing_imports = true 

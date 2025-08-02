@@ -1,9 +1,11 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
-from srt_core.translator.srt_parser import SRTParser
+from typing import Dict, List, Tuple
+
 import srt
+
+from srt_core.translator.srt_parser import SRTParser
 
 
 @dataclass
@@ -139,12 +141,12 @@ class SRTFixer:
 
         # Only process language directories that correspond to TARGET_LANGUAGES
         target_language_codes = set(code.upper() for code in TARGET_LANGUAGES.values())
-        
+
         for lang_dir in os.listdir(self.translations_dir):
             lang_path = os.path.join(self.translations_dir, lang_dir)
             if not os.path.isdir(lang_path):
                 continue
-                
+
             # Skip directories that don't correspond to languages being translated in this session
             if lang_dir not in target_language_codes:
                 continue
@@ -202,11 +204,11 @@ class SRTFixer:
             if not os.path.exists(file_path):
                 print(f"File not found: {file_path}")
                 continue
-                
+
             # Extract language directory and filename from the full path
             lang_dir = os.path.basename(os.path.dirname(file_path))
             filename = os.path.basename(file_path)
-            
+
             print(f"Processing specific file: {filename} in {lang_dir}")
 
             # Get regular issues for this language that should be fixed based on aggressiveness
@@ -251,7 +253,9 @@ class SRTFixer:
         for issue in issues:
             for subtitle in subtitles:
                 if issue.placeholder in subtitle.content:
-                    subtitle.content = subtitle.content.replace(issue.placeholder, issue.original_term)
+                    subtitle.content = subtitle.content.replace(
+                        issue.placeholder, issue.original_term
+                    )
                     self.fixed_count += 1
                     changed = True
 

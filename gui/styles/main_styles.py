@@ -317,4 +317,4 @@ MAIN_STYLESHEET = """
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
         height: 0px;
     }
-""" 
+"""

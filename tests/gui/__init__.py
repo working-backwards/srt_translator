@@ -1,1 +1,1 @@
-# GUI tests package for SRT Translator 
+# GUI tests package for SRT Translator

@@ -1,18 +1,25 @@
-import os
 import logging
+import os
 from datetime import datetime
-
-logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
 
 from dotenv import load_dotenv
 
-from srt_core.config.settings import SOURCE_DIR, OUTPUT_BASE_DIR, TARGET_LANGUAGES, SOURCE_LANG, \
-    FIX_AGGRESSIVENESS, LOG_DIRECTORY
 from srt_core.config.language_config import language_config
+from srt_core.config.settings import (
+    BATCH_SIZE,
+    FIX_AGGRESSIVENESS,
+    LOG_DIRECTORY,
+    OUTPUT_BASE_DIR,
+    SOURCE_DIR,
+    SOURCE_LANG,
+    TARGET_LANGUAGES,
+)
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
 
 
 def translate_srt_files(file_paths=None):
@@ -26,12 +33,12 @@ def translate_srt_files(file_paths=None):
                 "completed": 0,
                 "failed": 0,
                 "skipped": 0,
-                "error_details": ["Source directory does not exist"]
+                "error_details": ["Source directory does not exist"],
             }
         file_paths = [
             os.path.join(SOURCE_DIR, f)
             for f in os.listdir(SOURCE_DIR)
-            if f.endswith('.srt')
+            if f.endswith(".srt")
         ]
 
     # Ensure translation logs directory exists
@@ -41,7 +48,6 @@ def translate_srt_files(file_paths=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
 
-    from srt_core.config.settings import BATCH_SIZE
     print(f"Log file created at: {log_file}")
     print(f"Translating with batch size: {BATCH_SIZE}")
 
@@ -63,9 +69,9 @@ def translate_srt_files(file_paths=None):
         "successes": 0,
         "skipped": 0,
         "errors": 0,
-        "error_details": []
+        "error_details": [],
     }
-    
+
     # Track which files were actually translated in this session
     translated_files = []
 
@@ -80,14 +86,14 @@ def translate_srt_files(file_paths=None):
             output_filepath = os.path.join(
                 OUTPUT_BASE_DIR,
                 lang_code.upper(),  # Convert language code to uppercase for folder name
-                new_filename
+                new_filename,
             )
 
             try:
                 result = translator.translate_file(
                     input_filepath=input_filepath,
                     output_filepath=output_filepath,
-                    target_lang=lang_name
+                    target_lang=lang_name,
                 )
                 if result is None:
                     summary["skipped"] += 1
@@ -97,9 +103,7 @@ def translate_srt_files(file_paths=None):
                     translated_files.append(output_filepath)
             except Exception as e:
                 summary["errors"] += 1
-                summary["error_details"].append(
-                    f"{filename} ({lang_name}): {e}"
-                )
+                summary["error_details"].append(f"{filename} ({lang_name}): {e}")
                 print(f"Error translating {filename} to {lang_name}: {e}")
 
     # Perform fixes only on files that were translated in this session
@@ -108,7 +112,9 @@ def translate_srt_files(file_paths=None):
 
     if FIX_AGGRESSIVENESS > 0 and translated_files:
         # Only fix files that were actually translated in this session
-        fixer.fix_specific_srt_files(translated_files, aggressiveness=FIX_AGGRESSIVENESS)
+        fixer.fix_specific_srt_files(
+            translated_files, aggressiveness=FIX_AGGRESSIVENESS
+        )
 
     fixer.report_status()
 
@@ -132,9 +138,9 @@ def translate_srt_files(file_paths=None):
         "completed": summary["successes"],
         "failed": summary["errors"],
         "skipped": summary["skipped"],
-        "error_details": summary["error_details"]
+        "error_details": summary["error_details"],
     }
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     translate_srt_files()

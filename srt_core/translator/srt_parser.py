@@ -1,12 +1,14 @@
 import os
-import srt
 from typing import List
+
+import srt
+
 
 class SRTParser:
     @staticmethod
     def parse_file(filepath: str) -> List[srt.Subtitle]:
         """Parse an SRT file into a list of srt.Subtitle objects."""
-        encodings = ['utf-8', 'utf-16', 'iso-8859-1']
+        encodings = ["utf-8", "utf-16", "iso-8859-1"]
         for enc in encodings:
             try:
                 with open(filepath, "r", encoding=enc) as file:

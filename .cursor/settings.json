@@ -1,0 +1,25 @@
+{
+    "python.defaultInterpreterPath": "./venv/Scripts/python.exe",
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.sortImports.args": ["--profile", "black"],
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    "files.associations": {
+        "*.py": "python"
+    },
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.stubPath": "./typings",
+    "python.analysis.extraPaths": [
+        "./srt_core",
+        "./gui"
+    ]
+} 

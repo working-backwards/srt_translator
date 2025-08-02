@@ -3,6 +3,8 @@ import os
 
 from dotenv import load_dotenv
 
+from .language_config import language_config
+
 load_dotenv()
 
 # Dynamically calculate BASE_DIR based on the project's root
@@ -51,9 +53,6 @@ FIX_AGGRESSIVENESS = float(
     os.environ.get("AGGRESSIVENESS", "0.75")
 )  # Default level: conservative fixes
 
-# Import the unified language configuration
-from .language_config import language_config
-
 # Dictionary of target languages with their ISO codes
 # TARGET_LANGUAGES must be explicitly configured in .env file
 if "TARGET_LANGUAGES" not in os.environ:
@@ -67,15 +66,19 @@ TARGET_LANGUAGES_TEXT = os.environ["TARGET_LANGUAGES"]
 try:
     TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
     if not TARGET_LANGUAGES:
-        raise ValueError("TARGET_LANGUAGES cannot be empty. Please specify at least one language.")
-    
+        raise ValueError(
+            "TARGET_LANGUAGES cannot be empty. Please specify at least one language."
+        )
+
     # Normalize all language codes to lowercase for consistency
     normalized_target_languages = {}
     for lang_name, lang_code in TARGET_LANGUAGES.items():
         normalized_target_languages[lang_name] = lang_code.lower()
-    
+
     TARGET_LANGUAGES = normalized_target_languages
-    print(f"Using TARGET_LANGUAGES from .env file with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)")
+    print(
+        f"Using TARGET_LANGUAGES from .env file with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
+    )
 except json.JSONDecodeError as e:
     raise ValueError(f"Invalid TARGET_LANGUAGES format in .env file: {e}")
 
@@ -115,4 +118,7 @@ def get_glossary_terms(target_lang):
     """Get glossary terms for a specific language"""
     return BUSINESS_GLOSSARY.get(target_lang, {})
 
-BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 5))  # Number of subtitles per translation batch
+
+BATCH_SIZE = int(
+    os.environ.get("BATCH_SIZE", 5)
+)  # Number of subtitles per translation batch

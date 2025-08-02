@@ -1,1 +1,1 @@
-# Tests package for SRT Translator 
+# Tests package for SRT Translator

@@ -145,3 +145,11 @@ python run_gui.py
 5. Get translated SRT files for course platform upload
 
 Simple, intuitive, professional results.
+
+## Code Quality Standards
+- Follow `AI_CODE_GENERATION_STANDARDS.md` for all new code
+- Use proper import order (standard library → third-party → local)
+- Include type hints for all functions
+- Use specific exceptions (not generic Exception)
+- Follow Black formatting (88 char line length)
+- Reference `CODING_STANDARDS.md` for detailed guidelines

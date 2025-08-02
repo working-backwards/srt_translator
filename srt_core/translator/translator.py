@@ -1,38 +1,39 @@
 import logging
 import os
 import re
-import time
-import srt
-
-from dotenv import load_dotenv
-from openai import OpenAI
-
-from srt_core.config.settings import OPENAI_MODEL, get_glossary_terms, BATCH_SIZE
-from srt_core.translator.srt_parser import SRTParser
-from srt_core.translator.term_handler import TermHandler
-from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
 
 # Import unified language configuration
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+import time
+
+import srt
+from dotenv import load_dotenv
+from openai import OpenAI
+
+from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_glossary_terms
+from srt_core.translator.srt_parser import SRTParser
+from srt_core.translator.term_handler import TermHandler
+from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
 from gui.config.language_config import language_config
 
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 # Update BAD_RESPONSE_PATTERNS to only check for the new phrase
-BAD_RESPONSE_PATTERNS = [
-    "I cannot translate because"
-]
+BAD_RESPONSE_PATTERNS = ["I cannot translate because"]
+
 
 def contains_bad_response(text, patterns=BAD_RESPONSE_PATTERNS):
     text_lower = text.lower()
     return any(pattern.lower() in text_lower for pattern in patterns)
 
+
 def extract_translation_failure_reason(ai_response):
     prefix = "I cannot translate because"
     if ai_response.lower().startswith(prefix.lower()):
-        return ai_response[len(prefix):].strip(" .")
+        return ai_response[len(prefix) :].strip(" .")
     return ai_response
+
 
 class SRTTranslator:
     def __init__(self, source_lang="EN"):
@@ -165,7 +166,9 @@ If you must refuse, respond EXACTLY: "I cannot translate because [specific reaso
 
 Return a complete, valid SRT block with all content translated. Do not change subtitle numbering or timestamps."""
 
-    def translate_subtitle(self, text, target_lang, filename, subtitle_number=None, summary=None):
+    def translate_subtitle(
+        self, text, target_lang, filename, subtitle_number=None, summary=None
+    ):
         """Translate a single subtitle text"""
         # Use unified language config (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
@@ -190,7 +193,12 @@ Return a complete, valid SRT block with all content translated. Do not change su
                 )
                 translated_text = response.choices[0].message.content.strip()
                 final_text = self.term_handler.restore_excluded_terms(
-                    translated_text, term_map, filename, subtitle_number=subtitle_number, source_lang=self.source_lang, target_lang=target_lang
+                    translated_text,
+                    term_map,
+                    filename,
+                    subtitle_number=subtitle_number,
+                    source_lang=self.source_lang,
+                    target_lang=target_lang,
                 )
                 if not contains_bad_response(final_text):
                     break
@@ -203,8 +211,11 @@ Return a complete, valid SRT block with all content translated. Do not change su
             if contains_bad_response(final_text):
                 failure_reason = extract_translation_failure_reason(final_text)
                 # Log the prompt and model response for debugging
-                logging.info(f"\n--- SINGLE TRANSLATION ERROR PROMPT for {filename} (subtitle {subtitle_number}) ---\nSYSTEM PROMPT:\n{system_prompt}\nUSER MESSAGE (processed_text):\n{processed_text}\n--- MODEL RESPONSE ---\n{final_text}\n--- END ERROR LOG ---\n")
-                logging.error(f"""
+                logging.info(
+                    f"\n--- SINGLE TRANSLATION ERROR PROMPT for {filename} (subtitle {subtitle_number}) ---\nSYSTEM PROMPT:\n{system_prompt}\nUSER MESSAGE (processed_text):\n{processed_text}\n--- MODEL RESPONSE ---\n{final_text}\n--- END ERROR LOG ---\n"
+                )
+                logging.error(
+                    f"""
 {'='*80}
 SINGLE TRANSLATION FAILURE - INSTRUCTOR ACTION NEEDED
 {'='*80}
@@ -242,7 +253,8 @@ TECHNICAL DETAILS:
 
 RESULT: Subtitle left untranslated to mark failure.
 {'='*80}
-""")
+"""
+                )
                 if summary is not None and isinstance(summary, dict):
                     summary["bad_translations"] = summary.get("bad_translations", 0) + 1
                 return final_text  # Keep the AI refusal message in the SRT output
@@ -358,7 +370,9 @@ Status: AI Hallucination - Remove this placeholder
         subtitles = self.parser.parse_file(input_filepath)
 
         if not subtitles:
-            logging.warning(f"No subtitles found in {input_filepath}. Skipping translation.")
+            logging.warning(
+                f"No subtitles found in {input_filepath}. Skipping translation."
+            )
             return
 
         subtitles = list(srt.sort_and_reindex(subtitles))
@@ -367,33 +381,49 @@ Status: AI Hallucination - Remove this placeholder
         translated_subtitles = []
         total = len(subtitles)
 
-        logging.info(f"Starting batch translation of {filename} to {target_lang} with batch size {batch_size}")
+        logging.info(
+            f"Starting batch translation of {filename} to {target_lang} with batch size {batch_size}"
+        )
 
         for i in range(0, total, batch_size):
-            batch = subtitles[i:i+batch_size]
+            batch = subtitles[i : i + batch_size]
             batch_srt = srt.compose(batch)
-            
-            logging.info(f"Translating batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size} (subtitles {i+1}-{min(i+batch_size, total)})")
-            
-            translated_batch_srt, prompt = self.translate_srt_block(batch_srt, target_lang, filename, i)
-            
+
+            logging.info(
+                f"Translating batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size} (subtitles {i+1}-{min(i+batch_size, total)})"
+            )
+
+            translated_batch_srt, prompt = self.translate_srt_block(
+                batch_srt, target_lang, filename, i
+            )
+
             # Check if the batch translation failed completely
             if contains_bad_response(translated_batch_srt):
-                logging.warning(f"Batch translation failed for batch starting at index {i}. Reason: {extract_translation_failure_reason(translated_batch_srt)}")
-                logging.info(f"\n--- BATCH TRANSLATION ERROR PROMPT for {filename} (batch starting at subtitle {i}) ---\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n")
-                
+                logging.warning(
+                    f"Batch translation failed for batch starting at index {i}. Reason: {extract_translation_failure_reason(translated_batch_srt)}"
+                )
+                logging.info(
+                    f"\n--- BATCH TRANSLATION ERROR PROMPT for {filename} (batch starting at subtitle {i}) ---\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
+                )
+
                 # Fall back to single subtitle translation for this batch
-                logging.info(f"Falling back to single subtitle translation for batch {i//batch_size + 1}")
+                logging.info(
+                    f"Falling back to single subtitle translation for batch {i//batch_size + 1}"
+                )
                 for sub in batch:
-                    sub.content = self.translate_subtitle(sub.content, target_lang, filename, sub.index)
+                    sub.content = self.translate_subtitle(
+                        sub.content, target_lang, filename, sub.index
+                    )
                     translated_subtitles.append(sub)
                 continue
-            
+
             translated_batch_srt = clean_srt_output(translated_batch_srt)
-            
+
             # Check for phantom placeholders in batch translation
-            phantom_placeholders = re.findall(r"__EXCLUDED_TERM_\d+__", translated_batch_srt)
-            batch_term_map = getattr(self, '_last_batch_term_map', {})
+            phantom_placeholders = re.findall(
+                r"__EXCLUDED_TERM_\d+__", translated_batch_srt
+            )
+            batch_term_map = getattr(self, "_last_batch_term_map", {})
             for phantom in phantom_placeholders:
                 if phantom not in batch_term_map:
                     logging.warning(
@@ -419,7 +449,9 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                         f"Redistributing content across original timing slots."
                     )
                     # Redistribute translated content across original timing slots
-                    redistributed_batch = self._redistribute_subtitles(batch, translated_batch, filename, i)
+                    redistributed_batch = self._redistribute_subtitles(
+                        batch, translated_batch, filename, i
+                    )
                     for orig, redistributed in zip(batch, redistributed_batch):
                         orig.content = redistributed.content
                         translated_subtitles.append(orig)
@@ -431,9 +463,13 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             except Exception as e:
                 logging.error(f"Failed to parse translated SRT batch at index {i}: {e}")
                 # Log the prompt and model response for debugging
-                logging.info(f"\n--- BATCH PARSING EXCEPTION for {filename} (batch starting at subtitle {i}) ---\nEXCEPTION: {e}\nPROMPT:\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n")
+                logging.info(
+                    f"\n--- BATCH PARSING EXCEPTION for {filename} (batch starting at subtitle {i}) ---\nEXCEPTION: {e}\nPROMPT:\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
+                )
                 for sub in batch:
-                    sub.content = self.translate_subtitle(sub.content, target_lang, filename, sub.index)
+                    sub.content = self.translate_subtitle(
+                        sub.content, target_lang, filename, sub.index
+                    )
                     translated_subtitles.append(sub)
 
         self.parser.write_file(output_filepath, translated_subtitles)
@@ -443,14 +479,16 @@ Status: AI Hallucination in batch translation - Remove this placeholder
     def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index):
         """Translate a block of SRT subtitles as a batch."""
         # Process excluded terms for the entire SRT block
-        processed_srt_block, term_map = self.term_handler.replace_excluded_terms(srt_block)
-        
+        processed_srt_block, term_map = self.term_handler.replace_excluded_terms(
+            srt_block
+        )
+
         # Store term_map for phantom detection (hacky but works)
         self._last_batch_term_map = term_map
-        
+
         prompt = self.get_batch_translation_prompt(self.source_lang, target_lang)
         full_prompt = f"{prompt}\n\n{processed_srt_block}"
-        
+
         time.sleep(0.5)  # Respect rate limits
         response = self.client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -459,20 +497,24 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             ],
             temperature=0.1,
         )
-        
+
         translated_srt = response.choices[0].message.content.strip()
-        
+
         # Restore excluded terms in the translated SRT block
         restored_srt = self.term_handler.restore_excluded_terms(
-            translated_srt, term_map, filename, 
-            subtitle_number=f"batch_{batch_start_index}", 
-            source_lang=self.source_lang, 
-            target_lang=target_lang
+            translated_srt,
+            term_map,
+            filename,
+            subtitle_number=f"batch_{batch_start_index}",
+            source_lang=self.source_lang,
+            target_lang=target_lang,
         )
-        
+
         return restored_srt, full_prompt
 
-    def _redistribute_subtitles(self, original_batch, translated_batch, filename, batch_start_index):
+    def _redistribute_subtitles(
+        self, original_batch, translated_batch, filename, batch_start_index
+    ):
         """Redistribute translated content across original timing slots, optimizing for user experience."""
         original_count = len(original_batch)
         translated_count = len(translated_batch)
@@ -485,17 +527,21 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                     index=original_batch[i].index,
                     start=original_batch[i].start,
                     end=original_batch[i].end,
-                    content=translated_batch[i].content
+                    content=translated_batch[i].content,
                 )
                 redistributed.append(new_subtitle)
             # If there are leftover slots, extend the last non-empty subtitle's end time
             if translated_count > 0:
                 last_sub = redistributed[-1]
                 last_sub.end = original_batch[-1].end  # Extend to end of last slot
-                logging.info(f"Extended subtitle {last_sub.index} to cover empty slots at end in batch {batch_start_index} of {filename}.")
+                logging.info(
+                    f"Extended subtitle {last_sub.index} to cover empty slots at end in batch {batch_start_index} of {filename}."
+                )
             # Log skipped empty slots
             if translated_count < original_count:
-                logging.info(f"Skipped {original_count - translated_count} empty slot(s) at end of batch {batch_start_index} in {filename}.")
+                logging.info(
+                    f"Skipped {original_count - translated_count} empty slot(s) at end of batch {batch_start_index} in {filename}."
+                )
         else:
             # More translations than original slots: combine as before
             translations_per_slot = translated_count / original_count
@@ -505,7 +551,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                     index=original_batch[i].index,
                     start=original_batch[i].start,
                     end=original_batch[i].end,
-                    content=""
+                    content="",
                 )
                 slot_translations = int(translations_per_slot)
                 if i < (translated_count % original_count):
@@ -513,7 +559,9 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                 combined_content = []
                 for j in range(slot_translations):
                     if translation_index < translated_count:
-                        combined_content.append(translated_batch[translation_index].content)
+                        combined_content.append(
+                            translated_batch[translation_index].content
+                        )
                         translation_index += 1
                 new_subtitle.content = " ".join(combined_content)
                 redistributed.append(new_subtitle)
@@ -535,10 +583,10 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 def clean_srt_output(text):
     """Remove Markdown code fences (``` or ```srt) from model output if present."""
     text = text.strip()
-    if text.startswith('```srt'):
-        text = text[len('```srt'):].strip()
-    if text.startswith('```'):
-        text = text[len('```'):].strip()
-    if text.endswith('```'):
+    if text.startswith("```srt"):
+        text = text[len("```srt") :].strip()
+    if text.startswith("```"):
+        text = text[len("```") :].strip()
+    if text.endswith("```"):
         text = text[:-3].strip()
     return text
