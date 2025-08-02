@@ -137,6 +137,29 @@ MAIN_STYLESHEET = """
         background-color: #D1D5DB;
     }
     
+    /* Toggle Button with Chevron Animation */
+    #toggleButton {
+        background-color: #F3F4F6;
+        color: #374151;
+        border: 1px solid #D1D5DB;
+        border-radius: 6px;
+        padding: 4px;
+        font-size: 18px;
+        font-weight: bold;
+        height: 30px;
+        width: 30px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+    }
+    
+    #toggleButton:hover {
+        background-color: #E5E7EB;
+    }
+    
+    #toggleButton:pressed {
+        background-color: #D1D5DB;
+    }
+    
     /* Help Button */
     #helpButton {
         background-color: #EFF6FF;

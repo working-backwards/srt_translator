@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from .business_glossary_editor import BusinessGlossaryEditor
 from .excluded_terms_editor import ExcludedTermsEditor
+from .toggle_button import AnimatedToggleButton
 
 
 class AIConfigSection(QGroupBox):
@@ -50,10 +51,8 @@ class AIConfigSection(QGroupBox):
         self.status_indicator.setObjectName("statusIndicator")
         self.status_indicator.setStyleSheet("color: #6B7280; font-weight: 500;")
 
-        # Toggle button
-        self.toggle_btn = QPushButton("▼")
-        self.toggle_btn.setObjectName("secondaryButton")
-        self.toggle_btn.setFixedSize(30, 30)
+        # Toggle button with chevron icon and animation
+        self.toggle_btn = AnimatedToggleButton()
 
         header_layout.addWidget(self.status_label)
         header_layout.addWidget(self.status_indicator)
@@ -184,13 +183,14 @@ class AIConfigSection(QGroupBox):
         self.content.setVisible(self.is_expanded)
 
         if self.is_expanded:
-            self.toggle_btn.setText("▲")
             # Expand to show full content
             self.content.setMaximumHeight(16777215)  # Qt's default maximum
         else:
-            self.toggle_btn.setText("▼")
             # Collapse to 0 height
             self.content.setMaximumHeight(0)
+            
+        # Animate the toggle button
+        self.toggle_btn.set_expanded_state(self.is_expanded)
 
     def set_dnt_display(self, dnt_text: str):
         """Set the DNT display text"""

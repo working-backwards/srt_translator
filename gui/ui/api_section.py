@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .toggle_button import AnimatedToggleButton
+
 
 class APISection(QGroupBox):
     """API Configuration section with collapsible content"""
@@ -45,10 +47,8 @@ class APISection(QGroupBox):
         self.status_indicator = QLabel("⏳ Not Connected")
         self.status_indicator.setObjectName("statusIndicator")
 
-        # Toggle button
-        self.toggle_btn = QPushButton("▼")
-        self.toggle_btn.setObjectName("secondaryButton")
-        self.toggle_btn.setFixedSize(30, 30)
+        # Toggle button with chevron icon and animation
+        self.toggle_btn = AnimatedToggleButton()
 
         header_layout.addWidget(self.status_label)
         header_layout.addWidget(self.status_indicator)
@@ -123,12 +123,13 @@ class APISection(QGroupBox):
         """Toggle the API Configuration section expansion"""
         if self.is_connected:
             # If connected, toggle between collapsed and expanded
-            self.content.setVisible(not self.content.isVisible())
-            self.toggle_btn.setText("▲" if self.content.isVisible() else "▼")
+            is_visible = not self.content.isVisible()
+            self.content.setVisible(is_visible)
+            self.toggle_btn.set_expanded_state(is_visible)
         else:
             # If not connected, always show content for setup
             self.content.setVisible(True)
-            self.toggle_btn.setText("▲")
+            self.toggle_btn.set_expanded_state(True)
 
     def set_connected_status(self, connected: bool):
         """Set the connected status and update UI accordingly"""
@@ -143,7 +144,7 @@ class APISection(QGroupBox):
             self.test_connection_btn_connected.setVisible(True)
             # Collapse content by default
             self.content.setVisible(False)
-            self.toggle_btn.setText("▼")
+            self.toggle_btn.set_expanded_state(False)
         else:
             self.status_indicator.setText("⏳ Not Connected")
             self.status_indicator.setStyleSheet("color: orange; font-weight: bold;")
@@ -154,7 +155,7 @@ class APISection(QGroupBox):
             self.test_connection_btn_connected.setVisible(False)
             # Show content for setup
             self.content.setVisible(True)
-            self.toggle_btn.setText("▲")
+            self.toggle_btn.set_expanded_state(True)
 
     def show_error(self, error_message: str):
         """Show error message"""
