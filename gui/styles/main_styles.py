@@ -296,7 +296,7 @@ MAIN_STYLESHEET = """
         border-radius: 6px;
     }
     
-    #aiTermsDisplay, #glossaryDisplay {
+    #aiTermsDisplay, #termbaseDisplay {
         background-color: #FFFFFF;
         border: 1px solid #E5E7EB;
         border-radius: 6px;

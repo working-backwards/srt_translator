@@ -1,13 +1,7 @@
 import sys
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-from gui.ui.business_glossary_editor import BusinessGlossaryEditor
-
-#!/usr/bin/env python3
-"""
-Test script for Business Glossary Editor
-"""
-
     QApplication,
     QHBoxLayout,
     QMainWindow,
@@ -16,25 +10,32 @@ Test script for Business Glossary Editor
     QWidget,
 )
 
+from gui.ui.termbase_editor import TermbaseEditor
+
+#!/usr/bin/env python3
+"""
+Test script for Termbase Editor
+"""
+
 sys.path.insert(0, "gui")
 
 
 class TestWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Business Glossary Editor Test")
+        self.setWindowTitle("Termbase Editor Test")
         self.setGeometry(100, 100, 800, 600)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Create the business glossary editor
-        self.glossary_editor = BusinessGlossaryEditor()
+        # Create the termbase editor
+        self.termbase_editor = TermbaseEditor()
 
-        # Test data - Business glossary with language-specific translations
+        # Test data - Termbase with language-specific translations
         # Note: DNT_TERMS would be separate and language-agnostic
-        test_glossary = {
+        test_termbase = {
             "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO", "Amazon": "Amazon"},
             "French": {
                 "API": "API",
@@ -44,38 +45,38 @@ class TestWindow(QMainWindow):
             },
         }
 
-        self.glossary_editor.set_glossary(test_glossary)
-        self.glossary_editor.glossary_changed.connect(self.on_glossary_changed)
+        self.termbase_editor.set_termbase(test_termbase)
+        self.termbase_editor.termbase_changed.connect(self.on_termbase_changed)
 
         # Test buttons
         button_layout = QHBoxLayout()
 
-        get_btn = QPushButton("Get Current Glossary")
-        get_btn.clicked.connect(self.get_current_glossary)
+        get_btn = QPushButton("Get Current Termbase")
+        get_btn.clicked.connect(self.get_current_termbase)
 
-        clear_btn = QPushButton("Clear Glossary")
-        clear_btn.clicked.connect(self.clear_glossary)
+        clear_btn = QPushButton("Clear Termbase")
+        clear_btn.clicked.connect(self.clear_termbase)
 
         button_layout.addWidget(get_btn)
         button_layout.addWidget(clear_btn)
         button_layout.addStretch()
 
-        layout.addWidget(self.glossary_editor)
+        layout.addWidget(self.termbase_editor)
         layout.addLayout(button_layout)
 
-    def on_glossary_changed(self, glossary):
-        print(f"Glossary changed: {len(glossary)} languages")
-        for language, terms in glossary.items():
+    def on_termbase_changed(self, termbase):
+        print(f"Termbase changed: {len(termbase)} languages")
+        for language, terms in termbase.items():
             print(f"  {language}: {len(terms)} terms")
 
-    def get_current_glossary(self):
-        glossary = self.glossary_editor.get_glossary()
-        print(f"Current glossary: {len(glossary)} languages")
-        for language, terms in glossary.items():
+    def get_current_termbase(self):
+        termbase = self.termbase_editor.get_termbase()
+        print(f"Current termbase: {len(termbase)} languages")
+        for language, terms in termbase.items():
             print(f"  {language}: {terms}")
 
-    def clear_glossary(self):
-        self.glossary_editor.set_glossary({})
+    def clear_termbase(self):
+        self.termbase_editor.set_termbase({})
 
 
 def main():

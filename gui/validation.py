@@ -98,28 +98,28 @@ class ConfigurationValidator:
             confidence=confidence,
         )
 
-    def validate_business_glossary(
-        self, business_glossary: Dict[str, Dict[str, str]], source_files: List[str]
+    def validate_termbase(
+        self, termbase: Dict[str, Dict[str, str]], source_files: List[str]
     ) -> ValidationResult:
-        """Validate business glossary entries."""
+        """Validate termbase entries."""
         issues = []
         suggestions = []
         valid_entries = 0
         total_entries = 0
 
-        if not business_glossary:
+        if not termbase:
             return ValidationResult(
                 is_valid=True,
                 score=1.0,
-                issues=["No business glossary to validate"],
+                issues=["No termbase to validate"],
                 suggestions=[
-                    "Consider adding a business glossary for better translation consistency"
+                    "Consider adding a termbase for better translation consistency"
                 ],
                 confidence=0.5,
             )
 
         # Check each language and term
-        for language, terms in business_glossary.items():
+        for language, terms in termbase.items():
             for english_term, translation in terms.items():
                 total_entries += 1
 
@@ -139,10 +139,10 @@ class ConfigurationValidator:
                     valid_entries += 1
                 else:
                     issues.append(
-                        f"Glossary term '{english_term}' not found in source files"
+                        f"Termbase term '{english_term}' not found in source files"
                     )
                     suggestions.append(
-                        f"Remove '{english_term}' from {language} glossary or add it to your content"
+                        f"Remove '{english_term}' from {language} termbase or add it to your content"
                     )
 
                 # Check translation quality
@@ -239,27 +239,29 @@ class ConfigurationValidator:
             is_valid=len(missing_terms) == 0,
             score=confidence,
             issues=issues,
-            suggestions=["Consider adding some DNT terms for better translation control"],
+            suggestions=[
+                "Consider adding some DNT terms for better translation control"
+            ],
             confidence=confidence,
         )
 
     def calculate_confidence_score(
-        self, dnt_terms_result: ValidationResult, glossary_result: ValidationResult
+        self, dnt_terms_result: ValidationResult, termbase_result: ValidationResult
     ) -> float:
         """Calculate overall confidence score for the configuration."""
         # Weight the scores (DNT terms are more important)
         dnt_weight = 0.6
-        glossary_weight = 0.4
+        termbase_weight = 0.4
 
         weighted_score = (
             dnt_terms_result.confidence * dnt_weight
-            + glossary_result.confidence * glossary_weight
+            + termbase_result.confidence * termbase_weight
         )
 
         return min(weighted_score, 1.0)
 
     def validate_configuration_quality(
-        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
     ) -> ValidationResult:
         """Validate overall configuration quality."""
         issues = []
@@ -267,12 +269,8 @@ class ConfigurationValidator:
 
         # Check for reasonable number of terms
         if len(dnt_terms) > 50:
-            issues.append(
-                "Too many DNT terms (50+) may impact translation quality"
-            )
-            suggestions.append(
-                "Consider reducing DNT terms to the most important ones"
-            )
+            issues.append("Too many DNT terms (50+) may impact translation quality")
+            suggestions.append("Consider reducing DNT terms to the most important ones")
 
         if len(dnt_terms) < 3:
             issues.append("Very few DNT terms may not provide enough control")
@@ -280,10 +278,10 @@ class ConfigurationValidator:
                 "Consider adding more important terms to exclude from translation"
             )
 
-        # Check glossary coverage
-        total_glossary_terms = sum(len(terms) for terms in business_glossary.values())
-        if total_glossary_terms > 100:
-            issues.append("Large glossary (100+ terms) may be difficult to maintain")
+        # Check termbase coverage
+        total_termbase_terms = sum(len(terms) for terms in termbase.values())
+        if total_termbase_terms > 100:
+            issues.append("Large termbase (100+ terms) may be difficult to maintain")
             suggestions.append("Consider focusing on the most important business terms")
 
         # Check for common patterns
@@ -300,7 +298,7 @@ class ConfigurationValidator:
             quality_score -= 0.3
         if len(dnt_terms) < 3:
             quality_score -= 0.2
-        if total_glossary_terms > 100:
+        if total_termbase_terms > 100:
             quality_score -= 0.2
 
         quality_score = max(0.0, quality_score)
@@ -316,29 +314,25 @@ class ConfigurationValidator:
     def get_validation_summary(
         self,
         dnt_terms: List[str],
-        business_glossary: Dict[str, Dict[str, str]],
+        termbase: Dict[str, Dict[str, str]],
         source_files: List[str],
     ) -> Dict[str, any]:
         """Get comprehensive validation summary."""
 
         # Run all validations
         dnt_validation = self.validate_dnt_terms(dnt_terms, source_files)
-        glossary_validation = self.validate_business_glossary(
-            business_glossary, source_files
-        )
-        quality_validation = self.validate_configuration_quality(
-            dnt_terms, business_glossary
-        )
+        termbase_validation = self.validate_termbase(termbase, source_files)
+        quality_validation = self.validate_configuration_quality(dnt_terms, termbase)
 
         # Calculate overall confidence
         overall_confidence = self.calculate_confidence_score(
-            dnt_validation, glossary_validation
+            dnt_validation, termbase_validation
         )
 
         # Determine overall status
         all_valid = (
             dnt_validation.is_valid
-            and glossary_validation.is_valid
+            and termbase_validation.is_valid
             and quality_validation.is_valid
         )
 
@@ -352,12 +346,12 @@ class ConfigurationValidator:
                 "issues": dnt_validation.issues,
                 "suggestions": dnt_validation.suggestions,
             },
-            "business_glossary": {
-                "valid": glossary_validation.is_valid,
-                "score": glossary_validation.score,
-                "confidence": glossary_validation.confidence,
-                "issues": glossary_validation.issues,
-                "suggestions": glossary_validation.suggestions,
+            "termbase": {
+                "valid": termbase_validation.is_valid,
+                "score": termbase_validation.score,
+                "confidence": termbase_validation.confidence,
+                "issues": termbase_validation.issues,
+                "suggestions": termbase_validation.suggestions,
             },
             "quality": {
                 "valid": quality_validation.is_valid,
@@ -368,10 +362,8 @@ class ConfigurationValidator:
             },
             "statistics": {
                 "dnt_terms_count": len(dnt_terms),
-                "glossary_languages": len(business_glossary),
-                "total_glossary_terms": sum(
-                    len(terms) for terms in business_glossary.values()
-                ),
+                "termbase_languages": len(termbase),
+                "total_termbase_terms": sum(len(terms) for terms in termbase.values()),
                 "source_files_count": len(source_files),
             },
         }

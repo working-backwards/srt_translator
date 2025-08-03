@@ -1,6 +1,9 @@
+import glob
 import os
 import sys
+
 from dotenv import load_dotenv
+
 from srt_core.config.settings import FIX_AGGRESSIVENESS, LOG_DIRECTORY, OUTPUT_BASE_DIR
 from srt_core.translator.fixer import SRTFixer
 
@@ -15,8 +18,8 @@ This script can be run independently to fix issues in already-translated SRT fil
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-
 load_dotenv()
+
 
 def run_fixer_only():
     """Run only the fixer on existing translation files"""

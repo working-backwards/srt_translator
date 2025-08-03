@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .business_glossary_editor import BusinessGlossaryEditor
 from .dnt_terms_editor import DNTTermsEditor
+from .termbase_editor import TermbaseEditor
 from .toggle_button import AnimatedToggleButton
 
 
@@ -188,7 +188,7 @@ class AIConfigSection(QGroupBox):
         else:
             # Collapse to 0 height
             self.content.setMaximumHeight(0)
-            
+
         # Animate the toggle button
         self.toggle_btn.set_expanded_state(self.is_expanded)
 
@@ -229,12 +229,12 @@ class AIConfigSection(QGroupBox):
         else:
             self.dnt_display.setText("No DNT terms generated")
 
-    def update_termbase_display(self, glossary: dict):
-        """Update the termbase display with glossary data"""
-        if glossary:
+    def update_termbase_display(self, termbase: dict):
+        """Update the termbase display with termbase data"""
+        if termbase:
             # Show a summary of the termbase
-            total_terms = sum(len(lang_glossary) for lang_glossary in glossary.values())
-            languages = list(glossary.keys())
+            total_terms = sum(len(lang_termbase) for lang_termbase in termbase.values())
+            languages = list(termbase.keys())
             summary = (
                 f"Generated for {len(languages)} languages: {', '.join(languages[:3])}"
             )
@@ -272,15 +272,15 @@ class EditConfigurationDialog(QDialog):
     def __init__(
         self,
         dnt_terms: list,
-        business_glossary: dict,
+        termbase: dict,
         parent=None,
         source_lang="EN",
     ):
         super().__init__(parent)
         self.dnt_terms = dnt_terms.copy()
-        self.business_glossary = business_glossary.copy()
+        self.termbase = termbase.copy()
         self.modified_terms = dnt_terms.copy()
-        self.modified_glossary = business_glossary.copy()
+        self.modified_termbase = termbase.copy()
         self.source_lang = source_lang
 
         self.setup_ui()
@@ -309,9 +309,9 @@ class EditConfigurationDialog(QDialog):
         self.tab_widget.addTab(self.terms_editor, "DNT")
 
         # Termbase Tab
-        self.glossary_editor = BusinessGlossaryEditor()
-        self.glossary_editor.set_glossary(self.business_glossary)
-        self.tab_widget.addTab(self.glossary_editor, "Termbase")
+        self.termbase_editor = TermbaseEditor()
+        self.termbase_editor.set_termbase(self.termbase)
+        self.tab_widget.addTab(self.termbase_editor, "Termbase")
 
         layout.addWidget(self.tab_widget)
 
@@ -326,22 +326,22 @@ class EditConfigurationDialog(QDialog):
     def connect_signals(self):
         """Connect widget signals."""
         self.terms_editor.terms_changed.connect(self.on_terms_changed)
-        self.glossary_editor.glossary_changed.connect(self.on_glossary_changed)
+        self.termbase_editor.termbase_changed.connect(self.on_termbase_changed)
 
     def on_terms_changed(self, terms: list):
         """Handle terms changes."""
         self.modified_terms = terms
 
-    def on_glossary_changed(self, glossary: dict):
-        """Handle glossary changes."""
-        self.modified_glossary = glossary
+    def on_termbase_changed(self, termbase: dict):
+        """Handle termbase changes."""
+        self.modified_termbase = termbase
 
     def get_modified_config(self) -> tuple:
         """Get the modified configuration."""
-        return self.modified_terms, self.modified_glossary
+        return self.modified_terms, self.modified_termbase
 
     def has_changes(self) -> bool:
         """Check if any changes were made."""
         return self.terms_editor.is_modified(
             self.dnt_terms
-        ) or self.glossary_editor.is_modified(self.business_glossary)
+        ) or self.termbase_editor.is_modified(self.termbase)

@@ -19,7 +19,7 @@ SRT subtitle translation tool for online course instructors. Translates course s
 - NEVER modify existing translation logic in srt_core/translator/
 - Preserve BATCH_SIZE=5 (proven to work well)
 - Keep two-pass error correction system (fixer.py)
-- Maintain business glossary and Do Not Translate (DNT) terms functionality
+- Maintain termbase and Do Not Translate (DNT) terms functionality
 - No performance optimizations that risk translation quality
 
 ### 2. Stability > Features  
@@ -45,7 +45,7 @@ srt_translator/
 ├── run_cli.py              # CLI entry point
 ├── run_gui.py              # GUI entry point  
 ├── .env                    # User configuration
-└── business_glossary.json  # Business terminology
+└── termbase.json  # Business terminology
 ```
 
 ## Development Rules

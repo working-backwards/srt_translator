@@ -155,19 +155,19 @@ EXAMPLE FORMAT:
             self.logger.error(f"Error generating DNT terms: {e}")
             raise
 
-    def generate_business_glossary(
+    def generate_termbase(
         self,
         content: str,
         target_languages: List[str],
         dnt_terms: List[str] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
-        Generate business glossary for all target languages using systematic analysis framework
+        Generate termbase for all target languages using systematic analysis framework
 
         Args:
             content: Clean text content from SRT files
             target_languages: List of target languages for translation
-            dnt_terms: List of terms that should not be included in the glossary
+            dnt_terms: List of terms that should not be included in the termbase
 
         Returns:
             Dictionary with language keys and term-translation pairs
@@ -207,34 +207,30 @@ EXAMPLE FORMAT:
                 )
                 return {}
 
-            self.logger.info(
-                f"Generating business glossary for {len(language_names)} languages"
-            )
+            self.logger.info(f"Generating termbase for {len(language_names)} languages")
 
             # Generate comprehensive termbase for all languages at once
-            business_glossary = self._generate_comprehensive_glossary(
+            termbase = self._generate_comprehensive_termbase(
                 content, language_names, dnt_terms
             )
 
-            self.logger.info(
-                f"Generated business glossary for {len(business_glossary)} languages"
-            )
-            return business_glossary
+            self.logger.info(f"Generated termbase for {len(termbase)} languages")
+            return termbase
 
         except Exception as e:
-            self.logger.error(f"Error generating business glossary: {e}")
+            self.logger.error(f"Error generating termbase: {e}")
             raise
 
-    def _generate_comprehensive_glossary(
+    def _generate_comprehensive_termbase(
         self,
         content: str,
         language_names: List[Dict[str, str]],
         dnt_terms: List[str] = None,
     ) -> Dict[str, Dict[str, str]]:
-        """Generate comprehensive glossary for all target languages using systematic analysis framework"""
+        """Generate comprehensive termbase for all target languages using systematic analysis framework"""
         try:
             self.logger.info(
-                f"Generating comprehensive glossary for {len(language_names)} languages"
+                f"Generating comprehensive termbase for {len(language_names)} languages"
             )
 
             lang_json = json.dumps(language_names, ensure_ascii=False)
@@ -283,15 +279,15 @@ TASK:
 
 4. Return both:
    - The extracted list of 25 terms, none of which appear in DNT_TERMS, with a brief reason for each
-   - A per-language glossary of 4–6 of the most important or difficult terms, based on difficulty, relevance, or risk of mistranslation
+   - A per-language termbase of 4–6 of the most important or difficult terms, based on difficulty, relevance, or risk of mistranslation
 
 5. You should expect heavy overlap of key terms across languages that are central to understanding the course’s subject matter, but there should also be language-specific variations when a term poses a unique translation risk in that language (e.g., cultural mismatch, ambiguity, idiomatic differences).
-   Do not artificially diversify the glossary across languages.
+   Do not artificially diversify the termbase across languages.
 
 6. For each language in TARGET_LANGUAGES:
    - Select 4–6 terms from the "extracted_terms" list that are most important to translate well for learners in that language.
-   - Only include terms in the glossary that appear in the "extracted_terms" list.
-   - Each glossary must include translations for all selected terms — even if no direct equivalent exists, provide a concise, localized explanation.
+   - Only include terms in the termbase that appear in the "extracted_terms" list.
+- Each termbase must include translations for all selected terms — even if no direct equivalent exists, provide a concise, localized explanation.
    - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or an explanation that would work in subtitle context.
    - Do not include any terms from DNT_TERMS, even if they appear in the extracted list.
 
@@ -304,11 +300,11 @@ TASK:
     {{"term": "term2", "reason": "reason2"}},
     ...
   ],
-  "glossary_results": [
+  "termbase_results": [
     {{
       "code": string,  // ISO code from TARGET_LANGUAGES
       "name": string,  // Human-readable name
-      "glossary": {{
+      "termbase": {{
           "<Source Term 1>": "<Translation 1>",
           "<Source Term 2>": "<Translation 2>"
       }}
@@ -320,7 +316,7 @@ TASK:
 Only return the JSON object. No commentary, markdown, or extra formatting.
 """
 
-            self.logger.info("Sending comprehensive glossary request to OpenAI")
+            self.logger.info("Sending comprehensive termbase request to OpenAI")
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",  # Use GPT-4 for better analysis
                 messages=[
@@ -336,25 +332,14 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                 f"Received response from OpenAI ({len(result_text)} characters)"
             )
 
-            parsed_glossary = self._parse_comprehensive_glossary_response(result_text)
-            self.logger.info(f"Parsed glossary with {len(parsed_glossary)} languages")
+            parsed_termbase = self._parse_comprehensive_termbase_response(result_text)
+            self.logger.info(f"Parsed termbase with {len(parsed_termbase)} languages")
 
-            return parsed_glossary
+            return parsed_termbase
 
         except Exception as e:
-            self.logger.error(f"Error in comprehensive glossary generation: {e}")
+            self.logger.error(f"Error in comprehensive termbase generation: {e}")
             raise
-
-    def _generate_language_glossary(
-        self, content: str, language: str, dnt_terms: List[str] = None
-    ) -> Dict[str, str]:
-        """Generate glossary for a specific language (legacy method - kept for compatibility)"""
-        # This method is now deprecated in favor of _generate_comprehensive_glossary
-        # But kept for backward compatibility
-        comprehensive = self._generate_comprehensive_glossary(
-            content, [language], dnt_terms
-        )
-        return comprehensive.get(language, {})
 
     def _clean_subtitle_text(self, text: str) -> str:
         """Clean subtitle text for analysis"""
@@ -435,12 +420,12 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             self.logger.debug(f"Raw response: {response_text}")
             return []
 
-    def _parse_comprehensive_glossary_response(
+    def _parse_comprehensive_termbase_response(
         self, response_text: str
     ) -> Dict[str, Dict[str, str]]:
         """
-        Parses the structured JSON response from the AI containing extracted terms and glossary results.
-        Returns a dictionary of language codes with their glossary entries.
+                Parses the structured JSON response from the AI containing extracted terms and termbase results.
+        Returns a dictionary of language codes with their termbase entries.
         """
         try:
             import json
@@ -489,40 +474,40 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             else:
                 self.logger.warning("No extracted terms found in AI response.")
 
-            # Parse glossary results
-            glossary_data = raw_data.get("glossary_results", [])
-            if not glossary_data:
-                self.logger.warning("No glossary_results found in AI response.")
+            # Parse termbase results
+            termbase_data = raw_data.get("termbase_results", [])
+            if not termbase_data:
+                self.logger.warning("No termbase_results found in AI response.")
                 return {}
 
             parsed = {}
-            for lang in glossary_data:
+            for lang in termbase_data:
                 code = lang.get("code")
-                glossary = lang.get("glossary", {})
-                if code and isinstance(glossary, dict):
-                    parsed[code] = glossary
+                termbase = lang.get("termbase", {})
+                if code and isinstance(termbase, dict):
+                    parsed[code] = termbase
                     self.logger.debug(
-                        f"Parsed {len(glossary)} terms for language: {code}"
+                        f"Parsed {len(termbase)} terms for language: {code}"
                     )
                 else:
-                    self.logger.warning(f"Invalid glossary entry for language: {lang}")
+                    self.logger.warning(f"Invalid termbase entry for language: {lang}")
 
             return parsed
 
         except json.JSONDecodeError as e:
             self.logger.error(
-                f"JSON decode error in comprehensive glossary response: {e}"
+                f"JSON decode error in comprehensive termbase response: {e}"
             )
             self.logger.debug(f"Raw response: {response_text}")
             return {}
 
         except Exception as e:
-            self.logger.error(f"Error parsing comprehensive glossary response: {e}")
+            self.logger.error(f"Error parsing comprehensive termbase response: {e}")
             self.logger.debug(f"Raw response: {response_text}")
             return {}
 
-    def _parse_glossary_response(self, response_text: str) -> Dict[str, str]:
-        """Parse the AI response for business glossary (legacy method)"""
+    def _parse_termbase_response(self, response_text: str) -> Dict[str, str]:
+        """Parse the AI response for termbase (legacy method)"""
         try:
 
             # Clean the response text
@@ -533,13 +518,13 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                 cleaned = cleaned[:-3]
 
             # Parse JSON
-            glossary = json.loads(cleaned)
+            termbase = json.loads(cleaned)
 
             # Ensure it's a dict and all values are strings
-            if isinstance(glossary, dict):
+            if isinstance(termbase, dict):
                 return {
                     str(k).strip(): str(v).strip()
-                    for k, v in glossary.items()
+                    for k, v in termbase.items()
                     if k and v
                 }
             else:
@@ -547,7 +532,7 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                 return {}
 
         except Exception as e:
-            self.logger.error(f"Error parsing glossary response: {e}")
+            self.logger.error(f"Error parsing termbase response: {e}")
             self.logger.debug(f"Raw response: {response_text}")
             return {}
 

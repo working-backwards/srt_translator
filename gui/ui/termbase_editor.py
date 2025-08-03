@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Business Glossary Editor Widget
+Termbase Editor Widget
 
-Provides a user interface for editing business glossary entries across multiple languages.
+Provides a user interface for editing termbase entries across multiple languages.
 Allows adding, editing, and removing terms and their translations.
 """
 
@@ -33,19 +33,19 @@ from PySide6.QtWidgets import (
 )
 
 
-class BusinessGlossaryEditor(QWidget):
-    """Widget for editing business glossary entries across multiple languages.
+class TermbaseEditor(QWidget):
+    """Widget for editing termbase entries across multiple languages.
 
-    The business glossary contains language-specific translations of English terms.
+    The termbase contains language-specific translations of English terms.
     Each language has its own set of translations for the same English terms.
     """
 
-    glossary_changed = Signal(dict)  # Emitted when glossary is modified
+    termbase_changed = Signal(dict)  # Emitted when termbase is modified
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.glossary = {}  # {language: {english_term: translation}}
+        self.termbase = {}  # {language: {english_term: translation}}
         self.languages = []
         self._updating_table = False  # Flag to prevent signal loops
         self.setup_ui()
@@ -109,16 +109,16 @@ class BusinessGlossaryEditor(QWidget):
         self.table.itemSelectionChanged.connect(self.update_button_states)
         self.table.itemChanged.connect(self.on_table_item_changed)
 
-    def set_glossary(self, glossary: Dict[str, Dict[str, str]]):
-        """Set the business glossary data."""
-        self.glossary = glossary.copy()
-        self.languages = list(glossary.keys()) if glossary else []
+    def set_termbase(self, termbase: Dict[str, Dict[str, str]]):
+        """Set the termbase data."""
+        self.termbase = termbase.copy()
+        self.languages = list(termbase.keys()) if termbase else []
         self.refresh_table()
         self.update_count_label()
 
-    def get_glossary(self) -> Dict[str, Dict[str, str]]:
-        """Get the current business glossary data."""
-        return self.glossary.copy()
+    def get_termbase(self) -> Dict[str, Dict[str, str]]:
+        """Get the current termbase data."""
+        return self.termbase.copy()
 
     def refresh_table(self):
         """Refresh the table display."""
@@ -128,14 +128,14 @@ class BusinessGlossaryEditor(QWidget):
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
 
-        if not self.glossary:
+        if not self.termbase:
             self._updating_table = False
             return
 
         # Get all unique English terms across all languages
         all_terms = set()
-        for language_glossary in self.glossary.values():
-            all_terms.update(language_glossary.keys())
+        for language_termbase in self.termbase.values():
+            all_terms.update(language_termbase.keys())
 
         if not all_terms:
             self._updating_table = False
@@ -159,7 +159,7 @@ class BusinessGlossaryEditor(QWidget):
 
             # Translations for each language
             for col, language in enumerate(self.languages, 1):
-                translation = self.glossary.get(language, {}).get(english_term, "")
+                translation = self.termbase.get(language, {}).get(english_term, "")
                 item = QTableWidgetItem(translation)
                 self.table.setItem(row, col, item)
 
@@ -171,8 +171,8 @@ class BusinessGlossaryEditor(QWidget):
     def update_count_label(self):
         """Update the term count label."""
         total_terms = 0
-        for language_glossary in self.glossary.values():
-            total_terms += len(language_glossary)
+        for language_termbase in self.termbase.values():
+            total_terms += len(language_termbase)
 
         language_count = len(self.languages)
         self.count_label.setText(
@@ -182,23 +182,23 @@ class BusinessGlossaryEditor(QWidget):
     def update_button_states(self):
         """Update button enabled states based on selection."""
         has_selection = len(self.table.selectedItems()) > 0
-        has_data = bool(self.glossary)
+        has_data = bool(self.termbase)
 
         self.edit_term_btn.setEnabled(has_selection)
         self.remove_term_btn.setEnabled(has_selection)
         self.clear_btn.setEnabled(has_data)
 
     def add_term(self):
-        """Add a new term to the glossary."""
+        """Add a new term to the termbase."""
         dialog = AddTermDialog(self.languages, self)
         if dialog.exec():
             english_term, translations = dialog.get_data()
             if english_term:
-                self._add_term_to_glossary(english_term, translations)
+                self._add_term_to_termbase(english_term, translations)
                 self.refresh_table()
                 self.update_count_label()
                 self.update_button_states()
-                self.glossary_changed.emit(self.glossary)
+                self.termbase_changed.emit(self.termbase)
 
     def edit_selected_term(self):
         """Edit the selected term."""
@@ -229,7 +229,7 @@ class BusinessGlossaryEditor(QWidget):
             self._update_term_translations(english_term, new_translations)
             self.refresh_table()
             self.update_count_label()
-            self.glossary_changed.emit(self.glossary)
+            self.termbase_changed.emit(self.termbase)
 
     def remove_selected_term(self):
         """Remove the selected term from all languages."""
@@ -246,7 +246,9 @@ class BusinessGlossaryEditor(QWidget):
 
         # Count how many languages have this term
         term_count = sum(
-            1 for lang_gloss in self.glossary.values() if english_term in lang_gloss
+            1
+            for lang_termbase in self.termbase.values()
+            if english_term in lang_termbase
         )
 
         reply = QMessageBox.question(
@@ -259,32 +261,34 @@ class BusinessGlossaryEditor(QWidget):
         )
 
         if reply == QMessageBox.Yes:
-            self._remove_term_from_glossary(english_term)
+            self._remove_term_from_termbase(english_term)
             self.refresh_table()
             self.update_count_label()
             self.update_button_states()
-            self.glossary_changed.emit(self.glossary)
+            self.termbase_changed.emit(self.termbase)
 
     def clear_all_terms(self):
-        """Clear all terms from the glossary."""
-        total_terms = sum(len(lang_gloss) for lang_gloss in self.glossary.values())
+        """Clear all terms from the termbase."""
+        total_terms = sum(
+            len(lang_termbase) for lang_termbase in self.termbase.values()
+        )
 
         reply = QMessageBox.question(
             self,
             "Clear All Terms",
-            f"Remove all {total_terms} terms from the business glossary?\n\n"
+            f"Remove all {total_terms} terms from the termbase?\n\n"
             "This action cannot be undone.",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
 
         if reply == QMessageBox.Yes:
-            self.glossary.clear()
+            self.termbase.clear()
             self.languages.clear()
             self.refresh_table()
             self.update_count_label()
             self.update_button_states()
-            self.glossary_changed.emit(self.glossary)
+            self.termbase_changed.emit(self.termbase)
 
     def on_table_item_changed(self, item):
         """Handle table item changes (direct editing)."""
@@ -304,52 +308,52 @@ class BusinessGlossaryEditor(QWidget):
         language = self.languages[item.column() - 1]  # -1 because column 0 is English
         translation = item.text()
 
-        # Update the glossary
-        if language not in self.glossary:
-            self.glossary[language] = {}
+        # Update the termbase
+        if language not in self.termbase:
+            self.termbase[language] = {}
 
         if translation.strip():
-            self.glossary[language][english_term] = translation.strip()
-        elif english_term in self.glossary[language]:
-            del self.glossary[language][english_term]
+            self.termbase[language][english_term] = translation.strip()
+        elif english_term in self.termbase[language]:
+            del self.termbase[language][english_term]
 
         self.update_count_label()
-        self.glossary_changed.emit(self.glossary)
+        self.termbase_changed.emit(self.termbase)
 
-    def _add_term_to_glossary(self, english_term: str, translations: Dict[str, str]):
-        """Add a new term to the glossary."""
+    def _add_term_to_termbase(self, english_term: str, translations: Dict[str, str]):
+        """Add a new term to the termbase."""
         for language, translation in translations.items():
-            if language not in self.glossary:
-                self.glossary[language] = {}
+            if language not in self.termbase:
+                self.termbase[language] = {}
             if translation.strip():
-                self.glossary[language][english_term] = translation.strip()
+                self.termbase[language][english_term] = translation.strip()
 
     def _update_term_translations(
         self, english_term: str, translations: Dict[str, str]
     ):
         """Update translations for an existing term."""
         for language, translation in translations.items():
-            if language not in self.glossary:
-                self.glossary[language] = {}
+            if language not in self.termbase:
+                self.termbase[language] = {}
 
             if translation.strip():
-                self.glossary[language][english_term] = translation.strip()
-            elif english_term in self.glossary[language]:
-                del self.glossary[language][english_term]
+                self.termbase[language][english_term] = translation.strip()
+            elif english_term in self.termbase[language]:
+                del self.termbase[language][english_term]
 
-    def _remove_term_from_glossary(self, english_term: str):
-        """Remove a term from all languages in the glossary."""
-        for language_glossary in self.glossary.values():
-            if english_term in language_glossary:
-                del language_glossary[english_term]
+    def _remove_term_from_termbase(self, english_term: str):
+        """Remove a term from all languages in the termbase."""
+        for language_termbase in self.termbase.values():
+            if english_term in language_termbase:
+                del language_termbase[english_term]
 
-    def is_modified(self, original_glossary: Dict[str, Dict[str, str]]) -> bool:
-        """Check if the glossary has been modified from the original."""
-        return self.glossary != original_glossary
+    def is_modified(self, original_termbase: Dict[str, Dict[str, str]]) -> bool:
+        """Check if the termbase has been modified from the original."""
+        return self.termbase != original_termbase
 
 
 class AddTermDialog(QDialog):
-    """Dialog for adding a new English term and its translations to the business glossary."""
+    """Dialog for adding a new English term and its translations to the termbase."""
 
     def __init__(self, languages: List[str], parent=None):
         super().__init__(parent)

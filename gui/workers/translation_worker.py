@@ -131,16 +131,15 @@ class TranslationWorker(QThread):
                 # Update .env file with DNT terms
                 self.update_env_dnt_terms(dnt_terms)
 
-            # Get business glossary for each target language
+            # Get termbase for each target language
             for language_name in self.target_languages.keys():
-                glossary = self.config_manager.get_business_glossary(language_name)
-                if glossary:
+                termbase = self.config_manager.get_termbase(language_name)
+                if termbase:
                     self.progress_updated.emit(
-                        f"Using AI-generated business glossary for {language_name}: {len(glossary)} terms"
+                        f"Using AI-generated termbase for {language_name}: {len(termbase)} terms"
                     )
-
-                    # Update business_glossary.json with AI-generated terms
-                    self.update_business_glossary(language_name, glossary)
+                    # Update termbase.json with AI-generated terms
+                    self.update_termbase(language_name, termbase)
 
             # Get DNT terms from config manager
             dnt_terms = self.config_manager.get_dnt_terms()
@@ -187,35 +186,35 @@ class TranslationWorker(QThread):
         with open(env_path, "w") as f:
             f.writelines(new_lines)
 
-    def update_business_glossary(self, language: str, glossary: Dict[str, str]):
-        """Update business_glossary.json with AI-generated terms"""
-        glossary_file = Path("business_glossary.json")
+    def update_termbase(self, language: str, termbase: Dict[str, str]):
+        """Update termbase.json with AI-generated terms"""
+        termbase_file = Path("termbase.json")
 
-        # Load existing glossary
-        existing_glossary = {}
-        if glossary_file.exists():
+        # Load existing termbase
+        existing_termbase = {}
+        if termbase_file.exists():
             try:
                 import json
 
-                with open(glossary_file, "r", encoding="utf-8") as f:
-                    existing_glossary = json.load(f)
+                with open(termbase_file, "r", encoding="utf-8") as f:
+                    existing_termbase = json.load(f)
             except Exception as e:
-                logging.warning(f"Could not load existing business_glossary.json: {e}")
+                logging.warning(f"Could not load existing termbase.json: {e}")
 
         # Update with AI-generated terms
-        if language not in existing_glossary:
-            existing_glossary[language] = {}
+        if language not in existing_termbase:
+            existing_termbase[language] = {}
 
-        existing_glossary[language].update(glossary)
+        existing_termbase[language].update(termbase)
 
         # Write back to file
         try:
             import json
 
-            with open(glossary_file, "w", encoding="utf-8") as f:
-                json.dump(existing_glossary, f, ensure_ascii=False, indent=2)
+            with open(termbase_file, "w", encoding="utf-8") as f:
+                json.dump(existing_termbase, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logging.error(f"Could not write business_glossary.json: {e}")
+            logging.error(f"Could not write termbase.json: {e}")
 
     def update_env_dnt_terms(self, dnt_terms: List[str]):
         """Update .env file with DNT terms"""

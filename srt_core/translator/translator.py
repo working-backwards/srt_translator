@@ -10,12 +10,11 @@ import srt
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_glossary_terms
+from gui.config.language_config import language_config
+from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_termbase_terms
 from srt_core.translator.srt_parser import SRTParser
 from srt_core.translator.term_handler import TermHandler
 from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
-from gui.config.language_config import language_config
-
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -52,10 +51,10 @@ class SRTTranslator:
         self.parser = SRTParser()
 
     def get_translation_prompt(self, source_lang, target_lang):
-        """Get the translation prompt with injected glossary from external file, environment, or use built-in default"""
+        """Get the translation prompt with injected termbase from external file, environment, or use built-in default"""
 
-        # Get glossary for this language
-        glossary_block = self._format_glossary_block(target_lang)
+        # Get termbase for this language
+termbase_block = self._format_termbase_block(target_lang)
         # Use unified language config for mapping (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
 
@@ -71,7 +70,7 @@ class SRTTranslator:
                     return custom_prompt.format(
                         source_lang=source_lang,
                         target_lang=mapped_target_lang,
-                        glossary_block=glossary_block,
+                        termbase_block=termbase_block,
                     )
             except Exception as e:
                 logging.warning(
@@ -85,33 +84,33 @@ class SRTTranslator:
                 return custom_prompt.format(
                     source_lang=source_lang,
                     target_lang=mapped_target_lang,
-                    glossary_block=glossary_block,
+                    termbase_block=termbase_block,
                 )
             except KeyError as e:
                 logging.warning(
                     f"Invalid template variable in TRANSLATION_PROMPT: {e}. Using built-in default."
                 )
 
-        # Built-in fallback with glossary injection
-        return self._get_builtin_prompt(source_lang, mapped_target_lang, glossary_block)
+        # Built-in fallback with termbase injection
+return self._get_builtin_prompt(source_lang, mapped_target_lang, termbase_block)
 
-    def _format_glossary_block(self, target_lang):
-        """Format glossary terms for injection into prompt"""
-        terms = get_glossary_terms(target_lang)
-        if not terms:
-            return "No specific glossary terms - use professional business terminology."
+    def _format_termbase_block(self, target_lang):
+    """Format termbase terms for injection into prompt"""
+    terms = get_termbase_terms(target_lang)
+    if not terms:
+        return "No specific termbase terms - use professional business terminology."
 
-        glossary_lines = [
-            f'- "{english}" → "{translation}"' for english, translation in terms.items()
-        ]
-        return "\n".join(glossary_lines)
+    termbase_lines = [
+        f'- "{english}" → "{translation}"' for english, translation in terms.items()
+    ]
+    return "\n".join(termbase_lines)
 
-    def _get_builtin_prompt(self, source_lang, target_lang, glossary_block):
-        """Built-in fallback prompt with glossary injection"""
+    def _get_builtin_prompt(self, source_lang, target_lang, termbase_block):
+    """Built-in fallback prompt with termbase injection"""
         return f"""You are a professional translator. Translate the following text from {source_lang} to {target_lang}.
 
 BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
-{glossary_block}
+{termbase_block}
 
 PLACEHOLDER RULES:
 1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
@@ -132,20 +131,20 @@ If you cannot translate, respond EXACTLY: "I cannot translate because [specific 
 
 Examples:
 - "Hello __DNT_TERM_0__ world" → "你好 __DNT_TERM_0__ 世界"
-- "The operating plan shows results" → "运营计划显示结果" (using glossary)
+- "The operating plan shows results" → "运营计划显示结果" (using termbase)
 - "They met at the time" → "他们当时见面了" (normal translation)
 
 Translate completely and naturally."""
 
     def get_batch_translation_prompt(self, source_lang, target_lang):
-        """Get the batch translation prompt with glossary integration"""
-        glossary_block = self._format_glossary_block(target_lang)
+    """Get the batch translation prompt with termbase integration"""
+    termbase_block = self._format_termbase_block(target_lang)
         # Use unified language config (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
         return f"""You are a professional translator. Translate the following SRT subtitles from {source_lang} to {mapped_target_lang}.
 
 BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
-{glossary_block}
+{termbase_block}
 
 SRT TRANSLATION RULES:
 1. Preserve SRT structure, numbering, and timestamps exactly

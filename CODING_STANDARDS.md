@@ -20,7 +20,7 @@ This document describes the code quality tools and standards used in the SRT Tra
 
 ```bash
 # Install all development tools
-pip install -r requirements-dev.txt
+pip install -e .[dev]
 
 # Or install individually
 pip install black isort pylint flake8 mypy

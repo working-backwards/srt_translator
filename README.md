@@ -164,7 +164,7 @@ srt_translator/
 ├── setup.py                   # Package setup configuration
 ├── .env.example              # Environment configuration template
 ├── .gitignore                # Git ignore rules
-├── requirements.txt          # Python dependencies
+├── pyproject.toml           # Project configuration and dependencies
 └── README.md                 # Project documentation
 ```
 
@@ -173,7 +173,7 @@ srt_translator/
 ## Prerequisites
 - Python 3.7 or higher
 - OpenAI API key
-- Required Python packages (see requirements.txt)
+- Required Python packages (see pyproject.toml)
 
 ---
 
@@ -198,7 +198,7 @@ srt_translator/
 
 3. **Install required packages:**
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 4. **Set up environment configuration:**
@@ -377,7 +377,7 @@ tests/
 ├── test_ai_config_basic.py     # Basic AI configuration tests
 ├── test_ai_config_integration.py # Integration tests for AI config system
 └── gui/                        # GUI component tests
-    ├── test_business_glossary_editor.py
+    ├── test_termbase_editor.py
     ├── test_editors_integration.py
     └── test_dnt_terms_editor.py
 ```

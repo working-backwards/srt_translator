@@ -1,12 +1,12 @@
+import logging
 import os
 import sys
+
 import pytest
-import logging
 
 """
 Pytest configuration for SRT Translator tests
 """
-
 
 
 # Add the project root to the Python path
@@ -25,8 +25,8 @@ def sample_dnt_terms():
 
 
 @pytest.fixture
-def sample_business_glossary():
-    """Sample business glossary for testing"""
+def sample_termbase():
+    """Sample termbase for testing"""
     return {
         "Spanish": {"API": "API", "Amazon": "Amazon", "Web Services": "Servicios Web"},
         "French": {"API": "API", "Amazon": "Amazon", "Web Services": "Services Web"},

@@ -1,14 +1,8 @@
 import os
 import sys
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-from gui.ui.ai_config_section import EditConfigurationDialog
-
-#!/usr/bin/env python3
-"""
-Integration test for both DNT Terms Editor and Business Glossary Editor
-"""
-
     QApplication,
     QHBoxLayout,
     QLabel,
@@ -17,6 +11,13 @@ Integration test for both DNT Terms Editor and Business Glossary Editor
     QVBoxLayout,
     QWidget,
 )
+
+from gui.ui.ai_config_section import EditConfigurationDialog
+
+#!/usr/bin/env python3
+"""
+Integration test for both DNT Terms Editor and Termbase Editor
+"""
 
 sys.path.insert(0, ".")
 
@@ -42,8 +43,8 @@ class TestWindow(QMainWindow):
             "Microsoft",
         ]
 
-        # Business Glossary: Language-specific translations of English terms
-        self.test_business_glossary = {
+        # Termbase: Language-specific translations of English terms
+        self.test_termbase = {
             "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO", "Amazon": "Amazon"},
             "French": {
                 "API": "API",
@@ -62,7 +63,7 @@ class TestWindow(QMainWindow):
         # Instructions
         instructions = QLabel(
             "Click 'Open Edit Dialog' to test the integrated editors.\n"
-            "The dialog will show both DNT Terms and Business Glossary editors in tabs."
+            "The dialog will show both DNT Terms and Termbase editors in tabs."
         )
         instructions.setStyleSheet(
             "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
@@ -95,22 +96,20 @@ class TestWindow(QMainWindow):
         """Open the EditConfigurationDialog with test data."""
         self.status_label.setText("Opening edit dialog...")
 
-        dialog = EditConfigurationDialog(
-            self.test_dnt_terms, self.test_business_glossary, self
-        )
+        dialog = EditConfigurationDialog(self.test_dnt_terms, self.test_termbase, self)
 
         if dialog.exec():
-            modified_terms, modified_glossary = dialog.get_modified_config()
+            modified_terms, modified_termbase = dialog.get_modified_config()
             has_changes = dialog.has_changes()
 
             if has_changes:
                 self.status_label.setText(
                     f"Dialog closed with changes:\n"
                     f"Terms: {len(modified_terms)} (was {len(self.test_dnt_terms)})\n"
-                    f"Glossary languages: {len(modified_glossary)} (was {len(self.test_business_glossary)})"
+                    f"Termbase languages: {len(modified_termbase)} (was {len(self.test_termbase)})"
                 )
                 print(f"Modified terms: {modified_terms}")
-                print(f"Modified glossary: {modified_glossary}")
+                print(f"Modified termbase: {modified_termbase}")
             else:
                 self.status_label.setText("Dialog closed without changes")
         else:
@@ -119,11 +118,9 @@ class TestWindow(QMainWindow):
     def show_test_data(self):
         """Display the test data being used."""
         print("=== Test Data ===")
-        print(
-            f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}"
-        )
-        print(f"Business Glossary ({len(self.test_business_glossary)} languages):")
-        for language, terms in self.test_business_glossary.items():
+        print(f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}")
+        print(f"Termbase ({len(self.test_termbase)} languages):")
+        for language, terms in self.test_termbase.items():
             print(f"  {language}: {len(terms)} terms - {list(terms.keys())}")
         print("================")
 

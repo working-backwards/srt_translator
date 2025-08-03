@@ -204,19 +204,21 @@ class SettingsManager:
 
     # AI Configuration Methods
     def save_ai_config(
-        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
     ) -> None:
         """
         Save AI-generated configuration to settings
 
         Args:
             dnt_terms: List of terms to exclude from translation
-            business_glossary: Dictionary with language keys and term-translation pairs
+            termbase: Dictionary with language keys and term-translation pairs
         """
         self.settings.setValue("ai_dnt_terms", dnt_terms)
-        self.settings.setValue("ai_business_glossary", business_glossary)
+        self.settings.setValue("ai_termbase", termbase)
         self.settings.sync()
-        logging.info(f"Saved AI config: {len(dnt_terms)} DNT terms, {len(business_glossary)} languages")
+        logging.info(
+            f"Saved AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages"
+        )
 
     def load_ai_config(
         self,
@@ -225,18 +227,18 @@ class SettingsManager:
         Load AI-generated configuration from settings
 
         Returns:
-            Tuple of (dnt_terms, business_glossary)
+            Tuple of (dnt_terms, termbase)
         """
         dnt_terms = self.settings.value("ai_dnt_terms", [])
-        business_glossary = self.settings.value("ai_business_glossary", {})
+        termbase = self.settings.value("ai_termbase", {})
 
         # Ensure we have the correct types
         if not isinstance(dnt_terms, list):
             dnt_terms = []
-        if not isinstance(business_glossary, dict):
-            business_glossary = {}
+        if not isinstance(termbase, dict):
+            termbase = {}
 
-        return dnt_terms, business_glossary
+        return dnt_terms, termbase
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
         """
@@ -261,13 +263,13 @@ class SettingsManager:
 
     def has_ai_config(self) -> bool:
         """Check if AI configuration exists"""
-        dnt_terms, business_glossary = self.load_ai_config()
-        return bool(dnt_terms or business_glossary)
+        dnt_terms, termbase = self.load_ai_config()
+        return bool(dnt_terms or termbase)
 
     def clear_ai_config(self) -> None:
         """Clear AI configuration from settings"""
         self.settings.remove("ai_dnt_terms")
-        self.settings.remove("ai_business_glossary")
+        self.settings.remove("ai_termbase")
         self.settings.sync()
         logging.info("Cleared AI configuration")
 

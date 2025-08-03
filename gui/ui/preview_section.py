@@ -37,13 +37,13 @@ class PreviewWorker(QThread):
         self,
         sample_text: str,
         dnt_terms: List[str],
-        business_glossary: Dict[str, Dict[str, str]],
+        termbase: Dict[str, Dict[str, str]],
         target_language: str,
     ):
         super().__init__()
         self.sample_text = sample_text
         self.dnt_terms = dnt_terms
-        self.business_glossary = business_glossary
+        self.termbase = termbase
         self.target_language = target_language
 
     def run(self):
@@ -60,7 +60,7 @@ class PreviewWorker(QThread):
         # This is a simplified preview - in a real implementation,
         # you might call the actual translation API with a small sample
 
-        # For now, we'll simulate the effect of DNT terms and glossary
+        # For now, we'll simulate the effect of DNT terms and termbase
         original_text = self.sample_text
         configured_text = self._apply_configuration(original_text)
 
@@ -74,11 +74,11 @@ class PreviewWorker(QThread):
                     if term.lower() in original_text.lower()
                 ]
             ),
-            "glossary_terms_applied": self._count_glossary_terms_applied(original_text),
+            "termbase_terms_applied": self._count_termbase_terms_applied(original_text),
         }
 
     def _apply_configuration(self, text: str) -> str:
-        """Apply DNT terms and glossary to the text."""
+        """Apply DNT terms and termbase to the text."""
         # This simulates how the configuration would affect translation
 
         result = text
@@ -92,12 +92,12 @@ class PreviewWorker(QThread):
                     result, term, "[", "]", processed_positions
                 )
 
-        # Apply glossary terms (show translations) - but only if not already processed
-        if self.target_language in self.business_glossary:
-            glossary = self.business_glossary[self.target_language]
-            for english_term, translation in glossary.items():
+        # Apply termbase terms (show translations) - but only if not already processed
+        if self.target_language in self.termbase:
+            termbase = self.termbase[self.target_language]
+            for english_term, translation in termbase.items():
                 if english_term.lower() in result.lower():
-                    # Show glossary translations with {curly braces}
+                    # Show termbase translations with {curly braces}
                     result, processed_positions = self._highlight_term_with_tracking(
                         result, english_term, "{", "}", processed_positions
                     )
@@ -144,14 +144,14 @@ class PreviewWorker(QThread):
         pattern = re.compile(re.escape(term), re.IGNORECASE)
         return pattern.sub(replace_func, text)
 
-    def _count_glossary_terms_applied(self, text: str) -> int:
-        """Count how many glossary terms would be applied."""
-        if self.target_language not in self.business_glossary:
+    def _count_termbase_terms_applied(self, text: str) -> int:
+        """Count how many termbase terms would be applied."""
+        if self.target_language not in self.termbase:
             return 0
 
-        glossary = self.business_glossary[self.target_language]
+        termbase = self.termbase[self.target_language]
         count = 0
-        for english_term in glossary.keys():
+        for english_term in termbase.keys():
             if english_term.lower() in text.lower():
                 count += 1
 
@@ -280,11 +280,11 @@ class PreviewSection(QWidget):
         self.sample_text_edit.textChanged.connect(self.on_sample_text_changed)
 
     def set_configuration(
-        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
     ):
         """Set the configuration to preview."""
         self.dnt_terms = dnt_terms
-        self.business_glossary = business_glossary
+        self.termbase = termbase
         self.preview_btn.setEnabled(True)
 
     def on_sample_text_changed(self):
@@ -317,7 +317,7 @@ class PreviewSection(QWidget):
         self.preview_worker = PreviewWorker(
             sample_text,
             self.dnt_terms,
-            self.business_glossary,
+            self.termbase,
             "Spanish",  # Default target language for preview
         )
         self.preview_worker.preview_ready.connect(self.on_preview_ready)
@@ -336,12 +336,12 @@ class PreviewSection(QWidget):
 
         # Update statistics
         dnt_count = result["dnt_terms_applied"]
-        glossary_count = result["glossary_terms_applied"]
+        termbase_count = result["termbase_terms_applied"]
 
         # Create more detailed statistics
-        total_terms = dnt_count + glossary_count
+        total_terms = dnt_count + termbase_count
         if total_terms > 0:
-            stats_text = f"Configuration Impact: {dnt_count} DNT terms (stay in English), {glossary_count} glossary terms (will be translated)"
+            stats_text = f"Configuration Impact: {dnt_count} DNT terms (stay in English), {termbase_count} termbase terms (will be translated)"
         else:
             stats_text = "Configuration Impact: No terms from your configuration found in this sample text"
 

@@ -1,21 +1,20 @@
 import os
 import sys
+import traceback
+
 from PySide6.QtWidgets import QApplication
+
+from gui.ai_config import AIConfigGenerator
 from gui.config_manager import GUIConfigManager
 from gui.settings_manager import SettingsManager
-        from gui.ai_config import AIConfigGenerator
-        import traceback
 
 #!/usr/bin/env python3
 """
 Test script for AI Configuration Integration
 """
 
-
-
 # Add the project root to the path
 sys.path.insert(0, ".")
-
 
 
 def test_settings_manager():
@@ -26,26 +25,26 @@ def test_settings_manager():
 
     # Test saving and loading AI config
     test_terms = ["API", "CEO", "CFO", "Amazon"]
-    test_glossary = {
+    test_termbase = {
         "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO"},
         "French": {"API": "API", "CEO": "PDG", "CFO": "DF"},
     }
 
     # Save AI config
-    settings_manager.save_ai_config(test_terms, test_glossary)
-    print(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_glossary)} languages")
+    settings_manager.save_ai_config(test_terms, test_termbase)
+    print(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages")
 
     # Load AI config
-    loaded_terms, loaded_glossary = settings_manager.load_ai_config()
+    loaded_terms, loaded_termbase = settings_manager.load_ai_config()
     print(
-        f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_glossary)} languages"
+        f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_termbase)} languages"
     )
 
     # Verify data integrity
     assert loaded_terms == test_terms, f"Terms mismatch: {loaded_terms} != {test_terms}"
     assert (
-        loaded_glossary == test_glossary
-    ), f"Glossary mismatch: {loaded_glossary} != {test_glossary}"
+        loaded_termbase == test_termbase
+    ), f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
     print("✓ Data integrity verified")
 
     # Test freshness check
@@ -70,13 +69,13 @@ def test_config_manager():
     dnt_terms = config_manager.get_dnt_terms()
     print(f"✓ DNT terms: {dnt_terms}")
 
-    # Test getting business glossary
-    spanish_glossary = config_manager.get_business_glossary("Spanish")
-    print(f"✓ Spanish glossary: {spanish_glossary}")
+    # Test getting termbase
+    spanish_termbase = config_manager.get_termbase("Spanish")
+    print(f"✓ Spanish termbase: {spanish_termbase}")
 
-    # Test getting all glossaries
-    all_glossaries = config_manager.get_all_business_glossaries()
-    print(f"✓ All glossaries: {len(all_glossaries)} languages")
+    # Test getting all termbases
+    all_termbases = config_manager.get_all_termbases()
+    print(f"✓ All termbases: {len(all_termbases)} languages")
 
     # Test config source info
     source_info = config_manager.get_config_source_info()

@@ -10,13 +10,11 @@ from gui.ai_config import AIConfigGenerator
 from gui.config_manager import GUIConfigManager
 from gui.settings_manager import SettingsManager
 
-
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-
 
 
 def test_ai_config_system():
@@ -29,7 +27,7 @@ def test_ai_config_system():
 
     # Test saving and loading AI config
     test_dnt_terms = ["API", "CEO", "CFO", "Amazon"]
-    test_business_glossary = {
+    test_termbase = {
         "Spanish": {
             "operating plan": "plan operativo",
             "business review": "revisión de negocio",
@@ -40,16 +38,16 @@ def test_ai_config_system():
         },
     }
 
-    settings_manager.save_ai_config(test_dnt_terms, test_business_glossary)
-    loaded_terms, loaded_glossary = settings_manager.load_ai_config()
+    settings_manager.save_ai_config(test_dnt_terms, test_termbase)
+    loaded_terms, loaded_termbase = settings_manager.load_ai_config()
 
     print(f"Saved DNT terms: {test_dnt_terms}")
     print(f"Loaded DNT terms: {loaded_terms}")
     print(f"Terms match: {test_dnt_terms == loaded_terms}")
 
-    print(f"Saved glossary languages: {list(test_business_glossary.keys())}")
-    print(f"Loaded glossary languages: {list(loaded_glossary.keys())}")
-    print(f"Glossary match: {test_business_glossary == loaded_glossary}")
+    print(f"Saved termbase languages: {list(test_termbase.keys())}")
+    print(f"Loaded termbase languages: {list(loaded_termbase.keys())}")
+    print(f"Termbase match: {test_termbase == loaded_termbase}")
 
     # Test 2: Config Manager
     print("\n2. Testing Config Manager...")
@@ -59,9 +57,9 @@ def test_ai_config_system():
     dnt_terms = config_manager.get_dnt_terms()
     print(f"Config manager DNT terms: {dnt_terms}")
 
-    # Test getting business glossary
-    spanish_glossary = config_manager.get_business_glossary("Spanish")
-    print(f"Spanish glossary: {spanish_glossary}")
+    # Test getting termbase
+    spanish_termbase = config_manager.get_termbase("Spanish")
+    print(f"Spanish termbase: {spanish_termbase}")
 
     # Test config summary
     summary = config_manager.get_config_summary()

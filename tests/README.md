@@ -12,7 +12,7 @@ tests/
 ├── test_ai_config_integration.py # Integration tests for AI config system
 └── gui/                        # GUI component tests
     ├── __init__.py
-    ├── test_business_glossary_editor.py
+    ├── test_termbase_editor.py
     ├── test_editors_integration.py
     └── test_dnt_terms_editor.py
 ```
@@ -48,7 +48,7 @@ pytest tests/test_ai_config_integration.py -v
 - **`test_ai_config_integration.py`**: Integration tests for the complete AI config system
 
 ### GUI Tests
-- **`test_business_glossary_editor.py`**: Tests the business glossary editor widget
+- **`test_termbase_editor.py`**: Tests the termbase editor widget
 - **`test_editors_integration.py`**: Tests the integrated editors dialog
 - **`test_dnt_terms_editor.py`**: Tests the DNT terms editor widget
 

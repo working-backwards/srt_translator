@@ -15,7 +15,7 @@ class GUIConfigManager:
     """
     Manages configuration retrieval with three-tier fallback system:
     1. GUI AI-generated config (highest priority)
-    2. Manual .env/business_glossary.json (fallback)
+    2. Manual .env/termbase.json (fallback)
     3. Built-in defaults (last resort)
     """
 
@@ -38,7 +38,7 @@ class GUIConfigManager:
             "ROI",
         ]
 
-        self.DEFAULT_BUSINESS_GLOSSARY = {
+        self.DEFAULT_TERMBASE = {
             "Spanish": {
                 "operating plan": "plan operativo",
                 "business review": "revisión de negocio",
@@ -79,9 +79,9 @@ class GUIConfigManager:
         self.logger.info("Using default DNT terms")
         return self.DEFAULT_DNT_TERMS.copy()
 
-    def get_business_glossary(self, target_language: str) -> Dict[str, str]:
+    def get_termbase(self, target_language: str) -> Dict[str, str]:
         """
-        Get business glossary for a specific language using three-tier fallback
+        Get termbase for a specific language using three-tier fallback
 
         Args:
             target_language: Target language for translation
@@ -90,60 +90,55 @@ class GUIConfigManager:
             Dictionary of English terms to translated terms
         """
         # Priority 1: GUI AI-generated config
-        _, ai_business_glossary = self.settings_manager.load_ai_config()
-        if (
-            target_language in ai_business_glossary
-            and ai_business_glossary[target_language]
-        ):
-            self.logger.info(
-                f"Using AI-generated business glossary for {target_language}"
-            )
-            return ai_business_glossary[target_language]
+        _, ai_termbase = self.settings_manager.load_ai_config()
+        if target_language in ai_termbase and ai_termbase[target_language]:
+            self.logger.info(f"Using AI-generated termbase for {target_language}")
+            return ai_termbase[target_language]
 
-        # Priority 2: Manual business_glossary.json fallback
-        manual_glossary = self._load_business_glossary_from_file()
-        if target_language in manual_glossary and manual_glossary[target_language]:
-            self.logger.info(f"Using business glossary from file for {target_language}")
-            return manual_glossary[target_language]
+        # Priority 2: Manual termbase.json fallback
+        manual_termbase = self._load_termbase_from_file()
+        if target_language in manual_termbase and manual_termbase[target_language]:
+            self.logger.info(f"Using termbase from file for {target_language}")
+            return manual_termbase[target_language]
 
         # Priority 3: Built-in defaults
-        if target_language in self.DEFAULT_BUSINESS_GLOSSARY:
-            self.logger.info(f"Using default business glossary for {target_language}")
-            return self.DEFAULT_BUSINESS_GLOSSARY[target_language].copy()
+        if target_language in self.DEFAULT_TERMBASE:
+            self.logger.info(f"Using default termbase for {target_language}")
+            return self.DEFAULT_TERMBASE[target_language].copy()
 
-        # No glossary available for this language
-        self.logger.warning(f"No business glossary available for {target_language}")
+        # No termbase available for this language
+        self.logger.warning(f"No termbase available for {target_language}")
         return {}
 
-    def get_all_business_glossaries(self) -> Dict[str, Dict[str, str]]:
+    def get_all_termbases(self) -> Dict[str, Dict[str, str]]:
         """
-        Get business glossaries for all languages using three-tier fallback
+        Get termbases for all languages using three-tier fallback
 
         Returns:
             Dictionary with language keys and term-translation pairs
         """
         # Priority 1: GUI AI-generated config
-        _, ai_business_glossary = self.settings_manager.load_ai_config()
-        if ai_business_glossary:
-            self.logger.info("Using AI-generated business glossaries")
-            return ai_business_glossary
+        _, ai_termbase = self.settings_manager.load_ai_config()
+        if ai_termbase:
+            self.logger.info("Using AI-generated termbases")
+            return ai_termbase
 
-        # Priority 2: Manual business_glossary.json fallback
-        manual_glossary = self._load_business_glossary_from_file()
-        if manual_glossary:
-            self.logger.info("Using business glossaries from file")
-            return manual_glossary
+        # Priority 2: Manual termbase.json fallback
+        manual_termbase = self._load_termbase_from_file()
+        if manual_termbase:
+            self.logger.info("Using termbases from file")
+            return manual_termbase
 
         # Priority 3: Built-in defaults
-        self.logger.info("Using default business glossaries")
-        return self.DEFAULT_BUSINESS_GLOSSARY.copy()
+        self.logger.info("Using default termbases")
+        return self.DEFAULT_TERMBASE.copy()
 
     def get_config_source_info(self) -> Dict[str, str]:
         """
         Get information about which configuration source is being used
 
         Returns:
-            Dictionary with source information for DNT terms and business glossary
+            Dictionary with source information for DNT terms and termbase
         """
         info = {}
 
@@ -156,14 +151,14 @@ class GUIConfigManager:
         else:
             info["dnt_terms_source"] = "Default"
 
-        # Check business glossary source
-        _, ai_business_glossary = self.settings_manager.load_ai_config()
-        if ai_business_glossary:
-            info["business_glossary_source"] = "AI Generated"
-        elif self._load_business_glossary_from_file():
-            info["business_glossary_source"] = "Manual (business_glossary.json)"
+        # Check termbase source
+        _, ai_termbase = self.settings_manager.load_ai_config()
+        if ai_termbase:
+            info["termbase_source"] = "AI Generated"
+        elif self._load_termbase_from_file():
+            info["termbase_source"] = "Manual (termbase.json)"
         else:
-            info["business_glossary_source"] = "Default"
+            info["termbase_source"] = "Default"
 
         return info
 
@@ -225,25 +220,25 @@ class GUIConfigManager:
             self.logger.error(f"Error loading DNT terms from .env: {e}")
             return []
 
-    def _load_business_glossary_from_file(self) -> Dict[str, Dict[str, str]]:
-        """Load business glossary from business_glossary.json file"""
+    def _load_termbase_from_file(self) -> Dict[str, Dict[str, str]]:
+        """Load termbase from termbase.json file"""
         try:
-            glossary_file = "business_glossary.json"
-            if not os.path.exists(glossary_file):
+            termbase_file = "termbase.json"
+            if not os.path.exists(termbase_file):
                 return {}
 
-            with open(glossary_file, "r", encoding="utf-8") as f:
-                business_glossary = json.load(f)
+            with open(termbase_file, "r", encoding="utf-8") as f:
+                termbase = json.load(f)
 
             # Validate structure
-            if not isinstance(business_glossary, dict):
-                self.logger.warning("business_glossary.json is not a valid dictionary")
+            if not isinstance(termbase, dict):
+                self.logger.warning("termbase.json is not a valid dictionary")
                 return {}
 
-            return business_glossary
+            return termbase
 
         except Exception as e:
-            self.logger.error(f"Error loading business glossary from file: {e}")
+            self.logger.error(f"Error loading termbase from file: {e}")
             return {}
 
     def validate_ai_config(self) -> Tuple[bool, List[str]]:
@@ -278,10 +273,10 @@ class GUIConfigManager:
         if not dnt_terms:
             issues.append("No DNT terms in AI configuration")
 
-        # Validate business glossary
-        _, business_glossary = self.settings_manager.load_ai_config()
-        if not business_glossary:
-            issues.append("No business glossary in AI configuration")
+        # Validate termbase
+        _, termbase = self.settings_manager.load_ai_config()
+        if not termbase:
+            issues.append("No termbase in AI configuration")
 
         return len(issues) == 0, issues
 
@@ -293,15 +288,15 @@ class GUIConfigManager:
             Dictionary with configuration summary information
         """
         dnt_terms = self.get_dnt_terms()
-        business_glossaries = self.get_all_business_glossaries()
+        termbases = self.get_all_termbases()
         source_info = self.get_config_source_info()
         is_valid, issues = self.validate_ai_config()
 
         return {
             "dnt_terms_count": len(dnt_terms),
-            "business_glossary_languages": list(business_glossaries.keys()),
-            "total_glossary_terms": sum(
-                len(glossary) for glossary in business_glossaries.values()
+            "termbase_languages": list(termbases.keys()),
+            "total_termbase_terms": sum(
+                len(termbase) for termbase in termbases.values()
             ),
             "source_info": source_info,
             "ai_config_valid": is_valid,

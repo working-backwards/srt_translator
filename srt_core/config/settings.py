@@ -83,40 +83,38 @@ except json.JSONDecodeError as e:
     raise ValueError(f"Invalid TARGET_LANGUAGES format in .env file: {e}")
 
 # DNT terms that will not be translated
-DNT_TERMS_TEXT = (
-    os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""
-)
+DNT_TERMS_TEXT = os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""
 DNT_TERMS = DNT_TERMS_TEXT.split(",")
 
 # Language configuration is now handled by the unified system in config/languages.json
 
-# Business Glossary Support
-BUSINESS_GLOSSARY_PATH = os.path.join(BASE_DIR, "business_glossary.json")
-BUSINESS_GLOSSARY = {}
+# Termbase Support
+TERMBASE_PATH = os.path.join(BASE_DIR, "termbase.json")
+TERMBASE = {}
 
 
-def load_business_glossary():
-    """Load business glossary from JSON file if it exists"""
-    global BUSINESS_GLOSSARY
-    if os.path.exists(BUSINESS_GLOSSARY_PATH):
+def load_termbase():
+    """Load termbase from JSON file if it exists"""
+    global TERMBASE
+    if os.path.exists(TERMBASE_PATH):
         try:
-            with open(BUSINESS_GLOSSARY_PATH, "r", encoding="utf-8") as f:
-                BUSINESS_GLOSSARY = json.load(f)
-            print(f"Loaded business glossary with {len(BUSINESS_GLOSSARY)} languages")
+            with open(TERMBASE_PATH, "r", encoding="utf-8") as f:
+                TERMBASE = json.load(f)
+            print(f"Loaded termbase with {len(TERMBASE)} languages")
         except (json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"Warning: Could not load business glossary: {e}")
-            BUSINESS_GLOSSARY = {}
+            print(f"Warning: Could not load termbase: {e}")
+            TERMBASE = {}
     else:
-        print("No business glossary found - using default translations")
+        print("No termbase found - using default translations")
 
 
-# Load glossary on import
-load_business_glossary()
+# Load termbase on import
+load_termbase()
 
 
-def get_glossary_terms(target_lang):
-    """Get glossary terms for a specific language"""
-    return BUSINESS_GLOSSARY.get(target_lang, {})
+def get_termbase_terms(target_lang):
+    """Get termbase terms for a specific language"""
+    return TERMBASE.get(target_lang, {})
 
 
 BATCH_SIZE = int(

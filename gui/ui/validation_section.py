@@ -38,12 +38,12 @@ class ValidationWorker(QThread):
     def __init__(
         self,
         dnt_terms: List[str],
-        business_glossary: Dict[str, Dict[str, str]],
+        termbase: Dict[str, Dict[str, str]],
         source_files: List[str],
     ):
         super().__init__()
         self.dnt_terms = dnt_terms
-        self.business_glossary = business_glossary
+        self.termbase = termbase
         self.source_files = source_files
 
     def run(self):
@@ -51,7 +51,7 @@ class ValidationWorker(QThread):
         try:
             validator = ConfigurationValidator()
             results = validator.get_validation_summary(
-                self.dnt_terms, self.business_glossary, self.source_files
+                self.dnt_terms, self.termbase, self.source_files
             )
             self.validation_complete.emit(results)
         except Exception as e:
@@ -174,11 +174,11 @@ class ValidationSection(QWidget):
         self.validate_btn.clicked.connect(self.run_validation)
 
     def set_configuration(
-        self, dnt_terms: List[str], business_glossary: Dict[str, Dict[str, str]]
+        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
     ):
         """Set the configuration to validate."""
         self.dnt_terms = dnt_terms
-        self.business_glossary = business_glossary
+        self.termbase = termbase
         self.validate_btn.setEnabled(True)
 
     def set_source_files(self, source_files: List[str]):
@@ -201,7 +201,7 @@ class ValidationSection(QWidget):
 
         # Start validation worker
         self.validation_worker = ValidationWorker(
-            self.dnt_terms, self.business_glossary, self.source_files
+            self.dnt_terms, self.termbase, self.source_files
         )
         self.validation_worker.validation_complete.connect(self.on_validation_complete)
         self.validation_worker.validation_error.connect(self.on_validation_error)
@@ -243,13 +243,13 @@ class ValidationSection(QWidget):
         stats = results["statistics"]
         stats_text = f"""Configuration Statistics:
 • DNT Terms: {stats['dnt_terms_count']}
-• Glossary Languages: {stats['glossary_languages']}
-• Total Glossary Terms: {stats['total_glossary_terms']}
+        • Termbase Languages: {stats['termbase_languages']}
+        • Total Termbase Terms: {stats['total_termbase_terms']}
 • Source Files: {stats['source_files_count']}
 
 Validation Scores:
 • DNT Terms: {results['dnt_terms']['score']:.1%} ({results['dnt_terms']['confidence']:.1%} confidence)
-• Business Glossary: {results['business_glossary']['score']:.1%} ({results['business_glossary']['confidence']:.1%} confidence)
+        • Termbase: {results['termbase']['score']:.1%} ({results['termbase']['confidence']:.1%} confidence)
 • Overall Quality: {results['quality']['score']:.1%} ({results['quality']['confidence']:.1%} confidence)"""
 
         self.stats_text.setText(stats_text)
@@ -258,17 +258,11 @@ Validation Scores:
         all_issues = []
         if results["dnt_terms"]["issues"]:
             all_issues.extend(
-                [
-                    f"DNT Terms: {issue}"
-                    for issue in results["dnt_terms"]["issues"]
-                ]
+                [f"DNT Terms: {issue}" for issue in results["dnt_terms"]["issues"]]
             )
-        if results["business_glossary"]["issues"]:
+        if results["termbase"]["issues"]:
             all_issues.extend(
-                [
-                    f"Business Glossary: {issue}"
-                    for issue in results["business_glossary"]["issues"]
-                ]
+                [f"Termbase: {issue}" for issue in results["termbase"]["issues"]]
             )
         if results["quality"]["issues"]:
             all_issues.extend(
@@ -289,12 +283,9 @@ Validation Scores:
                     for suggestion in results["dnt_terms"]["suggestions"]
                 ]
             )
-        if results["business_glossary"]["suggestions"]:
+        if results["termbase"]["suggestions"]:
             all_suggestions.extend(
-                [
-                    f"• {suggestion}"
-                    for suggestion in results["business_glossary"]["suggestions"]
-                ]
+                [f"• {suggestion}" for suggestion in results["termbase"]["suggestions"]]
             )
         if results["quality"]["suggestions"]:
             all_suggestions.extend(

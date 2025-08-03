@@ -10,71 +10,79 @@ from pathlib import Path
 
 def fix_imports_in_file(file_path):
     """Fix import order issues in a single file."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
-    
+
     original_content = content
-    
+
     # Pattern to match imports that are not at the top
     # This looks for imports that come after non-import statements
-    lines = content.split('\n')
+    lines = content.split("\n")
     new_lines = []
     imports_to_move = []
     in_import_section = True
-    
+
     for i, line in enumerate(lines):
         stripped = line.strip()
-        
+
         # Check if this is an import statement
         is_import = (
-            stripped.startswith('import ') or 
-            stripped.startswith('from ') and ' import ' in stripped
+            stripped.startswith("import ")
+            or stripped.startswith("from ")
+            and " import " in stripped
         )
-        
+
         # Check if this is a non-import statement (but not empty or comment)
         is_non_import = (
-            stripped and 
-            not stripped.startswith('#') and 
-            not stripped.startswith('"""') and
-            not stripped.startswith("'''") and
-            not is_import
+            stripped
+            and not stripped.startswith("#")
+            and not stripped.startswith('"""')
+            and not stripped.startswith("'''")
+            and not is_import
         )
-        
+
         if is_non_import and in_import_section:
             in_import_section = False
-        
+
         if is_import and not in_import_section:
             # This import needs to be moved to the top
             imports_to_move.append(line)
         else:
             new_lines.append(line)
-    
+
     if imports_to_move:
         # Find the right place to insert imports (after existing imports)
         insert_index = 0
         for i, line in enumerate(new_lines):
             stripped = line.strip()
-            if stripped.startswith('import ') or (stripped.startswith('from ') and ' import ' in stripped):
+            if stripped.startswith("import ") or (
+                stripped.startswith("from ") and " import " in stripped
+            ):
                 insert_index = i + 1
-            elif stripped and not stripped.startswith('#') and not stripped.startswith('"""') and not stripped.startswith("'''"):
+            elif (
+                stripped
+                and not stripped.startswith("#")
+                and not stripped.startswith('"""')
+                and not stripped.startswith("'''")
+            ):
                 break
-        
+
         # Insert the moved imports
-        new_lines.insert(insert_index, '')
+        new_lines.insert(insert_index, "")
         for import_line in imports_to_move:
             new_lines.insert(insert_index, import_line)
             insert_index += 1
-        
+
         # Remove the original import lines
-        content = '\n'.join(new_lines)
-        
+        content = "\n".join(new_lines)
+
         # Write the fixed content back
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
-        
+
         print(f"Fixed imports in {file_path}")
         return True
-    
+
     return False
 
 
@@ -83,28 +91,27 @@ def main():
     # Files with known E402 errors
     files_to_fix = [
         "scripts/run_fixer_only.py",
-        "srt_core/config/settings.py", 
+        "srt_core/config/settings.py",
         "srt_core/main.py",
         "srt_core/translator/translator.py",
         "tests/conftest.py",
-        "tests/gui/test_business_glossary_editor.py",
-        "tests/gui/test_editors_integration.py", 
+        "tests/gui/test_termbase_editor.py",
+        "tests/gui/test_editors_integration.py",
         "tests/gui/test_dnt_terms_editor.py",
         "tests/test_ai_config_basic.py",
         "tests/test_ai_config_integration.py",
-        "tests/test_performance_optimization.py",
-        "tests/test_validation.py"
+        "tests/test_validation.py",
     ]
-    
+
     fixed_count = 0
     for file_path in files_to_fix:
         if Path(file_path).exists():
             if fix_imports_in_file(file_path):
                 fixed_count += 1
-    
+
     print(f"\nFixed import order issues in {fixed_count} files.")
     print("Run 'flake8 --select E402' to verify the fixes.")
 
 
 if __name__ == "__main__":
-    main() 
+    main()
