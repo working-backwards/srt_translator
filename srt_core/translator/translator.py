@@ -54,7 +54,7 @@ class SRTTranslator:
         """Get the translation prompt with injected termbase from external file, environment, or use built-in default"""
 
         # Get termbase for this language
-termbase_block = self._format_termbase_block(target_lang)
+        termbase_block = self._format_termbase_block(target_lang)
         # Use unified language config for mapping (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
 
@@ -92,21 +92,21 @@ termbase_block = self._format_termbase_block(target_lang)
                 )
 
         # Built-in fallback with termbase injection
-return self._get_builtin_prompt(source_lang, mapped_target_lang, termbase_block)
+        return self._get_builtin_prompt(source_lang, mapped_target_lang, termbase_block)
 
     def _format_termbase_block(self, target_lang):
-    """Format termbase terms for injection into prompt"""
-    terms = get_termbase_terms(target_lang)
-    if not terms:
-        return "No specific termbase terms - use professional business terminology."
+        """Format termbase terms for injection into prompt"""
+        terms = get_termbase_terms(target_lang)
+        if not terms:
+            return "No specific termbase terms - use professional business terminology."
 
-    termbase_lines = [
-        f'- "{english}" → "{translation}"' for english, translation in terms.items()
-    ]
-    return "\n".join(termbase_lines)
+        termbase_lines = [
+            f'- "{english}" → "{translation}"' for english, translation in terms.items()
+        ]
+        return "\n".join(termbase_lines)
 
     def _get_builtin_prompt(self, source_lang, target_lang, termbase_block):
-    """Built-in fallback prompt with termbase injection"""
+        """Built-in fallback prompt with termbase injection"""
         return f"""You are a professional translator. Translate the following text from {source_lang} to {target_lang}.
 
 BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
@@ -137,8 +137,8 @@ Examples:
 Translate completely and naturally."""
 
     def get_batch_translation_prompt(self, source_lang, target_lang):
-    """Get the batch translation prompt with termbase integration"""
-    termbase_block = self._format_termbase_block(target_lang)
+        """Get the batch translation prompt with termbase integration"""
+        termbase_block = self._format_termbase_block(target_lang)
         # Use unified language config (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
         return f"""You are a professional translator. Translate the following SRT subtitles from {source_lang} to {mapped_target_lang}.

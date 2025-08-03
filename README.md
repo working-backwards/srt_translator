@@ -106,28 +106,33 @@ The SRT Translator supports **78 languages** through a unified language configur
 ### All Available Languages (78 total)
 The system includes languages from Albanian to Zulu, covering major world languages and many regional variants.
 
-### Language Management CLI
+### Language Statistics
 
-Use the built-in language manager to explore available languages:
+- **Total languages**: 77
+- **Popular languages**: 12 (most commonly used)
+- **Other languages**: 65 (specialized and regional variants)
+- **Configuration version**: 1.0
 
-```bash
-# List all available languages
-python run_language_manager.py list-all
+### Finding Language Codes
 
-# List popular languages only
-python run_language_manager.py popular
+To find specific language codes, you can:
 
-# Search for specific languages
-python run_language_manager.py search spanish
+1. **Check the GUI** - The language selection interface shows all available languages
+2. **View the configuration** - Examine `config/languages.json` for the complete list
+3. **Search the file** - Use `grep` or text search: `grep -i "spanish" config/languages.json`
 
-# Get information about a language
-python run_language_manager.py info es
+### Popular Languages (Recommended)
 
-# Show language statistics
-python run_language_manager.py stats
+These 12 languages cover the most common translation needs:
 
-
-```
+| Code | Language | Code | Language |
+|------|----------|------|----------|
+| `es` | Spanish | `fr` | French |
+| `de` | German | `it` | Italian |
+| `pt-BR` | Portuguese (Brazil) | `zh-Hans` | Chinese (Simplified) |
+| `ja` | Japanese | `ko` | Korean |
+| `ar` | Arabic | `hi` | Hindi |
+| `ru` | Russian | `nl` | Dutch |
 
 ### Language Codes
 
@@ -142,11 +147,14 @@ The system uses standard ISO language codes:
 ```
 srt_translator/
 ├── scripts/                    # Utility scripts
-│   ├── run_fixer_only.py      # Run placeholder fixer only
+│   ├── fix_formatting.py      # Auto-fix code formatting
+│   ├── fix_imports.py         # Fix import order issues
+│   ├── lint.py                # Run code quality checks
 │   └── __init__.py
-├── srt/                       # Main application package
+├── srt_core/                  # Main application package
 │   ├── config/
 │   │   ├── settings.py        # Configuration settings
+│   │   ├── language_config.py # Language configuration
 │   │   └── __init__.py
 │   ├── translator/
 │   │   ├── fixer.py           # Fixes subtitle errors
@@ -157,11 +165,20 @@ srt_translator/
 │   ├── utils/
 │   │   ├── logging_setup.py   # Logging utilities
 │   │   └── __init__.py
-│   ├── main.py                # Entry point of the application
+│   ├── main.py                # Entry point for CLI
 │   └── __init__.py
+├── gui/                       # GUI application
+│   ├── ui/                    # User interface components
+│   ├── workers/               # Background workers
+│   ├── config/                # GUI configuration
+│   └── main_window.py         # Main GUI window
 ├── original_captions/         # Input directory (place .srt files here)
-├── run.py                     # Main executable script
-├── setup.py                   # Package setup configuration
+├── translated_srt_files/      # Output directory for translations
+├── translation_logs/          # Translation logs and error reports
+├── run_cli.py                 # CLI entry point
+├── run_gui.py                 # GUI entry point
+├── config/
+│   └── languages.json         # Language definitions
 ├── .env.example              # Environment configuration template
 ├── .gitignore                # Git ignore rules
 ├── pyproject.toml           # Project configuration and dependencies

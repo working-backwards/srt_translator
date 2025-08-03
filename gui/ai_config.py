@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 import tiktoken
 from openai import OpenAI
 
+from srt_core.config.settings import SOURCE_LANG
 from srt_core.translator.srt_parser import SRTParser
 
 from .config.language_config import language_config
@@ -95,19 +96,23 @@ class AIConfigGenerator:
             raise
 
     def generate_dnt_terms(
-        self, content: str, source_lang: str = "English"
+        self, content: str, source_lang: str = None
     ) -> List[str]:
         """
         Generate list of terms that should stay in the source language
 
         Args:
             content: Clean text content from SRT files
-            source_lang: Source language name (default: "English")
+            source_lang: Source language name (defaults to SOURCE_LANG from settings)
 
         Returns:
             List of terms to exclude from translation
         """
         try:
+            # Use SOURCE_LANG if source_lang is not provided
+            if source_lang is None:
+                source_lang = language_config.get_language_name(SOURCE_LANG)
+            
             prompt = f"""
 You are analyzing educational video transcript content to identify terms that should NOT be translated and should remain in {source_lang}.
 

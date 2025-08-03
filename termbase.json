@@ -70,5 +70,20 @@
     "annual planning": "illik planlaşdırma",
     "input metrics": "giriş göstəriciləri",
     "resource allocation": "resurs bölgüsü"
+  },
+  "French": {
+    "operating plan": "plan opérationnel",
+    "business review": "revue d'affaires",
+    "input metrics": "indicateurs d'entrée"
+  },
+  "German": {
+    "operating plan": "Betriebsplan",
+    "business review": "Geschäftsüberprüfung",
+    "input metrics": "Eingangskennzahlen"
+  },
+  "Spanish": {
+    "operating plan": "plan operativo",
+    "business review": "revisión de negocio",
+    "input metrics": "métricas de entrada"
   }
 }

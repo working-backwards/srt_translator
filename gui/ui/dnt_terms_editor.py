@@ -24,6 +24,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from srt_core.config.settings import SOURCE_LANG
+from srt_core.config.language_config import language_config
+
 
 class DNTTermsEditor(QWidget):
     """Widget for editing DNT terms that should remain in English."""
@@ -31,11 +34,17 @@ class DNTTermsEditor(QWidget):
     # Signal emitted when terms are modified
     terms_changed = Signal(list)
 
-    def __init__(self, parent=None, source_lang="EN"):
+    def __init__(self, parent=None, source_lang=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.terms_list = []
-        self.source_lang = source_lang
+        
+        # Use SOURCE_LANG if source_lang is not provided
+        if source_lang is None:
+            self.source_lang = language_config.get_language_name(SOURCE_LANG)
+        else:
+            self.source_lang = source_lang
+            
         self.setup_ui()
         self.connect_signals()
 

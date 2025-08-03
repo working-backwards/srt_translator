@@ -375,7 +375,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                     self.logger.info("AI Config Worker: Generating DNT terms")
                     # Generate DNT terms
                     dnt_terms = self.ai_generator.generate_dnt_terms(
-                        content, SOURCE_LANG
+                        content, None  # Will use SOURCE_LANG internally
                     )
                     self.logger.info(
                         f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"

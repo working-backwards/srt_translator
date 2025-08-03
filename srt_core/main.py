@@ -93,7 +93,7 @@ def translate_srt_files(file_paths=None):
                 result = translator.translate_file(
                     input_filepath=input_filepath,
                     output_filepath=output_filepath,
-                    target_lang=lang_name,
+                    target_lang=lang_code,
                 )
                 if result is None:
                     summary["skipped"] += 1
