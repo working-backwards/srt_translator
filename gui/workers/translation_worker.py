@@ -216,36 +216,6 @@ class TranslationWorker(QThread):
         except Exception as e:
             logging.error(f"Could not write termbase.json: {e}")
 
-    def update_env_dnt_terms(self, dnt_terms: List[str]):
-        """Update .env file with DNT terms"""
-        env_path = Path(".env")
-
-        # Read existing .env file
-        lines = []
-        if env_path.exists():
-            with open(env_path, "r") as f:
-                lines = f.readlines()
-
-        # Update DNT_TERMS line
-        new_lines = []
-        dnt_terms_str = ", ".join([f'"{term}"' for term in dnt_terms])
-        dnt_terms_line = f"DNT_TERMS = [{dnt_terms_str}]"
-
-        found = False
-        for line in lines:
-            if line.startswith("DNT_TERMS"):
-                new_lines.append(dnt_terms_line + "\n")
-                found = True
-            else:
-                new_lines.append(line)
-
-        if not found:
-            new_lines.append(dnt_terms_line + "\n")
-
-        # Write back to .env file
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
-
     def update_env_languages(self):
         """Update .env file with selected target languages"""
         env_path = Path(".env")

@@ -191,35 +191,6 @@ class GUIConfigManager:
             self.logger.error(f"Error loading DNT terms from .env: {e}")
             return []
 
-    def _load_dnt_terms_from_env(self) -> List[str]:
-        """Load DNT terms from .env file"""
-        try:
-            env_file = ".env"
-            if not os.path.exists(env_file):
-                return []
-
-            dnt_terms = []
-            with open(env_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("DNT_TERMS="):
-                        # Parse comma-separated terms
-                        terms_str = line.split("=", 1)[1].strip()
-                        if terms_str.startswith('"') and terms_str.endswith('"'):
-                            terms_str = terms_str[1:-1]
-                        dnt_terms = [
-                            term.strip()
-                            for term in terms_str.split(",")
-                            if term.strip()
-                        ]
-                        break
-
-            return dnt_terms
-
-        except Exception as e:
-            self.logger.error(f"Error loading DNT terms from .env: {e}")
-            return []
-
     def _load_termbase_from_file(self) -> Dict[str, Dict[str, str]]:
         """Load termbase from termbase.json file"""
         try:

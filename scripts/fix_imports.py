@@ -100,7 +100,6 @@ def main():
         "tests/gui/test_dnt_terms_editor.py",
         "tests/test_ai_config_basic.py",
         "tests/test_ai_config_integration.py",
-        "tests/test_validation.py",
     ]
 
     fixed_count = 0
