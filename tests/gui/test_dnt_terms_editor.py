@@ -5,7 +5,6 @@ Test script for DNT Terms Editor
 
 import sys
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -14,10 +13,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.ui.dnt_terms_editor import DNTTermsEditor
+
 # Add the gui directory to the path
 sys.path.insert(0, "gui")
-
-from gui.ui.dnt_terms_editor import DNTTermsEditor
 
 
 class TestWindow(QMainWindow):

@@ -70,15 +70,22 @@ disable = [
     "C0114",  # missing-module-docstring
     "C0115",  # missing-class-docstring
     "C0116",  # missing-function-docstring
+    "C0301",  # line-too-long (handled by black)
     "R0903",  # too-few-public-methods
     "R0913",  # too-many-arguments
     "R0914",  # too-many-locals
     "R0915",  # too-many-statements
+    "R0902",  # too-many-instance-attributes
+    "R0904",  # too-many-public-methods
+    "R0917",  # too-many-positional-arguments
     "W0621",  # redefined-outer-name (common in tests)
     "W0622",  # redefined-builtin
     "W0703",  # broad-except
     "W0612",  # unused-variable
     "W0611",  # unused-import
+    "W1203",  # logging-fstring-interpolation (f-strings are fine)
+    "R0801",  # duplicate-code (normal in UI patterns)
+    "E0611",  # no-name-in-module (PySide6 detection issue)
 ]
 
 [tool.pylint.master]

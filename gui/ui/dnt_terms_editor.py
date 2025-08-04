@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from srt_core.config.settings import SOURCE_LANG
 from srt_core.config.language_config import language_config
+from srt_core.config.settings import SOURCE_LANG
 
 
 class DNTTermsEditor(QWidget):

@@ -56,8 +56,8 @@ class LanguageConfig:
                 "ko",
                 "ar",
                 "hi",
-                "ru",
-                "nl",
+                "id",
+                "vi",
             ],
             "languages": {
                 "es": {"name": "Spanish", "popular": True},
@@ -70,8 +70,8 @@ class LanguageConfig:
                 "ko": {"name": "Korean", "popular": True},
                 "ar": {"name": "Arabic", "popular": True},
                 "hi": {"name": "Hindi", "popular": True},
-                "ru": {"name": "Russian", "popular": True},
-                "nl": {"name": "Dutch", "popular": True},
+                "id": {"name": "Indonesian", "popular": True},
+                "vi": {"name": "Vietnamese", "popular": True},
             },
         }
 

@@ -10,7 +10,7 @@ import srt
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from gui.config.language_config import language_config
+from srt_core.config.language_config import language_config
 from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_termbase_terms
 from srt_core.translator.srt_parser import SRTParser
 from srt_core.translator.term_handler import TermHandler
@@ -308,15 +308,35 @@ Status: AI Hallucination - Remove this placeholder
         filename,
         subtitle_number=None,
     ):
-        """Check for issues with placeholders in translated text"""
+        """
+        Check for issues with placeholders in translated text.
+
+        This method validates that DNT (Do Not Translate) terms were properly preserved
+        during translation by checking for two types of issues:
+        1. Missing placeholders - DNT terms that were completely removed
+        2. Position mismatches - DNT terms that moved to different contexts
+
+        Args:
+            original_text: The source text before translation
+            translated_text: The translated text to check
+            term_map: Dictionary mapping placeholders to original terms
+            target_lang: Target language code
+            filename: Source filename for logging
+            subtitle_number: Subtitle number for logging
+
+        Returns:
+            List of issue dictionaries with details about placeholder problems
+        """
         issues = []
 
+        # Check each DNT term that was replaced with a placeholder
         for placeholder, original_term in term_map.items():
+            # Issue 1: Missing placeholder - DNT term was completely removed
             if placeholder not in translated_text:
                 issues.append(
                     {
                         "type": "missing_placeholder",
-                        "fixable": True,  # This issue can likely be fixed by re-adding the placeholder
+                        "fixable": True,  # Can be fixed by re-adding the placeholder
                         "reason_description": "The placeholder is missing in the translated text.",
                         "filename": filename,
                         "subtitle_number": subtitle_number,
@@ -327,8 +347,11 @@ Status: AI Hallucination - Remove this placeholder
                         "translated_text": translated_text,
                     }
                 )
+                # Auto-fix: Add placeholder back to the beginning
                 translated_text = f"{placeholder} {translated_text}"
             else:
+                # Issue 2: Position mismatch - DNT term moved to different context
+                # Get the surrounding context (words before/after) for both original and translated
                 original_context = self.term_handler.get_context(
                     original_text, original_term
                 )
@@ -336,6 +359,7 @@ Status: AI Hallucination - Remove this placeholder
                     translated_text, placeholder
                 )
 
+                # Check if contexts are similar (same surrounding words)
                 if (
                     original_context
                     and translated_context
@@ -346,7 +370,7 @@ Status: AI Hallucination - Remove this placeholder
                     issues.append(
                         {
                             "type": "position_mismatch",
-                            "fixable": False,  # This issue usually requires human review
+                            "fixable": False,  # Requires human review due to sentence structure changes
                             "reason_description": (
                                 "The placeholder position in the translated text does not match its "
                                 "original context, likely due to sentence structure changes."
@@ -364,8 +388,20 @@ Status: AI Hallucination - Remove this placeholder
         return issues
 
     def batch_translate_file(self, input_filepath, output_filepath, target_lang):
-        """Translate an entire SRT file in batches for efficiency and context."""
+        """
+        Translate an entire SRT file in batches for efficiency and context preservation.
+
+        This method processes SRT files in chunks (batches) rather than individual subtitles
+        to maintain context between related subtitles and improve translation quality.
+
+        Args:
+            input_filepath: Path to source SRT file
+            output_filepath: Path for translated SRT file
+            target_lang: Target language code
+        """
         filename = os.path.basename(input_filepath)
+
+        # Parse the SRT file into subtitle objects
         subtitles = self.parser.parse_file(input_filepath)
 
         if not subtitles:
@@ -374,8 +410,10 @@ Status: AI Hallucination - Remove this placeholder
             )
             return
 
+        # Sort and reindex subtitles to ensure proper order
         subtitles = list(srt.sort_and_reindex(subtitles))
 
+        # Process subtitles in batches for better context and efficiency
         batch_size = BATCH_SIZE
         translated_subtitles = []
         total = len(subtitles)
@@ -384,7 +422,9 @@ Status: AI Hallucination - Remove this placeholder
             f"Starting batch translation of {filename} to {target_lang} with batch size {batch_size}"
         )
 
+        # Process each batch of subtitles
         for i in range(0, total, batch_size):
+            # Extract current batch and convert to SRT format
             batch = subtitles[i : i + batch_size]
             batch_srt = srt.compose(batch)
 
@@ -392,11 +432,12 @@ Status: AI Hallucination - Remove this placeholder
                 f"Translating batch {i//batch_size + 1}/{(total + batch_size - 1)//batch_size} (subtitles {i+1}-{min(i+batch_size, total)})"
             )
 
+            # Translate the entire batch as one unit
             translated_batch_srt, prompt = self.translate_srt_block(
                 batch_srt, target_lang, filename, i
             )
 
-            # Check if the batch translation failed completely
+            # Error handling: Check if batch translation failed completely
             if contains_bad_response(translated_batch_srt):
                 logging.warning(
                     f"Batch translation failed for batch starting at index {i}. Reason: {extract_translation_failure_reason(translated_batch_srt)}"
@@ -405,7 +446,7 @@ Status: AI Hallucination - Remove this placeholder
                     f"\n--- BATCH TRANSLATION ERROR PROMPT for {filename} (batch starting at subtitle {i}) ---\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
                 )
 
-                # Fall back to single subtitle translation for this batch
+                # Fallback strategy: Translate each subtitle individually
                 logging.info(
                     f"Falling back to single subtitle translation for batch {i//batch_size + 1}"
                 )
@@ -416,12 +457,12 @@ Status: AI Hallucination - Remove this placeholder
                     translated_subtitles.append(sub)
                 continue
 
+            # Clean up the translated SRT output
             translated_batch_srt = clean_srt_output(translated_batch_srt)
 
-            # Check for phantom placeholders in batch translation
-            phantom_placeholders = re.findall(
-                r"__DNT_TERM_\d+__", translated_batch_srt
-            )
+            # Quality check: Detect phantom placeholders (AI hallucinations)
+            # These are placeholders that appear in translation but weren't in the original
+            phantom_placeholders = re.findall(r"__DNT_TERM_\d+__", translated_batch_srt)
             batch_term_map = getattr(self, "_last_batch_term_map", {})
             for phantom in phantom_placeholders:
                 if phantom not in batch_term_map:
@@ -478,9 +519,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
     def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index):
         """Translate a block of SRT subtitles as a batch."""
         # Process DNT terms for the entire SRT block
-        processed_srt_block, term_map = self.term_handler.replace_dnt_terms(
-            srt_block
-        )
+        processed_srt_block, term_map = self.term_handler.replace_dnt_terms(srt_block)
 
         # Store term_map for phantom detection (hacky but works)
         self._last_batch_term_map = term_map

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..config.language_config import language_config
+from srt_core.config.language_config import language_config
 
 
 class LanguageSection(QGroupBox):

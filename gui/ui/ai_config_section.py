@@ -18,11 +18,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from srt_core.config.language_config import language_config
+from srt_core.config.settings import SOURCE_LANG
+
 from .dnt_terms_editor import DNTTermsEditor
 from .termbase_editor import TermbaseEditor
-
-from srt_core.config.settings import SOURCE_LANG
-from srt_core.config.language_config import language_config
 from .toggle_button import AnimatedToggleButton
 
 

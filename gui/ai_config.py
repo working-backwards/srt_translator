@@ -15,7 +15,7 @@ from openai import OpenAI
 from srt_core.config.settings import SOURCE_LANG
 from srt_core.translator.srt_parser import SRTParser
 
-from .config.language_config import language_config
+from srt_core.config.language_config import language_config
 
 
 class AIConfigGenerator:
@@ -95,9 +95,7 @@ class AIConfigGenerator:
             self.logger.error(f"Error extracting subtitle content: {e}")
             raise
 
-    def generate_dnt_terms(
-        self, content: str, source_lang: str = None
-    ) -> List[str]:
+    def generate_dnt_terms(self, content: str, source_lang: str = None) -> List[str]:
         """
         Generate list of terms that should stay in the source language
 
@@ -112,7 +110,7 @@ class AIConfigGenerator:
             # Use SOURCE_LANG if source_lang is not provided
             if source_lang is None:
                 source_lang = language_config.get_language_name(SOURCE_LANG)
-            
+
             prompt = f"""
 You are analyzing educational video transcript content to identify terms that should NOT be translated and should remain in {source_lang}.
 
