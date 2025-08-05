@@ -15,7 +15,7 @@ class GUIConfigManager:
     """
     Manages configuration retrieval with three-tier fallback system:
     1. GUI AI-generated config (highest priority)
-    2. Manual .env/termbase.json (fallback)
+    2. Manual environment/termbase.json (fallback)
     3. Built-in defaults (last resort)
     """
 
@@ -69,10 +69,10 @@ class GUIConfigManager:
             self.logger.info("Using AI-generated DNT terms")
             return ai_dnt_terms
 
-        # Priority 2: Manual .env file fallback
+        # Priority 2: Manual environment variable fallback
         env_dnt_terms = self._load_dnt_terms_from_env()
         if env_dnt_terms:
-            self.logger.info("Using DNT terms from .env file")
+            self.logger.info("Using DNT terms from environment variables")
             return env_dnt_terms
 
         # Priority 3: Built-in defaults
@@ -147,7 +147,7 @@ class GUIConfigManager:
         if ai_dnt_terms:
             info["dnt_terms_source"] = "AI Generated"
         elif self._load_dnt_terms_from_env():
-            info["dnt_terms_source"] = "Manual (.env)"
+            info["dnt_terms_source"] = "Manual (environment)"
         else:
             info["dnt_terms_source"] = "Default"
 
@@ -163,32 +163,25 @@ class GUIConfigManager:
         return info
 
     def _load_dnt_terms_from_env(self) -> List[str]:
-        """Load DNT terms from .env file"""
+        """Load DNT terms from environment variables"""
         try:
-            env_file = ".env"
-            if not os.path.exists(env_file):
-                return []
-
-            dnt_terms = []
-            with open(env_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("DNT_TERMS="):
-                        # Parse comma-separated terms
-                        terms_str = line.split("=", 1)[1].strip()
-                        if terms_str.startswith('"') and terms_str.endswith('"'):
-                            terms_str = terms_str[1:-1]
-                        dnt_terms = [
-                            term.strip()
-                            for term in terms_str.split(",")
-                            if term.strip()
-                        ]
-                        break
-
-            return dnt_terms
+            # Check environment variable first
+            dnt_terms_str = os.environ.get("DNT_TERMS", "")
+            if dnt_terms_str:
+                # Parse the string format: ["term1", "term2", "term3"]
+                if dnt_terms_str.startswith('[') and dnt_terms_str.endswith(']'):
+                    terms_content = dnt_terms_str[1:-1]
+                    dnt_terms = [
+                        term.strip().strip('"').strip("'")
+                        for term in terms_content.split(",")
+                        if term.strip()
+                    ]
+                    return dnt_terms
+            
+            return []
 
         except Exception as e:
-            self.logger.error(f"Error loading DNT terms from .env: {e}")
+            self.logger.error(f"Error loading DNT terms from environment: {e}")
             return []
 
     def _load_termbase_from_file(self) -> Dict[str, Dict[str, str]]:

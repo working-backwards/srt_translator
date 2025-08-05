@@ -115,8 +115,10 @@ class TranslationWorker(QThread):
         logging.info("Using selected files for translation")
         self.progress_updated.emit("Using selected files for translation")
 
-        # Update .env file with target languages
+        # Update environment variables with target languages
         self.update_env_languages()
+
+
 
     def setup_ai_configuration(self):
         """Set up AI-generated configuration for translation"""
@@ -128,7 +130,7 @@ class TranslationWorker(QThread):
                     f"Using AI-generated DNT terms: {', '.join(dnt_terms)}"
                 )
 
-                # Update .env file with DNT terms
+                # Update environment variables with DNT terms
                 self.update_env_dnt_terms(dnt_terms)
 
             # Get termbase for each target language
@@ -147,7 +149,7 @@ class TranslationWorker(QThread):
                 self.progress_updated.emit(
                     f"Using AI-generated DNT terms: {', '.join(dnt_terms)}"
                 )
-                # Update .env file with DNT terms
+                # Update environment variables with DNT terms
                 self.update_env_dnt_terms(dnt_terms)
 
         except Exception as e:
@@ -157,34 +159,10 @@ class TranslationWorker(QThread):
             )
 
     def update_env_dnt_terms(self, dnt_terms: List[str]):
-        """Update .env file with DNT terms"""
-        env_path = Path(".env")
-
-        # Read existing .env file
-        lines = []
-        if env_path.exists():
-            with open(env_path, "r") as f:
-                lines = f.readlines()
-
-        # Update DNT_TERMS line
-        new_lines = []
+        """Update environment variables with DNT terms"""
+        # Set environment variable instead of writing to environment file
         dnt_terms_str = ", ".join([f'"{term}"' for term in dnt_terms])
-        dnt_terms_line = f"DNT_TERMS = [{dnt_terms_str}]"
-
-        found = False
-        for line in lines:
-            if line.startswith("DNT_TERMS"):
-                new_lines.append(dnt_terms_line + "\n")
-                found = True
-            else:
-                new_lines.append(line)
-
-        if not found:
-            new_lines.append(dnt_terms_line + "\n")
-
-        # Write back to .env file
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
+        os.environ["DNT_TERMS"] = f"[{dnt_terms_str}]"
 
     def update_termbase(self, language: str, termbase: Dict[str, str]):
         """Update termbase.json with AI-generated terms"""
@@ -217,31 +195,9 @@ class TranslationWorker(QThread):
             logging.error(f"Could not write termbase.json: {e}")
 
     def update_env_languages(self):
-        """Update .env file with selected target languages"""
-        env_path = Path(".env")
-        if env_path.exists():
-            # Read existing .env file
-            with open(env_path, "r") as f:
-                lines = f.readlines()
-
-            # Update TARGET_LANGUAGES line
-            new_lines = []
-            languages_str = ", ".join(
-                [f'"{name}": "{code}"' for name, code in self.target_languages.items()]
-            )
-            target_languages_line = f"TARGET_LANGUAGES = {{{languages_str}}}"
-
-            found = False
-            for line in lines:
-                if line.startswith("TARGET_LANGUAGES"):
-                    new_lines.append(target_languages_line + "\n")
-                    found = True
-                else:
-                    new_lines.append(line)
-
-            if not found:
-                new_lines.append(target_languages_line + "\n")
-
-            # Write back to .env file
-            with open(env_path, "w") as f:
-                f.writelines(new_lines)
+        """Update environment variables with selected target languages"""
+        # Set environment variable instead of writing to environment file
+        languages_str = ", ".join(
+            [f'"{name}": "{code}"' for name, code in self.target_languages.items()]
+        )
+        os.environ["TARGET_LANGUAGES"] = f"{{{languages_str}}}"

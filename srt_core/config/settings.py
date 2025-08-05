@@ -1,11 +1,8 @@
 import json
 import os
-
-from dotenv import load_dotenv
+import sys
 
 from .language_config import language_config
-
-load_dotenv()
 
 # Dynamically calculate BASE_DIR based on the project's root
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -54,10 +51,10 @@ FIX_AGGRESSIVENESS = float(
 )  # Default level: conservative fixes
 
 # Dictionary of target languages with their ISO codes
-# TARGET_LANGUAGES must be explicitly configured in .env file
+# TARGET_LANGUAGES must be explicitly configured in environment variables
 if "TARGET_LANGUAGES" not in os.environ:
     raise ValueError(
-        "TARGET_LANGUAGES must be configured in your .env file. "
+        "TARGET_LANGUAGES must be configured in your environment variables. "
         "This setting is required to specify which languages to translate to. "
         "See env_example_language_configs.txt for configuration examples."
     )
@@ -77,10 +74,10 @@ try:
 
     TARGET_LANGUAGES = normalized_target_languages
     print(
-        f"Using TARGET_LANGUAGES from .env file with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
+        f"Using TARGET_LANGUAGES from environment with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
     )
 except json.JSONDecodeError as e:
-    raise ValueError(f"Invalid TARGET_LANGUAGES format in .env file: {e}")
+    raise ValueError(f"Invalid TARGET_LANGUAGES format in environment: {e}")
 
 # DNT terms that will not be translated
 DNT_TERMS_TEXT = os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""

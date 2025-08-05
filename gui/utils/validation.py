@@ -18,16 +18,16 @@ def validate_translation_inputs(
     Returns:
         tuple: (is_valid, error_message)
     """
-    logging.info(f"API key loaded: {'Yes' if api_key else 'No'}")
+    logging.debug(f"API key loaded: {'Yes' if api_key else 'No'}")
 
     if not api_key:
         return False, "Please enter your OpenAI API key."
 
-    logging.info(f"Selected files: {len(selected_files)}")
+    logging.debug(f"Selected files: {len(selected_files)}")
     if not selected_files:
         return False, "Please select at least one SRT file to translate."
 
-    logging.info(f"Target languages: {target_languages}")
+    logging.debug(f"Target languages: {target_languages}")
     if not target_languages:
         return False, "Please select at least one target language."
 

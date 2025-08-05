@@ -38,13 +38,13 @@ class DNTTermsEditor(QWidget):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.terms_list = []
-        
+
         # Use SOURCE_LANG if source_lang is not provided
         if source_lang is None:
             self.source_lang = language_config.get_language_name(SOURCE_LANG)
         else:
             self.source_lang = source_lang
-            
+
         self.setup_ui()
         self.connect_signals()
 
@@ -279,7 +279,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Added DNT term: {term}")
+            self.logger.debug(f"Added DNT term: {term}")
 
     def edit_selected_term(self):
         """Edit the currently selected term."""
@@ -315,7 +315,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Edited DNT term: '{old_term}' -> '{new_term}'")
+            self.logger.debug(f"Edited DNT term: '{old_term}' -> '{new_term}'")
 
     def remove_selected_term(self):
         """Remove the currently selected term."""
@@ -338,7 +338,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info(f"Removed DNT term: {term}")
+            self.logger.debug(f"Removed DNT term: {term}")
 
     def clear_all_terms(self):
         """Clear all terms from the list."""
@@ -358,7 +358,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.info("Cleared all DNT terms")
+            self.logger.debug("Cleared all DNT terms")
 
     def _validate_term(self, term: str) -> bool:
         """Validate a term before adding/editing."""

@@ -138,7 +138,7 @@ class LanguageSection(QGroupBox):
                 self.target_languages[checkbox.text()] = code
                 # Track usage for adaptive popular languages
                 self.settings_manager.track_language_usage(code)
-                logging.info(f"Added checkbox language: {checkbox.text()} -> {code}")
+                logging.debug(f"Added checkbox language: {checkbox.text()} -> {code}")
 
         # Add languages from list selection
         for item in self.language_list.selectedItems():
@@ -148,9 +148,9 @@ class LanguageSection(QGroupBox):
                 self.target_languages[name] = code
                 # Track usage for adaptive popular languages
                 self.settings_manager.track_language_usage(code)
-                logging.info(f"Added list language: {name} -> {code}")
+                logging.debug(f"Added list language: {name} -> {code}")
 
-        logging.info(f"Total target languages: {self.target_languages}")
+        logging.debug(f"Total target languages: {self.target_languages}")
         self.update_language_count()
         self.settings_manager.save_target_languages(self.target_languages)
 
@@ -268,7 +268,7 @@ class LanguageSection(QGroupBox):
         # Update target languages to reflect the changes
         self.update_target_languages_from_ui()
 
-        logging.info(f"Refreshed popular languages: {new_popular_codes}")
+        logging.debug(f"Refreshed popular languages: {new_popular_codes}")
 
     def check_for_adaptive_updates(self):
         """

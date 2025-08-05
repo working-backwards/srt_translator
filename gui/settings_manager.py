@@ -100,7 +100,7 @@ class SettingsManager:
         """Reset adaptive popular languages to default values"""
         self.settings.remove("user_popular_languages")
         self.settings.remove("language_usage_data")
-        logging.info("Reset adaptive popular languages to defaults")
+        logging.debug("Reset adaptive popular languages to defaults")
 
     def track_language_usage(self, language_code: str) -> None:
         """
@@ -160,7 +160,7 @@ class SettingsManager:
         # If the top used languages are different from current popular, update them
         if top_used_codes != current_popular:
             self.save_user_popular_languages(top_used_codes)
-            logging.info(f"Updated adaptive popular languages: {top_used_codes}")
+            logging.debug(f"Updated adaptive popular languages: {top_used_codes}")
 
     def get_all_languages(self) -> Dict[str, str]:
         """Get all available languages from unified config"""
@@ -216,7 +216,7 @@ class SettingsManager:
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
         self.settings.sync()
-        logging.info(
+        logging.debug(
             f"Saved AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages"
         )
 
@@ -271,7 +271,7 @@ class SettingsManager:
         self.settings.remove("ai_dnt_terms")
         self.settings.remove("ai_termbase")
         self.settings.sync()
-        logging.info("Cleared AI configuration")
+        logging.debug("Cleared AI configuration")
 
     def get_ai_config_age_days(self) -> Optional[int]:
         """

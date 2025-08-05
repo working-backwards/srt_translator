@@ -2,8 +2,6 @@ import logging
 import os
 from datetime import datetime
 
-from dotenv import load_dotenv
-
 from srt_core.config.language_config import language_config
 from srt_core.config.settings import (
     BATCH_SIZE,
@@ -16,8 +14,6 @@ from srt_core.config.settings import (
 )
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
 

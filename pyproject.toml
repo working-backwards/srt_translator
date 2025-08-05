@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=45", "wheel", "pyinstaller>=5.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -29,7 +29,33 @@ dev = [
     "mypy>=1.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pyinstaller>=5.0.0",
 ]
+
+# Build scripts
+[project.scripts]
+srt-translator-cli = "srt_core.main:translate_srt_files"
+srt-translator-gui = "run_gui:main"
+
+# PyInstaller configuration
+[tool.pyinstaller]
+# Common options
+--name = "SRT-Translator"
+--onefile = true
+--windowed = true
+--clean = true
+--noconfirm = true
+
+# Data files to include (only static assets)
+--add-data = "config/languages.json;config"
+
+# Hidden imports
+--hidden-import = "PySide6.QtCore"
+--hidden-import = "PySide6.QtWidgets"
+--hidden-import = "PySide6.QtGui"
+--hidden-import = "openai"
+--hidden-import = "srt"
+--hidden-import = "tiktoken"
 
 # Black configuration
 [tool.black]

@@ -7,7 +7,6 @@ import sys
 import time
 
 import srt
-from dotenv import load_dotenv
 from openai import OpenAI
 
 from srt_core.config.language_config import language_config
@@ -36,7 +35,6 @@ def extract_translation_failure_reason(ai_response):
 
 class SRTTranslator:
     def __init__(self, source_lang="EN"):
-        load_dotenv()
         self.log_file = setup_logging()
 
         api_key = os.getenv("OPENAI_API_KEY")

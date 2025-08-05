@@ -150,6 +150,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.select_all_files,
             self.clear_all_files,
             self.on_file_selection_changed,
+            self.browse_output_directory,
         )
 
         # Language Section signals
@@ -185,6 +186,9 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Load selected files
         self.file_section.load_saved_files()
+
+        # Load output directory
+        self.file_section.load_saved_output_directory()
 
         # Load target languages
         self.language_section.load_saved_languages()
@@ -237,23 +241,22 @@ class SRTTranslatorMainWindow(QMainWindow):
         last_dir = self.settings_manager.load_last_input_directory()
         if last_dir and os.path.exists(last_dir):
             file_dialog.setDirectory(last_dir)
+        else:
+            file_dialog.setDirectory(os.getcwd())
 
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
-            logging.info(f"File dialog returned: {selected_files}")
-
             for file_path in selected_files:
                 self.file_section.add_file(file_path)
 
             # Save directory
             if selected_files:
-                self.settings_manager.save_last_input_directory(
-                    os.path.dirname(selected_files[0])
-                )
+                last_dir = os.path.dirname(selected_files[0])
+                self.settings_manager.save_last_input_directory(last_dir)
 
-            logging.info(f"Total selected files: {self.file_section.selected_files}")
-            self.file_section.update_file_count_from_selection()
-            self.settings_manager.save_selected_files(self.file_section.selected_files)
+    def browse_output_directory(self):
+        """Browse for output directory"""
+        self.file_section.browse_output_directory()
 
     def select_all_files(self):
         """Select all files in the list"""
@@ -651,9 +654,16 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Start translation
         self.translation_section.start_translation()
 
+        # Get output directory from file section
+        output_directory = self.file_section.get_output_directory()
+
         # Start translation worker
         self.translation_worker = TranslationWorker(
-            api_key, selected_files, target_languages, self.config_manager
+            api_key,
+            selected_files,
+            target_languages,
+            self.config_manager,
+            output_directory,
         )
 
         self.translation_worker.progress_updated.connect(
