@@ -1,517 +1,252 @@
 # SRT Translator
+
 ## Overview
 
-The **SRT Translator** is a Python-based tool that uses OpenAI’s GPT API to translate `.srt` subtitle files while preserving specific terms—like names, brands, or technical terms—that should *not* be translated. It supports multiple target languages and ensures subtitle timing, numbering, and formatting remain intact.
+The **SRT Translator** is a tool that uses AI to translate subtitle files while preserving important terms like names, brands, and technical terms. Perfect for content creators who want to reach international audiences.
 
 ### Who is this for?
 
-This tool is ideal for:
+**Perfect for:**
+- **Content creators** translating videos for international viewers
+- **YouTubers and podcasters** expanding to global audiences
+- **Course creators** offering multilingual educational content
+- **Business professionals** localizing training videos
 
-* **Content creators** translating videos for international viewers
-* **Course creators and educators** offering multilingual educational content
-* **Business professionals** localizing training videos, presentations, or internal communications
-* **YouTubers and podcasters** expanding to global audiences
-* **Localization teams** managing subtitles with branded terms or specialized vocabulary
-* **Small businesses** looking for a cost-effective alternative to full-service localization
-
-**Best suited for users who:**
-
-* Have subtitle files (in srt format) that need translation into one or more languages
-* Need to preserve specific terms like names, product names, or acronyms
-* Want consistent, professional subtitle formatting without manual editing
-
-**May not be ideal if:**
-
-* You only need a quick, one-time translation of a single file (an online tool might be faster)
-* Your subtitles don’t include terms that must be preserved
-* You require human-level localization, cultural nuance, or creative rewriting
-
-### What You Need (and Don’t Need) to Know
-
-To use the SRT Translator, you **don’t need to be a developer**—but you should be comfortable with a few basic tasks.
-
-✅ You **should know how to**:
-
-* Use the command line on Windows, macOS, or Linux
-* Run simple Python commands like `python run.py`
-* Install packages with `pip`
-* Edit a `.env` configuration file
-* Copy your `.srt` files into folders
-
-🚫 You **don’t need to know how to**:
-
-* Write or debug Python code
-* Understand the OpenAI API
-* Use Git or GitHub
-* Read complex error logs
-* Know anything about programming
-
-If you’ve used basic command-line tools before (or followed setup instructions for a Python-based app), you’ll feel right at home using the SRT Translator app.
-
-
-## Features
-- **Multi-language Translation**: Translate `.srt` files into multiple languages simultaneously.
-- **Preserve Specific Terms**: Exclude names, brands, and other terms from translation.
-- **Maintains Timing and Structure**: Ensures subtitles retain proper formatting.
-- **Automatic Error Fixing**: Intelligently fixes common translation issues with placeholders.
-- **Logging**: Provides detailed logs of translation processes and errors.
-- **Customizable Settings**: Configure through environment variables.
+**What you need to know:**
+- Basic computer skills (no programming required)
+- An OpenAI API key (costs ~$0.01-0.05 per minute of video)
+- Subtitle files in .srt format
 
 ---
 
-## Two-Pass Translation System
+## Quick Start (5 minutes)
 
-The SRT Translator uses a **two-pass system** to ensure high-quality translations while reliably preserving important terms such as names, product names, and technical phrases. These DNT terms are temporarily replaced with special **placeholders** like `__DNT_TERM_0__` during translation, and then restored afterward.
+### Option 1: Download Executable (Recommended for Content Creators)
 
-### Pass 1: Real-Time Translation Fixes
+1. **Download** the executable for your platform
+2. **Run the application** (Windows may show security warnings - this is normal for free software)
+3. **Enter your OpenAI API key** in the API Configuration section
+4. **Select target languages** (Spanish, French, German, etc.)
+5. **Add your .srt files** and click "Translate All Files"
 
-During translation, the system automatically detects and fixes **missing placeholder** issues. If OpenAI omits a required placeholder in the output, the translator immediately adds it back to preserve the DNT term.
+### Option 2: Install from Source (For Developers)
 
-**Example:**
-- **Original**: "We use the same infrastructure as __DNT_TERM_0__"
-- **OpenAI returns**: "我们使用相同的基础设施" (placeholder is missing)
-- **Immediate fix**: "__DNT_TERM_0__ 我们使用相同的基础设施" (placeholder restored)
-
-### Pass 2: Batch Placeholder Fixing
-
-Once all translations are complete, the fixer scans the output files for **position mismatch** issues—cases where the placeholder is present but awkwardly placed. These are corrected in bulk using a configurable "aggressiveness" setting.
-
-**Example:**
-- **Original**: "Amazon's retail business model"
-- **Translation**: "小売業__DNT_TERM_0__のビジネスモデル" (placeholder placement sounds unnatural)
-- **Batch fix**: "Amazonの小売業ビジネスモデル" (term is placed more naturally)
-
-### Why Two Passes Are Necessary
-
-- **Missing placeholders** must be fixed immediately to prevent loss of critical terms
-- **Position mismatches** benefit from post-processing, which can be tuned for different languages
-- **Language structure varies**, so what's natural in English may not be in Japanese, Arabic, etc.
-- **Reviewable logs** ensure transparency and help you refine your translation settings over time
-
-This two-pass approach ensures that key terms like company names, technical jargon, and proper nouns are always preserved—while still producing natural-sounding, professional translations in every supported language.
-
-
-## Supported Languages
-
-The SRT Translator supports **78 languages** through a unified language configuration system. You **must** specify which languages to translate to using the `TARGET_LANGUAGES` setting in your `.env` file.
-
-**This is required to prevent accidentally translating to all 78 languages, which would be expensive.**
-
-### Popular Languages (12)
-- Spanish (ES), French (FR), German (DE), Italian (IT)
-- Portuguese (Brazil) (PT-BR), Chinese Simplified (ZH-HANS)
-- Japanese (JA), Korean (KO), Arabic (AR), Hindi (HI)
-- Russian (RU), Dutch (NL)
-
-### All Available Languages (78 total)
-The system includes languages from Albanian to Zulu, covering major world languages and many regional variants.
-
-### Language Statistics
-
-- **Total languages**: 77
-- **Popular languages**: 12 (most commonly used)
-- **Other languages**: 65 (specialized and regional variants)
-- **Configuration version**: 1.0
-
-### Finding Language Codes
-
-To find specific language codes, you can:
-
-1. **Check the GUI** - The language selection interface shows all available languages
-2. **View the configuration** - Examine `config/languages.json` for the complete list
-3. **Search the file** - Use `grep` or text search: `grep -i "spanish" config/languages.json`
-
-### Popular Languages (Recommended)
-
-These 12 languages cover the most common translation needs:
-
-| Code | Language | Code | Language |
-|------|----------|------|----------|
-| `es` | Spanish | `fr` | French |
-| `de` | German | `it` | Italian |
-| `pt-BR` | Portuguese (Brazil) | `zh-Hans` | Chinese (Simplified) |
-| `ja` | Japanese | `ko` | Korean |
-| `ar` | Arabic | `hi` | Hindi |
-| `ru` | Russian | `nl` | Dutch |
-
-### Language Codes
-
-The system uses standard ISO language codes:
-- **Simple codes**: `es` (Spanish), `fr` (French), `de` (German)
-- **Regional variants**: `pt-BR` (Portuguese Brazil), `zh-Hans` (Chinese Simplified)
-- **Full support**: All 78 languages use proper ISO codes for maximum compatibility
-
----
-
-## Project Structure
-```
-srt_translator/
-├── scripts/                    # Utility scripts
-│   ├── fix_formatting.py      # Auto-fix code formatting
-│   ├── fix_imports.py         # Fix import order issues
-│   ├── lint.py                # Run code quality checks
-│   └── __init__.py
-├── srt_core/                  # Main application package
-│   ├── config/
-│   │   ├── settings.py        # Configuration settings
-│   │   ├── language_config.py # Language configuration
-│   │   └── __init__.py
-│   ├── translator/
-│   │   ├── fixer.py           # Fixes subtitle errors
-│   │   ├── srt_parser.py      # Parses .srt files
-│   │   ├── term_handler.py    # Handles translation terms
-│   │   ├── translator.py      # Core translation logic
-│   │   └── __init__.py
-│   ├── utils/
-│   │   ├── logging_setup.py   # Logging utilities
-│   │   └── __init__.py
-│   ├── main.py                # Entry point for CLI
-│   └── __init__.py
-├── gui/                       # GUI application
-│   ├── ui/                    # User interface components
-│   ├── workers/               # Background workers
-│   ├── config/                # GUI configuration
-│   └── main_window.py         # Main GUI window
-├── original_captions/         # Input directory (place .srt files here)
-├── translated_srt_files/      # Output directory for translations
-├── translation_logs/          # Translation logs and error reports
-├── run_cli.py                 # CLI entry point
-├── run_gui.py                 # GUI entry point
-├── config/
-│   └── languages.json         # Language definitions
-├── .env.example              # Environment configuration template
-├── .gitignore                # Git ignore rules
-├── pyproject.toml           # Project configuration and dependencies
-└── README.md                 # Project documentation
-```
-
----
-
-## Prerequisites
-- Python 3.7 or higher
-- OpenAI API key
-- Required Python packages (see pyproject.toml)
-
----
-
-## Installation
-
-1. **Clone this repository:**
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/working-backwards/srt_translator.git
    cd srt_translator
    ```
 
-2. **Create and activate a virtual environment (recommended):**
-   ```bash
-   python -m venv venv
-   
-   # On Windows:
-   venv\Scripts\activate
-   
-   # On macOS/Linux:
-   source venv/bin/activate
-   ```
-
-3. **Install required packages:**
+2. **Install and run:**
    ```bash
    pip install -e .
+   python run_gui.py
    ```
 
-4. **Set up environment configuration:**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your OpenAI API key
-   ```
+---
 
-5. **Create input directory:**
-   ```bash
-   mkdir original_captions
-   ```
+## Features
 
-## Configuration
+- **Multi-language Translation**: Translate to multiple languages at once
+- **Preserve Important Terms**: Keep names, brands, and technical terms untranslated
+- **Maintains Timing**: Subtitle timing and formatting stay intact
+- **Automatic Error Fixing**: Intelligently fixes common translation issues
+- **Professional Results**: High-quality translations suitable for public content
 
-### Environment Variables (.env file)
+---
 
-**Required:**
-- `OPENAI_API_KEY`: Your OpenAI API key
+## Installation
 
-**Required:**
-- `TARGET_LANGUAGES`: Dictionary of target languages (must specify which languages to translate to)
+### For Content Creators (Executable)
 
-**Optional (with defaults):**
-- `DNT_TERMS`: Comma-separated list of terms to preserve
-- `INPUT_DIRECTORY`: Input folder name (default: `original_captions`)
-- `OUTPUT_DIRECTORY`: Output folder name (default: `translated_srt_files`)
-- `LOGS_DIRECTORY`: Logs folder name (default: `translation_logs`)
-- `SOURCE_LANG`: Source language code (default: `en`) - **Case-insensitive**
-- `OPENAI_MODEL`: OpenAI model to use (default: `gpt-4o-mini`)
-- `AGGRESSIVENESS`: Auto-fix aggressiveness 0-1 (default: `0.75`)
+1. **Download** the latest release for your platform
+2. **Extract** the files to a folder
+3. **Run** the executable
+4. **Follow** the on-screen setup instructions
 
-**Note:** Language codes are case-insensitive. You can enter `SOURCE_LANG=EN` or `SOURCE_LANG=en`, and `TARGET_LANGUAGES={"Spanish": "ES"}` or `TARGET_LANGUAGES={"Spanish": "es"}` - the system will normalize them to lowercase internally.
+**Note**: Windows may show security warnings because this is free, open-source software. This is normal and safe.
 
-### Example .env Configuration
+### For Developers (Source Code)
 
-```bash
-OPENAI_API_KEY=your_api_key_here
-TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de", "Japanese": "ja"}
-DNT_TERMS=YourName,YourCompany,YourProduct,CEO,CFO
-SOURCE_LANG=en
-INPUT_DIRECTORY=original_captions
-OUTPUT_DIRECTORY=translated_srt_files
-AGGRESSIVENESS=0.75
-```
+1. **Clone the repository**
+2. **Create virtual environment**: `python -m venv venv`
+3. **Activate environment**: 
+   - Windows: `venv\Scripts\activate`
+   - Mac/Linux: `source venv/bin/activate`
+4. **Install**: `pip install -e .`
+5. **Run**: `python run_gui.py`
 
-### DNT Terms
-Customize terms that should not be translated by editing the `DNT_TERMS` in your `.env` file:
+---
 
-**Examples of terms to exclude:**
-- Instructor names: `YourName,CoInstructorName`
-- Company names: `YourCompany,PartnerCompanies`
-- Product names: `YourProduct,SoftwareNames`
-- Technical terms: `API,SDK,specific methodologies`
-- Industry acronyms: `CRM,ERP,KPI,ROI`
-- Location names: `YourCity,HeadquartersLocation`
+## Basic Configuration
 
+### 1. API Key Setup
+- Get an OpenAI API key from [OpenAI's website](https://platform.openai.com/api-keys)
+- Enter it in the GUI's API Configuration section
+- Test the connection to verify it works
 
-## Customizing the Translation Prompt
+### 2. Target Languages
+- Select which languages you want to translate to
+- Popular choices: Spanish, French, German, Japanese, Chinese
+- You can select multiple languages at once
 
-The SRT Translator uses OpenAI's GPT models with a carefully crafted prompt to ensure high-quality translations while preserving Do Not Translate (DNT) terms. You can customize this prompt if needed.
+### 3. Do Not Translate (DNT) Terms (Optional)
+- Add names, brands, or technical terms that shouldn't be translated
+- Examples: Your name, company name, product names, technical acronyms
 
-### When to Customize the Prompt
-
-Consider customizing the prompt if you experience:
-- **Inconsistent translation style** - You need more formal/informal tone
-- **Domain-specific terminology issues** - Technical, medical, or legal content needs specialized handling
-- **Cultural adaptation needs** - Certain phrases need localization beyond direct translation
-- **Persistent placeholder issues** - The default anti-hallucination instructions aren't working for your content
-
-### How to Customize the Prompt
-
-1. **Modify the `TRANSLATION_PROMPT` in your `.env` file:**
-   The prompt is already included in your `.env` file when you copy from `.env.example`. Simply edit it to meet your needs.
-
-   ```bash
-   TRANSLATION_PROMPT=Your custom prompt here with {source_lang} and {target_lang} variables
-   ```
-
-2. **Required template variables:**
-   - `{source_lang}` - Will be replaced with source language (e.g., "en")
-   - `{target_lang}` - Will be replaced with target language (e.g., "Spanish")
-
-3. **Example customization for formal business content:**
-   ```bash
-   TRANSLATION_PROMPT=You are an expert business translator. Translate the following text from {source_lang} to {target_lang} using formal, professional language appropriate for corporate communications.
-
-   CRITICAL REQUIREMENTS:
-   - Maintain formal business tone throughout
-   - Do NOT create any new placeholders like __DNT_TERM_X__
-   - Preserve existing placeholders exactly as written
-   - Use industry-standard terminology when available
-   
-   Translate professionally while preserving all formatting.
-   ```
-
-### Best Practices for Prompt Customization
-
-- **Keep placeholder instructions** - Always include instructions about not creating new `__DNT_TERM_X__` placeholders
-- **Test incrementally** - Try small changes first, then evaluate translation quality
-- **Use specific language** - Vague instructions like "translate well" are less effective than specific requirements
-- **Consider your content type** - Business documents need different handling than casual content
-- **Validate with samples** - Test your custom prompt on a few subtitles before running full translations
-
-### Troubleshooting Prompt Issues
-
-If your custom prompt causes problems:
-
-1. **Check template variables** - Ensure you included `{source_lang}` and `{target_lang}`
-2. **Review logs** - Look for template error warnings in the translation logs
-3. **Revert to default** - Comment out `TRANSLATION_PROMPT` in your `.env` to use the built-in prompt
-4. **Test with simpler changes** - Start with minor modifications to the default prompt
-
-The default prompt is designed to work well for most content types. Only customize if you have specific requirements that aren't being met.
+### 4. AI-Generated Translation Settings (Recommended)
+To improve translation quality, the SRT Translator app supports two professional tools: Do Not Translate (DNT) terms and a Termbase—and both can be created for you automatically using AI. DNT terms are names, acronyms, or product references (like "Amazon" or "ROI") that should remain in the original language. The Termbase is a glossary that ensures consistent translations for important business or technical terms, such as "operating plan" or "input metrics." Creating these lists is easy: just upload a few representative subtitle files and click "Generate Translation Settings." The app analyzes your content and uses AI to suggest DNT terms and generate a Termbase for each selected language. While optional, these tools are highly recommended for videos that contain brand names, industry jargon, or educational content—helping ensure your translations are clear, accurate, and consistent across all languages.
 
 ---
 
 ## Usage
 
-1. **Place your SRT files** in the `original_captions` directory (or your configured input directory).
+### Step-by-Step Process
 
-2. **Run the translator:**
-   ```bash
-   python run.py
-   ```
+1. **Prepare your .srt files**
+   - Place subtitle files in the input folder
+   - Supported format: .srt files
 
-3. **Find translated files** in language-specific subdirectories under `translated_srt_files`:
-   ```
-   translated_srt_files/
-   ├── ES/
-   │   └── video1 - ES.srt
-   ├── FR/
-   │   └── video1 - FR.srt
-   └── DE/
-       └── video1 - DE.srt
-   ```
+2. **Configure settings**
+   - Enter your API key
+   - Select target languages
+   - Add any DNT terms to preserve
 
-4. **Check logs** in the `translation_logs` directory for any issues or fixes applied.
+3. **Start translation**
+   - Click "Translate All Files"
+   - Monitor progress in the interface
+   - Check logs for any issues
 
+4. **Find your results**
+   - Translated files appear in language-specific folders
+   - Each language gets its own subfolder
+   - Original timing and formatting preserved
 
-## Testing
-
-The project includes a comprehensive test suite to ensure reliability and functionality.
-
-### Running Tests
-
-**All Tests:**
-```bash
-python run_tests.py
+### Example Output Structure
+```
+translated_srt_files/
+├── ES/                    # Spanish translations
+│   └── video1 - ES.srt
+├── FR/                    # French translations
+│   └── video1 - FR.srt
+└── DE/                    # German translations
+    └── video1 - DE.srt
 ```
 
-**GUI Tests Only:**
-```bash
-python run_tests.py gui
-```
+---
 
-**Using pytest directly:**
-```bash
-# All tests
-pytest tests/ -v
+## Cost Estimation
 
-# GUI tests only  
-pytest tests/gui/ -v
+**Typical costs:**
+- **Short video (5-10 minutes)**: $0.05-0.15
+- **Medium video (20-30 minutes)**: $0.20-0.50
+- **Long video (60+ minutes)**: $0.50-1.50
 
-# Specific test file
-pytest tests/test_ai_config_integration.py -v
-```
+**Factors affecting cost:**
+- Length of video
+- Number of languages
+- Complexity of content
+- Number of subtitles
 
-### Test Structure
+**Tips to reduce costs:**
+- Remove unnecessary subtitles before translation
+- Use fewer target languages initially
+- Test with a short video first
 
-```
-tests/
-├── conftest.py                 # Pytest configuration and fixtures
-├── test_ai_config_basic.py     # Basic AI configuration tests
-├── test_ai_config_integration.py # Integration tests for AI config system
-└── gui/                        # GUI component tests
-    ├── test_termbase_editor.py
-    ├── test_editors_integration.py
-    └── test_dnt_terms_editor.py
-```
-
-### Test Types
-
-- **Unit Tests**: Test individual components and functions
-- **Integration Tests**: Test how components work together
-- **GUI Tests**: Test user interface components (standalone applications)
-
-For more details, see `tests/README.md`.
-
-
-## Automatic Error Fixing
-
-The translator includes intelligent error fixing with configurable aggressiveness:
-
-- **0.0**: No automatic fixes (manual intervention required)
-- **0.5**: Fix missing placeholders only
-- **0.75**: Fix missing placeholders + simple reordering (recommended)
-- **1.0**: Aggressive fixes including context mismatches (may risk translation integrity)
-
-
-## Error Handling
-- Creates backups before making any modifications
-- Logs all translation events and errors
-- Handles API errors gracefully with retry logic
-- Automatically fixes common placeholder issues
-
+---
 
 ## Troubleshooting
 
-**Common Issues:**
-- **"Source directory does not exist"**: Create the input directory (`mkdir original_captions`)
-- **"OpenAI API key not found"**: Check your `.env` file has the correct API key
-- **Translation quality issues**: Review and adjust `DNT_TERMS` for your content
-- **Placeholder errors**: Adjust `AGGRESSIVENESS` setting (try 0.5 for more conservative fixes)
+### Common Issues
 
+**"API key not found"**
+- Check that you entered the API key correctly
+- Verify the key is active in your OpenAI account
+
+**"Source directory does not exist"**
+- Create the input folder: `mkdir original_captions`
+- Place your .srt files in this folder
+
+**Translation quality issues**
+- Review and adjust your DNT terms list
+- Check the logs for specific issues
+- Try translating to fewer languages first
+
+**Security warnings (Windows)**
+- This is normal for free, open-source software
+- Right-click → Properties → Unblock if needed
+- The software is safe to run
+
+---
 
 ## FAQ
 
-**Q: Do I need to edit my srt files before running this?**\
-A: No. Just place them in `original_captions/` as-is.
+**Q: Do I need to edit my .srt files first?**
+A: No, just place them in the input folder as-is.
 
-**Q: Can I translate to more than one language at a time?**\
-A: Yes! You can translate to multiple languages by specifying them in the `TARGET_LANGUAGES` setting in your `.env` file. You must specify which languages you want to translate to.
+**Q: Can I translate to multiple languages at once?**
+A: Yes! Select multiple target languages in the interface.
 
-**Q: What if my subtitles break or translate the wrong terms?**\
-A: Check the logs. The fixer will attempt auto-corrections, but logs will report issues.
+**Q: What if some terms get translated that shouldn't be?**
+A: Add them to your DNT terms list and re-run the translation.
 
-**Q: Can I use this on Windows? macOS?**\
-A: Yes. The tool is cross-platform.
+**Q: How accurate are the translations?**
+A: Very good for most content. Review important videos before publishing.
 
-**Q: How much will this cost?**\
-A: You pay OpenAI per token. This script is efficient and uses GPT only for translation.
+**Q: Can I use this on Windows/Mac/Linux?**
+A: Yes, the tool works on all major platforms.
 
+**Q: Is my content secure?**
+A: Yes, only subtitle text is sent to OpenAI. Your video files stay local.
 
-## Utility Scripts
+---
 
-The project includes several utility scripts in the `scripts/` directory for maintenance and troubleshooting:
+## Advanced Configuration
 
-### Fix Placeholders Only (`scripts/run_fixer_only.py`)
+### Environment Variables (For Advanced Users)
 
-Run only the placeholder fixer without re-translating files. Useful when you need to fix remaining `__DNT_TERM_X__` placeholders after translation is complete.
+If you're installing from source, you can configure these settings:
 
+**Required:**
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `TARGET_LANGUAGES`: Dictionary of target languages
+
+**Optional:**
+- `DNT_TERMS`: Comma-separated list of DNT terms
+- `SOURCE_LANG`: Source language (default: en)
+- `OPENAI_MODEL`: AI model to use (default: gpt-4o-mini)
+- `AGGRESSIVENESS`: Auto-fix level 0-1 (default: 0.75)
+
+### Example Configuration
 ```bash
-python scripts/run_fixer_only.py
+OPENAI_API_KEY=your_api_key_here
+TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de"}
+DNT_TERMS=YourName,YourCompany,YourProduct
+SOURCE_LANG=en
 ```
 
-**When to use:**
-- After translations are complete but some placeholders remain unfixed
-- When you've updated your DNT terms and want to apply fixes
-- To avoid re-running hours of translation just to fix placeholders
+---
 
-### Debug Log Parser (`scripts/debug_log_parser.py`)
+## Supported Languages
 
-Analyze translation log files to understand what issues occurred during translation and why the fixer might not be working.
+**Popular Languages (12):**
+- Spanish, French, German, Italian
+- Portuguese (Brazil), Chinese (Simplified)
+- Japanese, Korean, Arabic, Hindi
+- Russian, Dutch
 
-```bash
-python scripts/debug_log_parser.py
-```
-
-**Output includes:**
-- Total number of logged issues
-- Breakdown of issue types (missing placeholders vs. position mismatches)
-- Sample log entries for debugging
-- Issue counts by language
-
-**When to use:**
-- When the fixer reports "0 issues found" but you expect issues
-- To understand what types of problems occurred during translation
-- For troubleshooting log file parsing problems
-
-### Running Utilities
-
-All utility scripts automatically:
-- Find the most recent log file in your `translation_logs` directory
-- Use your current configuration from `.env`
-- Provide detailed output for debugging
-
-**Note:** These scripts require that you've run at least one full translation to generate log files.
+**Total Available:** 78 languages including regional variants
 
 ---
 
 ## Contributing
+
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
-
 ## License
+
 This project is licensed under the [MIT License](LICENSE).
 
-
-## Notes
-- API costs vary based on the length and number of subtitles
-- Translation quality should be reviewed for critical content
-- The application creates all necessary directories automatically
-
-
 ## Support
-For issues and feature requests, please use the GitHub issues page.
+
+For issues and feature requests, please use the [GitHub issues page](https://github.com/working-backwards/srt_translator/issues).
