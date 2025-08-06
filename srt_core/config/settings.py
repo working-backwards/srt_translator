@@ -81,7 +81,8 @@ except json.JSONDecodeError as e:
 
 # DNT terms that will not be translated
 DNT_TERMS_TEXT = os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""
-DNT_TERMS = DNT_TERMS_TEXT.split(",")
+# Filter out empty strings and strip whitespace
+DNT_TERMS = [term.strip() for term in DNT_TERMS_TEXT.split(",") if term.strip()]
 
 # Language configuration is now handled by the unified system in config/languages.json
 

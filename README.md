@@ -201,6 +201,90 @@ A: Yes, only subtitle text is sent to OpenAI. Your video files stay local.
 
 ---
 
+## Configuration Parameters
+
+### Required Parameters
+
+The SRT Translator requires these parameters to function:
+
+| Parameter | Purpose | GUI Source | CLI Source | Configurable? |
+|-----------|---------|------------|------------|---------------|
+| `OPENAI_API_KEY` | Your OpenAI API key for translation | Settings → API Configuration | `.env` file | ✅ Yes |
+| `TARGET_LANGUAGES` | Languages to translate to | Language Selection UI | `.env` file | ✅ Yes |
+| `SOURCE_LANG` | Source language (usually English) | Settings → Translation Settings | `.env` file | ✅ Yes |
+| `OPENAI_MODEL` | AI model to use | Settings → Translation Settings | `.env` file | ✅ Yes |
+| `BATCH_SIZE` | Translation batch size | Settings → Translation Settings | `.env` file | ✅ Yes |
+
+### Optional Parameters
+
+| Parameter | Purpose | GUI Source | CLI Source | Configurable? |
+|-----------|---------|------------|------------|---------------|
+| `DNT_TERMS` | Terms not to translate | AI Configuration Generation | `.env` file | ✅ Yes |
+| `TERMBASE_JSON` | Translation glossary | AI Configuration Generation | Manual file | ✅ Yes |
+| `OUTPUT_DIRECTORY` | Where to save translations | File Selection UI | `.env` file | ✅ Yes |
+| `FIX_AGGRESSIVENESS` | Auto-fix level (0-1) | Hardcoded to 0.75 | `.env` file | ❌ GUI only |
+
+### Parameter Sources by Mode
+
+#### **GUI Mode**
+- **Settings Storage**: Uses Qt's QSettings (persistent across sessions)
+- **Language Selection**: Real-time UI checkboxes and list selection
+- **File Selection**: UI file browser and output directory picker
+- **AI Configuration**: Automatic generation of DNT terms and termbase
+- **Environment Variables**: Set dynamically during translation
+
+#### **CLI Mode**
+- **Settings Storage**: Uses `.env` file in project root
+- **Language Selection**: Must be configured in `.env` file
+- **File Selection**: Uses `original_captions/` directory
+- **AI Configuration**: Manual setup of DNT terms and termbase.json
+- **Environment Variables**: Loaded from `.env` file at startup
+
+### Quick Configuration Guide
+
+#### **For GUI Users:**
+1. **First Time Setup**: Enter API key in Settings → API Configuration
+2. **Language Selection**: Use the Popular Languages checkboxes or search the full list
+3. **File Selection**: Browse and select your .srt files
+4. **Output Directory**: Choose where to save translations (optional)
+5. **AI Configuration**: Generate DNT terms and termbase automatically
+
+#### **For CLI Users:**
+1. **Create `.env` file** in project root with required parameters
+2. **Place .srt files** in `original_captions/` directory
+3. **Configure languages** in `TARGET_LANGUAGES` environment variable
+4. **Set up DNT terms** and termbase.json manually (optional)
+
+### Example CLI Configuration (.env file)
+```bash
+# Required parameters
+OPENAI_API_KEY=your_api_key_here
+TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de"}
+SOURCE_LANG=en
+OPENAI_MODEL=gpt-4o-mini
+BATCH_SIZE=5
+
+# Optional parameters
+DNT_TERMS=YourName,YourCompany,YourProduct
+OUTPUT_DIRECTORY=translated_srt_files
+FIX_AGGRESSIVENESS=0.75
+```
+
+### Switching Between Modes
+
+**GUI → CLI**: 
+- Copy your API key and target languages to `.env` file
+- Place files in `original_captions/` directory
+- Run `python run_cli.py`
+
+**CLI → GUI**: 
+- Launch GUI with `python run_gui.py`
+- Enter API key in Settings
+- Select languages using UI checkboxes
+- Browse and select files
+
+---
+
 ## Advanced Configuration
 
 ### Environment Variables (For Advanced Users)

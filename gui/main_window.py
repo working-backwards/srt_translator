@@ -634,11 +634,16 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Update target languages from UI state to ensure synchronization
         self.language_section.update_target_languages_from_ui()
-        # Check for adaptive updates after language selection
-        self.language_section.check_for_adaptive_updates()
+        # DO NOT call check_for_adaptive_updates() here as it can override current selections
 
         # Get target languages from the language section
         target_languages = self.language_section.get_target_languages()
+        
+        # Debug logging to track language selection
+        self.logger.info(f"Translation requested with languages: {target_languages}")
+        self.logger.info(f"Language names: {list(target_languages.keys())}")
+        self.logger.info(f"Language codes: {list(target_languages.values())}")
+        self.logger.info(f"Number of languages selected: {len(target_languages)}")
 
         # Get API key from settings manager
         api_key = self.settings_manager.load_api_key()
@@ -658,6 +663,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         output_directory = self.file_section.get_output_directory()
 
         # Start translation worker
+        # The worker will automatically run the fixer after translation completes
+        # with hardcoded aggressiveness of 0.75 for consistent behavior
         self.translation_worker = TranslationWorker(
             api_key,
             selected_files,

@@ -132,15 +132,29 @@ class LanguageSection(QGroupBox):
         """Update target languages from both checkboxes and list selection"""
         self.target_languages.clear()
 
-        # Add languages from checkboxes
+        # Debug: Count total checkboxes and checked ones
+        total_checkboxes = len(self.language_checkboxes)
+        checked_checkboxes = 0
+        
+        # Add languages from checkboxes with detailed debugging
         for code, checkbox in self.language_checkboxes.items():
-            if checkbox.isChecked():
+            checkbox_state = checkbox.checkState()
+            is_checked = checkbox.isChecked()
+            logging.info(f"Checkbox '{checkbox.text()}' ({code}): state={checkbox_state}, isChecked={is_checked}")
+            
+            if is_checked:
+                checked_checkboxes += 1
                 self.target_languages[checkbox.text()] = code
                 # Track usage for adaptive popular languages
                 self.settings_manager.track_language_usage(code)
-                logging.debug(f"Added checkbox language: {checkbox.text()} -> {code}")
+                logging.info(f"Added checkbox language: {checkbox.text()} -> {code}")
+        
+        logging.info(f"Language selection debug: {checked_checkboxes}/{total_checkboxes} checkboxes are checked")
 
         # Add languages from list selection
+        list_selected_count = len(self.language_list.selectedItems())
+        logging.info(f"Language selection debug: {list_selected_count} items selected in list")
+        
         for item in self.language_list.selectedItems():
             name = item.text()
             code = item.data(Qt.UserRole)
@@ -148,11 +162,18 @@ class LanguageSection(QGroupBox):
                 self.target_languages[name] = code
                 # Track usage for adaptive popular languages
                 self.settings_manager.track_language_usage(code)
-                logging.debug(f"Added list language: {name} -> {code}")
+                logging.info(f"Added list language: {name} -> {code}")
 
-        logging.debug(f"Total target languages: {self.target_languages}")
+        logging.info(f"Total target languages: {self.target_languages}")
+        logging.info(f"Target languages count: {len(self.target_languages)}")
         self.update_language_count()
         self.settings_manager.save_target_languages(self.target_languages)
+        
+        # Immediately update environment variable to reflect current selection
+        import os
+        import json
+        os.environ["TARGET_LANGUAGES"] = json.dumps(self.target_languages)
+        logging.info(f"Updated TARGET_LANGUAGES environment variable: {os.environ['TARGET_LANGUAGES']}")
 
     def filter_languages(self):
         """Filter the language list based on search text"""
@@ -176,40 +197,64 @@ class LanguageSection(QGroupBox):
         """Load previously selected languages using unified language configuration"""
         saved_languages = self.settings_manager.load_target_languages()
 
-        # Clear existing selections
+        # Temporarily block signals to prevent interference during loading
         for checkbox in self.language_checkboxes.values():
-            checkbox.setChecked(False)
+            checkbox.blockSignals(True)
+        self.language_list.blockSignals(True)
 
-        # Load saved languages
-        for name, code in saved_languages.items():
-            if code in self.language_checkboxes:
-                self.language_checkboxes[code].setChecked(True)
-            else:
-                # If it's not in popular languages, try to select it in the list
-                # This handles cases where languages were moved from popular to non-popular
-                for i in range(self.language_list.count()):
-                    item = self.language_list.item(i)
-                    if item.data(Qt.UserRole) == code:
-                        item.setSelected(True)
-                        break
+        try:
+            # Clear existing selections
+            for checkbox in self.language_checkboxes.values():
+                checkbox.setChecked(False)
 
-        # Update the target_languages dictionary from UI state (without triggering adaptive updates)
-        self.target_languages.clear()
+            # Load saved languages
+            for name, code in saved_languages.items():
+                if code in self.language_checkboxes:
+                    self.language_checkboxes[code].setChecked(True)
+                else:
+                    # If it's not in popular languages, try to select it in the list
+                    # This handles cases where languages were moved from popular to non-popular
+                    for i in range(self.language_list.count()):
+                        item = self.language_list.item(i)
+                        if item.data(Qt.UserRole) == code:
+                            item.setSelected(True)
+                            break
 
-        # Add languages from checkboxes
-        for code, checkbox in self.language_checkboxes.items():
-            if checkbox.isChecked():
-                self.target_languages[checkbox.text()] = code
+            # Update the target_languages dictionary from UI state (without triggering adaptive updates)
+            self.target_languages.clear()
 
-        # Add languages from list selection
-        for item in self.language_list.selectedItems():
-            name = item.text()
-            code = item.data(Qt.UserRole)
-            if code and name not in self.target_languages:  # Avoid duplicates
-                self.target_languages[name] = code
+            # Add languages from checkboxes
+            for code, checkbox in self.language_checkboxes.items():
+                if checkbox.isChecked():
+                    self.target_languages[checkbox.text()] = code
 
-        # Update the display without triggering adaptive updates
-        self.update_language_count()
+            # Add languages from list selection
+            for item in self.language_list.selectedItems():
+                name = item.text()
+                code = item.data(Qt.UserRole)
+                if code and name not in self.target_languages:  # Avoid duplicates
+                    self.target_languages[name] = code
+
+            # Update the display without triggering adaptive updates
+            self.update_language_count()
+            
+            # Immediately update environment variable to reflect loaded state
+            import os
+            import json
+            os.environ["TARGET_LANGUAGES"] = json.dumps(self.target_languages)
+            logging.info(f"Loaded saved languages: {self.target_languages}")
+            logging.info(f"Updated TARGET_LANGUAGES environment variable: {os.environ['TARGET_LANGUAGES']}")
+            
+            # Debug: Verify synchronization
+            total_checkboxes = len(self.language_checkboxes)
+            checked_checkboxes = sum(1 for checkbox in self.language_checkboxes.values() if checkbox.isChecked())
+            logging.info(f"Load verification: {checked_checkboxes}/{total_checkboxes} checkboxes checked, {len(self.target_languages)} languages in target_languages")
+        
+        finally:
+            # Re-enable signals after loading is complete
+            for checkbox in self.language_checkboxes.values():
+                checkbox.blockSignals(False)
+            self.language_list.blockSignals(False)
 
     def refresh_popular_languages(self):
         """
