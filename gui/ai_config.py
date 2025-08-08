@@ -264,35 +264,36 @@ TASK:
    - Are important for learners to grasp — even if they appear only once
    - Would benefit from a standardized, subtitle-friendly translation to avoid confusion
 
-   AVOID if they:
-   - Are obvious, literal, or easily translatable without risk of confusion
-   - Are purely stylistic idioms or colorful language with little instructional value
-   - Are listed in DNT_TERMS
+       AVOID if they:
+    - Are obvious, literal, or easily translatable without risk of confusion
+    - Are purely stylistic idioms or colorful language with little instructional value
+    - Are listed in DNT_TERMS (do not extract any terms that appear in the DNT_TERMS list)
 
-3. Pass 2: Identify 5 additional English, words or phrases, not in DNT_TERMS, from the transcript that are likely to be:
+3. Pass 2: Identify 10 additional English words or phrases from the transcript that are likely to be:
    - mistranslated,
    - interpreted too literally,
    - or misunderstood without context.
 
-   These may include figurative language, verbs or idioms with a special usage, or phrases that learners might take the wrong way in another culture or language.
-   Only include these 5 if their mistranslation could cause confusion or reduce learner understanding.
+   These may include single words, figurative language, verbs or idioms with a special usage, or phrases that learners might take the wrong way in another culture or language.
+   Pay special attention to single words that could be confused with similar words (e.g., "thrash" vs "trash").
+   Only include these 10 if their mistranslation could cause confusion or reduce learner understanding.
    Do not include merely colorful or stylistic phrases.
 
-   ➤ Add these 5 to your list of 20 extracted terms, for a total of 25.
+       ➤ Add these 10 to your list of 20 extracted terms, for a total of 30.
 
 4. Return both:
-   - The extracted list of 25 terms, none of which appear in DNT_TERMS, with a brief reason for each
-   - A per-language termbase of 4–6 of the most important or difficult terms, based on difficulty, relevance, or risk of mistranslation
+   - The extracted list of 30 terms, with a brief reason for each
+
 
 5. You should expect heavy overlap of key terms across languages that are central to understanding the course’s subject matter, but there should also be language-specific variations when a term poses a unique translation risk in that language (e.g., cultural mismatch, ambiguity, idiomatic differences).
    Do not artificially diversify the termbase across languages.
 
 6. For each language in TARGET_LANGUAGES:
-   - Select 4–6 terms from the "extracted_terms" list that are most important to translate well for learners in that language.
-   - Only include terms in the termbase that appear in the "extracted_terms" list.
-- Each termbase must include translations for all selected terms — even if no direct equivalent exists, provide a concise, localized explanation.
-   - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or an explanation that would work in subtitle context.
-   - Do not include any terms from DNT_TERMS, even if they appear in the extracted list.
+   - Translate all 30 terms from the "extracted_terms" list.
+   - Each language's termbase must include translations for every term — even if no direct equivalent exists, provide a concise, localized explanation.
+   - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or subtitle-friendly explanation.
+   - You may extract terms that overlap with DNT_TERMS, but exclude them from the `termbase_results`. Do not translate or include them in any language termbase.
+
 
 
 7. Output MUST use this JSON format:
@@ -316,7 +317,7 @@ TASK:
   ]
 }}
 
-Only return the JSON object. No commentary, markdown, or extra formatting.
+IMPORTANT: If you cannot complete this task, return a JSON object with an "error" field containing a brief explanation of why you failed. Otherwise, return only the JSON object. No commentary, markdown, or extra formatting.
 """
 
             self.logger.info("Sending comprehensive termbase request to OpenAI")
@@ -326,7 +327,7 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": content},
                 ],
-                max_tokens=3000,  # Increased to prevent JSON truncation
+                max_tokens=10000,  # Increased to handle 30 terms × 12 languages
                 temperature=0.6,
             )
 
@@ -334,6 +335,9 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             self.logger.info(
                 f"Received response from OpenAI ({len(result_text)} characters)"
             )
+            # Debug: Log the first 500 characters of the response to see what we're getting
+            print(f"DEBUG: Response preview: {result_text[:500]}...")
+            self.logger.info(f"Response preview: {result_text[:500]}...")
 
             parsed_termbase = self._parse_comprehensive_termbase_response(result_text)
             self.logger.info(f"Parsed termbase with {len(parsed_termbase)} languages")
@@ -456,6 +460,20 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
             # Parse the JSON
             raw_data = json.loads(cleaned)
 
+            # Check for error response
+            if "error" in raw_data:
+                error_msg = raw_data.get("error", "Unknown error")
+                # Clean up the error message to avoid format specifier issues
+                if isinstance(error_msg, str):
+                    # Remove any JSON-like content that might cause format issues
+                    clean_error = error_msg.split('"')[0] if '"' in error_msg else error_msg
+                    clean_error = clean_error.split('{')[0] if '{' in clean_error else clean_error
+                    clean_error = clean_error.strip()
+                    if clean_error:
+                        error_msg = clean_error
+                self.logger.error("AI returned error: %s", str(error_msg))
+                return {}
+
             # Handle extracted_terms: can be a list of strings or list of {"term": ..., "reason": ...}
             extracted_terms = raw_data.get("extracted_terms", [])
             if extracted_terms:
@@ -463,11 +481,20 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
                     self.logger.info(
                         f"AI extracted {len(extracted_terms)} terms with reasons:"
                     )
-                    for item in extracted_terms:
+                    
+                    # Temporarily disable DNT filtering to debug the issue
+                    filtered_terms = extracted_terms
+                    self.logger.info(f"Using all {len(filtered_terms)} extracted terms (DNT filtering disabled)")
+                    
+                    # Show first 20 as Pass #1, remaining as Pass #2
+                    for i, item in enumerate(filtered_terms):
                         term = item.get("term")
                         reason = item.get("reason", "No reason provided")
                         if term:
-                            self.logger.info(f"  - {term}: {reason}")
+                            if i < 20:
+                                self.logger.info(f"  Pass #1 ({i+1}/20): {term}: {reason}")
+                            else:
+                                self.logger.info(f"  Pass #2 ({i-19}/10): {term}: {reason}")
                 elif isinstance(extracted_terms[0], str):  # Simple list
                     self.logger.info(
                         f"AI extracted {len(extracted_terms)} terms: {', '.join(extracted_terms)}"
@@ -479,9 +506,32 @@ Only return the JSON object. No commentary, markdown, or extra formatting.
 
             # Parse termbase results
             termbase_data = raw_data.get("termbase_results", [])
+            print(f"DEBUG: termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}")
             if not termbase_data:
                 self.logger.warning("No termbase_results found in AI response.")
+                print("DEBUG: No termbase_results found in AI response")
                 return {}
+            
+            # Use filtered_terms for the actual termbase generation
+            # The AI response contains termbase_results based on the original extracted_terms
+            # We need to filter the termbase_results to exclude DNT terms
+            filtered_termbase_data = []
+            for lang_data in termbase_data:
+                code = lang_data.get("code")
+                name = lang_data.get("name")
+                termbase = lang_data.get("termbase", {})
+                
+                # Temporarily disable DNT filtering in termbase
+                filtered_termbase = termbase
+                self.logger.info(f"Using all {len(filtered_termbase)} terms for {code} (DNT filtering disabled)")
+                
+                filtered_termbase_data.append({
+                    "code": code,
+                    "name": name,
+                    "termbase": filtered_termbase
+                })
+            
+            termbase_data = filtered_termbase_data
 
             parsed = {}
             for lang in termbase_data:

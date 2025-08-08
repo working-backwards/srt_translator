@@ -49,9 +49,12 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 
 - **Multi-language Translation**: Translate to multiple languages at once
 - **Preserve Important Terms**: Keep names, brands, and technical terms untranslated
-- **Maintains Timing**: Subtitle timing and formatting stay intact
+- **Maintains Timing**: Subtitle timing and formatting stay intact with improved batch boundary enforcement
 - **Automatic Error Fixing**: Intelligently fixes common translation issues
 - **Professional Results**: High-quality translations suitable for public content
+- **Smart Batching**: Sentence-aware batch processing for better context and translation quality
+- **Centralized Configuration**: Single source of truth for all translation settings
+- **Thread-Safe GUI**: Improved reliability for concurrent operations
 
 ---
 
@@ -203,6 +206,15 @@ A: Yes, only subtitle text is sent to OpenAI. Your video files stay local.
 
 ## Configuration Parameters
 
+### Architecture Overview
+
+The SRT Translator now uses a **clean architecture** with centralized configuration management:
+
+- **`TranslationConfig`**: Immutable configuration object containing all translation settings
+- **`ConfigResolver`**: Centralized logic for resolving configuration from different sources
+- **`SettingsManager`**: Single source of truth for GUI state management
+- **Environment Variables**: Used only for CLI mode, eliminated from GUI runtime
+
 ### Required Parameters
 
 The SRT Translator requires these parameters to function:
@@ -226,19 +238,19 @@ The SRT Translator requires these parameters to function:
 
 ### Parameter Sources by Mode
 
-#### **GUI Mode**
-- **Settings Storage**: Uses Qt's QSettings (persistent across sessions)
-- **Language Selection**: Real-time UI checkboxes and list selection
+#### **GUI Mode (New Architecture)**
+- **Settings Storage**: Uses Qt's QSettings with `ConfigState` dataclass for thread-safe access
+- **Language Selection**: Real-time UI updates with centralized `SettingsManager` state
 - **File Selection**: UI file browser and output directory picker
 - **AI Configuration**: Automatic generation of DNT terms and termbase
-- **Environment Variables**: Set dynamically during translation
+- **Environment Variables**: **No longer used for runtime state** - all configuration passed explicitly
 
-#### **CLI Mode**
-- **Settings Storage**: Uses `.env` file in project root
+#### **CLI Mode (Updated)**
+- **Settings Storage**: Uses `ConfigResolver` to load from `.env` file
 - **Language Selection**: Must be configured in `.env` file
 - **File Selection**: Uses `original_captions/` directory
 - **AI Configuration**: Manual setup of DNT terms and termbase.json
-- **Environment Variables**: Loaded from `.env` file at startup
+- **Environment Variables**: Loaded from `.env` file via `ConfigResolver`
 
 ### Quick Configuration Guide
 
@@ -334,3 +346,32 @@ This project is licensed under the [MIT License](LICENSE).
 ## Support
 
 For issues and feature requests, please use the [GitHub issues page](https://github.com/working-backwards/srt_translator/issues).
+
+---
+
+## Recent Improvements (v2.0)
+
+### Architecture Refactoring
+- **Eliminated Environment Variable Dependencies**: GUI no longer relies on environment variables for runtime state
+- **Centralized State Management**: `SettingsManager` now serves as the single source of truth for all GUI configuration
+- **Thread-Safe Operations**: Improved reliability for concurrent translation operations
+- **Clean Configuration Abstraction**: New `TranslationConfig` and `ConfigResolver` classes for better maintainability
+
+### Translation Quality Enhancements
+- **Improved Prompt Structure**: Streamlined AI prompts for better translation consistency
+- **Batch Boundary Enforcement**: Fixed timing drift issues by enforcing exact batch start/end times
+- **Smart Termbase Integration**: Only relevant terms are included in each translation batch
+- **Enhanced Error Handling**: Better detection and reporting of translation issues
+
+### Bug Fixes
+- **Language Selection Bug**: Fixed issue where all languages were used instead of user-selected ones
+- **Termbase Lookup Bug**: Resolved problems with AI-generated termbase lookups
+- **State Management Inconsistency**: GUI now correctly reflects and updates centralized state
+- **Thread Safety Issues**: Background worker threads now properly communicate with GUI using Qt signals
+
+### Performance Improvements
+- **Sentence-Aware Batching**: Better context preservation across subtitle boundaries
+- **Optimized Configuration Loading**: Faster startup and more efficient state management
+- **Reduced Memory Usage**: More efficient handling of large translation projects
+
+---

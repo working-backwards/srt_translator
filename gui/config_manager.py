@@ -84,16 +84,32 @@ class GUIConfigManager:
         Get termbase for a specific language using three-tier fallback
 
         Args:
-            target_language: Target language for translation
+            target_language: Target language for translation (can be name or code)
 
         Returns:
             Dictionary of English terms to translated terms
         """
         # Priority 1: GUI AI-generated config
         _, ai_termbase = self.settings_manager.load_ai_config()
+        
+        # Try direct lookup first
         if target_language in ai_termbase and ai_termbase[target_language]:
             self.logger.info(f"Using AI-generated termbase for {target_language}")
             return ai_termbase[target_language]
+        
+        # Try language name to code mapping
+        try:
+            from srt_core.config.language_config import language_config
+            all_languages = language_config.get_all_languages()
+            
+            for code, lang_info in all_languages.items():
+                if lang_info.get('name') == target_language:
+                    if code in ai_termbase:
+                        self.logger.info(f"Using AI-generated termbase for {target_language} (code: {code})")
+                        return ai_termbase[code]
+        except Exception as e:
+            self.logger.debug(f"Error checking language mapping: {e}")
+            pass
 
         # Priority 2: Manual termbase.json fallback
         manual_termbase = self._load_termbase_from_file()

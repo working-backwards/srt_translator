@@ -639,6 +639,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get target languages from the language section
         target_languages = self.language_section.get_target_languages()
         
+        # Update SettingsManager with current state (single source of truth)
+        self.settings_manager.update_target_languages(target_languages)
+        
         # Debug logging to track language selection
         self.logger.info(f"Translation requested with languages: {target_languages}")
         self.logger.info(f"Language names: {list(target_languages.keys())}")
@@ -662,14 +665,14 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get output directory from file section
         output_directory = self.file_section.get_output_directory()
 
-        # Start translation worker
+        # Start translation worker with settings manager (not config manager)
         # The worker will automatically run the fixer after translation completes
         # with hardcoded aggressiveness of 0.75 for consistent behavior
         self.translation_worker = TranslationWorker(
             api_key,
             selected_files,
             target_languages,
-            self.config_manager,
+            self.settings_manager,  # Use settings_manager instead of config_manager
             output_directory,
         )
 

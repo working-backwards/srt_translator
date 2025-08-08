@@ -119,6 +119,43 @@ class LanguageConfig:
         languages = self.get_all_languages()
         return {lang.get("name", code): code for code, lang in languages.items()}
 
+    def get_language_rules(self, lang_code: str) -> Dict[str, List[str]]:
+        """Get language-specific sentence boundary rules"""
+        DEFAULT_SENTENCE_ENDINGS = [".", "!", "?", "...", ":", ";"]
+        DEFAULT_BREAK_MARKERS = []
+        
+        languages = self.get_all_languages()
+        lang_info = languages.get(lang_code, {})
+        
+        return {
+            "sentence_endings": lang_info.get("sentence_endings", DEFAULT_SENTENCE_ENDINGS),
+            "break_markers": lang_info.get("break_markers", DEFAULT_BREAK_MARKERS)
+        }
+
+    def normalize_to_code(self, name_or_code: str) -> Optional[str]:
+        """Convert language name or code to normalized language code"""
+        if not name_or_code:
+            return None
+            
+        # First check if it's already a valid language code
+        if self.validate_language_code(name_or_code):
+            return name_or_code
+            
+        # If not, try to find it by name
+        languages = self.get_all_languages()
+        for code, lang_info in languages.items():
+            if lang_info.get("name", "").lower() == name_or_code.lower():
+                return code
+                
+        # If still not found, try partial matches
+        for code, lang_info in languages.items():
+            lang_name = lang_info.get("name", "").lower()
+            if name_or_code.lower() in lang_name or lang_name in name_or_code.lower():
+                return code
+                
+        # If no match found, return None
+        return None
+
 
 # Global instance for easy access
 language_config = LanguageConfig()

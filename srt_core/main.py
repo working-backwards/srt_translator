@@ -11,15 +11,49 @@ from srt_core.config.settings import (
     SOURCE_DIR,
     SOURCE_LANG,
     TARGET_LANGUAGES,
+    DNT_TERMS,
+    TERMBASE,
 )
+from srt_core.config.translation_config import TranslationConfig, build_config_from_parameters
+from srt_core.config.config_resolver import ConfigResolver
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
 
 logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
 
 
-def translate_srt_files(file_paths=None):
-    """Translate SRT files. If file_paths is None, process all files in SOURCE_DIR."""
+def translate_srt_files(
+    file_paths=None, 
+    target_languages=None, 
+    dnt_terms=None, 
+    termbase=None, 
+    api_key=None,
+    config: TranslationConfig = None
+):
+    """Translate SRT files. If config is provided, use it. Otherwise, use individual parameters or fall back to global settings."""
+    
+    # If TranslationConfig is provided, use it
+    if config is not None:
+        translation_config = config
+    else:
+        # Build configuration from parameters or fall back to global settings
+        if target_languages is None:
+            target_languages = TARGET_LANGUAGES
+        
+        if dnt_terms is None:
+            dnt_terms = DNT_TERMS
+        
+        if termbase is None:
+            termbase = TERMBASE
+        
+        translation_config = build_config_from_parameters(
+            target_languages=target_languages,
+            dnt_terms=dnt_terms,
+            termbase=termbase,
+            source_lang=SOURCE_LANG,
+            api_key=api_key
+        )
+    
     if file_paths is None:
         if not os.path.exists(SOURCE_DIR):
             print(f"Source directory {SOURCE_DIR} does not exist.")
@@ -47,21 +81,33 @@ def translate_srt_files(file_paths=None):
     print(f"Log file created at: {log_file}")
     print(f"Translating with batch size: {BATCH_SIZE}")
 
-    translator = SRTTranslator(source_lang=SOURCE_LANG)
+    # Create translator with configuration
+    translator = SRTTranslator(
+        source_lang=translation_config.source_lang,
+        dnt_terms=translation_config.dnt_terms,
+        termbase=translation_config.termbase,
+        api_key=translation_config.api_key,
+        logger=translation_config.logger
+    )
 
     # Log language configuration information
-    logging.info(f"Source language: {SOURCE_LANG}")
-    logging.info(f"Target languages: {len(TARGET_LANGUAGES)} languages configured")
-    if len(TARGET_LANGUAGES) <= 10:
-        logging.info(f"Languages: {', '.join(TARGET_LANGUAGES.keys())}")
+    logging.info(f"Source language: {translation_config.source_lang}")
+    logging.info(f"Target languages: {len(translation_config.target_languages)} languages configured")
+    if len(translation_config.target_languages) <= 10:
+        logging.info(f"Languages: {', '.join(translation_config.target_languages.keys())}")
     else:
         popular_langs = language_config.get_popular_languages()
         logging.info(f"Popular languages: {', '.join(popular_langs)}")
-        logging.info(f"Total available languages: {len(TARGET_LANGUAGES)}")
+        logging.info(f"Total available languages: {len(translation_config.target_languages)}")
+    
+    # Log configuration information
+    logging.info(f"DNT terms count: {len(translation_config.dnt_terms)}")
+    logging.info(f"Termbase languages: {list(translation_config.termbase.keys())}")
 
     summary = {
         "total_files": 0,
-        "total_languages": 0,
+        "unique_languages": 0,
+        "total_operations": 0,
         "successes": 0,
         "skipped": 0,
         "errors": 0,
@@ -75,8 +121,8 @@ def translate_srt_files(file_paths=None):
         filename = os.path.basename(input_filepath)
         summary["total_files"] += 1
 
-        for lang_name, lang_code in TARGET_LANGUAGES.items():
-            summary["total_languages"] += 1
+        for lang_name, lang_code in translation_config.target_languages.items():
+            summary["total_operations"] += 1
             file_base, file_ext = os.path.splitext(filename)
             new_filename = f"{file_base} - {lang_code.upper()}{file_ext}"  # Convert language code to uppercase for filename
             output_filepath = os.path.join(
@@ -102,6 +148,9 @@ def translate_srt_files(file_paths=None):
                 summary["error_details"].append(f"{filename} ({lang_name}): {e}")
                 print(f"Error translating {filename} to {lang_name}: {e}")
 
+    # Set unique languages count
+    summary["unique_languages"] = len(translation_config.target_languages)
+
     # Perform fixes only on files that were translated in this session
     fixer = SRTFixer(log_file, OUTPUT_BASE_DIR)
     fixer.parse_log_file()
@@ -117,7 +166,8 @@ def translate_srt_files(file_paths=None):
     # Print summary
     logging.info("\n=== Translation Summary ===")
     logging.info(f"Files processed: {summary['total_files']}")
-    logging.info(f"Languages processed: {summary['total_languages']}")
+    logging.info(f"Languages processed: {summary['unique_languages']}")
+    logging.info(f"Total translation operations: {summary['total_operations']}")
     logging.info(f"Successful translations: {summary['successes']}")
     logging.info(f"Skipped (empty/corrupt): {summary['skipped']}")
     logging.info(f"Errors: {summary['errors']}")
@@ -139,4 +189,10 @@ def translate_srt_files(file_paths=None):
 
 
 if __name__ == "__main__":
-    translate_srt_files()
+    # For CLI mode, use ConfigResolver to get configuration
+    try:
+        config = ConfigResolver.get_translation_config_for_cli()
+        translate_srt_files(config=config)
+    except Exception as e:
+        print(f"Error: {e}")
+        exit(1)

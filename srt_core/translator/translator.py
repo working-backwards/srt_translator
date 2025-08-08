@@ -37,84 +37,69 @@ def extract_translation_failure_reason(ai_response):
 
 
 class SRTTranslator:
-    def __init__(self, source_lang="EN"):
+    def __init__(self, source_lang="EN", dnt_terms=None, termbase=None, api_key=None, logger=None):
         self.log_file = setup_logging()
+        self.logger = logger or logging.getLogger(__name__)
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+        # Use provided API key or fall back to environment variable
+        if api_key:
+            self.api_key = api_key
+        else:
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            
+        if not self.api_key:
             raise ValueError(
-                "OpenAI API key must be set in the OPENAI_API_KEY environment variable"
+                "OpenAI API key must be provided as parameter or set in the OPENAI_API_KEY environment variable"
             )
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=self.api_key)
         self.source_lang = source_lang
-        self.term_handler = TermHandler()
+        
+        # Use provided DNT terms and termbase or fall back to defaults
+        self.dnt_terms = dnt_terms or []
+        self.termbase = termbase or {}
+        
+        # Initialize term handler with provided DNT terms
+        self.term_handler = TermHandler(dnt_terms=self.dnt_terms)
         self.parser = SRTParser()
+        
+        # Log configuration information
+        self.logger.info(f"SRTTranslator initialized with {len(self.dnt_terms)} DNT terms")
+        self.logger.info(f"SRTTranslator initialized with termbase for {len(self.termbase)} languages")
 
     def get_translation_prompt(self, source_lang, target_lang):
-        """Get the translation prompt with injected termbase from external file, environment, or use built-in default"""
-
-        # Get termbase for this language
-        termbase_block = self._format_termbase_block(target_lang)
-        # Use unified language config for mapping (no mapping needed for standard ISO codes)
+        """Get the translation prompt for single subtitle translation (fallback only)"""
+        # For single subtitle translation, we need to create a dummy batch with one subtitle
+        # This is only used as fallback when batch translation fails
+        dummy_batch = [type('Subtitle', (), {'content': ''})()]
+        termbase_block = self._format_termbase_block(target_lang, dummy_batch)
         mapped_target_lang = target_lang
-
-        # Skip external prompt files for GUI mode - use built-in prompts only
-        # External prompt files are only for CLI configuration
-        gui_mode = os.getenv("GUI_MODE")
-        logging.info(f"GUI_MODE environment variable: {gui_mode}")
-        
-        if gui_mode == "true":
-            # GUI mode: skip external files and use built-in prompts
-            logging.info("GUI mode detected - using built-in prompts only")
-        else:
-            # CLI mode: try to load from external prompt file
-            logging.info("CLI mode detected - checking for external prompt files")
-            prompt_file_path = os.getenv(
-                "TRANSLATION_PROMPT_FILE", "translation_prompt.txt"
-            )
-            if os.path.exists(prompt_file_path):
-                try:
-                    with open(prompt_file_path, "r", encoding="utf-8") as f:
-                        custom_prompt = f.read().strip()
-                    if custom_prompt:
-                        return custom_prompt.format(
-                            source_lang=source_lang,
-                            target_lang=mapped_target_lang,
-                            termbase_block=termbase_block,
-                        )
-                except Exception as e:
-                    logging.warning(
-                        f"Error reading prompt file {prompt_file_path}: {e}. Using fallback."
-                    )
-
-        # Fall back to environment variable (single line)
-        custom_prompt = os.getenv("TRANSLATION_PROMPT")
-        if custom_prompt:
-            try:
-                return custom_prompt.format(
-                    source_lang=source_lang,
-                    target_lang=mapped_target_lang,
-                    termbase_block=termbase_block,
-                )
-            except KeyError as e:
-                logging.warning(
-                    f"Invalid template variable in TRANSLATION_PROMPT: {e}. Using built-in default."
-                )
-
-        # Built-in fallback with termbase injection
         return self._get_builtin_prompt(source_lang, mapped_target_lang, termbase_block)
 
-    def _format_termbase_block(self, target_lang):
+    def _format_termbase_block(self, target_lang, batch_content):
         """Format termbase terms for injection into prompt"""
-        terms = get_termbase_terms(target_lang)
-        if not terms:
-            return "No specific termbase terms - use professional business terminology."
+        return self._format_termbase_block_smart(target_lang, batch_content)
 
-        termbase_lines = [
-            f'- "{english}" → "{translation}"' for english, translation in terms.items()
-        ]
-        return "\n".join(termbase_lines)
+    def _format_termbase_block_smart(self, target_lang, batch_content):
+        """Filter termbase to only include terms present in current batch"""
+        # Use instance termbase if available, otherwise fall back to global termbase
+        if target_lang in self.termbase:
+            all_terms = self.termbase[target_lang]
+        else:
+            all_terms = get_termbase_terms(target_lang)
+            
+        batch_text = " ".join([sub.content for sub in batch_content]).lower()
+
+        relevant_terms = {
+            english: translation 
+            for english, translation in all_terms.items() 
+            if english.lower() in batch_text
+        }
+
+        if not relevant_terms:
+            return "No specific termbase terms for this content."
+
+        return "\n".join([f'- "{en}" → "{trans}"' for en, trans in relevant_terms.items()])
 
     def _get_builtin_prompt(self, source_lang, target_lang, termbase_block):
         """Built-in fallback prompt with termbase injection"""
@@ -147,34 +132,37 @@ Examples:
 
 Translate completely and naturally."""
 
-    def get_batch_translation_prompt(self, source_lang, target_lang):
-        """Get the batch translation prompt with termbase integration"""
-        termbase_block = self._format_termbase_block(target_lang)
-        # Use unified language config (no mapping needed for standard ISO codes)
+    def get_batch_translation_prompt(self, source_lang, target_lang, batch_content):
+        termbase_block = self._format_termbase_block(target_lang, batch_content)
         mapped_target_lang = target_lang
+
         return f"""You are a professional translator. Translate the following SRT subtitles from {source_lang} to {mapped_target_lang}.
 
-BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
+BUSINESS TERMINOLOGY:
+When you see these specific business terms, use these translations:
 {termbase_block}
 
-SRT TRANSLATION RULES:
-1. Preserve SRT structure, numbering, and timestamps exactly
-2. Translate ALL subtitle text content completely
-3. Use business terminology above for those specific terms
-4. For all other text, translate normally using standard practices
-5. Do not skip or omit any subtitle content unless it is genuinely untranslatable
+SRT STRUCTURE RULES:
+1. Preserve subtitle numbering and timestamps exactly as shown.
+2. Return one translated subtitle for each original — do not merge, split, or skip subtitles.
+3. Keep the structure and order of subtitles exactly as provided.
+
+TRANSLATION RULES:
+1. Translate all subtitle text completely and naturally.
+2. Use the business terminology provided above when terms appear.
+3. For all other content, use standard professional translation practices.
+4. Do not add or remove any content, punctuation, or formatting unless necessary to complete the translation.
 
 PLACEHOLDER RULES:
-1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
-2. Do NOT create any new placeholders
-3. Do NOT replace normal words with placeholders
-4. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your translation exactly as __DNT_TERM_0__
+1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written — do not translate or modify them.
+2. Do not invent new placeholders.
+3. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your output exactly as __DNT_TERM_0__.
 
 ERROR HANDLING:
-Only refuse if content is genuinely untranslatable. Otherwise, translate everything.
-If you must refuse, respond EXACTLY: "I cannot translate because [specific reason]"
+Only refuse to translate if content is truly untranslatable. If so, return: "I cannot translate because [specific reason]"
 
-Return a complete, valid SRT block with all content translated. Do not change subtitle numbering or timestamps."""
+Return a complete, valid SRT block with the same subtitle count, structure, and timestamps as the input.
+"""
 
     def translate_subtitle(
         self, text, target_lang, filename, subtitle_number=None, summary=None
@@ -430,7 +418,7 @@ Status: AI Hallucination - Remove this placeholder
 
         # Create sentence-aware batches for better context and efficiency
         logging.info(f"Using sentence-aware batching for {filename} to {target_lang}")
-        subtitle_batches = self._create_batches(subtitles, soft_limit=BATCH_SIZE, hard_limit=8)
+        subtitle_batches = self._create_batches(subtitles, soft_limit=BATCH_SIZE, hard_limit=8, target_lang=target_lang)
 
         logging.info(
             f"Starting batch translation of {filename} to {target_lang} with {len(subtitle_batches)} batches"
@@ -446,7 +434,7 @@ Status: AI Hallucination - Remove this placeholder
 
             # Translate the entire batch as one unit
             translated_batch_srt, prompt = self.translate_srt_block(
-                batch_srt, target_lang, filename, batch[0].index
+                batch_srt, target_lang, filename, batch[0].index, batch
             )
 
             # Error handling: Check if batch translation failed completely
@@ -492,26 +480,12 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                     )
             try:
                 translated_batch = list(srt.parse(translated_batch_srt))
-                if len(translated_batch) != len(batch):
-                    # Log the redistribution instead of falling back
-                    logging.info(
-                        f"BATCH REDISTRIBUTION: File {filename}, Batch {batch_index + 1} "
-                        f"(subtitles {batch[0].index}-{batch[-1].index}): "
-                        f"Original {len(batch)} subtitles  AI returned {len(translated_batch)} subtitles. "
-                        f"Redistributing content across original timing slots."
-                    )
-                    # Redistribute translated content across original timing slots
-                    redistributed_batch = self._redistribute_subtitles(
-                        batch, translated_batch, filename, batch[0].index
-                    )
-                    for orig, redistributed in zip(batch, redistributed_batch):
-                        orig.content = redistributed.content
-                        translated_subtitles.append(orig)
-                else:
-                    # Normal case: same count, direct mapping
-                    for orig, trans in zip(batch, translated_batch):
-                        orig.content = trans.content
-                        translated_subtitles.append(orig)
+                
+                # ALWAYS use redistribution for consistent boundary clamping
+                redistributed_batch = self._redistribute_subtitles(
+                    batch, translated_batch, filename, batch[0].index
+                )
+                translated_subtitles.extend(redistributed_batch)
             except Exception as e:
                 logging.error(f"Failed to parse translated SRT batch at index {batch[0].index}: {e}")
                 # Log the prompt and model response for debugging
@@ -524,11 +498,26 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                     )
                     translated_subtitles.append(sub)
 
-        self.parser.write_file(output_filepath, translated_subtitles)
+        # Filter out empty subtitles and reindex for clean output
+        final_subtitles = []
+        for subtitle in translated_subtitles:
+            if subtitle.content.strip():  # Only keep subtitles with content
+                final_subtitles.append(subtitle)
+        
+        # Reindex the final subtitles to ensure sequential numbering
+        final_subtitles = list(srt.sort_and_reindex(final_subtitles))
+        
+        logging.info(f"Final output: {len(final_subtitles)} subtitles (filtered from {len(translated_subtitles)} total)")
+        
+        # Log timing boundaries for verification
+        if final_subtitles:
+            logging.info(f"Final timing boundaries: {final_subtitles[0].start} --> {final_subtitles[-1].end}")
+        
+        self.parser.write_file(output_filepath, final_subtitles)
         logging.info(f"Translated SRT saved to: {output_filepath}")
         return output_filepath
 
-    def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index):
+    def translate_srt_block(self, srt_block, target_lang, filename, batch_start_index, batch_content):
         """Translate a block of SRT subtitles as a batch."""
         # Process DNT terms for the entire SRT block
         processed_srt_block, term_map = self.term_handler.replace_dnt_terms(srt_block)
@@ -536,7 +525,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
         # Store term_map for phantom detection (hacky but works)
         self._last_batch_term_map = term_map
 
-        prompt = self.get_batch_translation_prompt(self.source_lang, target_lang)
+        prompt = self.get_batch_translation_prompt(self.source_lang, target_lang, batch_content)
         full_prompt = f"{prompt}\n\n{processed_srt_block}"
 
         time.sleep(0.5)  # Respect rate limits
@@ -562,7 +551,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 
         return restored_srt, full_prompt
 
-    def _create_batches(self, subtitles: List[srt.Subtitle], soft_limit: int, hard_limit: int) -> List[List[srt.Subtitle]]:
+    def _create_batches(self, subtitles: List[srt.Subtitle], soft_limit: int, hard_limit: int, target_lang: str) -> List[List[srt.Subtitle]]:
         """
         Create sentence-aware batches that respect sentence boundaries while staying within size limits.
         
@@ -573,6 +562,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             subtitles: List of subtitle objects to batch
             soft_limit: Target batch size (preferred)
             hard_limit: Maximum batch size (absolute limit)
+            target_lang: Target language code for language-specific rules
             
         Returns:
             List of subtitle batches
@@ -582,7 +572,12 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             
         batches = []
         current_batch = []
-        sentence_endings = (".", "!", "?", "。", "！", "？")
+        
+        # Get language-specific sentence boundary rules
+        from srt_core.config.language_config import language_config
+        lang_rules = language_config.get_language_rules(target_lang)
+        sentence_endings = tuple(lang_rules["sentence_endings"])
+        break_markers = lang_rules["break_markers"]
         
         for subtitle in subtitles:
             current_batch.append(subtitle)
@@ -610,62 +605,92 @@ Status: AI Hallucination in batch translation - Remove this placeholder
     def _redistribute_subtitles(
         self, original_batch, translated_batch, filename, batch_start_index
     ):
-        """Redistribute translated content across original timing slots, optimizing for user experience."""
+        """Redistribute translated content across original timing slots, clamped to batch boundaries, no blanks."""
         original_count = len(original_batch)
         translated_count = len(translated_batch)
+
+        batch_start_time = original_batch[0].start
+        batch_end_time = original_batch[-1].end
         redistributed = []
 
-        if translated_count < original_count:
-            # Assign each translation to a slot as usual
-            for i in range(translated_count):
-                new_subtitle = srt.Subtitle(
-                    index=original_batch[i].index,
-                    start=original_batch[i].start,
-                    end=original_batch[i].end,
-                    content=translated_batch[i].content,
-                )
-                redistributed.append(new_subtitle)
-            # If there are leftover slots, extend the last non-empty subtitle's end time
-            if translated_count > 0:
-                last_sub = redistributed[-1]
-                last_sub.end = original_batch[-1].end  # Extend to end of last slot
-                logging.info(
-                    f"Extended subtitle {last_sub.index} to cover empty slots at end in batch {batch_start_index} of {filename}."
-                )
-            # Log skipped empty slots
-            if translated_count < original_count:
-                logging.info(
-                    f"Skipped {original_count - translated_count} empty slot(s) at end of batch {batch_start_index} in {filename}."
-                )
-        else:
-            # More translations than original slots: combine as before
-            translations_per_slot = translated_count / original_count
-            translation_index = 0
-            for i in range(original_count):
-                new_subtitle = srt.Subtitle(
-                    index=original_batch[i].index,
-                    start=original_batch[i].start,
-                    end=original_batch[i].end,
-                    content="",
-                )
-                slot_translations = int(translations_per_slot)
-                if i < (translated_count % original_count):
-                    slot_translations += 1
-                combined_content = []
-                for j in range(slot_translations):
-                    if translation_index < translated_count:
-                        combined_content.append(
-                            translated_batch[translation_index].content
-                        )
-                        translation_index += 1
-                new_subtitle.content = " ".join(combined_content)
-                redistributed.append(new_subtitle)
+        # Edge case: no translations returned
+        if translated_count == 0:
+            logging.info(f"No translations returned for batch {batch_start_index} of {filename}, emitting nothing.")
+            return redistributed
 
-        # Log the specific redistribution details
+        # Case 1: counts match → keep AI timing/content, then clamp batch edges
+        if translated_count == original_count:
+            for orig, trans in zip(original_batch, translated_batch):
+                redistributed.append(srt.Subtitle(
+                    index=orig.index,
+                    start=trans.start,
+                    end=trans.end,
+                    content=trans.content.strip()
+                ))
+            # clamp edges
+            redistributed[0].start = batch_start_time
+            redistributed[-1].end = batch_end_time
+            logging.debug(f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}")
+            logging.debug(f"REDISTRIBUTION DETAILS for {filename}: 1:1 mapping with clamped edges")
+            return redistributed
+
+        # Case 2: fewer translations than original → spread evenly across whole batch, no blanks
+        if translated_count < original_count:
+            total = (batch_end_time - batch_start_time)
+            slot = total / translated_count
+
+            for i in range(translated_count):
+                t_start = batch_start_time + i * slot
+                t_end = batch_start_time + (i + 1) * slot
+                redistributed.append(srt.Subtitle(
+                    index=original_batch[i].index,  # preserve first N indices
+                    start=t_start,
+                    end=t_end,
+                    content=translated_batch[i].content.strip()
+                ))
+
+            # clamp edges (defensive)
+            redistributed[0].start = batch_start_time
+            redistributed[-1].end = batch_end_time
+
+            logging.info(
+                f"Redistributed {translated_count} translations across {original_count} original slots "
+                f"(emitted {translated_count}; no blanks) in batch {batch_start_index} of {filename}."
+            )
+            logging.info(f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}")
+            logging.debug(
+                f"REDISTRIBUTION DETAILS for {filename}: even time slices = {[str(sub.end - sub.start) for sub in redistributed]}"
+            )
+            return redistributed
+
+        # Case 3: more translations than original → merge into original slots, keep original slot timing
+        translations_per_slot = translated_count / original_count
+        ti = 0
+        for i in range(original_count):
+            take = int(translations_per_slot) + (1 if i < (translated_count % original_count) else 0)
+            chunk = []
+            for _ in range(take):
+                if ti < translated_count:
+                    chunk.append(translated_batch[ti].content.strip())
+                    ti += 1
+            # keep original timing for slot i
+            redistributed.append(srt.Subtitle(
+                index=original_batch[i].index,
+                start=original_batch[i].start,
+                end=original_batch[i].end,
+                content=("\n".join(c for c in chunk if c))  # newline separator reads better
+            ))
+
+        # clamp edges (defensive)
+        redistributed[0].start = batch_start_time
+        redistributed[-1].end = batch_end_time
         logging.info(
-            f"REDISTRIBUTION DETAILS for {filename}: "
-            f"Mapped {translated_count} translations across {original_count} timing slots. "
-            f"Content distribution: {[len(sub.content) for sub in redistributed]}"
+            f"Merged {translated_count} translations into {original_count} original slots (kept original timing) "
+            f"in batch {batch_start_index} of {filename}."
+        )
+        logging.info(f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}")
+        logging.debug(
+            f"REDISTRIBUTION DETAILS for {filename}: content lengths = {[len(s.content) for s in redistributed]}"
         )
         return redistributed
 

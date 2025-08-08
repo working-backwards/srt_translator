@@ -51,33 +51,34 @@ FIX_AGGRESSIVENESS = float(
 )  # Default level: conservative fixes
 
 # Dictionary of target languages with their ISO codes
-# TARGET_LANGUAGES must be explicitly configured in environment variables
+# TARGET_LANGUAGES must be explicitly configured in environment variables for CLI mode
+# For GUI mode, this will be provided as parameters to translation functions
 if "TARGET_LANGUAGES" not in os.environ:
-    raise ValueError(
-        "TARGET_LANGUAGES must be configured in your environment variables. "
-        "This setting is required to specify which languages to translate to. "
-        "See env_example_language_configs.txt for configuration examples."
-    )
+    # GUI mode - use empty default, will be provided as parameters
+    TARGET_LANGUAGES = {}
+    TARGET_LANGUAGES_TEXT = "{}"
+    print("GUI mode detected - TARGET_LANGUAGES will be provided as parameters")
+else:
+    # CLI mode - load from environment variables
+    TARGET_LANGUAGES_TEXT = os.environ["TARGET_LANGUAGES"]
+    try:
+        TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
+        if not TARGET_LANGUAGES:
+            raise ValueError(
+                "TARGET_LANGUAGES cannot be empty. Please specify at least one language."
+            )
 
-TARGET_LANGUAGES_TEXT = os.environ["TARGET_LANGUAGES"]
-try:
-    TARGET_LANGUAGES = json.loads(TARGET_LANGUAGES_TEXT)
-    if not TARGET_LANGUAGES:
-        raise ValueError(
-            "TARGET_LANGUAGES cannot be empty. Please specify at least one language."
+        # Normalize all language codes to lowercase for consistency
+        normalized_target_languages = {}
+        for lang_name, lang_code in TARGET_LANGUAGES.items():
+            normalized_target_languages[lang_name] = lang_code.lower()
+
+        TARGET_LANGUAGES = normalized_target_languages
+        print(
+            f"Using TARGET_LANGUAGES from environment with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
         )
-
-    # Normalize all language codes to lowercase for consistency
-    normalized_target_languages = {}
-    for lang_name, lang_code in TARGET_LANGUAGES.items():
-        normalized_target_languages[lang_name] = lang_code.lower()
-
-    TARGET_LANGUAGES = normalized_target_languages
-    print(
-        f"Using TARGET_LANGUAGES from environment with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
-    )
-except json.JSONDecodeError as e:
-    raise ValueError(f"Invalid TARGET_LANGUAGES format in environment: {e}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid TARGET_LANGUAGES format in environment: {e}")
 
 # DNT terms that will not be translated
 DNT_TERMS_TEXT = os.environ["DNT_TERMS"] if "DNT_TERMS" in os.environ else ""

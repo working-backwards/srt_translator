@@ -6,12 +6,52 @@ Handles persistent storage of user preferences and settings
 import json
 import logging
 import os
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, asdict
 
 from PySide6.QtCore import QSettings
 
 from srt_core.config.language_config import language_config
+
+
+@dataclass
+class ConfigState:
+    """Immutable configuration state with validation"""
+    target_languages: Dict[str, str]  # language_name -> language_code
+    dnt_terms: List[str]
+    termbase: Dict[str, Dict[str, str]]  # language_code -> {term -> translation}
+    output_directory: Optional[str] = None
+    api_key: Optional[str] = None
+    
+    def __post_init__(self):
+        """Validate state after initialization"""
+        if not isinstance(self.target_languages, dict):
+            raise ValueError("target_languages must be a dictionary")
+        if not isinstance(self.dnt_terms, list):
+            raise ValueError("dnt_terms must be a list")
+        if not isinstance(self.termbase, dict):
+            raise ValueError("termbase must be a dictionary")
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization"""
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ConfigState':
+        """Create from dictionary with validation"""
+        return cls(**data)
+    
+    def copy(self) -> 'ConfigState':
+        """Create a deep copy of the state"""
+        return ConfigState(
+            target_languages=self.target_languages.copy(),
+            dnt_terms=self.dnt_terms.copy(),
+            termbase={k: v.copy() for k, v in self.termbase.items()},
+            output_directory=self.output_directory,
+            api_key=self.api_key
+        )
 
 
 class SettingsManager:
@@ -19,10 +59,100 @@ class SettingsManager:
 
     def __init__(self):
         self.settings = QSettings("SRTTranslator", "SRTTranslator")
+        self._state = ConfigState(
+            target_languages={},
+            dnt_terms=[],
+            termbase={}
+        )
+        self._lock = threading.Lock()
+        self.logger = logging.getLogger(__name__)
+
+    # === CENTRALIZED STATE MANAGEMENT ===
+    
+    def get_current_state(self) -> ConfigState:
+        """Get current state (thread-safe)"""
+        with self._lock:
+            return self._state.copy()
+    
+    def update_state(self, new_state: ConfigState):
+        """Update state (thread-safe)"""
+        with self._lock:
+            self._state = new_state
+        self._persist_state(new_state)
+    
+    def get_current_target_languages(self) -> Dict[str, str]:
+        """Get current language selection from UI state (thread-safe)"""
+        with self._lock:
+            return self._state.target_languages.copy()
+    
+    def update_target_languages(self, languages: Dict[str, str]):
+        """Update both UI state and persistent storage (thread-safe)"""
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.target_languages = languages.copy()
+            self._state = new_state
+        self._persist_state(self._state)
+        # Also update legacy storage for backward compatibility
+        self.save_target_languages(languages)
+    
+    def get_current_dnt_terms(self) -> List[str]:
+        """Get current DNT terms (thread-safe)"""
+        with self._lock:
+            return self._state.dnt_terms.copy()
+    
+    def update_dnt_terms(self, dnt_terms: List[str]):
+        """Update DNT terms (thread-safe)"""
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.dnt_terms = dnt_terms.copy()
+            self._state = new_state
+        self._persist_state(self._state)
+    
+    def get_current_termbase(self) -> Dict[str, Dict[str, str]]:
+        """Get current termbase (thread-safe)"""
+        with self._lock:
+            return {k: v.copy() for k, v in self._state.termbase.items()}
+    
+    def update_termbase(self, termbase: Dict[str, Dict[str, str]]):
+        """Update termbase (thread-safe)"""
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
+            self._state = new_state
+        self._persist_state(self._state)
+    
+    def _persist_state(self, state: ConfigState):
+        """Persist state to storage"""
+        try:
+            state_dict = state.to_dict()
+            # Remove sensitive data before persistence
+            if 'api_key' in state_dict:
+                del state_dict['api_key']
+            # Save to QSettings
+            self.settings.setValue("current_state", state_dict)
+        except Exception as e:
+            self.logger.error(f"Failed to persist state: {e}")
+    
+    def _load_state_from_storage(self) -> ConfigState:
+        """Load state from storage"""
+        try:
+            data = self.settings.value("current_state", {})
+            if data:
+                return ConfigState.from_dict(data)
+        except Exception as e:
+            self.logger.warning(f"Failed to load state, using defaults: {e}")
+        return ConfigState(target_languages={}, dnt_terms=[], termbase={})
+
+    # === LEGACY METHODS (for backward compatibility) ===
 
     def save_api_key(self, api_key: str) -> None:
         """Save API key to settings"""
         self.settings.setValue("api_key", api_key)
+        # Also update current state
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.api_key = api_key
+            self._state = new_state
 
     def load_api_key(self) -> str:
         """Load API key from settings"""
@@ -99,34 +229,19 @@ class SettingsManager:
     def reset_adaptive_popular_languages(self) -> None:
         """Reset adaptive popular languages to default values"""
         self.settings.remove("user_popular_languages")
-        self.settings.remove("language_usage_data")
-        logging.debug("Reset adaptive popular languages to defaults")
 
     def track_language_usage(self, language_code: str) -> None:
-        """
-        Track when a user selects a language to improve adaptive popular languages
-
-        Args:
-            language_code: The language code that was selected
-        """
-        if not language_config.validate_language_code(language_code):
-            return
-
-        # Get current usage tracking
+        """Track language usage for adaptive popular languages"""
         usage_data = self.load_language_usage_data()
-
+        
         # Update usage count and last used timestamp
-        current_time = datetime.now().isoformat()
-        if language_code in usage_data:
-            usage_data[language_code]["count"] += 1
-            usage_data[language_code]["last_used"] = current_time
-        else:
-            usage_data[language_code] = {"count": 1, "last_used": current_time}
-
-        # Save updated usage data
+        if language_code not in usage_data:
+            usage_data[language_code] = {"count": 0, "last_used": None}
+        
+        usage_data[language_code]["count"] += 1
+        usage_data[language_code]["last_used"] = datetime.now().isoformat()
+        
         self.save_language_usage_data(usage_data)
-
-        # Update popular languages if needed
         self._update_adaptive_popular_languages(usage_data)
 
     def load_language_usage_data(self) -> Dict[str, Dict]:
@@ -138,33 +253,24 @@ class SettingsManager:
         self.settings.setValue("language_usage_data", usage_data)
 
     def _update_adaptive_popular_languages(self, usage_data: Dict[str, Dict]) -> None:
-        """
-        Update adaptive popular languages based on usage data
-
-        Args:
-            usage_data: Dictionary of language usage statistics
-        """
-        popular_limit = language_config.get_popular_limit()
-        current_popular = self.load_user_popular_languages()
-
+        """Update adaptive popular languages based on usage data"""
         # Sort languages by usage count (descending) and then by last used (descending)
         sorted_languages = sorted(
             usage_data.items(),
-            key=lambda x: (x[1]["count"], x[1]["last_used"]),
-            reverse=True,
+            key=lambda x: (x[1]["count"], x[1]["last_used"] or ""),
+            reverse=True
         )
-
+        
         # Get top used languages
-        top_used_codes = [code for code, _ in sorted_languages[:popular_limit]]
-
-        # If the top used languages are different from current popular, update them
-        if top_used_codes != current_popular:
-            self.save_user_popular_languages(top_used_codes)
-            logging.debug(f"Updated adaptive popular languages: {top_used_codes}")
+        popular_limit = language_config.get_popular_limit()
+        top_languages = [lang_code for lang_code, _ in sorted_languages[:popular_limit]]
+        
+        # Save as user's preferred popular languages
+        self.save_user_popular_languages(top_languages)
 
     def get_all_languages(self) -> Dict[str, str]:
         """Get all available languages from unified config"""
-        return language_config.get_language_names()
+        return language_config.get_all_languages()
 
     def save_last_input_directory(self, directory: str) -> None:
         """Save last used input directory"""
@@ -183,11 +289,11 @@ class SettingsManager:
         return self.settings.value("last_output_directory", "")
 
     def save_selected_files(self, file_paths: List[str]) -> None:
-        """Save list of selected file paths"""
+        """Save list of selected files"""
         self.settings.setValue("selected_files", file_paths)
 
     def load_selected_files(self) -> List[str]:
-        """Load list of selected file paths"""
+        """Load list of selected files"""
         return self.settings.value("selected_files", [])
 
     def save_window_geometry(self, geometry: bytes) -> None:
@@ -196,60 +302,45 @@ class SettingsManager:
 
     def load_window_geometry(self) -> Optional[bytes]:
         """Load window geometry"""
-        return self.settings.value("window_geometry")
+        return self.settings.value("window_geometry", None)
 
     def clear_all_settings(self) -> None:
-        """Clear all saved settings"""
+        """Clear all settings"""
         self.settings.clear()
+        # Reset current state
+        with self._lock:
+            self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
 
-    # AI Configuration Methods
     def save_ai_config(
         self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
     ) -> None:
-        """
-        Save AI-generated configuration to settings
-
-        Args:
-            dnt_terms: List of terms to exclude from translation
-            termbase: Dictionary with language keys and term-translation pairs
-        """
+        """Save AI-generated configuration"""
+        # Save to legacy storage
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
-        self.settings.sync()
-        logging.debug(
-            f"Saved AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages"
-        )
+        self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
+        
+        # Also update current state
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.dnt_terms = dnt_terms.copy()
+            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
+            self._state = new_state
+        
+        # Calculate and store file hash for change detection
+        file_hash = self._calculate_file_hash()
+        self.settings.setValue("ai_config_file_hash", file_hash)
 
     def load_ai_config(
         self,
     ) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
-        """
-        Load AI-generated configuration from settings
-
-        Returns:
-            Tuple of (dnt_terms, termbase)
-        """
+        """Load AI-generated configuration"""
         dnt_terms = self.settings.value("ai_dnt_terms", [])
         termbase = self.settings.value("ai_termbase", {})
-
-        # Ensure we have the correct types
-        if not isinstance(dnt_terms, list):
-            dnt_terms = []
-        if not isinstance(termbase, dict):
-            termbase = {}
-
         return dnt_terms, termbase
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
-        """
-        Check if we have recent AI config to avoid re-generation
-
-        Args:
-            max_age_days: Maximum age in days for config to be considered recent
-
-        Returns:
-            True if recent config exists, False otherwise
-        """
+        """Check if AI configuration is recent"""
         timestamp_str = self.settings.value("ai_config_timestamp", "")
         if not timestamp_str:
             return False
@@ -267,19 +358,21 @@ class SettingsManager:
         return bool(dnt_terms or termbase)
 
     def clear_ai_config(self) -> None:
-        """Clear AI configuration from settings"""
+        """Clear AI configuration"""
         self.settings.remove("ai_dnt_terms")
         self.settings.remove("ai_termbase")
-        self.settings.sync()
-        logging.debug("Cleared AI configuration")
+        self.settings.remove("ai_config_timestamp")
+        self.settings.remove("ai_config_file_hash")
+        
+        # Also clear from current state
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.dnt_terms = []
+            new_state.termbase = {}
+            self._state = new_state
 
     def get_ai_config_age_days(self) -> Optional[int]:
-        """
-        Get the age of the AI configuration in days
-
-        Returns:
-            Age in days, or None if no config exists
-        """
+        """Get age of AI configuration in days"""
         timestamp_str = self.settings.value("ai_config_timestamp", "")
         if not timestamp_str:
             return None
@@ -292,32 +385,30 @@ class SettingsManager:
             return None
 
     def _calculate_file_hash(self) -> str:
-        """Calculate a simple hash of the current file selection for change detection"""
-        # This is a simplified hash - in a real implementation, you might want
-        # to hash the actual file contents or use file modification times
-        selected_files = self.load_selected_files()
-        if not selected_files:
+        """Calculate hash of selected files for change detection"""
+        try:
+            import hashlib
+            selected_files = self.load_selected_files()
+            if not selected_files:
+                return ""
+
+            # Create hash from file paths and modification times
+            hash_input = ""
+            for file_path in selected_files:
+                if os.path.exists(file_path):
+                    stat = os.stat(file_path)
+                    hash_input += f"{file_path}:{stat.st_mtime}:{stat.st_size}\n"
+
+            return hashlib.md5(hash_input.encode()).hexdigest()
+        except Exception as e:
+            self.logger.error(f"Error calculating file hash: {e}")
             return ""
 
-        # Simple hash based on file names and modification times
-        hash_parts = []
-        for file_path in selected_files:
-            if os.path.exists(file_path):
-                try:
-                    mtime = os.path.getmtime(file_path)
-                    hash_parts.append(f"{file_path}:{mtime}")
-                except OSError:
-                    hash_parts.append(file_path)
-
-        return str(hash(tuple(hash_parts)))
-
     def has_files_changed(self) -> bool:
-        """
-        Check if the selected files have changed since last AI config generation
+        """Check if selected files have changed since AI config was generated"""
+        stored_hash = self.settings.value("ai_config_file_hash", "")
+        if not stored_hash:
+            return True  # No stored hash means files have "changed"
 
-        Returns:
-            True if files have changed, False otherwise
-        """
         current_hash = self._calculate_file_hash()
-        saved_hash = self.settings.value("ai_config_file_hash", "")
-        return current_hash != saved_hash
+        return stored_hash != current_hash

@@ -21,10 +21,13 @@ class TermHandler:
     technical terms, or proper nouns that should remain in the original language.
     """
 
-    def __init__(self):
-        # Sort DNT terms by length (longest first) to avoid partial matches
-        # e.g., "Microsoft Office" should be matched before "Microsoft"
-        self.dnt_terms = sorted(DNT_TERMS, key=len, reverse=True)
+    def __init__(self, dnt_terms=None):
+        # Use provided DNT terms or fall back to environment variable for backward compatibility
+        if dnt_terms is not None:
+            self.dnt_terms = sorted(dnt_terms, key=len, reverse=True)
+        else:
+            # Fall back to environment variable for backward compatibility
+            self.dnt_terms = sorted(DNT_TERMS, key=len, reverse=True)
 
     def replace_dnt_terms(self, text):
         """
