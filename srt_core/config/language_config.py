@@ -6,6 +6,7 @@ Handles loading and accessing language configuration from JSON file
 import json
 import logging
 import os
+import sys
 from typing import Dict, List, Optional
 
 
@@ -14,11 +15,29 @@ class LanguageConfig:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # Path to languages.json from srt_core/config directory
-        self.config_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "config", "languages.json"
-        )
+        # Resolve path to languages.json with robust handling for PyInstaller builds
+        self.config_path = self._resolve_languages_path()
         self.config = self.load_config()
+
+    def _resolve_languages_path(self) -> str:
+        """Resolve the languages.json path for both source and packaged builds.
+
+        Order:
+        1) PyInstaller one-file/one-dir runtime under sys._MEIPASS: config/languages.json
+        2) Source tree relative to this file: ../../config/languages.json
+        """
+        # 1) PyInstaller
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidate = os.path.join(meipass, "config", "languages.json")
+            if os.path.exists(candidate):
+                return candidate
+
+        # 2) Source tree relative path
+        candidate = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "config", "languages.json")
+        )
+        return candidate
 
     def load_config(self) -> Dict:
         """Load language configuration from JSON file"""

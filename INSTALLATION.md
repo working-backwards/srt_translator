@@ -42,7 +42,7 @@ If you want to create executables from source:
    ```
 3. **Install dependencies**:
    ```bash
-   pip install -e .[dev]
+   pip install -e '.[dev]'
    ```
 4. **Build executables (PyInstaller quick path)**:
    - Windows:
@@ -53,9 +53,14 @@ If you want to create executables from source:
      ```
    - macOS:
      ```bash
-     pyinstaller --windowed --name SRT-Translator \
-       --add-data "config/languages.json:config" \
-       run_gui.py
+      # Build a Finder app (.app bundle)
+      pyinstaller --windowed --name SRT-Translator \
+        --add-data "config/languages.json:config" \
+        run_gui.py
+      
+      # Build/update only the single-file console-launchable binary
+      # (uses the provided .spec and places output in dist/SRT-Translator)
+      pyinstaller build_specs/srt_translator_gui.spec --noconfirm --clean
      ```
    - Linux:
      ```bash
@@ -96,8 +101,8 @@ If you want to create executables from source:
 
 3. **Install the package**:
    ```bash
-   # Install with development dependencies
-   pip install -e .[dev]
+   # Install with development dependencies (note the quotes for zsh)
+   pip install -e '.[dev]'
    
    # Or install without dev dependencies
    pip install -e .
@@ -126,6 +131,32 @@ For multi‑hour jobs, use `caffeinate` to keep the system awake while allowing 
 
 ```bash
 caffeinate -imsu python3 run_gui.py
+## 🔁 Rebuilding (macOS)
+
+Use these depending on what you need to refresh:
+
+- Rebuild only the Terminal binary (fast, single file):
+  ```bash
+  rm -rf dist/SRT-Translator build
+  pyinstaller build_specs/srt_translator_gui.spec --noconfirm --clean
+  ```
+
+- Rebuild a fresh Finder app (.app bundle):
+  ```bash
+  rm -rf dist/SRT-Translator.app build
+  pyinstaller --windowed --name SRT-Translator \
+    --clean --noconfirm \
+    --add-data "config/languages.json:config" \
+    run_gui.py
+  # Open it
+  open dist/SRT-Translator.app
+  ```
+
+- Quick local test without packaging:
+  ```bash
+  python run_gui.py
+  ```
+
 ```
 
 Flags:
@@ -211,6 +242,9 @@ Flags:
 - Make sure you've installed dependencies: `pip install -e .`
 - Check that you're in the correct virtual environment
 
+**zsh: no matches found: .[dev]**
+- zsh treats `[]` as globbing characters. Quote the extras spec: run `pip install -e '.[dev]'` (or escape the brackets: `pip install -e .\[dev\]`).
+
 **GUI doesn't start**
 - Verify PySide6 is installed: `pip install PySide6`
 - Check for display/display server issues on Linux
@@ -267,7 +301,7 @@ Flags:
 
 2. **Update dependencies**:
    ```bash
-   pip install -e .[dev]
+   pip install -e '.[dev]'
    ```
 
 3. **Test the installation**:

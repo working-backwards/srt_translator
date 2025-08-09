@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from typing import Dict, List, Optional
 
 import tiktoken
@@ -26,6 +27,12 @@ class AIConfigGenerator:
         self.api_key = api_key
         self.client = OpenAI(api_key=api_key)
         self.logger = logging.getLogger(__name__)
+        # GUI-only model selection for AI config generation is intentionally
+        # isolated from CLI/env to avoid cross-mode confusion
+        self.DEFAULT_MODEL = "gpt-4o-mini"
+        # GUI-local approximation for characters per token to guide truncation.
+        # Keep GUI/CLI separation: do not read from env.
+        self.CHARS_PER_TOKEN = 4
 
         # Configuration constants
         self.MAX_INLINE_TOKENS = 12500  # Precise token limit for inline content
@@ -74,26 +81,31 @@ class AIConfigGenerator:
 
             # Join all text
             combined_text = " ".join(all_text_chunks)
+            # Normalize to NFC to reduce odd splits of composed characters/emoji
+            combined_text = unicodedata.normalize("NFC", combined_text)
 
-            # --- Precise token-based truncation ---
-            enc = tiktoken.encoding_for_model("gpt-4o-mini")
-            tokens = enc.encode(combined_text)
-
-            if len(tokens) > self.MAX_INLINE_TOKENS:
-                truncated_tokens = tokens[: self.MAX_INLINE_TOKENS]
-                truncated_text = enc.decode(truncated_tokens)
+            # --- Safe character-based truncation (avoids tiktoken in packaged builds) ---
+            # Approximate 1 token ≈ 4 characters and truncate at sentence boundaries
+            approximate_chars = self.MAX_INLINE_TOKENS * self.CHARS_PER_TOKEN
+            if len(combined_text) > approximate_chars:
+                truncated_text = self._truncate_text_intelligently(
+                    combined_text, target_length=approximate_chars
+                )
                 self.logger.info(
-                    f"Truncated transcript from {len(tokens):,} to {self.MAX_INLINE_TOKENS:,} tokens"
+                    f"Transcript truncated to ~{approximate_chars:,} chars for safe analysis"
                 )
                 return truncated_text
 
             # Under limit—return whole thing
-            self.logger.info(f"Transcript size: {len(tokens):,} tokens")
+            self.logger.info(
+                f"Transcript size: {len(combined_text):,} chars (no truncation needed)"
+            )
             return combined_text
 
         except Exception as e:
             self.logger.error(f"Error extracting subtitle content: {e}")
-            raise
+            # Provide a clearer message to the GUI layer
+            raise RuntimeError("Failed to prepare transcript content for AI analysis. Please verify your files and try again.") from e
 
     def generate_dnt_terms(self, content: str, source_lang: str = None) -> List[str]:
         """
@@ -143,7 +155,7 @@ EXAMPLE FORMAT:
 """
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
                 temperature=0.3,
@@ -322,7 +334,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
 
             self.logger.info("Sending comprehensive termbase request to OpenAI")
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",  # Use GPT-4 for better analysis
+                model=self.DEFAULT_MODEL,  # GUI isolation: fixed model for consistency
                 messages=[
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": content},
@@ -594,7 +606,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
         try:
             # Make a simple test call
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=5,
             )

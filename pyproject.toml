@@ -38,24 +38,9 @@ srt-translator-cli = "srt_core.main:translate_srt_files"
 srt-translator-gui = "run_gui:main"
 
 # PyInstaller configuration
-[tool.pyinstaller]
-# Common options
---name = "SRT-Translator"
---onefile = true
---windowed = true
---clean = true
---noconfirm = true
-
-# Data files to include (only static assets)
---add-data = "config/languages.json;config"
-
-# Hidden imports
---hidden-import = "PySide6.QtCore"
---hidden-import = "PySide6.QtWidgets"
---hidden-import = "PySide6.QtGui"
---hidden-import = "openai"
---hidden-import = "srt"
---hidden-import = "tiktoken"
+#[tool.pyinstaller]
+# PyInstaller is configured via spec files in `build_specs/`.
+# This section was removed to keep `pyproject.toml` TOML‑valid.
 
 # Black configuration
 [tool.black]
