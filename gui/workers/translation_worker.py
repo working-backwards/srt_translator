@@ -6,10 +6,13 @@ Handles background translation processing
 import logging
 import os
 import uuid
+import time
+import threading
+from collections import deque
 from pathlib import Path
 from typing import Dict, List
 
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
 # Import fixer for automatic cleanup after translation
@@ -17,8 +20,8 @@ from srt_core.translator.fixer import SRTFixer
 from srt_core.config.translation_config import build_config_from_gui
 
 
-class TranslationWorker(QThread):
-    """Worker thread for running translations in background"""
+class TranslationWorker(QObject):
+    """Worker object for running translations in background thread"""
 
     progress_updated = pyqtSignal(str)
     translation_completed = pyqtSignal(dict)
@@ -43,6 +46,34 @@ class TranslationWorker(QThread):
         self.log_file = None
         self.session_id = str(uuid.uuid4())[:8]
         self.logger = logging.getLogger(f"translation.{self.session_id}")
+        
+        # Signal throttling for GUI responsiveness
+        self._emit_lock = threading.Lock()
+        self._emit_buf = deque(maxlen=500)  # Bound the buffer
+        self._last_emit = 0.0
+        self._stop = threading.Event()  # Cooperative stop flag
+
+    def request_stop(self):
+        """Request cooperative stop of the worker"""
+        self._stop.set()
+
+    def is_stopped(self):
+        """Check if stop has been requested"""
+        return self._stop.is_set()
+
+    def _throttled_emit(self, signal, message):
+        """Emit signal with throttling to prevent GUI hammering"""
+        batched = None
+        with self._emit_lock:
+            if not self._emit_buf or self._emit_buf[-1] != message:
+                self._emit_buf.append(message)
+            now = time.monotonic()
+            if now - self._last_emit >= 0.25:  # 4 Hz throttle (250ms)
+                batched = "\n".join(self._emit_buf)
+                self._emit_buf.clear()
+                self._last_emit = now
+        if batched is not None:
+            signal.emit(batched)
 
     def run(self):
         """Run the translation process"""
@@ -53,20 +84,23 @@ class TranslationWorker(QThread):
             self.logger.info(f"Target language names: {list(self.target_languages.keys())}")
             self.logger.info(f"Target language codes: {list(self.target_languages.values())}")
             
-            # Emit progress via signal (thread-safe)
-            self.progress_updated.emit(f"Starting translation to {len(self.target_languages)} languages")
+            # Emit progress via signal (thread-safe, throttled)
+            self._throttled_emit(self.progress_updated, f"Starting translation to {len(self.target_languages)} languages")
             
-            # Reset logging configuration and set up proper logging
-            logging.getLogger().handlers.clear()  # Clear existing handlers
+            # Set up logging once per run and remember the log file
             from srt_core.utils.logging_setup import setup_logging
-
             log_file = setup_logging()
+            
+            # Create session-specific logger that doesn't propagate to root
+            session_logger = logging.getLogger(f"translation.session.{self.session_id}")
+            session_logger.propagate = False
 
             # Debug logging
             self.logger.info(
                 f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages"
             )
-            self.progress_updated.emit(
+            self._throttled_emit(
+                self.progress_updated,
                 f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages"
             )
 
@@ -84,6 +118,11 @@ class TranslationWorker(QThread):
                 )
                 self.logger.info(f"Using configuration from direct parameters: {config.to_log_string()}")
 
+            # Check for cooperative stop before starting translation
+            if self.is_stopped():
+                self.logger.info("Translation stopped by user request")
+                return
+
             # Run the translation
             # Capture both stdout and logging output
             import io
@@ -92,43 +131,73 @@ class TranslationWorker(QThread):
 
             from srt_core.main import translate_srt_files
 
-            # Create a custom log handler to capture log messages
+            # Create a custom log handler to capture log messages with throttling
             class LogCaptureHandler(logging.Handler):
-                def __init__(self, signal_emitter):
+                def __init__(self, worker_instance):
                     super().__init__()
-                    self.signal_emitter = signal_emitter
-                    self.captured_messages = []
+                    self.worker = worker_instance
 
                 def emit(self, record):
                     msg = self.format(record)
-                    self.captured_messages.append(msg)
-                    self.signal_emitter.emit(msg)
+                    # Use throttled emission to prevent GUI hammering
+                    self.worker._throttled_emit(self.worker.progress_updated, msg)
 
-            # Add our custom handler to capture log messages
-            log_handler = LogCaptureHandler(self.progress_updated)
+            # Add our custom handler to both session logger and root logger for complete coverage
+            log_handler = LogCaptureHandler(self)
             log_handler.setFormatter(logging.Formatter("%(message)s"))
-            logging.getLogger().addHandler(log_handler)
+            session_logger.addHandler(log_handler)
+            
+            # Also add to root logger to catch all logging output
+            root_logger = logging.getLogger()
+            root_logger.addHandler(log_handler)
 
             # Capture stdout output
             output = io.StringIO()
-            with redirect_stdout(output):
-                # Call translation with configuration object
-                results = translate_srt_files(
-                    file_paths=self.selected_files, 
-                    config=config
-                )
+            try:
+                with redirect_stdout(output):
+            # Call translation with configuration object
+                    results = translate_srt_files(
+                        file_paths=self.selected_files, 
+                        config=config
+                    )
+            finally:
+                # Always clean up handlers, even on error
+                session_logger.removeHandler(log_handler)
+                root_logger.removeHandler(log_handler)
 
-            # Remove our custom handler
-            logging.getLogger().removeHandler(log_handler)
+            # Remember the log file path for fixer
+            self.log_file = log_file
 
-            # Capture any stdout output
+            # Check for cooperative stop before completion
+            if self.is_stopped():
+                self.logger.info("Translation stopped by user request before completion")
+                return
+
+            # Capture any stdout output and chunk it if large
             stdout_output = output.getvalue()
             if stdout_output.strip():
-                self.progress_updated.emit(f"Translation output: {stdout_output.strip()}")
+                output_lines = stdout_output.strip().split('\n')
+                if len(output_lines) > 10:
+                    # Chunk large outputs to prevent GUI issues
+                    for i in range(0, len(output_lines), 10):
+                        chunk = output_lines[i:i+10]
+                        self._throttled_emit(self.progress_updated, f"Translation output (part {i//10 + 1}): {'\n'.join(chunk)}")
+                else:
+                    self._throttled_emit(self.progress_updated, f"Translation output: {stdout_output.strip()}")
 
             # Store results for potential fixer use
             self.translation_results = results
             self.log_file = log_file
+
+            # Run automatic fixes after successful translation
+            if results and results.get('success', False):
+                self._throttled_emit(self.progress_updated, "Running automatic fixes on translated files...")
+                try:
+                    self.run_fixer()
+                    self._throttled_emit(self.progress_updated, "Automatic fixes completed successfully")
+                except Exception as e:
+                    self.logger.error(f"Error running fixer: {e}")
+                    self._throttled_emit(self.progress_updated, f"Warning: Automatic fixes failed: {e}")
 
             # Emit completion via signal (thread-safe)
             self.translation_completed.emit(results)

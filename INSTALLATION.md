@@ -44,10 +44,25 @@ If you want to create executables from source:
    ```bash
    pip install -e .[dev]
    ```
-4. **Build executables**:
-   ```bash
-   python build.py
-   ```
+4. **Build executables (PyInstaller quick path)**:
+   - Windows:
+     ```bash
+     pyinstaller --noconsole --name SRT-Translator \
+       --add-data "config\\languages.json;config" \
+       run_gui.py
+     ```
+   - macOS:
+     ```bash
+     pyinstaller --windowed --name SRT-Translator \
+       --add-data "config/languages.json:config" \
+       run_gui.py
+     ```
+   - Linux:
+     ```bash
+     pyinstaller --windowed --name SRT-Translator \
+       --add-data "config/languages.json:config" \
+       run_gui.py
+     ```
 5. **Find executables** in the `dist/` folder
 
 ## 🔧 Advanced Installation (Developers)
@@ -104,6 +119,17 @@ If you want to create executables from source:
    # CLI version
    python run_cli.py
    ```
+
+### macOS: Prevent Sleep for Long Runs
+
+For multi‑hour jobs, use `caffeinate` to keep the system awake while allowing the display to sleep:
+
+```bash
+caffeinate -imsu python3 run_gui.py
+```
+
+Flags:
+- `-i` prevent idle sleep, `-m` prevent disk sleep, `-s` prevent system sleep on AC, `-u` user activity. Omit `-d` so the display may turn off.
 
 ## 📋 System Requirements
 

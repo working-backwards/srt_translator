@@ -37,6 +37,7 @@ class SRTFixer:
         self.phantoms = []
         self.fixed_count = 0
         self.phantom_fixed_count = 0
+        self.dnt_terms_fixed_count = 0
         self.parser = SRTParser()
 
     def parse_log_file(self):
@@ -93,39 +94,54 @@ class SRTFixer:
             self.issues.append(issue)
 
     def _parse_phantom_placeholder(self, entry):
-        """Parse phantom placeholder issues"""
-        # The timestamp might not be in this entry due to splitting, so make it optional
-        timestamp_match = re.search(
-            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry
-        )
+        """Parse phantom placeholder issues.
+
+        Supports both the legacy format (with "Subtitle Number", "Original Text",
+        and "Translated Text") and the newer batch format:
+
+            File: <name>.srt
+            Batch: <n> (subtitles X-Y)
+            Language: <code>
+            Phantom Placeholder: __DNT_TERM_0__
+        """
+        # Optional timestamp
+        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry)
+
+        # Common fields
         language_match = re.search(r"Language: (.+?)(?:\n|$)", entry)
         filename_match = re.search(r"File: (.+?)(?:\n|$)", entry)
-        subtitle_match = re.search(r"Subtitle Number: (.+?)(?:\n|$)", entry)
         phantom_match = re.search(r"Phantom Placeholder: (.+?)(?:\n|$)", entry)
+
+        # Legacy optional fields
+        subtitle_match_legacy = re.search(r"Subtitle Number: (.+?)(?:\n|$)", entry)
         original_text_match = re.search(r"Original Text: (.+?)(?:\n|$)", entry)
         translated_text_match = re.search(r"Translated Text: (.+?)(?:\n|$)", entry)
 
-        # Only require the essential fields (not timestamp since it might be split away)
-        if all(
-            [
-                language_match,
-                filename_match,
-                subtitle_match,
-                phantom_match,
-                original_text_match,
-                translated_text_match,
-            ]
-        ):
-            phantom = PhantomPlaceholder(
-                timestamp=timestamp_match.group(1) if timestamp_match else "unknown",
-                language=language_match.group(1).strip(),
-                filename=filename_match.group(1).strip(),
-                subtitle_number=subtitle_match.group(1).strip(),
-                phantom_placeholder=phantom_match.group(1).strip(),
-                original_text=original_text_match.group(1).strip(),
-                translated_text=translated_text_match.group(1).strip(),
-            )
-            self.phantoms.append(phantom)
+        # New batch-format optional fields
+        batch_match = re.search(r"Batch:\s*(\d+)\s*\(subtitles\s*([0-9]+)-([0-9]+)\)", entry)
+
+        if not (language_match and filename_match and phantom_match):
+            return
+
+        # Derive a subtitle identifier for bookkeeping (not strictly used in fixing)
+        if subtitle_match_legacy:
+            subtitle_identifier = subtitle_match_legacy.group(1).strip()
+        elif batch_match:
+            # e.g., "batch_22_subs_123-127"
+            subtitle_identifier = f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"
+        else:
+            subtitle_identifier = "unknown"
+
+        phantom = PhantomPlaceholder(
+            timestamp=timestamp_match.group(1) if timestamp_match else "unknown",
+            language=language_match.group(1).strip(),
+            filename=filename_match.group(1).strip(),
+            subtitle_number=subtitle_identifier,
+            phantom_placeholder=phantom_match.group(1).strip(),
+            original_text=original_text_match.group(1).strip() if original_text_match else "",
+            translated_text=translated_text_match.group(1).strip() if translated_text_match else "",
+        )
+        self.phantoms.append(phantom)
 
     def fix_srt_files(self, aggressiveness: float):
         """Process and fix all SRT files in the translations directory"""
@@ -301,6 +317,50 @@ class SRTFixer:
         if changed:
             self.parser.write_file(file_path, subtitles)
 
+    def _fix_dnt_term_placeholders(self, file_path: str):
+        """Fix DNT_TERM placeholders that weren't properly restored during translation"""
+        if not os.path.exists(file_path):
+            return 0
+
+        subtitles = self.parser.parse_file(file_path)
+        backup_path = file_path + ".bak"
+        if not os.path.exists(backup_path):
+            with open(backup_path, "w", encoding="utf-8") as f:
+                f.write(srt.compose(subtitles))
+
+        changed = False
+        dnt_terms_fixed = 0
+
+        # Pattern to match DNT_TERM placeholders
+        dnt_pattern = r'__DNT_TERM_\d+__'
+        
+        for subtitle in subtitles:
+            if re.search(dnt_pattern, subtitle.content):
+                # Find all DNT_TERM placeholders in this subtitle
+                placeholders = re.findall(dnt_pattern, subtitle.content)
+                
+                for placeholder in placeholders:
+                    # Extract the number from the placeholder
+                    match = re.search(r'__DNT_TERM_(\d+)__', placeholder)
+                    if match:
+                        term_number = int(match.group(1))
+                        
+                        # Try to find the original term from the DNT terms list
+                        # Since we don't have the original term map, we'll remove the placeholder
+                        # This is better than leaving the placeholder in the text
+                        subtitle.content = subtitle.content.replace(placeholder, "")
+                        dnt_terms_fixed += 1
+                        changed = True
+                        
+                        print(f"    Fixed DNT_TERM placeholder {placeholder} in subtitle {subtitle.index}")
+
+        if changed:
+            self.parser.write_file(file_path, subtitles)
+            print(f"  Fixed {dnt_terms_fixed} DNT_TERM placeholders in {os.path.basename(file_path)}")
+            self.dnt_terms_fixed_count += dnt_terms_fixed
+
+        return dnt_terms_fixed
+
     def _should_fix_issue(self, issue: PlaceholderIssue, aggressiveness: float) -> bool:
         """Decide if a regular issue should be fixed based on aggressiveness level"""
         return (
@@ -313,6 +373,7 @@ class SRTFixer:
         print(f"Total phantom placeholders found: {len(self.phantoms)}")
         print(f"Regular placeholders fixed: {self.fixed_count}")
         print(f"Phantom placeholders removed: {self.phantom_fixed_count}")
+        print(f"DNT_TERM placeholders removed: {self.dnt_terms_fixed_count}")
         if self.phantoms:
             print("\nPhantom placeholders detected and removed:")
             for phantom in self.phantoms:

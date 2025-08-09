@@ -29,6 +29,8 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 4. **Select target languages** (Spanish, French, German, etc.)
 5. **Add your .srt files** and click "Translate All Files"
 
+**📖 Need help?** Check the [GUI User Manual](GUI_USER_MANUAL.md) for detailed step-by-step instructions and screenshots.
+
 ### Option 2: Install from Source (For Developers)
 
 1. **Clone the repository:**
@@ -79,6 +81,50 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 4. **Install**: `pip install -e .`
 5. **Run**: `python run_gui.py`
 
+### Developers: Build Binaries (macOS/Windows/Linux)
+
+If you want a standalone app without requiring Python, you can build it with PyInstaller.
+
+Prerequisites:
+- Python 3.11+ recommended
+- Create and activate a virtual environment
+- Install dependencies and PyInstaller
+
+```
+pip install -e .
+pip install pyinstaller
+```
+
+Build commands:
+
+- Windows (no console window):
+```
+pyinstaller --noconsole --name SRT-Translator \
+  --add-data "config\\languages.json;config" \
+  run_gui.py
+```
+
+- macOS (GUI app bundle):
+```
+pyinstaller --windowed --name SRT-Translator \
+  --add-data "config/languages.json:config" \
+  run_gui.py
+```
+
+- Linux (one-folder recommended for Qt apps):
+```
+pyinstaller --windowed --name SRT-Translator \
+  --add-data "config/languages.json:config" \
+  run_gui.py
+```
+
+Output is created in `dist/`. On macOS you will get `SRT-Translator.app`; on Windows `SRT-Translator\SRT-Translator.exe`.
+
+Notes:
+- The `--add-data` syntax uses `;` on Windows and `:` on macOS/Linux.
+- If you package the CLI as well, use `pyinstaller run_cli.py --name SRT-Translator-CLI`.
+- For Linux distribution, shipping source with a virtualenv is often simpler than distributing a binary because of glibc/Qt variations.
+
 ---
 
 ## Basic Configuration
@@ -96,6 +142,39 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 ### 3. Do Not Translate (DNT) Terms (Optional)
 - Add names, brands, or technical terms that shouldn't be translated
 - Examples: Your name, company name, product names, technical acronyms
+
+---
+
+## Log Files and Troubleshooting
+
+### Log File Locations
+
+**GUI Mode:**
+- **Windows**: `%LOCALAPPDATA%\SRTTranslator\Logs\`
+- **macOS**: `~/Library/Application Support/SRTTranslator/Logs/`
+- **Linux**: `~/.local/share/SRTTranslator/Logs/`
+
+**CLI Mode:**
+- **All Platforms**: `./translation_logs/` (in project directory)
+
+### Log File Naming
+- Format: `translation_issues_YYYYMMDD_HHMMSS.log`
+- Example: `translation_issues_20250807_171613.log`
+
+### Troubleshooting
+- Check log files for detailed error messages
+### Long Runs on macOS (Prevent Sleep)
+
+For multi‑hour jobs, prevent the system from sleeping while allowing the display to turn off:
+
+- Recommended: run the app under `caffeinate` from Terminal:
+```
+caffeinate -imsu python3 run_gui.py
+```
+  - Drop `-d` to allow the screen to sleep, keep the system awake. Use your packaged app path if running the .app bundle.
+- Alternatively, in System Settings → Battery, disable Low Power Mode and enable “Prevent automatic sleeping when the display is off” on Power Adapter.
+- Logs show translation progress, API responses, and fixer results
+- Each translation session creates a new timestamped log file
 
 ### 4. AI-Generated Translation Settings (Recommended)
 To improve translation quality, the SRT Translator app supports two professional tools: Do Not Translate (DNT) terms and a Termbase—and both can be created for you automatically using AI. DNT terms are names, acronyms, or product references (like "Amazon" or "ROI") that should remain in the original language. The Termbase is a glossary that ensures consistent translations for important business or technical terms, such as "operating plan" or "input metrics." Creating these lists is easy: just upload a few representative subtitle files and click "Generate Translation Settings." The app analyzes your content and uses AI to suggest DNT terms and generate a Termbase for each selected language. While optional, these tools are highly recommended for videos that contain brand names, industry jargon, or educational content—helping ensure your translations are clear, accurate, and consistent across all languages.

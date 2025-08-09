@@ -57,6 +57,9 @@ class TranslationSection(QGroupBox):
         self.log_output.setMaximumHeight(200)
         self.log_output.setReadOnly(True)
         self.log_output.setPlaceholderText("Translation progress will appear here...")
+        
+        # Cap log widget to prevent unbounded growth
+        self.log_output.document().setMaximumBlockCount(2000)
 
         layout.addLayout(cost_layout)
         layout.addWidget(self.translate_btn)

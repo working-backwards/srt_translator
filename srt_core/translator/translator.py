@@ -16,7 +16,7 @@ from srt_core.config.language_config import language_config
 from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_termbase_terms
 from srt_core.translator.srt_parser import SRTParser
 from srt_core.translator.term_handler import TermHandler
-from srt_core.utils.logging_setup import log_placeholder_issue, setup_logging
+from srt_core.utils.logging_setup import log_placeholder_issue
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -38,7 +38,6 @@ def extract_translation_failure_reason(ai_response):
 
 class SRTTranslator:
     def __init__(self, source_lang="EN", dnt_terms=None, termbase=None, api_key=None, logger=None):
-        self.log_file = setup_logging()
         self.logger = logger or logging.getLogger(__name__)
 
         # Use provided API key or fall back to environment variable
@@ -257,7 +256,7 @@ RESULT: Subtitle left untranslated to mark failure.
                     summary["bad_translations"] = summary.get("bad_translations", 0) + 1
                 return final_text  # Keep the AI refusal message in the SRT output
 
-            # Check for phantom placeholders (AI hallucinations)
+            # Check for phantom placeholders (AI hallucinations) and remove them
             phantom_placeholders = re.findall(r"__DNT_TERM_\d+__", final_text)
             for phantom in phantom_placeholders:
                 if phantom not in term_map:
@@ -275,6 +274,10 @@ Status: AI Hallucination - Remove this placeholder
 ==================================================
 """
                     )
+                    # Remove hallucinated placeholder from output
+                    final_text = final_text.replace(phantom, "")
+            # Tidy whitespace after removals
+            final_text = re.sub(r"\s{2,}", " ", final_text).strip()
 
             placeholder_issues = self._check_placeholder_issues(
                 text, final_text, term_map, target_lang, filename, subtitle_number
@@ -478,6 +481,10 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 ==================================================
 """
                     )
+                    # Remove hallucinated placeholder from batch output before parsing
+                    translated_batch_srt = translated_batch_srt.replace(phantom, "")
+            # Tidy whitespace after removals (basic)
+            translated_batch_srt = re.sub(r"[ \t]{2,}", " ", translated_batch_srt)
             try:
                 translated_batch = list(srt.parse(translated_batch_srt))
                 

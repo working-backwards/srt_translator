@@ -6,42 +6,58 @@ from srt_core.config.settings import LOG_DIRECTORY, LOG_MODE
 
 
 def setup_logging():
-    """Configure logging settings for translation issues"""
+    """Configure logging settings exactly once and return active log file path.
+
+    This function is idempotent and does not rely on logging.basicConfig(), so it
+    works even if logging was already initialized elsewhere. It will:
+      - Reuse an existing FileHandler that points to our LOG_DIRECTORY if present
+      - Otherwise add a new FileHandler and a StreamHandler to the root logger
+    """
     os.makedirs(LOG_DIRECTORY, exist_ok=True)
 
+    root_logger = logging.getLogger()
+
+    # If there is already a FileHandler writing into our log directory, reuse it
+    for handler in root_logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            try:
+                handler_path = os.path.abspath(handler.baseFilename)
+                if os.path.commonpath([handler_path, os.path.abspath(LOG_DIRECTORY)]) == os.path.abspath(LOG_DIRECTORY):
+                    return handler.baseFilename
+            except Exception:
+                continue
+
+    # No existing handler → create a new timestamped file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
 
     class HTTPFilter(logging.Filter):
         def filter(self, record):
             if LOG_MODE == "Standard":
-                http_keywords = [
-                    "http",
-                    "https",
-                    "request",
-                    "response",
-                    "api.openai.com",
-                ]
-                return not any(
-                    keyword in record.msg.lower() for keyword in http_keywords
-                )
+                msg = str(record.msg).lower()
+                http_keywords = ["http", "https", "request", "response", "api.openai.com"]
+                return not any(keyword in msg for keyword in http_keywords)
             return True
-
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    console_handler = logging.StreamHandler()
-
-    http_filter = HTTPFilter()
-    file_handler.addFilter(http_filter)
-    console_handler.addFilter(http_filter)
 
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
     formatter = logging.Formatter(log_format)
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
+    file_handler.addFilter(HTTPFilter())
 
-    logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
+    # Add a console handler if one isn't already present
+    has_stream = any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers)
+    if not has_stream:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.addFilter(HTTPFilter())
+        root_logger.addHandler(console_handler)
 
-    # Suppress HTTP request logs from httpx and openai libraries
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+
+    # Suppress verbose HTTP logs from dependencies
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)

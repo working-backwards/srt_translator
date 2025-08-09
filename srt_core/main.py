@@ -19,7 +19,8 @@ from srt_core.config.config_resolver import ConfigResolver
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
 
-logging.basicConfig(level=logging.INFO)  # Enable DEBUG-level logging for the whole app
+# Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
+# is responsible for initializing logging via setup_logging().
 
 
 def translate_srt_files(
@@ -120,6 +121,9 @@ def translate_srt_files(
     for input_filepath in file_paths:
         filename = os.path.basename(input_filepath)
         summary["total_files"] += 1
+        
+        # Track files translated for this specific SRT file
+        current_file_translations = []
 
         for lang_name, lang_code in translation_config.target_languages.items():
             summary["total_operations"] += 1
@@ -142,26 +146,23 @@ def translate_srt_files(
                 else:
                     summary["successes"] += 1
                     # Track successfully translated files
+                    current_file_translations.append(output_filepath)
                     translated_files.append(output_filepath)
             except Exception as e:
                 summary["errors"] += 1
                 summary["error_details"].append(f"{filename} ({lang_name}): {e}")
                 print(f"Error translating {filename} to {lang_name}: {e}")
+        
+        # Run fixer after each SRT file is complete
+        if FIX_AGGRESSIVENESS > 0 and current_file_translations:
+            logging.info(f"Running automatic fixes for {filename}...")
+            fixer = SRTFixer(log_file, OUTPUT_BASE_DIR)
+            fixer.parse_log_file()
+            fixer.fix_specific_srt_files(current_file_translations, aggressiveness=FIX_AGGRESSIVENESS)
+            fixer.report_status()
 
     # Set unique languages count
     summary["unique_languages"] = len(translation_config.target_languages)
-
-    # Perform fixes only on files that were translated in this session
-    fixer = SRTFixer(log_file, OUTPUT_BASE_DIR)
-    fixer.parse_log_file()
-
-    if FIX_AGGRESSIVENESS > 0 and translated_files:
-        # Only fix files that were actually translated in this session
-        fixer.fix_specific_srt_files(
-            translated_files, aggressiveness=FIX_AGGRESSIVENESS
-        )
-
-    fixer.report_status()
 
     # Print summary
     logging.info("\n=== Translation Summary ===")
