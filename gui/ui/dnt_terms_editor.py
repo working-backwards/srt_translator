@@ -6,7 +6,7 @@ Allows users to add, remove, and modify terms that should remain in English.
 """
 
 import logging
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont

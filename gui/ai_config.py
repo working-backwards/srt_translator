@@ -10,7 +10,6 @@ import re
 import unicodedata
 from typing import Dict, List, Optional
 
-import tiktoken
 from openai import OpenAI
 
 

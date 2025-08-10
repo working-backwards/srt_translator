@@ -10,7 +10,7 @@ import psutil
 from typing import Dict, List
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, QTimer
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,

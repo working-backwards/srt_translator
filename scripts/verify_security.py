@@ -8,7 +8,6 @@ import os
 import sys
 import zipfile
 import tempfile
-import shutil
 from pathlib import Path
 
 

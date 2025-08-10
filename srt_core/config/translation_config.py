@@ -152,7 +152,7 @@ def build_config_from_gui(settings_manager) -> TranslationConfig:
     )
 
 
-def build_config_from_cli(env_file_path: Optional[str] = None) -> TranslationConfig:
+def build_config_from_cli() -> TranslationConfig:
     """Build configuration from CLI environment variables"""
     # Load from environment variables
     target_languages_str = os.getenv("TARGET_LANGUAGES", "{}")
