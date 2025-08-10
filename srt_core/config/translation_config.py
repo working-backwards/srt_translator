@@ -28,6 +28,7 @@ class TranslationConfig:
     model_name: str = "gpt-4o-mini"
     batch_size: int = 5
     logger: Optional[logging.Logger] = None
+    mode: str = "CLI"  # "GUI" or "CLI" - indicates the execution mode
 
     def __post_init__(self):
         """Validate configuration integrity and normalize language codes"""
@@ -54,13 +55,15 @@ class TranslationConfig:
             raise ValueError("termbase must be a dictionary")
         if self.batch_size <= 0:
             raise ValueError("batch_size must be greater than 0")
+        if self.mode not in ["GUI", "CLI"]:
+            raise ValueError("mode must be either 'GUI' or 'CLI'")
 
         # Log configuration summary
         self.logger.info(f"TranslationConfig created: {self.to_log_string()}")
 
     def to_log_string(self):
         """Return a concise string representation for logging"""
-        return f"Languages: {list(self.target_languages.values())}, DNT: {len(self.dnt_terms)}, Termbase: {list(self.termbase.keys())}"
+        return f"Mode: {self.mode}, Languages: {list(self.target_languages.values())}, DNT: {len(self.dnt_terms)}, Termbase: {list(self.termbase.keys())}"
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization"""
@@ -72,11 +75,13 @@ class TranslationConfig:
             "api_key": self.api_key,
             "model_name": self.model_name,
             "batch_size": self.batch_size,
+            "mode": self.mode,
         }
 
     def to_safe_log_dict(self) -> Dict[str, Any]:
         """Redacted snapshot for DEBUG logs only (never INFO)."""
         return {
+            "mode": self.mode,
             "output_directory": self.output_directory,
             "target_languages": list(self.target_languages.values()),
             "target_lang_count": len(self.target_languages),
@@ -101,6 +106,7 @@ class TranslationConfig:
             api_key=data.get("api_key"),
             model_name=data.get("model_name", "gpt-4o-mini"),
             batch_size=int(data.get("batch_size", 5)),
+            mode=data.get("mode", "CLI"),
             logger=logger,
         )
 
@@ -142,6 +148,7 @@ def build_config_from_gui(settings_manager) -> TranslationConfig:
         or "translated_srt_files",
         model_name=model_name,
         batch_size=batch_size,
+        mode="GUI",
     )
 
 
@@ -175,6 +182,7 @@ def build_config_from_cli(env_file_path: Optional[str] = None) -> TranslationCon
         api_key=os.getenv("OPENAI_API_KEY"),
         model_name=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         batch_size=batch_size,
+        mode="CLI",
     )
 
 
@@ -196,4 +204,5 @@ def build_config_from_parameters(
         model_name=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         batch_size=int(os.getenv("BATCH_SIZE", 5)),
         logger=logger,
+        mode="CLI",
     )

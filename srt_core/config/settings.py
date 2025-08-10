@@ -19,9 +19,6 @@ SOURCE_DIR = (
 OUTPUT_BASE_DIR = os.environ.get(
     "OUTPUT_DIRECTORY", os.path.join(BASE_DIR, "translated_srt_files")
 )
-LOG_DIRECTORY = os.environ.get(
-    "LOGS_DIRECTORY", os.path.join(BASE_DIR, "translation_logs")
-)
 
 print(f"BASE_DIR: {os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))}")
 print(f"SOURCE_DIR: {SOURCE_DIR}")

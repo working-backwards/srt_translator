@@ -3,23 +3,20 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from srt_core.config.settings import LOG_DIRECTORY, LOG_MODE
+from srt_core.config.settings import LOG_MODE
 
 
-def setup_logging(log_file_override: Optional[str] = None) -> str:
+def setup_logging(log_file_override: str) -> str:
     """Configure logging and return active log file path.
 
     Behavior:
     - Removes any existing FileHandlers to avoid duplicate log lines across runs.
-    - If ``log_file_override`` is provided, uses it; else creates a timestamped file in ``LOG_DIRECTORY``.
+    - Uses the provided log_file_override path (required for batch-specific logging).
     - Ensures a single console StreamHandler exists.
     - Sets logging level to DEBUG if DEBUG_MODE environment variable is set to "true".
     """
     # Ensure directory exists
-    if log_file_override:
-        os.makedirs(os.path.dirname(log_file_override), exist_ok=True)
-    else:
-        os.makedirs(LOG_DIRECTORY, exist_ok=True)
+    os.makedirs(os.path.dirname(log_file_override), exist_ok=True)
 
     root_logger = logging.getLogger()
 
@@ -32,12 +29,8 @@ def setup_logging(log_file_override: Optional[str] = None) -> str:
             except Exception:
                 pass
 
-    # Determine log file path
-    if log_file_override:
-        log_file = log_file_override
-    else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
+    # Use the provided log file path
+    log_file = log_file_override
 
     class HTTPFilter(logging.Filter):
         def filter(self, record):

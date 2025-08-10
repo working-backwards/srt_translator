@@ -90,13 +90,13 @@ def translate_srt_files(
     print(f"Translating with batch size: {translation_config.batch_size}")
 
     # Create translator with configuration
-    is_gui = os.getenv("GUI_MODE", "false").lower() == "true"
     translator = SRTTranslator(
         dnt_terms=translation_config.dnt_terms,
         termbase=translation_config.termbase,
         api_key=translation_config.api_key,
         logger=translation_config.logger,
-        allow_global_termbase_fallback=not is_gui,  # GUI: no fallback; CLI: allow
+        allow_global_termbase_fallback=translation_config.mode
+        == "CLI",  # GUI: no fallback; CLI: allow
         model_name=translation_config.model_name,
         batch_size=translation_config.batch_size,
     )
@@ -179,8 +179,8 @@ def translate_srt_files(
 
     # Build minimal manifest (Option B)
     try:
-        # Resolve mode
-        mode = "GUI" if os.getenv("GUI_MODE", "false").lower() == "true" else "CLI"
+        # Use mode from config
+        mode = translation_config.mode
 
         # App version from pyproject.toml (best effort)
         app_version = "1.0.0"

@@ -39,21 +39,6 @@ def prepare_environment_from_settings():
             QDir().mkpath(output_dir)
         os.environ["OUTPUT_DIRECTORY"] = output_dir
 
-        # Log directory (use platform-specific path)
-        try:
-            from platformdirs import user_log_dir
-
-            log_dir = user_log_dir("SRTTranslator", appauthor=False)
-            os.makedirs(log_dir, exist_ok=True)
-            os.environ["LOGS_DIRECTORY"] = log_dir
-        except ImportError:
-            # Fallback if platformdirs not available
-            import tempfile
-
-            log_dir = os.path.join(tempfile.gettempdir(), "SRTTranslator", "logs")
-            os.makedirs(log_dir, exist_ok=True)
-            os.environ["LOGS_DIRECTORY"] = log_dir
-
     except Exception as e:
         # If QSettings fails, we'll use defaults
         print(f"Warning: Could not load GUI settings: {e}")

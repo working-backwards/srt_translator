@@ -5,7 +5,7 @@ a = Analysis(
     ['run_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('config/languages.json', 'config')],
+    datas=[('config\\\\languages.json', 'config')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -41,10 +41,4 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='SRT-Translator',
-)
-app = BUNDLE(
-    coll,
-    name='SRT-Translator.app',
-    icon=None,
-    bundle_identifier=None,
 )

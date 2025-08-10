@@ -46,9 +46,6 @@ if "LOG_MODE" not in os.environ:
 if "OUTPUT_DIRECTORY" not in os.environ:
     os.environ["OUTPUT_DIRECTORY"] = "translated_srt_files"
 
-if "LOGS_DIRECTORY" not in os.environ:
-    os.environ["LOGS_DIRECTORY"] = "translation_logs"
-
 from srt_core import main
 from srt_core.config.translation_config import build_config_from_cli
 

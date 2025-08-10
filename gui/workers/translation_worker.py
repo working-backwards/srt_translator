@@ -238,35 +238,6 @@ class TranslationWorker(QObject):
             # Emit error via signal (thread-safe)
             self.translation_error.emit(error_msg)
 
-    def prepare_translation_environment(self):
-        """Prepare environment for translation (minimal setup only)"""
-        try:
-            # Set only essential environment variables for file paths and API key
-            # DO NOT set runtime state variables like TARGET_LANGUAGES, DNT_TERMS, TERMBASE
-
-            # API key is required for translation
-            os.environ["OPENAI_API_KEY"] = self.api_key
-            self.logger.info("Set OPENAI_API_KEY environment variable")
-
-            # Set GUI mode flag
-            os.environ["GUI_MODE"] = "true"
-            self.logger.info(
-                f"Set GUI_MODE environment variable to: {os.getenv('GUI_MODE')}"
-            )
-
-            # Set output directory if provided
-            if self.output_directory:
-                os.environ["OUTPUT_DIRECTORY"] = self.output_directory
-                self.logger.info(f"Set OUTPUT_DIRECTORY to: {self.output_directory}")
-
-            # DO NOT set TARGET_LANGUAGES - this will be passed as parameter
-            # DO NOT set DNT_TERMS - this will be passed as parameter
-            # DO NOT set TERMBASE - this will be passed as parameter
-
-        except Exception as e:
-            self.logger.error(f"Error preparing translation environment: {e}")
-            raise
-
     def setup_ai_configuration(self):
         """Set up AI configuration from settings manager (if available)"""
         if not self.settings_manager:
