@@ -37,7 +37,7 @@ If you want to create executables from source:
 1. **Install Python 3.9+** and pip
 2. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-repo/srt_translator.git
+   git clone https://github.com/working-backwards/srt_translator.git
    cd srt_translator
    ```
 3. **Install dependencies**:

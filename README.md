@@ -21,29 +21,12 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 
 ## Quick Start (5 minutes)
 
-### Option 1: Download Executable (Recommended for Content Creators)
+- Download a packaged build from `dist/<platform>/SRT_Translator/` (or from a release zip)
+- Double‑click to run the app (see INSTALLATION.md for OS‑specific notes)
+- Open **API Configuration** in the app and paste your OpenAI API key
+- Add your `.srt` files and click **Translate All Files**
 
-1. **Download** the executable for your platform
-2. **Run the application** (Windows may show security warnings - this is normal for free software)
-3. **Enter your OpenAI API key** in the API Configuration section
-4. **Select target languages** (Spanish, French, German, etc.)
-5. **Add your .srt files** and click "Translate All Files"
-
-**📖 Need help?** Check the [GUI User Manual](GUI_USER_MANUAL.md) for detailed step-by-step instructions and screenshots.
-
-### Option 2: Install from Source (For Developers)
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/working-backwards/srt_translator.git
-   cd srt_translator
-   ```
-
-2. **Install and run:**
-   ```bash
-   pip install -e .
-   python run_gui.py
-   ```
+See **INSTALLATION.md** for building per‑platform and packaging details.
 
 ---
 

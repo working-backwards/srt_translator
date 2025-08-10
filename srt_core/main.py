@@ -3,9 +3,8 @@ import os
 from datetime import datetime, timezone
 from typing import Dict, List
 
-from srt_core.config.language_config import language_config
+
 from srt_core.config.settings import (
-    BATCH_SIZE,
     FIX_AGGRESSIVENESS,
     SOURCE_DIR,
     TARGET_LANGUAGES,
@@ -88,34 +87,22 @@ def translate_srt_files(
 
     print(f"Batch folder: {batch_dir}")
     print(f"Log file: {log_file}")
-    print(f"Translating with batch size: {BATCH_SIZE}")
+    print(f"Translating with batch size: {translation_config.batch_size}")
 
     # Create translator with configuration
+    is_gui = os.getenv("GUI_MODE", "false").lower() == "true"
     translator = SRTTranslator(
         dnt_terms=translation_config.dnt_terms,
         termbase=translation_config.termbase,
         api_key=translation_config.api_key,
         logger=translation_config.logger,
+        allow_global_termbase_fallback=not is_gui,  # GUI: no fallback; CLI: allow
+        model_name=translation_config.model_name,
+        batch_size=translation_config.batch_size,
     )
 
-    # Log language configuration information
-    logging.info(
-        f"Target languages: {len(translation_config.target_languages)} languages configured"
-    )
-    if len(translation_config.target_languages) <= 10:
-        logging.info(
-            f"Languages: {', '.join(translation_config.target_languages.keys())}"
-        )
-    else:
-        popular_langs = language_config.get_popular_languages()
-        logging.info(f"Popular languages: {', '.join(popular_langs)}")
-        logging.info(
-            f"Total available languages: {len(translation_config.target_languages)}"
-        )
-
-    # Log configuration information
-    logging.info(f"DNT terms count: {len(translation_config.dnt_terms)}")
-    logging.info(f"Termbase languages: {list(translation_config.termbase.keys())}")
+    # Log configuration debug info using the new debug_log_config method
+    SRTTranslator.debug_log_config(translation_config, full_termbase=True)
 
     summary = {
         "total_files": 0,
@@ -267,6 +254,8 @@ def translate_srt_files(
             "inputs": inputs,
             "outputs": outputs,
             "log_file": os.path.relpath(log_file, batch_dir),
+            "termbase_file": "termbase.json",
+            "dnt_terms_file": "dnt_terms.json",
             "paths_are_relative_to_batch_dir": True,
         }
 
@@ -278,6 +267,48 @@ def translate_srt_files(
             json.dump(manifest, f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, final_path)
         logging.info(f"Manifest written: {os.path.relpath(final_path, batch_dir)}")
+
+        # Write termbase and DNT terms to the same output directory
+        try:
+            # Debug logging to see what data we have
+            logging.info(
+                f"Writing configuration files - Termbase keys: {list(translation_config.termbase.keys()) if translation_config.termbase else 'None'}"
+            )
+            logging.info(
+                f"Writing configuration files - DNT terms count: {len(translation_config.dnt_terms) if translation_config.dnt_terms else 0}"
+            )
+            if translation_config.dnt_terms:
+                logging.info(
+                    f"Writing configuration files - DNT terms sample: {translation_config.dnt_terms[:5]}"
+                )
+
+            # termbase.json
+            termbase_tmp = os.path.join(batch_dir, "termbase.tmp.json")
+            termbase_path = os.path.join(batch_dir, "termbase.json")
+            with open(termbase_tmp, "w", encoding="utf-8") as f:
+                json.dump(translation_config.termbase, f, ensure_ascii=False, indent=2)
+            os.replace(termbase_tmp, termbase_path)
+            logging.info(
+                f"Termbase written: {os.path.relpath(termbase_path, batch_dir)}"
+            )
+
+            # dnt_terms.json
+            dnt_tmp = os.path.join(batch_dir, "dnt_terms.tmp.json")
+            dnt_terms_path = os.path.join(batch_dir, "dnt_terms.json")
+            dnt_terms_data = {
+                "description": "List of terms that should not be translated (Do Not Translate)",
+                "terms": translation_config.dnt_terms,
+            }
+            with open(dnt_tmp, "w", encoding="utf-8") as f:
+                json.dump(dnt_terms_data, f, ensure_ascii=False, indent=2)
+            os.replace(dnt_tmp, dnt_terms_path)
+            logging.info(
+                f"DNT terms written: {os.path.relpath(dnt_terms_path, batch_dir)}"
+            )
+
+        except Exception as e:
+            logging.warning(f"Failed to write termbase or DNT terms: {e}")
+
         logging.info(f"Batch folder: {batch_dir}")
     except Exception as e:
         logging.warning(f"Failed to write manifest: {e}")

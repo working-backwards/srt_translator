@@ -19,12 +19,13 @@ from srt_core.config.language_config import language_config
 @dataclass
 class ConfigState:
     """Immutable configuration state with validation"""
+
     target_languages: Dict[str, str]  # language_name -> language_code
     dnt_terms: List[str]
     termbase: Dict[str, Dict[str, str]]  # language_code -> {term -> translation}
     output_directory: Optional[str] = None
     api_key: Optional[str] = None
-    
+
     def __post_init__(self):
         """Validate state after initialization"""
         if not isinstance(self.target_languages, dict):
@@ -33,24 +34,24 @@ class ConfigState:
             raise ValueError("dnt_terms must be a list")
         if not isinstance(self.termbase, dict):
             raise ValueError("termbase must be a dictionary")
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization"""
         return asdict(self)
-    
+
     @classmethod
-    def from_dict(cls, data: dict) -> 'ConfigState':
+    def from_dict(cls, data: dict) -> "ConfigState":
         """Create from dictionary with validation"""
         return cls(**data)
-    
-    def copy(self) -> 'ConfigState':
+
+    def copy(self) -> "ConfigState":
         """Create a deep copy of the state"""
         return ConfigState(
             target_languages=self.target_languages.copy(),
             dnt_terms=self.dnt_terms.copy(),
             termbase={k: v.copy() for k, v in self.termbase.items()},
             output_directory=self.output_directory,
-            api_key=self.api_key
+            api_key=self.api_key,
         )
 
 
@@ -59,32 +60,43 @@ class SettingsManager:
 
     def __init__(self):
         self.settings = QSettings("SRTTranslator", "SRTTranslator")
-        self._state = ConfigState(
-            target_languages={},
-            dnt_terms=[],
-            termbase={}
-        )
+        self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
         self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
 
     # === CENTRALIZED STATE MANAGEMENT ===
-    
+
     def get_current_state(self) -> ConfigState:
         """Get current state (thread-safe)"""
         with self._lock:
+            # If current state is empty, try to load AI configuration
+            if not self._state.dnt_terms and not self._state.termbase:
+                try:
+                    ai_dnt_terms, ai_termbase = self.load_ai_config()
+                    if ai_dnt_terms or ai_termbase:
+                        self.logger.info("Loading AI configuration into current state")
+                        new_state = self._state.copy()
+                        new_state.dnt_terms = ai_dnt_terms.copy()
+                        new_state.termbase = {
+                            k: v.copy() for k, v in ai_termbase.items()
+                        }
+                        self._state = new_state
+                except Exception as e:
+                    self.logger.warning(f"Failed to load AI configuration: {e}")
+
             return self._state.copy()
-    
+
     def update_state(self, new_state: ConfigState):
         """Update state (thread-safe)"""
         with self._lock:
             self._state = new_state
         self._persist_state(new_state)
-    
+
     def get_current_target_languages(self) -> Dict[str, str]:
         """Get current language selection from UI state (thread-safe)"""
         with self._lock:
             return self._state.target_languages.copy()
-    
+
     def update_target_languages(self, languages: Dict[str, str]):
         """Update both UI state and persistent storage (thread-safe)"""
         with self._lock:
@@ -94,12 +106,12 @@ class SettingsManager:
         self._persist_state(self._state)
         # Also update legacy storage for backward compatibility
         self.save_target_languages(languages)
-    
+
     def get_current_dnt_terms(self) -> List[str]:
         """Get current DNT terms (thread-safe)"""
         with self._lock:
             return self._state.dnt_terms.copy()
-    
+
     def update_dnt_terms(self, dnt_terms: List[str]):
         """Update DNT terms (thread-safe)"""
         with self._lock:
@@ -107,12 +119,12 @@ class SettingsManager:
             new_state.dnt_terms = dnt_terms.copy()
             self._state = new_state
         self._persist_state(self._state)
-    
+
     def get_current_termbase(self) -> Dict[str, Dict[str, str]]:
         """Get current termbase (thread-safe)"""
         with self._lock:
             return {k: v.copy() for k, v in self._state.termbase.items()}
-    
+
     def update_termbase(self, termbase: Dict[str, Dict[str, str]]):
         """Update termbase (thread-safe)"""
         with self._lock:
@@ -120,19 +132,19 @@ class SettingsManager:
             new_state.termbase = {k: v.copy() for k, v in termbase.items()}
             self._state = new_state
         self._persist_state(self._state)
-    
+
     def _persist_state(self, state: ConfigState):
         """Persist state to storage"""
         try:
             state_dict = state.to_dict()
             # Remove sensitive data before persistence
-            if 'api_key' in state_dict:
-                del state_dict['api_key']
+            if "api_key" in state_dict:
+                del state_dict["api_key"]
             # Save to QSettings
             self.settings.setValue("current_state", state_dict)
         except Exception as e:
             self.logger.error(f"Failed to persist state: {e}")
-    
+
     def _load_state_from_storage(self) -> ConfigState:
         """Load state from storage"""
         try:
@@ -233,14 +245,14 @@ class SettingsManager:
     def track_language_usage(self, language_code: str) -> None:
         """Track language usage for adaptive popular languages"""
         usage_data = self.load_language_usage_data()
-        
+
         # Update usage count and last used timestamp
         if language_code not in usage_data:
             usage_data[language_code] = {"count": 0, "last_used": None}
-        
+
         usage_data[language_code]["count"] += 1
         usage_data[language_code]["last_used"] = datetime.now().isoformat()
-        
+
         self.save_language_usage_data(usage_data)
         self._update_adaptive_popular_languages(usage_data)
 
@@ -258,13 +270,13 @@ class SettingsManager:
         sorted_languages = sorted(
             usage_data.items(),
             key=lambda x: (x[1]["count"], x[1]["last_used"] or ""),
-            reverse=True
+            reverse=True,
         )
-        
+
         # Get top used languages
         popular_limit = language_config.get_popular_limit()
         top_languages = [lang_code for lang_code, _ in sorted_languages[:popular_limit]]
-        
+
         # Save as user's preferred popular languages
         self.save_user_popular_languages(top_languages)
 
@@ -319,14 +331,14 @@ class SettingsManager:
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
         self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
-        
+
         # Also update current state
         with self._lock:
             new_state = self._state.copy()
             new_state.dnt_terms = dnt_terms.copy()
             new_state.termbase = {k: v.copy() for k, v in termbase.items()}
             self._state = new_state
-        
+
         # Calculate and store file hash for change detection
         file_hash = self._calculate_file_hash()
         self.settings.setValue("ai_config_file_hash", file_hash)
@@ -363,7 +375,7 @@ class SettingsManager:
         self.settings.remove("ai_termbase")
         self.settings.remove("ai_config_timestamp")
         self.settings.remove("ai_config_file_hash")
-        
+
         # Also clear from current state
         with self._lock:
             new_state = self._state.copy()
@@ -388,6 +400,7 @@ class SettingsManager:
         """Calculate hash of selected files for change detection"""
         try:
             import hashlib
+
             selected_files = self.load_selected_files()
             if not selected_files:
                 return ""

@@ -12,56 +12,12 @@ The SRT Translator reads your original SRT subtitle files, translates them into 
 
 ## Getting Started
 
-### Choose how you want to run the application
+### How to get the app
 
-You can use the SRT Translator in two simple ways. Please choose the path that feels most comfortable.
+- **Download a packaged build** from `dist/<platform>/SRT_Translator/` (or from a release zip).
+- If you are a developer, you can build it yourself following **INSTALLATION.md**.
 
-- Option A: Download the packaged application (recommended for most users)
-- Option B: Run the application from source (recommended for developers)
-
-You can find detailed, up‑to‑date installation steps in the Installation guide: [INSTALLATION.md](INSTALLATION.md). The short version appears below.
-
-#### Option A — Download the packaged application (recommended)
-
-1. Download the latest packaged build for your operating system. You will find it in the project’s Releases page or in your team’s distribution folder.
-2. Unzip or install the application as instructed for your platform.
-3. Open the SRT Translator application. If your operating system warns you about an unknown publisher, choose the option to proceed. This is common for open‑source tools.
-
-#### Option B — Run from source (for developers)
-
-1. Install Python 3.10 or newer.
-2. Open a terminal and navigate to the project folder.
-3. Create and activate a virtual environment.
-   ```bash
-   python -m venv venv
-   # Windows
-   venv\Scripts\activate
-   # macOS/Linux
-   # source venv/bin/activate
-   ```
-4. Install the project in editable mode.
-   ```bash
-   pip install -e .
-   ```
-5. Start the GUI.
-   ```bash
-   python run_gui.py
-   ```
-
-### Prerequisites
-
-- You have an OpenAI API key. You can create one in your OpenAI account. Please keep it private.
-- You have one or more .srt files that you want to translate.
-
-### First run
-
-1. Open the SRT Translator using Option A or Option B above.
-2. Open the API Configuration section. Paste your API key and save it. The application stores it securely on your machine.
-3. Open the Language Selection section. Choose one or more target languages. You can change these at any time.
-4. Open the Files & Output section. Choose the folder that contains your original SRT files and choose the output folder where the translated files will be saved.
-5. Click Translate All Files. The application begins translating. You will see progress updates and a log of the work.
-
-You can stop a translation at any time. When you start again, the application resumes with your current settings.
+Then launch the app and go to **API Configuration** to paste your OpenAI API key.
 
 ---
 

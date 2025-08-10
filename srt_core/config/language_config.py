@@ -5,7 +5,7 @@ Handles loading and accessing language configuration from JSON file
 
 import json
 import logging
-from importlib.resources import files
+from .resource_loader import load_languages
 from typing import Dict, List, Optional
 
 
@@ -17,22 +17,14 @@ class LanguageConfig:
         self.config = self.load_config()
 
     def load_config(self) -> Dict:
-        """Load language configuration from JSON file using importlib.resources"""
+        """Load language configuration from JSON file using resource loader"""
         try:
-            # Use importlib.resources to load the JSON file
-            # This works both in development and in frozen PyInstaller builds
-            with files("srt_core.config").joinpath("languages.json").open("rb") as f:
-                config = json.load(f)
-                self.logger.info(
-                    f"Loaded language config with {len(config.get('languages', {}))} languages"
-                )
-                return config
-        except FileNotFoundError:
-            self.logger.error("Language config file not found in package")
-            return self.get_fallback_config()
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Invalid JSON in language config: {e}")
-            return self.get_fallback_config()
+            # Use the resource loader which handles both package resources and repo paths
+            config = load_languages()
+            self.logger.info(
+                f"Loaded language config with {len(config.get('languages', {}))} languages"
+            )
+            return config
         except Exception as e:
             self.logger.error(f"Error loading language config: {e}")
             return self.get_fallback_config()
@@ -121,36 +113,38 @@ class LanguageConfig:
         """Get language-specific sentence boundary rules"""
         DEFAULT_SENTENCE_ENDINGS = [".", "!", "?", "...", ":", ";"]
         DEFAULT_BREAK_MARKERS = []
-        
+
         languages = self.get_all_languages()
         lang_info = languages.get(lang_code, {})
-        
+
         return {
-            "sentence_endings": lang_info.get("sentence_endings", DEFAULT_SENTENCE_ENDINGS),
-            "break_markers": lang_info.get("break_markers", DEFAULT_BREAK_MARKERS)
+            "sentence_endings": lang_info.get(
+                "sentence_endings", DEFAULT_SENTENCE_ENDINGS
+            ),
+            "break_markers": lang_info.get("break_markers", DEFAULT_BREAK_MARKERS),
         }
 
     def normalize_to_code(self, name_or_code: str) -> Optional[str]:
         """Convert language name or code to normalized language code"""
         if not name_or_code:
             return None
-            
+
         # First check if it's already a valid language code
         if self.validate_language_code(name_or_code):
             return name_or_code
-            
+
         # If not, try to find it by name
         languages = self.get_all_languages()
         for code, lang_info in languages.items():
             if lang_info.get("name", "").lower() == name_or_code.lower():
                 return code
-                
+
         # If still not found, try partial matches
         for code, lang_info in languages.items():
             lang_name = lang_info.get("name", "").lower()
             if name_or_code.lower() in lang_name or lang_name in name_or_code.lower():
                 return code
-                
+
         # If no match found, return None
         return None
 

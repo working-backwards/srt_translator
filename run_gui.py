@@ -101,12 +101,14 @@ def main():
 
     # Set debug mode if requested
     if args.debug:
+        # Set DEBUG_MODE environment variable for core logging setup
+        os.environ["DEBUG_MODE"] = "true"
         # Keep standard mode to filter out noisy HTTP messages from libraries
         os.environ["LOG_MODE"] = "Standard"
         # Set Python logging level to DEBUG to show all application log messages
         logging.basicConfig(level=logging.DEBUG)
         print(
-            "Debug mode enabled - DEBUG level logging will be shown (HTTP messages filtered)"
+            "🔍 Debug mode enabled - detailed information will be shown (HTTP messages filtered)"
         )
 
     app = QApplication(sys.argv)

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -6,19 +7,16 @@ from datetime import datetime
 from typing import List, Tuple
 
 # Import unified language configuration
-import sys
 import time
 
 import srt
 from openai import OpenAI
 
 from srt_core.config.language_config import language_config
-from srt_core.config.settings import BATCH_SIZE, OPENAI_MODEL, get_termbase_terms
+from srt_core.config.settings import get_termbase_terms  # optional CLI fallback only
 from srt_core.translator.srt_parser import SRTParser
 from srt_core.translator.term_handler import TermHandler
 from srt_core.utils.logging_setup import log_placeholder_issue
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # Update BAD_RESPONSE_PATTERNS to only check for the new phrase
 BAD_RESPONSE_PATTERNS = ["I cannot translate because"]
@@ -37,25 +35,31 @@ def extract_translation_failure_reason(ai_response):
 
 
 class SRTTranslator:
-    def __init__(self, dnt_terms=None, termbase=None, api_key=None, logger=None):
+    def __init__(
+        self,
+        dnt_terms=None,
+        termbase=None,
+        api_key=None,
+        logger=None,
+        allow_global_termbase_fallback: bool = False,
+        model_name: str = "gpt-4o-mini",
+        batch_size: int = 5,
+    ):
         self.logger = logger or logging.getLogger(__name__)
+        self.allow_global_termbase_fallback = allow_global_termbase_fallback
 
-        # Use provided API key or fall back to environment variable
-        if api_key:
-            self.api_key = api_key
-        else:
-            self.api_key = os.getenv("OPENAI_API_KEY")
-
-        if not self.api_key:
-            raise ValueError(
-                "OpenAI API key must be provided as parameter or set in the OPENAI_API_KEY environment variable"
-            )
+        # Require API key to be provided explicitly
+        if not api_key:
+            raise ValueError("OpenAI API key must be provided as parameter")
+        self.api_key = api_key
 
         self.client = OpenAI(api_key=self.api_key)
 
         # Use provided DNT terms and termbase or fall back to defaults
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
+        self.model_name = model_name
+        self.batch_size = batch_size
 
         # Initialize term handler with provided DNT terms
         self.term_handler = TermHandler(dnt_terms=self.dnt_terms)
@@ -68,6 +72,84 @@ class SRTTranslator:
         self.logger.info(
             f"SRTTranslator initialized with termbase for {len(self.termbase)} languages"
         )
+
+    @staticmethod
+    def debug_log_config(
+        cfg, logger=None, *, full_termbase=False, max_langs=12, max_terms_per_lang=8
+    ):
+        """
+        Emit a redacted, human-friendly config snapshot at DEBUG level.
+        - full_termbase=False prints a per-language summary with samples.
+        - Set full_termbase=True to pretty-print the entire termbase.
+        """
+        log = logger or logging.getLogger(__name__)
+        if not log.isEnabledFor(logging.DEBUG):
+            return
+
+        def _mask_tail(s: str, n: int = 4) -> str:
+            if not s:
+                return ""
+            return "…" + s[-n:]
+
+        # Header
+        lines = []
+        lines.append("=== TranslationConfig (DEBUG) ===")
+
+        # Basics
+        tgt = getattr(cfg, "target_languages", {}) or {}
+        dnt = getattr(cfg, "dnt_terms", []) or []
+        tb = getattr(cfg, "termbase", {}) or {}
+
+        lines.append(
+            f"Output directory  : {getattr(cfg, 'output_directory', 'translated_srt_files')}"
+        )
+        lines.append(
+            f"Model / batch     : {getattr(cfg, 'model_name', 'gpt-4o-mini')} / {getattr(cfg, 'batch_size', 5)}"
+        )
+        lines.append(f"API key (tail)    : {_mask_tail(getattr(cfg, 'api_key', ''))}")
+
+        # Targets
+        codes = list(tgt.values())
+        lines.append(
+            f"Targets ({len(codes)}): {', '.join(codes) if codes else '(none)'}"
+        )
+
+        # DNT
+        lines.append(f"DNT terms ({len(dnt)}):")
+        if dnt:
+            for term in dnt:
+                lines.append(f"  - {term}")
+        else:
+            lines.append("  (none)")
+
+        # Termbase
+        lines.append(
+            f"Termbase languages ({len(tb)}): {', '.join(sorted(tb.keys())) if tb else '(none)'}"
+        )
+
+        if full_termbase and tb:
+            # Pretty-print the entire termbase
+            lines.append("Termbase (full):")
+            lines.append(json.dumps(tb, ensure_ascii=False, indent=2, sort_keys=True))
+        elif tb:
+            # Summarize per language with samples
+            lines.append("Termbase (summary with samples):")
+            lang_items = sorted(tb.items())[:max_langs]
+            for lang, mapping in lang_items:
+                terms = list(mapping.items())
+                shown = terms[:max_terms_per_lang]
+                extra = len(terms) - len(shown)
+                lines.append(f"  [{lang}] {len(terms)} terms")
+                for k, v in shown:
+                    lines.append(f"  • {k}  →  {v}")
+                if extra > 0:
+                    lines.append(f"    … (+{extra} more)")
+            if len(tb) > max_langs:
+                lines.append(f"  … (+{len(tb)-max_langs} more languages)")
+        else:
+            lines.append("Termbase: (none)")
+
+        log.debug("\n".join(lines))
 
     def get_translation_prompt(self, target_lang):
         """Get the translation prompt for single subtitle translation (fallback only)"""
@@ -84,11 +166,13 @@ class SRTTranslator:
 
     def _format_termbase_block_smart(self, target_lang, batch_content):
         """Filter termbase to only include terms present in current batch"""
-        # Use instance termbase if available, otherwise fall back to global termbase
+        # Prefer instance termbase; optionally allow CLI fallback
         if target_lang in self.termbase:
             all_terms = self.termbase[target_lang]
+        elif self.allow_global_termbase_fallback:
+            all_terms = get_termbase_terms(target_lang)  # returns {} if none
         else:
-            all_terms = get_termbase_terms(target_lang)
+            all_terms = {}
 
         batch_text = " ".join([sub.content for sub in batch_content]).lower()
 
@@ -188,7 +272,7 @@ Return a complete, valid SRT block with the same subtitle count, structure, and 
             final_text = ""
             while retries <= max_retries:
                 response = self.client.chat.completions.create(
-                    model=OPENAI_MODEL,
+                    model=self.model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": processed_text},
@@ -248,7 +332,7 @@ value? Please suggest an alternative wording that would be acceptable.\"
 
 TECHNICAL DETAILS:
 - Translation attempts: {max_retries + 1}
-- Model: {OPENAI_MODEL}
+- Model: {self.model_name}
 - Processed text sent to AI: \"{processed_text}\"
 - Full AI response: \"{final_text}\"
 ----------------------------------------
@@ -427,7 +511,7 @@ Status: AI Hallucination - Remove this placeholder
         # Create sentence-aware batches for better context and efficiency
         logging.info(f"Using sentence-aware batching for {filename} to {target_lang}")
         subtitle_batches = self._create_batches(
-            subtitles, soft_limit=BATCH_SIZE, hard_limit=8, target_lang=target_lang
+            subtitles, soft_limit=self.batch_size, hard_limit=8, target_lang=target_lang
         )
 
         logging.info(
@@ -552,7 +636,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 
         time.sleep(0.5)  # Respect rate limits
         response = self.client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=self.model_name,
             messages=[
                 {"role": "user", "content": full_prompt},
             ],

@@ -13,6 +13,7 @@ def setup_logging(log_file_override: Optional[str] = None) -> str:
     - Removes any existing FileHandlers to avoid duplicate log lines across runs.
     - If ``log_file_override`` is provided, uses it; else creates a timestamped file in ``LOG_DIRECTORY``.
     - Ensures a single console StreamHandler exists.
+    - Sets logging level to DEBUG if DEBUG_MODE environment variable is set to "true".
     """
     # Ensure directory exists
     if log_file_override:
@@ -67,7 +68,13 @@ def setup_logging(log_file_override: Optional[str] = None) -> str:
         console_handler.addFilter(HTTPFilter())
         root_logger.addHandler(console_handler)
 
-    root_logger.setLevel(logging.INFO)
+    # Set logging level based on DEBUG_MODE environment variable
+    if os.getenv("DEBUG_MODE", "false").lower() == "true":
+        root_logger.setLevel(logging.DEBUG)
+        print("🔍 Debug logging enabled - detailed information will be shown")
+    else:
+        root_logger.setLevel(logging.INFO)
+
     root_logger.addHandler(file_handler)
 
     # Suppress verbose HTTP logs from dependencies
