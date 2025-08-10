@@ -1,0 +1,133 @@
+name: Security and Quality Checks
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+
+jobs:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+
+    - name: Run Safety (dependency vulnerability scan)
+      run: |
+        safety check --json --output safety-report.json || true
+        echo "Safety scan completed"
+
+    - name: Run Bandit (security linting)
+      run: |
+        bandit -r srt_core/ gui/ -f json -o bandit-report.json || true
+        echo "Bandit scan completed"
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run Black (code formatting check)
+      run: black --check --diff srt_core/ gui/ tests/
+
+    - name: Run isort (import sorting check)
+      run: isort --check-only --diff srt_core/ gui/ tests/
+
+    - name: Run Pylint
+      run: pylint srt_core/ gui/ --output-format=json --reports=y || true
+
+    - name: Run MyPy (type checking)
+      run: mypy srt_core/ gui/ --ignore-missing-imports || true
+
+    - name: Run Flake8
+      run: flake8 srt_core/ gui/ --format=json || true
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ --cov=srt_core --cov=gui --cov-report=xml --cov-report=html
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage.xml
+          htmlcov/
+
+  dependency-update-check:
+    name: Dependency Update Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install pip-tools
+      run: pip install pip-tools
+
+    - name: Check for outdated dependencies
+      run: |
+        pip list --outdated --format=json > outdated-deps.json
+        echo "Dependency check completed"
+
+    - name: Upload dependency report
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-reports
+        path: outdated-deps.json

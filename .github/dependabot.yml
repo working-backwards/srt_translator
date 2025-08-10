@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Enable version updates for Python
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "cbrya"  # Replace with your GitHub username
+    assignees:
+      - "cbrya"  # Replace with your GitHub username
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+    # Group minor and patch updates together
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+        dependency-type: "direct"
