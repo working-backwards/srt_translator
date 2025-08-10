@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from srt_core.config.settings import SOURCE_LANG
+
 from srt_core.utils.logging_setup import setup_logging
 
 from .ai_config import AIConfigGenerator
@@ -63,7 +63,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_worker = None
         self.translation_worker = None
         self.translation_thread = None
-        
+
         # Initialize memory monitoring
         self._proc = psutil.Process(os.getpid())
         self._rss0 = self._proc.memory_info().rss
@@ -75,7 +75,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.connect_signals()
         self.load_previous_settings()
         self.apply_styles()
-        
+
         # Set up memory monitoring timer (paused by default; started on run)
         self.mem_timer = QTimer(self)
         self.mem_timer.timeout.connect(self._sample_memory)
@@ -387,9 +387,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
                     self.logger.info("AI Config Worker: Generating DNT terms")
                     # Generate DNT terms
-                    dnt_terms = self.ai_generator.generate_dnt_terms(
-                        content, None  # Will use SOURCE_LANG internally
-                    )
+                    dnt_terms = self.ai_generator.generate_dnt_terms(content)
                     self.logger.info(
                         f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
                     )
@@ -508,7 +506,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from .ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(dnt_terms, termbase, self, SOURCE_LANG)
+        dialog = EditConfigurationDialog(dnt_terms, termbase, self)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
@@ -655,10 +653,10 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Get target languages from the language section
         target_languages = self.language_section.get_target_languages()
-        
+
         # Update SettingsManager with current state (single source of truth)
         self.settings_manager.update_target_languages(target_languages)
-        
+
         # Debug logging to track language selection
         self.logger.info(f"Translation requested with languages: {target_languages}")
         self.logger.info(f"Language names: {list(target_languages.keys())}")
@@ -696,23 +694,25 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create QThread for proper lifecycle management
         self.translation_thread = QThread()
         self.translation_worker.moveToThread(self.translation_thread)
-        
+
         # Connect worker signals to handlers
         self.translation_worker.progress_updated.connect(
             self.translation_section.update_log_output
         )
         self.translation_worker.translation_completed.connect(self.translation_finished)
         self.translation_worker.translation_error.connect(self.translation_error)
-        
+
         # Connect thread lifecycle signals for proper cleanup
-        self.translation_worker.translation_completed.connect(self.translation_thread.quit)
+        self.translation_worker.translation_completed.connect(
+            self.translation_thread.quit
+        )
         self.translation_worker.translation_error.connect(self.translation_thread.quit)
         self.translation_thread.finished.connect(self.translation_worker.deleteLater)
         self.translation_thread.finished.connect(self.translation_thread.deleteLater)
-        
+
         # Connect thread start to worker run
         self.translation_thread.started.connect(self.translation_worker.run)
-        
+
         # Start the thread
         self.translation_thread.start()
 
@@ -732,7 +732,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Show results dialog
         show_translation_results(self, results)
-        
+
         # Qt deleteLater handles cleanup automatically
 
     def translation_error(self, error_message: str):
@@ -742,18 +742,18 @@ class SRTTranslatorMainWindow(QMainWindow):
         if self.mem_timer and self.mem_timer.isActive():
             self.mem_timer.stop()
         show_translation_error(self, error_message)
-        
+
         # Qt deleteLater handles cleanup automatically
 
     def closeEvent(self, event):
         """Handle window close event"""
         # Request cooperative stop of translation worker
-        if getattr(self, 'translation_worker', None) is not None:
+        if getattr(self, "translation_worker", None) is not None:
             self.translation_worker.request_stop()
-            
+
         # Stop any running translation thread with proper cleanup
         try:
-            thread = getattr(self, 'translation_thread', None)
+            thread = getattr(self, "translation_thread", None)
             if thread is not None and thread.isRunning():
                 thread.quit()
                 thread.wait(10000)  # Wait up to 10 seconds for cooperative stop
@@ -762,9 +762,9 @@ class SRTTranslatorMainWindow(QMainWindow):
             pass
         finally:
             # Clear references to avoid calling methods on deleted Qt objects
-            if hasattr(self, 'translation_worker'):
+            if hasattr(self, "translation_worker"):
                 self.translation_worker = None
-            if hasattr(self, 'translation_thread'):
+            if hasattr(self, "translation_thread"):
                 self.translation_thread = None
             # Never use terminate() - let Qt handle cleanup properly
 
@@ -782,28 +782,32 @@ class SRTTranslatorMainWindow(QMainWindow):
         try:
             rss = self._proc.memory_info().rss
             growth_mb = (rss - self._rss0) / (1024 * 1024)
-            
+
             # Log memory usage every 5 minutes (10 samples)
-            if hasattr(self, '_mem_sample_count'):
+            if hasattr(self, "_mem_sample_count"):
                 self._mem_sample_count += 1
             else:
                 self._mem_sample_count = 1
-                
+
             if self._mem_sample_count % 10 == 0:  # Every 5 minutes
-                self.logger.debug(f"Memory usage: {growth_mb:.1f} MB growth since start")
-            
+                self.logger.debug(
+                    f"Memory usage: {growth_mb:.1f} MB growth since start"
+                )
+
             # Warn if memory growth exceeds 1GB
             if growth_mb > 1000 and not self._memory_warning_shown:
                 self._memory_warning_shown = True
-                self.logger.warning(f"High memory usage detected: {growth_mb:.1f} MB growth")
-                
+                self.logger.warning(
+                    f"High memory usage detected: {growth_mb:.1f} MB growth"
+                )
+
                 # Show warning to user
                 QMessageBox.warning(
                     self,
                     "High Memory Usage",
                     f"Memory usage has grown significantly ({growth_mb:.1f} MB).\n"
                     "Consider restarting the application after completing the current translation.\n\n"
-                    "This helps prevent crashes during long translation sessions."
+                    "This helps prevent crashes during long translation sessions.",
                 )
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")

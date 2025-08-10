@@ -27,7 +27,6 @@ from PySide6.QtWidgets import (
 )
 
 from srt_core.config.language_config import language_config
-from srt_core.config.settings import SOURCE_LANG
 
 
 class PreviewWorker(QThread):
@@ -343,9 +342,8 @@ class PreviewSection(QWidget):
 
         # Create more detailed statistics
         total_terms = dnt_count + termbase_count
-        source_lang_name = language_config.get_language_name(SOURCE_LANG)
         if total_terms > 0:
-            stats_text = f"Configuration Impact: {dnt_count} DNT terms (stay in {source_lang_name}), {termbase_count} termbase terms (will be translated)"
+            stats_text = f"Configuration Impact: {dnt_count} DNT terms (stay in original language), {termbase_count} termbase terms (will be translated)"
         else:
             stats_text = "Configuration Impact: No terms from your configuration found in this sample text"
 

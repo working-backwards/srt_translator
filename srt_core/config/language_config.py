@@ -5,8 +5,7 @@ Handles loading and accessing language configuration from JSON file
 
 import json
 import logging
-import os
-import sys
+from importlib.resources import files
 from typing import Dict, List, Optional
 
 
@@ -15,41 +14,21 @@ class LanguageConfig:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # Resolve path to languages.json with robust handling for PyInstaller builds
-        self.config_path = self._resolve_languages_path()
         self.config = self.load_config()
 
-    def _resolve_languages_path(self) -> str:
-        """Resolve the languages.json path for both source and packaged builds.
-
-        Order:
-        1) PyInstaller one-file/one-dir runtime under sys._MEIPASS: config/languages.json
-        2) Source tree relative to this file: ../../config/languages.json
-        """
-        # 1) PyInstaller
-        meipass = getattr(sys, "_MEIPASS", None)
-        if meipass:
-            candidate = os.path.join(meipass, "config", "languages.json")
-            if os.path.exists(candidate):
-                return candidate
-
-        # 2) Source tree relative path
-        candidate = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "config", "languages.json")
-        )
-        return candidate
-
     def load_config(self) -> Dict:
-        """Load language configuration from JSON file"""
+        """Load language configuration from JSON file using importlib.resources"""
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            # Use importlib.resources to load the JSON file
+            # This works both in development and in frozen PyInstaller builds
+            with files("srt_core.config").joinpath("languages.json").open("rb") as f:
                 config = json.load(f)
                 self.logger.info(
                     f"Loaded language config with {len(config.get('languages', {}))} languages"
                 )
                 return config
         except FileNotFoundError:
-            self.logger.error(f"Language config file not found: {self.config_path}")
+            self.logger.error("Language config file not found in package")
             return self.get_fallback_config()
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON in language config: {e}")

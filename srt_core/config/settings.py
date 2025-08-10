@@ -14,26 +14,20 @@ SOURCE_DIR = (
     else os.path.join(BASE_DIR, "original_captions")
 )
 
-# Path to the output directory for translated .srt files
-OUTPUT_BASE_DIR = (
-    os.environ["OUTPUT_DIRECTORY"]
-    if "OUTPUT_DIRECTORY" in os.environ
-    else os.path.join(BASE_DIR, "translated_srt_files")
+# Paths are provided via TranslationConfig at runtime now.
+# Keep environment fallbacks for legacy code paths where needed.
+OUTPUT_BASE_DIR = os.environ.get(
+    "OUTPUT_DIRECTORY", os.path.join(BASE_DIR, "translated_srt_files")
 )
-
-LOG_DIRECTORY = (
-    os.environ["LOGS_DIRECTORY"]
-    if "LOGS_DIRECTORY" in os.environ
-    else os.path.join(BASE_DIR, "translation_logs")
+LOG_DIRECTORY = os.environ.get(
+    "LOGS_DIRECTORY", os.path.join(BASE_DIR, "translation_logs")
 )
 
 print(f"BASE_DIR: {os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))}")
 print(f"SOURCE_DIR: {SOURCE_DIR}")
 
 # General settings
-SOURCE_LANG = (
-    os.environ["SOURCE_LANG"].lower() if "SOURCE_LANG" in os.environ else "en"
-)  # Default source language (normalized to lowercase)
+# Default source language (normalized to lowercase)
 LOG_MODE = (
     os.environ["LOG_MODE"] if "LOG_MODE" in os.environ else "Standard"
 )  # Can be 'Standard' or 'Verbose'

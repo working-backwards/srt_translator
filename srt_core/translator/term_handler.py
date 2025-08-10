@@ -70,7 +70,6 @@ class TermHandler:
         term_map,
         filename,
         subtitle_number=None,
-        source_lang=None,
         target_lang=None,
     ):
         """Restore DNT terms from placeholders"""

@@ -1,41 +1,54 @@
 import logging
 import os
 from datetime import datetime
+from typing import Optional
 
 from srt_core.config.settings import LOG_DIRECTORY, LOG_MODE
 
 
-def setup_logging():
-    """Configure logging settings exactly once and return active log file path.
+def setup_logging(log_file_override: Optional[str] = None) -> str:
+    """Configure logging and return active log file path.
 
-    This function is idempotent and does not rely on logging.basicConfig(), so it
-    works even if logging was already initialized elsewhere. It will:
-      - Reuse an existing FileHandler that points to our LOG_DIRECTORY if present
-      - Otherwise add a new FileHandler and a StreamHandler to the root logger
+    Behavior:
+    - Removes any existing FileHandlers to avoid duplicate log lines across runs.
+    - If ``log_file_override`` is provided, uses it; else creates a timestamped file in ``LOG_DIRECTORY``.
+    - Ensures a single console StreamHandler exists.
     """
-    os.makedirs(LOG_DIRECTORY, exist_ok=True)
+    # Ensure directory exists
+    if log_file_override:
+        os.makedirs(os.path.dirname(log_file_override), exist_ok=True)
+    else:
+        os.makedirs(LOG_DIRECTORY, exist_ok=True)
 
     root_logger = logging.getLogger()
 
-    # If there is already a FileHandler writing into our log directory, reuse it
-    for handler in root_logger.handlers:
+    # Remove and close prior file handlers to prevent duplication
+    for handler in list(root_logger.handlers):
         if isinstance(handler, logging.FileHandler):
+            root_logger.removeHandler(handler)
             try:
-                handler_path = os.path.abspath(handler.baseFilename)
-                if os.path.commonpath([handler_path, os.path.abspath(LOG_DIRECTORY)]) == os.path.abspath(LOG_DIRECTORY):
-                    return handler.baseFilename
+                handler.close()
             except Exception:
-                continue
+                pass
 
-    # No existing handler → create a new timestamped file
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
+    # Determine log file path
+    if log_file_override:
+        log_file = log_file_override
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(LOG_DIRECTORY, f"translation_issues_{timestamp}.log")
 
     class HTTPFilter(logging.Filter):
         def filter(self, record):
             if LOG_MODE == "Standard":
                 msg = str(record.msg).lower()
-                http_keywords = ["http", "https", "request", "response", "api.openai.com"]
+                http_keywords = [
+                    "http",
+                    "https",
+                    "request",
+                    "response",
+                    "api.openai.com",
+                ]
                 return not any(keyword in msg for keyword in http_keywords)
             return True
 

@@ -44,9 +44,11 @@ class TranslationWorker(QObject):
         self.output_directory = output_directory
         self.translation_successful = False
         self.log_file = None
+        self.batch_dir = None
+        self.translation_results = None
         self.session_id = str(uuid.uuid4())[:8]
         self.logger = logging.getLogger(f"translation.{self.session_id}")
-        
+
         # Signal throttling for GUI responsiveness
         self._emit_lock = threading.Lock()
         self._emit_buf = deque(maxlen=500)  # Bound the buffer
@@ -79,18 +81,25 @@ class TranslationWorker(QObject):
         """Run the translation process"""
         try:
             # Debug logging for target languages
-            self.logger.info(f"TranslationWorker received target_languages: {self.target_languages}")
-            self.logger.info(f"Number of target languages: {len(self.target_languages)}")
-            self.logger.info(f"Target language names: {list(self.target_languages.keys())}")
-            self.logger.info(f"Target language codes: {list(self.target_languages.values())}")
-            
+            self.logger.info(
+                f"TranslationWorker received target_languages: {self.target_languages}"
+            )
+            self.logger.info(
+                f"Number of target languages: {len(self.target_languages)}"
+            )
+            self.logger.info(
+                f"Target language names: {list(self.target_languages.keys())}"
+            )
+            self.logger.info(
+                f"Target language codes: {list(self.target_languages.values())}"
+            )
+
             # Emit progress via signal (thread-safe, throttled)
-            self._throttled_emit(self.progress_updated, f"Starting translation to {len(self.target_languages)} languages")
-            
-            # Set up logging once per run and remember the log file
-            from srt_core.utils.logging_setup import setup_logging
-            log_file = setup_logging()
-            
+            self._throttled_emit(
+                self.progress_updated,
+                f"Starting translation to {len(self.target_languages)} languages",
+            )
+
             # Create session-specific logger that doesn't propagate to root
             session_logger = logging.getLogger(f"translation.session.{self.session_id}")
             session_logger.propagate = False
@@ -101,22 +110,29 @@ class TranslationWorker(QObject):
             )
             self._throttled_emit(
                 self.progress_updated,
-                f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages"
+                f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages",
             )
 
             # Build configuration from GUI settings manager
             if self.settings_manager:
                 config = build_config_from_gui(self.settings_manager)
-                self.logger.info(f"Using configuration from settings manager: {config.to_log_string()}")
+                self.logger.info(
+                    f"Using configuration from settings manager: {config.to_log_string()}"
+                )
             else:
                 # Fallback to direct parameters
-                from srt_core.config.translation_config import build_config_from_parameters
+                from srt_core.config.translation_config import (
+                    build_config_from_parameters,
+                )
+
                 config = build_config_from_parameters(
                     target_languages=self.target_languages,
                     api_key=self.api_key,
-                    output_directory=self.output_directory
+                    output_directory=self.output_directory,
                 )
-                self.logger.info(f"Using configuration from direct parameters: {config.to_log_string()}")
+                self.logger.info(
+                    f"Using configuration from direct parameters: {config.to_log_string()}"
+                )
 
             # Check for cooperative stop before starting translation
             if self.is_stopped():
@@ -146,7 +162,7 @@ class TranslationWorker(QObject):
             log_handler = LogCaptureHandler(self)
             log_handler.setFormatter(logging.Formatter("%(message)s"))
             session_logger.addHandler(log_handler)
-            
+
             # Also add to root logger to catch all logging output
             root_logger = logging.getLogger()
             root_logger.addHandler(log_handler)
@@ -155,49 +171,63 @@ class TranslationWorker(QObject):
             output = io.StringIO()
             try:
                 with redirect_stdout(output):
-            # Call translation with configuration object
+                    # Call translation with configuration object
                     results = translate_srt_files(
-                        file_paths=self.selected_files, 
-                        config=config
+                        file_paths=self.selected_files, config=config
                     )
             finally:
                 # Always clean up handlers, even on error
                 session_logger.removeHandler(log_handler)
                 root_logger.removeHandler(log_handler)
 
-            # Remember the log file path for fixer
-            self.log_file = log_file
+            # Remember returned paths for fixer and UI
+            self.log_file = results.get("log_file") if results else None
+            self.batch_dir = results.get("batch_dir") if results else None
 
             # Check for cooperative stop before completion
             if self.is_stopped():
-                self.logger.info("Translation stopped by user request before completion")
+                self.logger.info(
+                    "Translation stopped by user request before completion"
+                )
                 return
 
             # Capture any stdout output and chunk it if large
             stdout_output = output.getvalue()
             if stdout_output.strip():
-                output_lines = stdout_output.strip().split('\n')
+                output_lines = stdout_output.strip().split("\n")
                 if len(output_lines) > 10:
                     # Chunk large outputs to prevent GUI issues
                     for i in range(0, len(output_lines), 10):
-                        chunk = output_lines[i:i+10]
-                        self._throttled_emit(self.progress_updated, f"Translation output (part {i//10 + 1}): {'\n'.join(chunk)}")
+                        chunk = output_lines[i : i + 10]
+                        self._throttled_emit(
+                            self.progress_updated,
+                            f"Translation output (part {i//10 + 1}): {'\n'.join(chunk)}",
+                        )
                 else:
-                    self._throttled_emit(self.progress_updated, f"Translation output: {stdout_output.strip()}")
+                    self._throttled_emit(
+                        self.progress_updated,
+                        f"Translation output: {stdout_output.strip()}",
+                    )
 
             # Store results for potential fixer use
             self.translation_results = results
-            self.log_file = log_file
 
             # Run automatic fixes after successful translation
-            if results and results.get('success', False):
-                self._throttled_emit(self.progress_updated, "Running automatic fixes on translated files...")
+            if results and results.get("success", False):
+                self._throttled_emit(
+                    self.progress_updated,
+                    "Running automatic fixes on translated files...",
+                )
                 try:
                     self.run_fixer()
-                    self._throttled_emit(self.progress_updated, "Automatic fixes completed successfully")
+                    self._throttled_emit(
+                        self.progress_updated, "Automatic fixes completed successfully"
+                    )
                 except Exception as e:
                     self.logger.error(f"Error running fixer: {e}")
-                    self._throttled_emit(self.progress_updated, f"Warning: Automatic fixes failed: {e}")
+                    self._throttled_emit(
+                        self.progress_updated, f"Warning: Automatic fixes failed: {e}"
+                    )
 
             # Emit completion via signal (thread-safe)
             self.translation_completed.emit(results)
@@ -213,24 +243,26 @@ class TranslationWorker(QObject):
         try:
             # Set only essential environment variables for file paths and API key
             # DO NOT set runtime state variables like TARGET_LANGUAGES, DNT_TERMS, TERMBASE
-            
+
             # API key is required for translation
             os.environ["OPENAI_API_KEY"] = self.api_key
             self.logger.info("Set OPENAI_API_KEY environment variable")
-            
+
             # Set GUI mode flag
             os.environ["GUI_MODE"] = "true"
-            self.logger.info(f"Set GUI_MODE environment variable to: {os.getenv('GUI_MODE')}")
-            
+            self.logger.info(
+                f"Set GUI_MODE environment variable to: {os.getenv('GUI_MODE')}"
+            )
+
             # Set output directory if provided
             if self.output_directory:
                 os.environ["OUTPUT_DIRECTORY"] = self.output_directory
                 self.logger.info(f"Set OUTPUT_DIRECTORY to: {self.output_directory}")
-            
+
             # DO NOT set TARGET_LANGUAGES - this will be passed as parameter
-            # DO NOT set DNT_TERMS - this will be passed as parameter  
+            # DO NOT set DNT_TERMS - this will be passed as parameter
             # DO NOT set TERMBASE - this will be passed as parameter
-            
+
         except Exception as e:
             self.logger.error(f"Error preparing translation environment: {e}")
             raise
@@ -244,59 +276,72 @@ class TranslationWorker(QObject):
         try:
             # Get current state from settings manager (thread-safe)
             config_state = self.settings_manager.get_current_state()
-            
-            self.logger.info(f"Using AI configuration from settings manager")
+
+            self.logger.info("Using AI configuration from settings manager")
             self.logger.info(f"DNT terms count: {len(config_state.dnt_terms)}")
-            self.logger.info(f"Termbase languages: {list(config_state.termbase.keys())}")
-            
+            self.logger.info(
+                f"Termbase languages: {list(config_state.termbase.keys())}"
+            )
+
             # Note: We don't set environment variables anymore
             # The translation functions will receive this configuration directly as parameters
-            
+
         except Exception as e:
             self.logger.error(f"Error setting up AI configuration: {e}")
             # Don't raise - this is not critical for translation
 
-    def update_env_dnt_terms(self, dnt_terms: List[str]):
+    def update_env_dnt_terms(self, _dnt_terms: List[str]):
         """Update DNT terms (DEPRECATED - use settings manager instead)"""
-        self.logger.warning("update_env_dnt_terms() is deprecated - use settings manager instead")
+        self.logger.warning(
+            "update_env_dnt_terms() is deprecated - use settings manager instead"
+        )
         # This method is kept for backward compatibility but does nothing
         # DNT terms should be passed directly to translation functions
 
-    def update_termbase(self, language: str, termbase: Dict[str, str]):
+    def update_termbase(self, _language: str, _termbase: Dict[str, str]):
         """Update termbase (DEPRECATED - use settings manager instead)"""
-        self.logger.warning("update_termbase() is deprecated - use settings manager instead")
+        self.logger.warning(
+            "update_termbase() is deprecated - use settings manager instead"
+        )
         # This method is kept for backward compatibility but does nothing
         # Termbase should be passed directly to translation functions
 
     def update_env_languages(self):
         """Update environment languages (DEPRECATED - use direct parameters instead)"""
-        self.logger.warning("update_env_languages() is deprecated - use direct parameters instead")
+        self.logger.warning(
+            "update_env_languages() is deprecated - use direct parameters instead"
+        )
         # This method is kept for backward compatibility but does nothing
         # Languages are now passed directly to translate_srt_files()
 
     def run_fixer(self):
         """Run the fixer to clean up translation issues"""
-        if not hasattr(self, 'translation_results') or not self.log_file:
-            self.logger.warning("No translation results or log file available for fixing")
+        if not hasattr(self, "translation_results") or not self.log_file:
+            self.logger.warning(
+                "No translation results or log file available for fixing"
+            )
             return
 
         try:
             self.progress_updated.emit("Running automatic fixes on translated files...")
-            
+
             # Create fixer instance
-            fixer = SRTFixer(self.log_file, self.output_directory or "translated_srt_files")
-            
+            fixer = SRTFixer(
+                self.log_file,
+                self.batch_dir or self.output_directory or "translated_srt_files",
+            )
+
             # Parse log file for issues
             fixer.parse_log_file()
-            
+
             # Run fixes
             fixer.fix_srt_files(aggressiveness=0.75)
-            
+
             # Report status
             fixer.report_status()
-            
+
             self.progress_updated.emit("Automatic fixes completed")
-            
+
         except Exception as e:
             error_msg = f"Error running fixer: {str(e)}"
             self.logger.error(error_msg, exc_info=True)

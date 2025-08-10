@@ -10,15 +10,13 @@ if "TARGET_LANGUAGES" not in os.environ:
     # Default target languages for CLI mode
     default_languages = {
         "Spanish": "es",
-        "French": "fr", 
+        "French": "fr",
         "German": "de",
-        "Chinese (Simplified)": "zh-Hans"
+        "Chinese (Simplified)": "zh-Hans",
     }
     os.environ["TARGET_LANGUAGES"] = json.dumps(default_languages)
     print(f"Using default TARGET_LANGUAGES: {os.environ['TARGET_LANGUAGES']}")
 
-if "SOURCE_LANG" not in os.environ:
-    os.environ["SOURCE_LANG"] = "en"
 
 if "OPENAI_MODEL" not in os.environ:
     os.environ["OPENAI_MODEL"] = "gpt-4o-mini"

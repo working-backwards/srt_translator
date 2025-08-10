@@ -1,4 +1,8 @@
-{
+# Auto-generated embedded languages data
+# This file is auto-generated from config/languages.json
+# Do not edit manually - run create_embedded_languages.py to regenerate
+
+LANGUAGES_JSON = {
   "version": "1.0",
   "default_popular_limit": 12,
   "default_popular_languages": [
@@ -384,3 +388,7 @@
     }
   }
 }
+
+def get_embedded_languages():
+    """Get the embedded language configuration"""
+    return LANGUAGES_JSON

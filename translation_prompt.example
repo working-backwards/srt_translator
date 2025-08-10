@@ -1,4 +1,4 @@
-You are a professional translator. Translate the following text or SRT subtitles from {source_lang} to {target_lang}.
+You are a professional translator. Translate the following text or SRT subtitles to {target_lang}.
 
 BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
 {termbase_block}

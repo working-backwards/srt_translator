@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from srt_core.config.language_config import language_config
-from srt_core.config.settings import SOURCE_LANG
+
 
 from .dnt_terms_editor import DNTTermsEditor
 from .termbase_editor import TermbaseEditor
@@ -127,15 +127,16 @@ class AIConfigSection(QGroupBox):
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
 
         # DNT (Do Not Translate) display
-        source_lang_name = language_config.get_language_name(SOURCE_LANG)
-        dnt_label = QLabel(f"🚫 Do Not Translate (DNT) - Terms that stay in {source_lang_name}:")
+        dnt_label = QLabel(
+            "🚫 Do Not Translate (DNT) - Terms that stay in original language:"
+        )
         self.dnt_display = QTextEdit()
         self.dnt_display.setObjectName("dntDisplay")
         self.dnt_display.setReadOnly(True)
         self.dnt_display.setPlaceholderText("DNT terms will appear here...")
         self.dnt_display.setMaximumHeight(80)
         self.dnt_display.setToolTip(
-            f"These terms will remain in {source_lang_name} in all translated subtitles.\n"
+            f"These terms will remain in the original language in all translated subtitles.\n"
             "Includes company names, people, technical acronyms, and branded terms.\n"
             f'Example: "Amazon" stays "Amazon" instead of being translated.'
         )
@@ -278,19 +279,12 @@ class EditConfigurationDialog(QDialog):
         dnt_terms: list,
         termbase: dict,
         parent=None,
-        source_lang=None,
     ):
         super().__init__(parent)
         self.dnt_terms = dnt_terms.copy()
         self.termbase = termbase.copy()
         self.modified_terms = dnt_terms.copy()
         self.modified_termbase = termbase.copy()
-        
-        # Convert ISO code to language name if provided
-        if source_lang is not None:
-            self.source_lang = language_config.get_language_name(source_lang)
-        else:
-            self.source_lang = "English"  # Fallback
 
         self.setup_ui()
         self.connect_signals()
@@ -313,7 +307,7 @@ class EditConfigurationDialog(QDialog):
         self.tab_widget = QTabWidget()
 
         # DNT Tab
-        self.terms_editor = DNTTermsEditor(source_lang=self.source_lang)
+        self.terms_editor = DNTTermsEditor()
         self.terms_editor.set_terms(self.dnt_terms)
         self.tab_widget.addTab(self.terms_editor, "DNT")
 

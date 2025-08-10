@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import tiktoken
 from openai import OpenAI
 
-from srt_core.config.settings import SOURCE_LANG
+
 from srt_core.translator.srt_parser import SRTParser
 
 from srt_core.config.language_config import language_config
@@ -105,26 +105,23 @@ class AIConfigGenerator:
         except Exception as e:
             self.logger.error(f"Error extracting subtitle content: {e}")
             # Provide a clearer message to the GUI layer
-            raise RuntimeError("Failed to prepare transcript content for AI analysis. Please verify your files and try again.") from e
+            raise RuntimeError(
+                "Failed to prepare transcript content for AI analysis. Please verify your files and try again."
+            ) from e
 
-    def generate_dnt_terms(self, content: str, source_lang: str = None) -> List[str]:
+    def generate_dnt_terms(self, content: str) -> List[str]:
         """
-        Generate list of terms that should stay in the source language
+        Generate list of terms that should stay in the original language
 
         Args:
             content: Clean text content from SRT files
-            source_lang: Source language name (defaults to SOURCE_LANG from settings)
 
         Returns:
             List of terms to exclude from translation
         """
         try:
-            # Use SOURCE_LANG if source_lang is not provided
-            if source_lang is None:
-                source_lang = language_config.get_language_name(SOURCE_LANG)
-
             prompt = f"""
-You are analyzing educational video transcript content to identify terms that should NOT be translated and should remain in {source_lang}.
+You are analyzing educational video transcript content to identify terms that should NOT be translated and should remain in the original language.
 
 TASK: From the transcript, extract terms that should be excluded from translation and kept in the original language.
 
@@ -142,7 +139,7 @@ DO NOT INCLUDE:
 • General phrases or filler words
 
 CONTEXT:
-This is for subtitling and educational translation. Be conservative — only include terms that should clearly remain in {source_lang} across all target languages.
+This is for subtitling and educational translation. Be conservative — only include terms that should clearly remain in the original language across all target languages.
 
 TRANSCRIPT:
 {content}
@@ -478,8 +475,12 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 # Clean up the error message to avoid format specifier issues
                 if isinstance(error_msg, str):
                     # Remove any JSON-like content that might cause format issues
-                    clean_error = error_msg.split('"')[0] if '"' in error_msg else error_msg
-                    clean_error = clean_error.split('{')[0] if '{' in clean_error else clean_error
+                    clean_error = (
+                        error_msg.split('"')[0] if '"' in error_msg else error_msg
+                    )
+                    clean_error = (
+                        clean_error.split("{")[0] if "{" in clean_error else clean_error
+                    )
                     clean_error = clean_error.strip()
                     if clean_error:
                         error_msg = clean_error
@@ -493,20 +494,26 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                     self.logger.info(
                         f"AI extracted {len(extracted_terms)} terms with reasons:"
                     )
-                    
+
                     # Temporarily disable DNT filtering to debug the issue
                     filtered_terms = extracted_terms
-                    self.logger.info(f"Using all {len(filtered_terms)} extracted terms (DNT filtering disabled)")
-                    
+                    self.logger.info(
+                        f"Using all {len(filtered_terms)} extracted terms (DNT filtering disabled)"
+                    )
+
                     # Show first 20 as Pass #1, remaining as Pass #2
                     for i, item in enumerate(filtered_terms):
                         term = item.get("term")
                         reason = item.get("reason", "No reason provided")
                         if term:
                             if i < 20:
-                                self.logger.info(f"  Pass #1 ({i+1}/20): {term}: {reason}")
+                                self.logger.info(
+                                    f"  Pass #1 ({i+1}/20): {term}: {reason}"
+                                )
                             else:
-                                self.logger.info(f"  Pass #2 ({i-19}/10): {term}: {reason}")
+                                self.logger.info(
+                                    f"  Pass #2 ({i-19}/10): {term}: {reason}"
+                                )
                 elif isinstance(extracted_terms[0], str):  # Simple list
                     self.logger.info(
                         f"AI extracted {len(extracted_terms)} terms: {', '.join(extracted_terms)}"
@@ -518,12 +525,14 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
 
             # Parse termbase results
             termbase_data = raw_data.get("termbase_results", [])
-            print(f"DEBUG: termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}")
+            print(
+                f"DEBUG: termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}"
+            )
             if not termbase_data:
                 self.logger.warning("No termbase_results found in AI response.")
                 print("DEBUG: No termbase_results found in AI response")
                 return {}
-            
+
             # Use filtered_terms for the actual termbase generation
             # The AI response contains termbase_results based on the original extracted_terms
             # We need to filter the termbase_results to exclude DNT terms
@@ -532,17 +541,17 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 code = lang_data.get("code")
                 name = lang_data.get("name")
                 termbase = lang_data.get("termbase", {})
-                
+
                 # Temporarily disable DNT filtering in termbase
                 filtered_termbase = termbase
-                self.logger.info(f"Using all {len(filtered_termbase)} terms for {code} (DNT filtering disabled)")
-                
-                filtered_termbase_data.append({
-                    "code": code,
-                    "name": name,
-                    "termbase": filtered_termbase
-                })
-            
+                self.logger.info(
+                    f"Using all {len(filtered_termbase)} terms for {code} (DNT filtering disabled)"
+                )
+
+                filtered_termbase_data.append(
+                    {"code": code, "name": name, "termbase": filtered_termbase}
+                )
+
             termbase_data = filtered_termbase_data
 
             parsed = {}
