@@ -156,7 +156,10 @@ EXAMPLE FORMAT:
                 temperature=0.3,
             )
 
-            result_text = response.choices[0].message.content.strip()
+            result_text = response.choices[0].message.content
+            if result_text is None:
+                raise ValueError("OpenAI response content is None")
+            result_text = result_text.strip()
             dnt_terms = self._parse_dnt_terms_response(result_text)
             self.logger.info(f"Generated {len(dnt_terms)} DNT terms")
             return dnt_terms
@@ -338,7 +341,10 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 temperature=0.6,
             )
 
-            result_text = response.choices[0].message.content.strip()
+            result_text = response.choices[0].message.content
+            if result_text is None:
+                raise ValueError("OpenAI response content is None")
+            result_text = result_text.strip()
             self.logger.info(
                 f"Received response from OpenAI ({len(result_text)} characters)"
             )

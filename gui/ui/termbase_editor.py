@@ -6,7 +6,8 @@ Termbase Editor for the SRT Translator GUI.
 import logging
 from typing import Dict, List, Tuple
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QDialog,
@@ -41,8 +42,8 @@ class TermbaseEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.termbase = {}  # {language: {english_term: translation}}
-        self.languages = []
+        self.termbase: Dict[str, Dict[str, str]] = {}  # {language: {english_term: translation}}
+        self.languages: List[str] = []
         self._updating_table = False  # Flag to prevent signal loops
         self.setup_ui()
         self.connect_signals()
@@ -85,10 +86,10 @@ class TermbaseEditor(QWidget):
         # Table
         self.table = QTableWidget()
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)  # type: ignore[attr-defined]
+        self.table.setSelectionMode(QTableWidget.SingleSelection)  # type: ignore[attr-defined]
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)  # type: ignore[attr-defined]
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
 
@@ -129,7 +130,7 @@ class TermbaseEditor(QWidget):
             return
 
         # Get all unique English terms across all languages
-        all_terms = set()
+        all_terms: set[str] = set()
         for language_termbase in self.termbase.values():
             all_terms.update(language_termbase.keys())
 
@@ -149,7 +150,7 @@ class TermbaseEditor(QWidget):
         for row, english_term in enumerate(sorted_terms):
             # English term (read-only)
             english_item = QTableWidgetItem(english_term)
-            english_item.setFlags(english_item.flags() & ~Qt.ItemIsEditable)
+            english_item.setFlags(english_item.flags() & ~Qt.ItemIsEditable)  # type: ignore[attr-defined]
             english_item.setBackground(QColor(240, 240, 240))
             self.table.setItem(row, 0, english_item)
 
@@ -252,11 +253,11 @@ class TermbaseEditor(QWidget):
             "Remove Term",
             f"Remove '{english_term}' from {term_count} language(s)?\n\n"
             "This action cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
+            QMessageBox.No,  # type: ignore[attr-defined]
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.Yes:  # type: ignore[attr-defined]
             self._remove_term_from_termbase(english_term)
             self.refresh_table()
             self.update_count_label()
@@ -274,11 +275,11 @@ class TermbaseEditor(QWidget):
             "Clear All Terms",
             f"Remove all {total_terms} terms from the termbase?\n\n"
             "This action cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
+            QMessageBox.No,  # type: ignore[attr-defined]
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.Yes:  # type: ignore[attr-defined]
             self.termbase.clear()
             self.languages.clear()
             self.refresh_table()
@@ -353,7 +354,7 @@ class AddTermDialog(QDialog):
         super().__init__(parent)
         self.languages = languages
         self.english_term = ""
-        self.translations = {}
+        self.translations: Dict[str, QLineEdit] = {}
         self.setup_ui()
         self.connect_signals()
 
@@ -398,7 +399,7 @@ class AddTermDialog(QDialog):
         layout.addWidget(scroll_area)
 
         # Buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)  # type: ignore[attr-defined]
         layout.addWidget(button_box)
 
         self.button_box = button_box
@@ -416,7 +417,7 @@ class AddTermDialog(QDialog):
             self.translations[lang].text().strip() for lang in self.languages
         )
 
-        self.button_box.button(QDialogButtonBox.Ok).setEnabled(
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(  # type: ignore[attr-defined]
             bool(english_term) and has_translations
         )
 
@@ -443,7 +444,7 @@ class EditTermDialog(QDialog):
         super().__init__(parent)
         self.english_term = english_term
         self.languages = languages
-        self.translations = {}
+        self.translations: Dict[str, QLineEdit] = {}
         self.setup_ui()
         self.populate_data(current_translations)
         self.connect_signals()
@@ -490,7 +491,7 @@ class EditTermDialog(QDialog):
         layout.addWidget(scroll_area)
 
         # Buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)  # type: ignore[attr-defined]
         layout.addWidget(button_box)
 
         self.button_box = button_box

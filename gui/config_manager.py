@@ -6,7 +6,7 @@ Configuration manager for the SRT Translator GUI.
 import json
 import logging
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 from .settings_manager import SettingsManager
 
@@ -263,7 +263,7 @@ class GUIConfigManager:
 
         return len(issues) == 0, issues
 
-    def get_config_summary(self) -> Dict[str, any]:
+    def get_config_summary(self) -> Dict[str, Any]:
         """
         Get a summary of the current configuration status
 

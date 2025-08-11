@@ -150,7 +150,7 @@ class SettingsManager:
         """Load state from storage"""
         try:
             data = self.settings.value("current_state", {})
-            if data:
+            if data and isinstance(data, dict):
                 return ConfigState.from_dict(data)
         except Exception as e:
             self.logger.warning(f"Failed to load state, using defaults: {e}")
@@ -169,7 +169,8 @@ class SettingsManager:
 
     def load_api_key(self) -> str:
         """Load API key from settings"""
-        return self.settings.value("api_key", "")
+        value = self.settings.value("api_key", "")
+        return str(value) if value is not None else ""
 
     def save_target_languages(self, languages: Dict[str, str]) -> None:
         """Save target languages dictionary"""
@@ -177,7 +178,10 @@ class SettingsManager:
 
     def load_target_languages(self) -> Dict[str, str]:
         """Load target languages dictionary"""
-        return self.settings.value("target_languages", {})
+        value = self.settings.value("target_languages", {})
+        if isinstance(value, dict):
+            return value
+        return {}
 
     def save_target_languages_from_codes(self, language_codes: List[str]) -> None:
         """Save target languages from list of language codes using unified config"""
@@ -237,7 +241,10 @@ class SettingsManager:
 
     def load_user_popular_languages(self) -> List[str]:
         """Load user's preferred popular languages"""
-        return self.settings.value("user_popular_languages", [])
+        value = self.settings.value("user_popular_languages", [])
+        if isinstance(value, list):
+            return value
+        return []
 
     def reset_adaptive_popular_languages(self) -> None:
         """Reset adaptive popular languages to default values"""

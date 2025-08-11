@@ -277,7 +277,10 @@ Return a complete, valid SRT block with the same subtitle count, structure, and 
                     ],
                     temperature=0.1,  # Lower temperature for more consistent behavior
                 )
-                translated_text = response.choices[0].message.content.strip()
+                translated_text = response.choices[0].message.content
+                if translated_text is None:
+                    raise ValueError("OpenAI response content is None")
+                translated_text = translated_text.strip()
                 final_text = self.term_handler.restore_dnt_terms(
                     translated_text,
                     term_map,
@@ -641,7 +644,10 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             temperature=0.1,
         )
 
-        translated_srt = response.choices[0].message.content.strip()
+        translated_srt = response.choices[0].message.content
+        if translated_srt is None:
+            raise ValueError("OpenAI response content is None")
+        translated_srt = translated_srt.strip()
 
         # Restore DNT terms in the translated SRT block
         restored_srt = self.term_handler.restore_dnt_terms(

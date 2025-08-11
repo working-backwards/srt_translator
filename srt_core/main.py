@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional, Union, TypedDict
 
 from srt_core.config.config_resolver import ConfigResolver
 from srt_core.config.settings import (
@@ -24,13 +24,23 @@ from srt_core.utils.logging_setup import setup_logging
 # is responsible for initializing logging via setup_logging().
 
 
+class SummaryDict(TypedDict):
+    total_files: int
+    unique_languages: int
+    total_operations: int
+    successes: int
+    skipped: int
+    errors: int
+    error_details: List[str]
+
+
 def translate_srt_files(
-    file_paths=None,
-    target_languages=None,
-    dnt_terms=None,
-    termbase=None,
-    api_key=None,
-    config: TranslationConfig = None,
+    file_paths: Optional[List[str]] = None,
+    target_languages: Optional[Dict[str, str]] = None,
+    dnt_terms: Optional[List[str]] = None,
+    termbase: Optional[Dict[str, Dict[str, str]]] = None,
+    api_key: Optional[str] = None,
+    config: Optional[TranslationConfig] = None,
 ):
     """Translate SRT files. If config is provided, use it. Otherwise, use individual parameters or fall back to global settings."""
 
@@ -104,7 +114,8 @@ def translate_srt_files(
     # Log configuration debug info using the new debug_log_config method
     SRTTranslator.debug_log_config(translation_config, full_termbase=True)
 
-    summary = {
+    # Create summary with proper typing
+    summary: SummaryDict = {
         "total_files": 0,
         "unique_languages": 0,
         "total_operations": 0,
@@ -147,7 +158,9 @@ def translate_srt_files(
                     translated_files.append(output_filepath)
             except Exception as e:
                 summary["errors"] += 1
-                summary["error_details"].append(f"{filename} ({lang_name}): {e}")
+                error_details = summary["error_details"]
+                if isinstance(error_details, list):
+                    error_details.append(f"{filename} ({lang_name}): {e}")
                 print(f"Error translating {filename} to {lang_name}: {e}")
 
         # Run fixer after each SRT file is complete
@@ -171,9 +184,10 @@ def translate_srt_files(
     logging.info(f"Successful translations: {summary['successes']}")
     logging.info(f"Skipped (empty/corrupt): {summary['skipped']}")
     logging.info(f"Errors: {summary['errors']}")
-    if summary["error_details"]:
+    error_details = summary["error_details"]
+    if isinstance(error_details, list) and error_details:
         logging.info("Error details:")
-        for detail in summary["error_details"]:
+        for detail in error_details:
             logging.info(f"  - {detail}")
     logging.info("==========================\n")
 
@@ -214,49 +228,44 @@ def translate_srt_files(
         )
 
         # Inputs relative paths
-        inputs: List[Dict[str, object]] = []
-        for input_filepath in file_paths:
+        input_files = []
+        for file_path in file_paths:
             try:
-                size = os.path.getsize(input_filepath)
-            except OSError:
-                size = None
-            rel_path = os.path.relpath(input_filepath, batch_dir)
-            inputs.append({"path": rel_path, "size": size})
+                rel_path = os.path.relpath(file_path, os.getcwd())
+                input_files.append(rel_path)
+            except ValueError:
+                input_files.append(file_path)
 
-        # Outputs mapping by code preserving casing from languages.json
-        outputs: Dict[str, List[str]] = {}
-        for lang_name, lang_code in translation_config.target_languages.items():
-            outputs.setdefault(lang_code, [])
-        for out_path in translated_files:
-            rel_out = os.path.relpath(out_path, batch_dir)
-            # infer code from parent directory (uppercase folder); map back to manifest code by scanning
-            lang_upper = os.path.basename(os.path.dirname(out_path))
-            # Find matching code by case-insensitive compare to uppercase
-            match_code = None
-            for code in translation_config.target_languages.values():
-                if code.upper() == lang_upper:
-                    match_code = code
-                    break
-            if match_code is None:
-                match_code = lang_upper  # fallback
-            outputs.setdefault(match_code, []).append(rel_out)
+        # Output files (only successfully translated ones)
+        output_files = []
+        for file_path in translated_files:
+            try:
+                rel_path = os.path.relpath(file_path, batch_dir)
+                output_files.append(rel_path)
+            except ValueError:
+                output_files.append(file_path)
 
+        # Build manifest
         manifest = {
-            "schema_version": "1.0",
-            "batch_id": ts_str,
-            "started_at_local": started_at_local,
-            "finished_at_local": finished_at_local,
-            "started_at_utc": started_at_utc,
-            "finished_at_utc": finished_at_utc,
-            "mode": mode,
+            "version": "1.0",
             "app_version": app_version,
-            "target_languages": list(translation_config.target_languages.values()),
-            "inputs": inputs,
-            "outputs": outputs,
-            "log_file": os.path.relpath(log_file, batch_dir),
-            "termbase_file": "termbase.json",
-            "dnt_terms_file": "dnt_terms.json",
-            "paths_are_relative_to_batch_dir": True,
+            "mode": mode,
+            "started_at": {
+                "local": started_at_local,
+                "utc": started_at_utc,
+            },
+            "finished_at": {
+                "local": finished_at_local,
+                "utc": finished_at_utc,
+            },
+            "input_files": input_files,
+            "output_files": output_files,
+            "summary": summary,
+            "error_details": (
+                summary["error_details"]
+                if isinstance(summary["error_details"], list)
+                else []
+            ),
         }
 
         tmp_path = os.path.join(batch_dir, "manifest.tmp.json")

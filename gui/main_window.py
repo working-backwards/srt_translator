@@ -8,7 +8,8 @@ import os
 import sys
 
 import psutil
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 
 from .ai_config import AIConfigGenerator
 from .config_manager import GUIConfigManager
@@ -64,6 +66,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self._proc = psutil.Process(os.getpid())
         self._rss0 = self._proc.memory_info().rss
         self._memory_warning_shown = False
+        self._mem_sample_count = 0
 
         # Set up the window
         self.setup_window()
@@ -465,25 +468,30 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.show_progress(False)
 
         # Get detailed error information
-        try:
-            error_details = self.ai_config_generator.get_error_details(
-                Exception(error_message)
-            )
-            title = error_details.get("title", "AI Configuration Failed")
-            message = error_details.get("message", error_message)
-            suggestion = error_details.get("suggestion", "")
+        if self.ai_config_generator is not None:
+            try:
+                error_details = self.ai_config_generator.get_error_details(
+                    Exception(error_message)
+                )
+                title = error_details.get("title", "AI Configuration Failed")
+                message = error_details.get("message", error_message)
+                suggestion = error_details.get("suggestion", "")
 
-            # Show detailed error message
-            QMessageBox.warning(
-                self, title, f"{message}\n\n{suggestion}" if suggestion else message
-            )
-        except Exception:
-            # Fallback to simple error message
-            QMessageBox.warning(
-                self,
-                "AI Configuration Failed",
-                f"An error occurred while generating translation settings:\n\n{error_message}",
-            )
+                # Show detailed error message
+                QMessageBox.warning(
+                    self, title, f"{message}\n\n{suggestion}" if suggestion else message
+                )
+                return
+            except Exception:
+                # Fallback to simple error message
+                pass
+        
+        # Fallback to simple error message
+        QMessageBox.warning(
+            self,
+            "AI Configuration Failed",
+            f"An error occurred while generating translation settings:\n\n{error_message}",
+        )
 
     def edit_translation_settings(self):
         """Open the Translation Settings editor dialog."""
@@ -745,7 +753,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event"""
         # Request cooperative stop of translation worker
-        if getattr(self, "translation_worker", None) is not None:
+        if hasattr(self, "translation_worker") and self.translation_worker is not None:
             self.translation_worker.request_stop()
 
         # Stop any running translation thread with proper cleanup

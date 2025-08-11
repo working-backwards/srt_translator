@@ -11,7 +11,7 @@ import time
 import uuid
 from collections import deque
 from contextlib import redirect_stdout
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
@@ -35,8 +35,8 @@ class TranslationWorker(QObject):
         api_key: str,
         selected_files: List[str],
         target_languages: Dict[str, str],
-        settings_manager=None,
-        output_directory: str = None,
+        settings_manager: Optional[Any] = None,
+        output_directory: Optional[str] = None,
     ):
         super().__init__()
         self.api_key = api_key
@@ -53,7 +53,7 @@ class TranslationWorker(QObject):
 
         # Signal throttling for GUI responsiveness
         self._emit_lock = threading.Lock()
-        self._emit_buf = deque(maxlen=500)  # Bound the buffer
+        self._emit_buf: deque[str] = deque(maxlen=500)  # Bound the buffer
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
 

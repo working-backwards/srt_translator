@@ -33,8 +33,8 @@ class SRTFixer:
     def __init__(self, log_file: str, translations_dir: str):
         self.log_file = log_file
         self.translations_dir = translations_dir
-        self.issues = []
-        self.phantoms = []
+        self.issues: List[PlaceholderIssue] = []
+        self.phantoms: List[PhantomPlaceholder] = []
         self.fixed_count = 0
         self.phantom_fixed_count = 0
         self.dnt_terms_fixed_count = 0
@@ -84,12 +84,12 @@ class SRTFixer:
             ]
         ):
             issue = PlaceholderIssue(
-                timestamp=timestamp_match.group(1),
-                language=language_match.group(1).strip(),
-                original_term=original_term_match.group(1).strip(),
-                placeholder=placeholder_match.group(1).strip(),
-                original_context=original_context_match.group(1).strip(),
-                translated_context=translated_context_match.group(1).strip(),
+                timestamp=timestamp_match.group(1),  # type: ignore[union-attr]
+                language=language_match.group(1).strip(),  # type: ignore[union-attr]
+                original_term=original_term_match.group(1).strip(),  # type: ignore[union-attr]
+                placeholder=placeholder_match.group(1).strip(),  # type: ignore[union-attr]
+                original_context=original_context_match.group(1).strip(),  # type: ignore[union-attr]
+                translated_context=translated_context_match.group(1).strip(),  # type: ignore[union-attr]
             )
             self.issues.append(issue)
 
@@ -127,12 +127,17 @@ class SRTFixer:
         if not (language_match and filename_match and phantom_match):
             return
 
+        # At this point, we know these matches are not None due to the check above
+        assert language_match is not None
+        assert filename_match is not None
+        assert phantom_match is not None
+
         # Derive a subtitle identifier for bookkeeping (not strictly used in fixing)
         if subtitle_match_legacy:
-            subtitle_identifier = subtitle_match_legacy.group(1).strip()
+            subtitle_identifier = subtitle_match_legacy.group(1).strip()  # type: ignore[union-attr]
         elif batch_match:
             # e.g., "batch_22_subs_123-127"
-            subtitle_identifier = f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"
+            subtitle_identifier = f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"  # type: ignore[union-attr]
         else:
             subtitle_identifier = "unknown"
 
