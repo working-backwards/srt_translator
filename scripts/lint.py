@@ -64,7 +64,8 @@ def main():
 
     # 3. Run flake8
     success &= run_command(
-        ["flake8", "srt_core", "gui", "tests", "scripts"], "flake8 style checking"
+        ["flake8", "--max-line-length=88", "srt_core", "gui", "tests", "scripts"],
+        "flake8 style checking",
     )
 
     # 4. Run pylint

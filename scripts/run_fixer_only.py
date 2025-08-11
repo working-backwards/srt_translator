@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Standalone script to run the SRT fixer on existing translated files.
-This script can be run independently to fix issues in already-translated SRT files.
-"""
-
 import argparse
 import glob
 import os
@@ -13,6 +7,13 @@ from dotenv import load_dotenv
 
 from srt_core.config.settings import FIX_AGGRESSIVENESS, OUTPUT_BASE_DIR
 from srt_core.translator.fixer import SRTFixer
+
+#!/usr/bin/env python3
+"""
+Standalone script to run the SRT fixer on existing translated files.
+This script can be run independently to fix issues in already-translated SRT files.
+"""
+
 
 # Add parent directory to path so we can import srt_core module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -4,10 +4,10 @@ Simple build wrapper for SRT Translator.
 Builds the GUI executable using PyInstaller.
 """
 
-import sys
 import os
-import subprocess
 import platform
+import subprocess
+import sys
 
 
 def main():

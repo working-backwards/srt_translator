@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Test script for AI Configuration Integration
-"""
-
 import os
 import sys
 import traceback
@@ -12,6 +7,12 @@ from PySide6.QtWidgets import QApplication
 from gui.ai_config import AIConfigGenerator
 from gui.config_manager import GUIConfigManager
 from gui.settings_manager import SettingsManager
+
+#!/usr/bin/env python3
+"""
+Test script for AI Configuration Integration
+"""
+
 
 # Add the project root to the path
 sys.path.insert(0, ".")

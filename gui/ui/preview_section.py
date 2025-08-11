@@ -6,7 +6,7 @@ Preview Section for the SRT Translator GUI.
 import logging
 from typing import Dict, List
 
-from PySide6.QtCore import QThread, Qt, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,

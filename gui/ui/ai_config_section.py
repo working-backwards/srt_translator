@@ -9,13 +9,13 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFrame,
     QGroupBox,
-    QProgressBar,
-    QTabWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
+    QTabWidget,
     QTextEdit,
+    QVBoxLayout,
 )
 
 from .dnt_terms_editor import DNTTermsEditor

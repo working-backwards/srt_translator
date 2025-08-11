@@ -3,9 +3,9 @@
 Test runner for SRT Translator
 """
 
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 
 
 def run_tests():

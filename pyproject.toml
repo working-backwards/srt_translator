@@ -133,7 +133,6 @@ max-line-length = 88
 extend-ignore = [
     "E203",  # whitespace before ':'
     "W503",  # line break before binary operator
-    "E501",  # line too long (handled by black)
 ]
 exclude = [
     ".git",

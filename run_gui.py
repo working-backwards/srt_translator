@@ -3,18 +3,18 @@
 SRT Translator GUI Entry Point
 """
 
-import sys
-import os
 import argparse
-import logging
 import json
+import logging
+import os
+import sys
 
 
 # Set up environment variables from QSettings BEFORE importing any core modules
 def prepare_environment_from_settings():
     """Set environment variables from QSettings before calling core engine"""
     try:
-        from PySide6.QtCore import QSettings, QStandardPaths, QDir
+        from PySide6.QtCore import QDir, QSettings, QStandardPaths
 
         settings = QSettings("SRTTranslator", "SRTTranslator")
 
@@ -54,6 +54,7 @@ print(f"OPENAI_API_KEY: {'SET' if os.environ.get('OPENAI_API_KEY') else 'NOT SET
 print(f"OUTPUT_DIRECTORY: {os.environ.get('OUTPUT_DIRECTORY', 'NOT SET')}")
 
 from PySide6.QtWidgets import QApplication
+
 from gui.main_window import SRTTranslatorMainWindow
 
 

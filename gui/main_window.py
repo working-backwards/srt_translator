@@ -5,8 +5,9 @@ Main window for the SRT Translator application.
 
 import logging
 import os
-import psutil
 import sys
+
+import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,

@@ -1,13 +1,14 @@
-#!/usr/bin/env python3
-"""
-Pytest configuration for SRT Translator tests
-"""
-
 import logging
 import os
 import sys
 
 import pytest
+
+#!/usr/bin/env python3
+"""
+Pytest configuration for SRT Translator tests
+"""
+
 
 # Add the project root to the Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

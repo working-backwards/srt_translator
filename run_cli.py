@@ -1,7 +1,8 @@
-from dotenv import load_dotenv
-import os
-import json
 import argparse
+import json
+import os
+
+from dotenv import load_dotenv
 
 # For older python-dotenv versions, manually clear OUTPUT_DIRECTORY
 # to ensure .env file values take precedence over system environment variables

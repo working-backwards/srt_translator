@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Test script for Termbase Editor
-"""
-
 import sys
 
 from PySide6.QtCore import Qt

@@ -5,6 +5,7 @@ Term handler for the SRT Translator.
 
 import logging
 import re
+
 from srt_core.config.settings import DNT_TERMS
 
 

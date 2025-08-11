@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Test script for DNT Terms Editor
-"""
-
 import sys
 
 from PySide6.QtWidgets import (

@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Integration test for both DNT Terms Editor and Termbase Editor
-"""
-
 import os
 import sys
 
