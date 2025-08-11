@@ -4,7 +4,7 @@ Termbase Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont

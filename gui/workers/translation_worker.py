@@ -4,13 +4,11 @@ Translation Worker for the SRT Translator GUI.
 """
 
 import logging
-import os
 import threading
 import time
 import uuid
 from collections import deque
-from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal

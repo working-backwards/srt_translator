@@ -6,8 +6,7 @@ Configuration manager for the SRT Translator GUI.
 import json
 import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from .settings_manager import SettingsManager
 

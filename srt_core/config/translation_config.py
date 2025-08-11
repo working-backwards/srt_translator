@@ -6,8 +6,7 @@ Translation configuration for the SRT Translator.
 import json
 import logging
 import os
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from .language_config import language_config

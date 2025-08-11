@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import srt
 

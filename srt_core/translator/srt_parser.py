@@ -3,14 +3,10 @@
 SRT parser for the SRT Translator.
 """
 
-import logging
 import os
-import re
-from typing import List, Optional
+from typing import List
 
 import srt
-
-from srt_core.utils.logging_setup import log_placeholder_issue
 
 
 class SRTParser:

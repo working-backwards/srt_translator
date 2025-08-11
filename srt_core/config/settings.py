@@ -1,8 +1,5 @@
 import json
 import os
-import sys
-
-from .language_config import language_config
 
 # Dynamically calculate BASE_DIR based on the project's root
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

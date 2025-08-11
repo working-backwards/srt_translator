@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import unicodedata
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from openai import OpenAI
 

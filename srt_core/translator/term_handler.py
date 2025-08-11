@@ -5,10 +5,7 @@ Term handler for the SRT Translator.
 
 import logging
 import re
-from typing import Optional
-
 from srt_core.config.settings import DNT_TERMS
-from srt_core.utils.logging_setup import log_placeholder_issue
 
 
 class TermHandler:

@@ -4,25 +4,20 @@ DNT Terms Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import Callable, List, Optional
+from typing import List
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )

@@ -5,6 +5,7 @@ Settings manager for the SRT Translator GUI.
 
 import logging
 import threading
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple

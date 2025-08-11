@@ -3,11 +3,10 @@
 Translation Section for the SRT Translator GUI.
 """
 
-from typing import Callable, Optional
+import logging
+from typing import Dict, List
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -15,7 +14,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTextEdit,
     QVBoxLayout,
-    QWidget,
 )
 
 

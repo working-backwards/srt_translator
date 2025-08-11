@@ -3,14 +3,12 @@
 Language Selection Section for the SRT Translator GUI.
 """
 
-import json
 import logging
-from typing import Callable, Dict, Optional
+from typing import Dict, List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
-    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -18,10 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QPushButton,
-    QScrollArea,
     QVBoxLayout,
-    QWidget,
 )
 
 from srt_core.config.language_config import language_config

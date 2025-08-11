@@ -5,8 +5,7 @@ import re
 
 # Import unified language configuration
 import time
-from datetime import datetime
-from typing import List, Tuple
+from typing import List
 
 import srt
 from openai import OpenAI

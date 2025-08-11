@@ -3,25 +3,19 @@
 AI Configuration Section for the SRT Translator GUI.
 """
 
-import json
-from typing import Any, Dict, List, Optional
-
-from PySide6.QtCore import QObject, QThread, QTimer, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QGroupBox,
+    QProgressBar,
+    QTabWidget,
+    QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QProgressBar,
     QPushButton,
-    QTabWidget,
     QTextEdit,
-    QVBoxLayout,
-    QWidget,
 )
 
 from .dnt_terms_editor import DNTTermsEditor

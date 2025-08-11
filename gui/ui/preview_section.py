@@ -4,7 +4,7 @@ Preview Section for the SRT Translator GUI.
 """
 
 import logging
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List
 
 from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
@@ -15,14 +15,11 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
-    QScrollArea,
     QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
-
-from srt_core.config.language_config import language_config
 
 
 class PreviewWorker(QThread):
