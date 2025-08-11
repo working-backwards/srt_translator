@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+Test script for AI Configuration System
+"""
+
 import logging
 import os
 import sys
@@ -5,11 +10,6 @@ import sys
 from gui.ai_config import AIConfigGenerator
 from gui.config_manager import GUIConfigManager
 from gui.settings_manager import SettingsManager
-
-"""
-Test script for AI Configuration System
-"""
-
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

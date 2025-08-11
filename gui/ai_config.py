@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-AI Configuration management for the SRT Translator.
+AI Configuration Generator for SRT Translator.
+Generates DNT terms and termbase using OpenAI API.
 """
 
 import json
@@ -437,12 +438,12 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
         self, response_text: str
     ) -> Dict[str, Dict[str, str]]:
         """
-                Parses the structured JSON response from the AI containing extracted terms and termbase results.
+        Parse the comprehensive termbase response from the AI.
+
+        Parses the structured JSON response from the AI containing extracted terms and termbase results.
         Returns a dictionary of language codes with their termbase entries.
         """
         try:
-            import json
-
             # Clean the response text
             cleaned = response_text.strip()
             if cleaned.startswith("```json"):

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Settings manager for the SRT Translator GUI.
+Settings Manager for the SRT Translator GUI.
+Handles persistent storage of user preferences and configuration.
 """
 
+import hashlib
 import logging
 import threading
 import os
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSettings
@@ -21,7 +23,7 @@ class ConfigState:
 
     target_languages: Dict[str, str]  # language_name -> language_code
     dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]  # language_code -> {term -> translation}
+    termbase: Dict[str, Dict[str, str]]  # language_code -> term mapping
     output_directory: Optional[str] = None
     api_key: Optional[str] = None
 
@@ -265,7 +267,8 @@ class SettingsManager:
 
     def _update_adaptive_popular_languages(self, usage_data: Dict[str, Dict]) -> None:
         """Update adaptive popular languages based on usage data"""
-        # Sort languages by usage count (descending) and then by last used (descending)
+        # Sort languages by usage count (descending) and then by last used
+        # (descending)
         sorted_languages = sorted(
             usage_data.items(),
             key=lambda x: (x[1]["count"], x[1]["last_used"] or ""),
@@ -398,8 +401,6 @@ class SettingsManager:
     def _calculate_file_hash(self) -> str:
         """Calculate hash of selected files for change detection"""
         try:
-            import hashlib
-
             selected_files = self.load_selected_files()
             if not selected_files:
                 return ""

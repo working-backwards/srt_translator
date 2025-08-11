@@ -3,11 +3,14 @@
 Translation Worker for the SRT Translator GUI.
 """
 
+import io
 import logging
+import sys
 import threading
 import time
 import uuid
 from collections import deque
+from contextlib import redirect_stdout
 from typing import Dict, List
 
 from PySide6.QtCore import QObject
@@ -140,10 +143,6 @@ class TranslationWorker(QObject):
 
             # Run the translation
             # Capture both stdout and logging output
-            import io
-            import sys
-            from contextlib import redirect_stdout
-
             from srt_core.main import translate_srt_files
 
             # Create a custom log handler to capture log messages with throttling

@@ -6,6 +6,7 @@ Main window for the SRT Translator application.
 import logging
 import os
 import psutil
+import sys
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -810,8 +811,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
 def main():
     """Main function for testing the GUI"""
-    import sys
-
     from PySide6.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
