@@ -8,11 +8,10 @@
     "python.sortImports.args": ["--profile", "black"],
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-        "source.organizeImports": "explicit"
+        "source.organizeImports": "explicit",
+        "source.fixAll.ruff": true
     },
-    "files.associations": {
-        "*.py": "python"
-    },
+    "ruff.lint.run": "onType",
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.autoImportCompletions": true,
     "python.analysis.autoSearchPaths": true,
@@ -21,5 +20,8 @@
     "python.analysis.extraPaths": [
         "./srt_core",
         "./gui"
-    ]
+    ],
+    "files.associations": {
+        "*.py": "python"
+    }
 } 
