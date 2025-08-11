@@ -149,10 +149,10 @@ class LanguageSection(QGroupBox):
 
         # Save to settings manager (single source of truth)
         self.settings_manager.save_target_languages(self.target_languages)
-        
+
         # Update SettingsManager current state (thread-safe)
         self.settings_manager.update_target_languages(self.target_languages)
-        
+
         # Log the update for debugging
         logging.info(f"Updated target languages from UI: {self.target_languages}")
 
@@ -218,17 +218,23 @@ class LanguageSection(QGroupBox):
 
             # Update the display without triggering adaptive updates
             self.update_language_count()
-            
+
             # Update SettingsManager current state (thread-safe)
             self.settings_manager.update_target_languages(self.target_languages)
-            
+
             logging.info(f"Loaded saved languages: {self.target_languages}")
-            
+
             # Debug: Verify synchronization
             total_checkboxes = len(self.language_checkboxes)
-            checked_checkboxes = sum(1 for checkbox in self.language_checkboxes.values() if checkbox.isChecked())
-            logging.info(f"Load verification: {checked_checkboxes}/{total_checkboxes} checkboxes checked, {len(self.target_languages)} languages in target_languages")
-        
+            checked_checkboxes = sum(
+                1
+                for checkbox in self.language_checkboxes.values()
+                if checkbox.isChecked()
+            )
+            logging.info(
+                f"Load verification: {checked_checkboxes}/{total_checkboxes} checkboxes checked, {len(self.target_languages)} languages in target_languages"
+            )
+
         finally:
             # Re-enable signals after loading is complete
             for checkbox in self.language_checkboxes.values():

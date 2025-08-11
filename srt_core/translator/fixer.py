@@ -105,7 +105,9 @@ class SRTFixer:
             Phantom Placeholder: __DNT_TERM_0__
         """
         # Optional timestamp
-        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry)
+        timestamp_match = re.search(
+            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry
+        )
 
         # Common fields
         language_match = re.search(r"Language: (.+?)(?:\n|$)", entry)
@@ -118,7 +120,9 @@ class SRTFixer:
         translated_text_match = re.search(r"Translated Text: (.+?)(?:\n|$)", entry)
 
         # New batch-format optional fields
-        batch_match = re.search(r"Batch:\s*(\d+)\s*\(subtitles\s*([0-9]+)-([0-9]+)\)", entry)
+        batch_match = re.search(
+            r"Batch:\s*(\d+)\s*\(subtitles\s*([0-9]+)-([0-9]+)\)", entry
+        )
 
         if not (language_match and filename_match and phantom_match):
             return
@@ -138,8 +142,12 @@ class SRTFixer:
             filename=filename_match.group(1).strip(),
             subtitle_number=subtitle_identifier,
             phantom_placeholder=phantom_match.group(1).strip(),
-            original_text=original_text_match.group(1).strip() if original_text_match else "",
-            translated_text=translated_text_match.group(1).strip() if translated_text_match else "",
+            original_text=original_text_match.group(1).strip()
+            if original_text_match
+            else "",
+            translated_text=translated_text_match.group(1).strip()
+            if translated_text_match
+            else "",
         )
         self.phantoms.append(phantom)
 
@@ -332,31 +340,35 @@ class SRTFixer:
         dnt_terms_fixed = 0
 
         # Pattern to match DNT_TERM placeholders
-        dnt_pattern = r'__DNT_TERM_\d+__'
-        
+        dnt_pattern = r"__DNT_TERM_\d+__"
+
         for subtitle in subtitles:
             if re.search(dnt_pattern, subtitle.content):
                 # Find all DNT_TERM placeholders in this subtitle
                 placeholders = re.findall(dnt_pattern, subtitle.content)
-                
+
                 for placeholder in placeholders:
                     # Extract the number from the placeholder
-                    match = re.search(r'__DNT_TERM_(\d+)__', placeholder)
+                    match = re.search(r"__DNT_TERM_(\d+)__", placeholder)
                     if match:
                         term_number = int(match.group(1))
-                        
+
                         # Try to find the original term from the DNT terms list
                         # Since we don't have the original term map, we'll remove the placeholder
                         # This is better than leaving the placeholder in the text
                         subtitle.content = subtitle.content.replace(placeholder, "")
                         dnt_terms_fixed += 1
                         changed = True
-                        
-                        print(f"    Fixed DNT_TERM placeholder {placeholder} in subtitle {subtitle.index}")
+
+                        print(
+                            f"    Fixed DNT_TERM placeholder {placeholder} in subtitle {subtitle.index}"
+                        )
 
         if changed:
             self.parser.write_file(file_path, subtitles)
-            print(f"  Fixed {dnt_terms_fixed} DNT_TERM placeholders in {os.path.basename(file_path)}")
+            print(
+                f"  Fixed {dnt_terms_fixed} DNT_TERM placeholders in {os.path.basename(file_path)}"
+            )
             self.dnt_terms_fixed_count += dnt_terms_fixed
 
         return dnt_terms_fixed

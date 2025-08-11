@@ -11,7 +11,7 @@ from pathlib import Path
 
 def run_command(cmd, description):
     """Run a command and handle errors."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Running: {description}")
     print(f"Command: {' '.join(cmd)}")
     print("=" * 60)
@@ -78,7 +78,7 @@ def main():
     except FileNotFoundError:
         print("\n⚠️  mypy not found. Install with: pip install mypy")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     if success:
         print("🎉 All checks passed!")
         sys.exit(0)

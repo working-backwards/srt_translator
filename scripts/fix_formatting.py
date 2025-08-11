@@ -11,7 +11,7 @@ from pathlib import Path
 
 def run_command(cmd, description):
     """Run a command and handle errors."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Running: {description}")
     print(f"Command: {' '.join(cmd)}")
     print("=" * 60)
@@ -49,7 +49,7 @@ def main():
         ["isort", "srt_core", "gui", "tests", "scripts"], "isort import sorting"
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     if success:
         print("🎉 All formatting issues have been fixed!")
         print("\nNext steps:")

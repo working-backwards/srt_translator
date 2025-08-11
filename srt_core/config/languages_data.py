@@ -3,391 +3,147 @@
 # Do not edit manually - run create_embedded_languages.py to regenerate
 
 LANGUAGES_JSON = {
-  "version": "1.0",
-  "default_popular_limit": 12,
-  "default_popular_languages": [
-    "es",
-    "fr",
-    "de",
-    "it",
-    "pt-BR",
-    "zh-Hans",
-    "ja",
-    "ar",
-    "vi",
-    "id",
-    "tr",
-    "az"
-  ],
-  "languages": {
-    "sq": {
-      "name": "Albanian",
-      "popular": false
+    "version": "1.0",
+    "default_popular_limit": 12,
+    "default_popular_languages": [
+        "es",
+        "fr",
+        "de",
+        "it",
+        "pt-BR",
+        "zh-Hans",
+        "ja",
+        "ar",
+        "vi",
+        "id",
+        "tr",
+        "az",
+    ],
+    "languages": {
+        "sq": {"name": "Albanian", "popular": false},
+        "ar": {
+            "name": "Arabic",
+            "popular": true,
+            "sentence_endings": ["!", "؟", "…", "."],
+        },
+        "hy": {"name": "Armenian", "popular": false},
+        "az": {
+            "name": "Azerbaijani",
+            "popular": true,
+            "break_markers": ["və", "amma", "lakin", "beləliklə"],
+        },
+        "eu": {"name": "Basque", "popular": false},
+        "be": {"name": "Belarusian", "popular": false},
+        "bn": {"name": "Bengali", "popular": false},
+        "bg": {"name": "Bulgarian", "popular": false},
+        "ca": {"name": "Catalan", "popular": false},
+        "zh-Hans": {
+            "name": "Chinese (Simplified)",
+            "popular": true,
+            "sentence_endings": ["。", "！", "？", "……"],
+        },
+        "zh-Hant": {"name": "Chinese (Traditional)", "popular": false},
+        "hr": {"name": "Croatian", "popular": false},
+        "cs": {"name": "Czech", "popular": false},
+        "da": {"name": "Danish", "popular": false},
+        "nl": {"name": "Dutch", "popular": true},
+        "en": {
+            "name": "English",
+            "popular": false,
+            "break_markers": [
+                "and",
+                "but",
+                "or",
+                "so",
+                "because",
+                "however",
+                "therefore",
+                "although",
+                "while",
+                "since",
+            ],
+        },
+        "et": {"name": "Estonian", "popular": false},
+        "fa": {"name": "Persian", "popular": false},
+        "fi": {"name": "Finnish", "popular": false},
+        "fr": {"name": "French", "popular": true},
+        "gl": {"name": "Galician", "popular": false},
+        "ka": {"name": "Georgian", "popular": false},
+        "de": {"name": "German", "popular": true},
+        "el": {"name": "Greek", "popular": false},
+        "gu": {"name": "Gujarati", "popular": false},
+        "ha": {"name": "Hausa", "popular": false},
+        "he": {"name": "Hebrew", "popular": false},
+        "hi": {"name": "Hindi", "popular": true},
+        "hu": {"name": "Hungarian", "popular": false},
+        "is": {"name": "Icelandic", "popular": false},
+        "ig": {"name": "Igbo", "popular": false},
+        "id": {"name": "Indonesian", "popular": true},
+        "ga": {"name": "Irish", "popular": false},
+        "it": {"name": "Italian", "popular": true},
+        "ja": {
+            "name": "Japanese",
+            "popular": true,
+            "sentence_endings": ["。", "！", "？", "…"],
+        },
+        "kn": {"name": "Kannada", "popular": false},
+        "kk": {"name": "Kazakh", "popular": false},
+        "km": {"name": "Khmer", "popular": false},
+        "ko": {
+            "name": "Korean",
+            "popular": true,
+            "sentence_endings": ["다.", "요.", "죠.", "입니다."],
+        },
+        "ky": {"name": "Kyrgyz", "popular": false},
+        "lo": {"name": "Lao", "popular": false},
+        "lv": {"name": "Latvian", "popular": false},
+        "lt": {"name": "Lithuanian", "popular": false},
+        "mk": {"name": "Macedonian", "popular": false},
+        "ml": {"name": "Malayalam", "popular": false},
+        "ms": {"name": "Malay (Malaysia)", "popular": false},
+        "mt": {"name": "Maltese", "popular": false},
+        "mr": {"name": "Marathi", "popular": false},
+        "mn": {"name": "Mongolian", "popular": false},
+        "ne": {"name": "Nepali", "popular": false},
+        "no": {"name": "Norwegian", "popular": false},
+        "pl": {"name": "Polish", "popular": false},
+        "pt-BR": {"name": "Portuguese (Brazil)", "popular": true},
+        "pt-PT": {"name": "Portuguese (Portugal)", "popular": false},
+        "ro": {"name": "Romanian", "popular": false},
+        "ru": {"name": "Russian", "popular": true},
+        "si": {"name": "Sinhala", "popular": false},
+        "sk": {"name": "Slovak", "popular": false},
+        "sl": {"name": "Slovenian", "popular": false},
+        "so": {"name": "Somali", "popular": false},
+        "es": {"name": "Spanish", "popular": true},
+        "sr": {"name": "Serbian", "popular": false},
+        "sw": {"name": "Swahili", "popular": false},
+        "sv": {"name": "Swedish", "popular": false},
+        "ta": {"name": "Tamil", "popular": false},
+        "te": {"name": "Telugu", "popular": false},
+        "th": {"name": "Thai", "popular": false},
+        "tl": {"name": "Filipino", "popular": false},
+        "tr": {
+            "name": "Turkish",
+            "popular": true,
+            "break_markers": ["ve", "ama", "bu nedenle", "fakat"],
+        },
+        "tk": {"name": "Turkmen", "popular": false},
+        "uk": {"name": "Ukrainian", "popular": false},
+        "ur": {"name": "Urdu", "popular": false},
+        "uz": {"name": "Uzbek", "popular": false},
+        "vi": {
+            "name": "Vietnamese",
+            "popular": true,
+            "break_markers": ["và", "nhưng", "do đó", "tuy nhiên"],
+        },
+        "cy": {"name": "Welsh", "popular": false},
+        "xh": {"name": "Xhosa", "popular": false},
+        "yo": {"name": "Yoruba", "popular": false},
+        "zu": {"name": "Zulu", "popular": false},
     },
-    "ar": {
-      "name": "Arabic",
-      "popular": true,
-      "sentence_endings": [
-        "!",
-        "؟",
-        "…",
-        "."
-      ]
-    },
-    "hy": {
-      "name": "Armenian",
-      "popular": false
-    },
-    "az": {
-      "name": "Azerbaijani",
-      "popular": true,
-      "break_markers": [
-        "və",
-        "amma",
-        "lakin",
-        "beləliklə"
-      ]
-    },
-    "eu": {
-      "name": "Basque",
-      "popular": false
-    },
-    "be": {
-      "name": "Belarusian",
-      "popular": false
-    },
-    "bn": {
-      "name": "Bengali",
-      "popular": false
-    },
-    "bg": {
-      "name": "Bulgarian",
-      "popular": false
-    },
-    "ca": {
-      "name": "Catalan",
-      "popular": false
-    },
-    "zh-Hans": {
-      "name": "Chinese (Simplified)",
-      "popular": true,
-      "sentence_endings": [
-        "。",
-        "！",
-        "？",
-        "……"
-      ]
-    },
-    "zh-Hant": {
-      "name": "Chinese (Traditional)",
-      "popular": false
-    },
-    "hr": {
-      "name": "Croatian",
-      "popular": false
-    },
-    "cs": {
-      "name": "Czech",
-      "popular": false
-    },
-    "da": {
-      "name": "Danish",
-      "popular": false
-    },
-    "nl": {
-      "name": "Dutch",
-      "popular": true
-    },
-    "en": {
-      "name": "English",
-      "popular": false,
-      "break_markers": [
-        "and",
-        "but",
-        "or",
-        "so",
-        "because",
-        "however",
-        "therefore",
-        "although",
-        "while",
-        "since"
-      ]
-    },
-    "et": {
-      "name": "Estonian",
-      "popular": false
-    },
-    "fa": {
-      "name": "Persian",
-      "popular": false
-    },
-    "fi": {
-      "name": "Finnish",
-      "popular": false
-    },
-    "fr": {
-      "name": "French",
-      "popular": true
-    },
-    "gl": {
-      "name": "Galician",
-      "popular": false
-    },
-    "ka": {
-      "name": "Georgian",
-      "popular": false
-    },
-    "de": {
-      "name": "German",
-      "popular": true
-    },
-    "el": {
-      "name": "Greek",
-      "popular": false
-    },
-    "gu": {
-      "name": "Gujarati",
-      "popular": false
-    },
-    "ha": {
-      "name": "Hausa",
-      "popular": false
-    },
-    "he": {
-      "name": "Hebrew",
-      "popular": false
-    },
-    "hi": {
-      "name": "Hindi",
-      "popular": true
-    },
-    "hu": {
-      "name": "Hungarian",
-      "popular": false
-    },
-    "is": {
-      "name": "Icelandic",
-      "popular": false
-    },
-    "ig": {
-      "name": "Igbo",
-      "popular": false
-    },
-    "id": {
-      "name": "Indonesian",
-      "popular": true
-    },
-    "ga": {
-      "name": "Irish",
-      "popular": false
-    },
-    "it": {
-      "name": "Italian",
-      "popular": true
-    },
-    "ja": {
-      "name": "Japanese",
-      "popular": true,
-      "sentence_endings": [
-        "。",
-        "！",
-        "？",
-        "…"
-      ]
-    },
-    "kn": {
-      "name": "Kannada",
-      "popular": false
-    },
-    "kk": {
-      "name": "Kazakh",
-      "popular": false
-    },
-    "km": {
-      "name": "Khmer",
-      "popular": false
-    },
-    "ko": {
-      "name": "Korean",
-      "popular": true,
-      "sentence_endings": [
-        "다.",
-        "요.",
-        "죠.",
-        "입니다."
-      ]
-    },
-    "ky": {
-      "name": "Kyrgyz",
-      "popular": false
-    },
-    "lo": {
-      "name": "Lao",
-      "popular": false
-    },
-    "lv": {
-      "name": "Latvian",
-      "popular": false
-    },
-    "lt": {
-      "name": "Lithuanian",
-      "popular": false
-    },
-    "mk": {
-      "name": "Macedonian",
-      "popular": false
-    },
-    "ml": {
-      "name": "Malayalam",
-      "popular": false
-    },
-    "ms": {
-      "name": "Malay (Malaysia)",
-      "popular": false
-    },
-    "mt": {
-      "name": "Maltese",
-      "popular": false
-    },
-    "mr": {
-      "name": "Marathi",
-      "popular": false
-    },
-    "mn": {
-      "name": "Mongolian",
-      "popular": false
-    },
-    "ne": {
-      "name": "Nepali",
-      "popular": false
-    },
-    "no": {
-      "name": "Norwegian",
-      "popular": false
-    },
-    "pl": {
-      "name": "Polish",
-      "popular": false
-    },
-    "pt-BR": {
-      "name": "Portuguese (Brazil)",
-      "popular": true
-    },
-    "pt-PT": {
-      "name": "Portuguese (Portugal)",
-      "popular": false
-    },
-    "ro": {
-      "name": "Romanian",
-      "popular": false
-    },
-    "ru": {
-      "name": "Russian",
-      "popular": true
-    },
-    "si": {
-      "name": "Sinhala",
-      "popular": false
-    },
-    "sk": {
-      "name": "Slovak",
-      "popular": false
-    },
-    "sl": {
-      "name": "Slovenian",
-      "popular": false
-    },
-    "so": {
-      "name": "Somali",
-      "popular": false
-    },
-    "es": {
-      "name": "Spanish",
-      "popular": true
-    },
-    "sr": {
-      "name": "Serbian",
-      "popular": false
-    },
-    "sw": {
-      "name": "Swahili",
-      "popular": false
-    },
-    "sv": {
-      "name": "Swedish",
-      "popular": false
-    },
-    "ta": {
-      "name": "Tamil",
-      "popular": false
-    },
-    "te": {
-      "name": "Telugu",
-      "popular": false
-    },
-    "th": {
-      "name": "Thai",
-      "popular": false
-    },
-    "tl": {
-      "name": "Filipino",
-      "popular": false
-    },
-    "tr": {
-      "name": "Turkish",
-      "popular": true,
-      "break_markers": [
-        "ve",
-        "ama",
-        "bu nedenle",
-        "fakat"
-      ]
-    },
-    "tk": {
-      "name": "Turkmen",
-      "popular": false
-    },
-    "uk": {
-      "name": "Ukrainian",
-      "popular": false
-    },
-    "ur": {
-      "name": "Urdu",
-      "popular": false
-    },
-    "uz": {
-      "name": "Uzbek",
-      "popular": false
-    },
-    "vi": {
-      "name": "Vietnamese",
-      "popular": true,
-      "break_markers": [
-        "và",
-        "nhưng",
-        "do đó",
-        "tuy nhiên"
-      ]
-    },
-    "cy": {
-      "name": "Welsh",
-      "popular": false
-    },
-    "xh": {
-      "name": "Xhosa",
-      "popular": false
-    },
-    "yo": {
-      "name": "Yoruba",
-      "popular": false
-    },
-    "zu": {
-      "name": "Zulu",
-      "popular": false
-    }
-  }
 }
+
 
 def get_embedded_languages():
     """Get the embedded language configuration"""

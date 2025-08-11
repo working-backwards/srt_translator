@@ -42,9 +42,9 @@ def test_settings_manager():
 
     # Verify data integrity
     assert loaded_terms == test_terms, f"Terms mismatch: {loaded_terms} != {test_terms}"
-    assert (
-        loaded_termbase == test_termbase
-    ), f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
+    assert loaded_termbase == test_termbase, (
+        f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
+    )
     print("✓ Data integrity verified")
 
     # Test freshness check
@@ -94,7 +94,6 @@ def test_ai_config_generator():
 
     # This test requires an API key, so we'll just test instantiation
     try:
-
         # Test instantiation (without API key)
         generator = AIConfigGenerator("test-key")
         print("✓ AIConfigGenerator instantiated successfully")

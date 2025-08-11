@@ -114,9 +114,9 @@ class TranslationConfig:
 def build_config_from_gui(settings_manager) -> TranslationConfig:
     """Build configuration from GUI settings manager"""
     # Defensive check to prevent CLI/GUI code path mixing
-    assert (
-        os.getenv("GUI_MODE") != "false"
-    ), "build_config_from_gui() should never run in CLI mode"
+    assert os.getenv("GUI_MODE") != "false", (
+        "build_config_from_gui() should never run in CLI mode"
+    )
 
     # Get current state from settings manager (thread-safe)
     config_state = settings_manager.get_current_state()

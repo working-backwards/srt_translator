@@ -107,7 +107,7 @@ For issues and questions:
 ## Version Information
 
 - Version: 1.0.0
-- Build Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- Build Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 - Platform: {platform.system()} {platform.machine()}
 """
 

@@ -201,7 +201,7 @@ class TranslationWorker(QObject):
                         chunk = output_lines[i : i + 10]
                         self._throttled_emit(
                             self.progress_updated,
-                            f"Translation output (part {i//10 + 1}): {'\n'.join(chunk)}",
+                            f"Translation output (part {i // 10 + 1}): {'\n'.join(chunk)}",
                         )
                 else:
                     self._throttled_emit(

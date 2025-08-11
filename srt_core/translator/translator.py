@@ -145,7 +145,7 @@ class SRTTranslator:
                 if extra > 0:
                     lines.append(f"    … (+{extra} more)")
             if len(tb) > max_langs:
-                lines.append(f"  … (+{len(tb)-max_langs} more languages)")
+                lines.append(f"  … (+{len(tb) - max_langs} more languages)")
         else:
             lines.append("Termbase: (none)")
 
@@ -303,9 +303,9 @@ Return a complete, valid SRT block with the same subtitle count, structure, and 
                 )
                 logging.error(
                     f"""
-{'='*80}
+{"=" * 80}
 SINGLE TRANSLATION FAILURE - INSTRUCTOR ACTION NEEDED
-{'='*80}
+{"=" * 80}
 SUMMARY: OpenAI refused to translate single subtitle after {max_retries + 1} attempts
 
 COPY THIS ENTIRE SECTION TO AN AI CHAT FOR HELP:
@@ -338,7 +338,7 @@ TECHNICAL DETAILS:
 ----------------------------------------
 
 RESULT: Subtitle left untranslated to mark failure.
-{'='*80}
+{"=" * 80}
 """
                 )
                 if summary is not None and isinstance(summary, dict):

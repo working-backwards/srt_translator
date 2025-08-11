@@ -95,13 +95,13 @@ def log_placeholder_issue(issue_type, issue_details):
         f"""
     ==================================================
     {issue_type.upper()}:
-    File: {issue_details['filename']}
+    File: {issue_details["filename"]}
     Subtitle Number: {subtitle_number}
-    Language: {issue_details['language']}
-    Original Term: {issue_details['original_term']}
-    Placeholder: {issue_details['placeholder']}
-    Original Context: {issue_details.get('original_context', 'N/A')}
-    Translated Context: {issue_details.get('translated_context', 'N/A')}
+    Language: {issue_details["language"]}
+    Original Term: {issue_details["original_term"]}
+    Placeholder: {issue_details["placeholder"]}
+    Original Context: {issue_details.get("original_context", "N/A")}
+    Translated Context: {issue_details.get("translated_context", "N/A")}
     Status: {fixable_status}
     Reason: {reason_description}
     ==================================================

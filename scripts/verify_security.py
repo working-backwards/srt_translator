@@ -26,7 +26,7 @@ def check_executable_security(executable_path):
         return False, ["Executable not found"]
 
     print(f"🔍 Checking executable: {executable_path}")
-    print(f"📏 File size: {os.path.getsize(executable_path) / (1024*1024):.1f} MB")
+    print(f"📏 File size: {os.path.getsize(executable_path) / (1024 * 1024):.1f} MB")
 
     # List of sensitive files/patterns to check for
     sensitive_patterns = [
@@ -53,9 +53,7 @@ def check_executable_security(executable_path):
                 for pattern in sensitive_patterns:
                     for file_path in file_list:
                         if pattern.lower() in file_path.lower():
-                            issues_found.append(
-                                f"Sensitive file found: {file_path}"
-                            )
+                            issues_found.append(f"Sensitive file found: {file_path}")
 
                 # Check for any environment files
                 env_files = [f for f in file_list if ".env" in f.lower()]
@@ -77,9 +75,7 @@ def check_executable_security(executable_path):
             # Check for sensitive strings in binary content
             for pattern in sensitive_patterns:
                 if pattern.encode() in content:
-                    issues_found.append(
-                        f"Sensitive pattern found in binary: {pattern}"
-                    )
+                    issues_found.append(f"Sensitive pattern found in binary: {pattern}")
 
     except Exception as e:
         issues_found.append(f"Error during security check: {e}")

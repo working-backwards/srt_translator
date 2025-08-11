@@ -507,11 +507,11 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                         if term:
                             if i < 20:
                                 self.logger.info(
-                                    f"  Pass #1 ({i+1}/20): {term}: {reason}"
+                                    f"  Pass #1 ({i + 1}/20): {term}: {reason}"
                                 )
                             else:
                                 self.logger.info(
-                                    f"  Pass #2 ({i-19}/10): {term}: {reason}"
+                                    f"  Pass #2 ({i - 19}/10): {term}: {reason}"
                                 )
                 elif isinstance(extracted_terms[0], str):  # Simple list
                     self.logger.info(
@@ -582,7 +582,6 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
     def _parse_termbase_response(self, response_text: str) -> Dict[str, str]:
         """Parse the AI response for termbase (legacy method)"""
         try:
-
             # Clean the response text
             cleaned = response_text.strip()
             if cleaned.startswith("```json"):

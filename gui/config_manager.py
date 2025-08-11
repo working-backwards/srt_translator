@@ -91,21 +91,24 @@ class GUIConfigManager:
         """
         # Priority 1: GUI AI-generated config
         _, ai_termbase = self.settings_manager.load_ai_config()
-        
+
         # Try direct lookup first
         if target_language in ai_termbase and ai_termbase[target_language]:
             self.logger.info(f"Using AI-generated termbase for {target_language}")
             return ai_termbase[target_language]
-        
+
         # Try language name to code mapping
         try:
             from srt_core.config.language_config import language_config
+
             all_languages = language_config.get_all_languages()
-            
+
             for code, lang_info in all_languages.items():
-                if lang_info.get('name') == target_language:
+                if lang_info.get("name") == target_language:
                     if code in ai_termbase:
-                        self.logger.info(f"Using AI-generated termbase for {target_language} (code: {code})")
+                        self.logger.info(
+                            f"Using AI-generated termbase for {target_language} (code: {code})"
+                        )
                         return ai_termbase[code]
         except Exception as e:
             self.logger.debug(f"Error checking language mapping: {e}")
@@ -185,7 +188,7 @@ class GUIConfigManager:
             dnt_terms_str = os.environ.get("DNT_TERMS", "")
             if dnt_terms_str:
                 # Parse the string format: ["term1", "term2", "term3"]
-                if dnt_terms_str.startswith('[') and dnt_terms_str.endswith(']'):
+                if dnt_terms_str.startswith("[") and dnt_terms_str.endswith("]"):
                     terms_content = dnt_terms_str[1:-1]
                     dnt_terms = [
                         term.strip().strip('"').strip("'")
@@ -193,7 +196,7 @@ class GUIConfigManager:
                         if term.strip()
                     ]
                     return dnt_terms
-            
+
             return []
 
         except Exception as e:

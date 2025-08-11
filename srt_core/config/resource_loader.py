@@ -4,8 +4,12 @@ import json
 import os
 from importlib import resources
 
-REPO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                         "config", "languages.json")
+REPO_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "config",
+    "languages.json",
+)
+
 
 def load_languages():
     """
@@ -15,7 +19,11 @@ def load_languages():
     # 1) Package resource (works in PyInstaller if you add-data into package path)
     try:
         # Python 3.9+: resources.files
-        data = resources.files("srt_core.config").joinpath("languages.json").read_text(encoding="utf-8")
+        data = (
+            resources.files("srt_core.config")
+            .joinpath("languages.json")
+            .read_text(encoding="utf-8")
+        )
         return json.loads(data)
     except Exception:
         pass

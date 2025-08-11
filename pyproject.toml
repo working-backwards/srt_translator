@@ -33,6 +33,7 @@ dev = [
     "safety>=2.3.0",
     "bandit>=1.7.0",
     "pip-tools>=7.0.0",
+    "ruff>=0.1.0",
 ]
 
 # Build scripts
