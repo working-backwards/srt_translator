@@ -4,8 +4,8 @@ Simple script to clear AI-generated configuration from the GUI settings.
 Run this from the project root directory.
 """
 
-import sys
 import os
+import sys
 
 # Add the project root to the path (scripts/ is one level down)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))

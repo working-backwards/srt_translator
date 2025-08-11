@@ -1,23 +1,24 @@
+#!/usr/bin/env python3
 """
-Translation Worker Thread
-Handles background translation processing
+Translation Worker for the SRT Translator GUI.
 """
 
 import logging
 import os
-import uuid
-import time
 import threading
+import time
+import uuid
 from collections import deque
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
+from srt_core.config.translation_config import build_config_from_gui
+
 # Import fixer for automatic cleanup after translation
 from srt_core.translator.fixer import SRTFixer
-from srt_core.config.translation_config import build_config_from_gui
 
 
 class TranslationWorker(QObject):

@@ -6,8 +6,8 @@ Checks if sensitive files are accidentally included in the executable.
 
 import os
 import sys
-import zipfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 

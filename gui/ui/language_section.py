@@ -1,14 +1,16 @@
+#!/usr/bin/env python3
 """
-Language Selection Section
-Handles target language selection and management using unified language configuration
+Language Selection Section for the SRT Translator GUI.
 """
 
+import json
 import logging
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -17,7 +19,9 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 from srt_core.config.language_config import language_config

@@ -1,12 +1,12 @@
+#!/usr/bin/env python3
 """
-Unified Language Configuration for CLI
-Handles loading and accessing language configuration from JSON file
+Language configuration for the SRT Translator.
 """
 
-import json
 import logging
-from .resource_loader import load_languages
-from typing import Dict, List, Optional
+from typing import Optional
+
+from .languages_data import LANGUAGES_JSON
 
 
 class LanguageConfig:
@@ -16,11 +16,11 @@ class LanguageConfig:
         self.logger = logging.getLogger(__name__)
         self.config = self.load_config()
 
-    def load_config(self) -> Dict:
+    def load_config(self) -> dict:
         """Load language configuration from JSON file using resource loader"""
         try:
             # Use the resource loader which handles both package resources and repo paths
-            config = load_languages()
+            config = LANGUAGES_JSON
             self.logger.info(
                 f"Loaded language config with {len(config.get('languages', {}))} languages"
             )
@@ -29,7 +29,7 @@ class LanguageConfig:
             self.logger.error(f"Error loading language config: {e}")
             return self.get_fallback_config()
 
-    def get_fallback_config(self) -> Dict:
+    def get_fallback_config(self) -> dict:
         """Get fallback configuration if JSON file is unavailable"""
         self.logger.warning("Using fallback language configuration")
         return {
@@ -65,11 +65,11 @@ class LanguageConfig:
             },
         }
 
-    def get_all_languages(self) -> Dict[str, Dict]:
+    def get_all_languages(self) -> dict:
         """Get all available languages"""
         return self.config.get("languages", {})
 
-    def get_popular_languages(self) -> List[str]:
+    def get_popular_languages(self) -> list:
         """Get current popular languages (defaults for now, user preferences in future)"""
         return self.config.get("default_popular_languages", [])
 
@@ -83,11 +83,11 @@ class LanguageConfig:
         languages = self.get_all_languages()
         return languages.get(code, {}).get("popular", False)
 
-    def get_language_codes(self) -> List[str]:
+    def get_language_codes(self) -> list:
         """Get list of all language codes"""
         return list(self.get_all_languages().keys())
 
-    def get_language_names(self) -> Dict[str, str]:
+    def get_language_names(self) -> dict:
         """Get mapping of language codes to display names"""
         languages = self.get_all_languages()
         return {code: lang.get("name", code) for code, lang in languages.items()}
@@ -104,12 +104,12 @@ class LanguageConfig:
         """Get the default popular languages limit"""
         return self.config.get("default_popular_limit", 12)
 
-    def get_target_languages_dict(self) -> Dict[str, str]:
+    def get_target_languages_dict(self) -> dict:
         """Get target languages in the format expected by CLI (name: code)"""
         languages = self.get_all_languages()
         return {lang.get("name", code): code for code, lang in languages.items()}
 
-    def get_language_rules(self, lang_code: str) -> Dict[str, List[str]]:
+    def get_language_rules(self, lang_code: str) -> dict:
         """Get language-specific sentence boundary rules"""
         DEFAULT_SENTENCE_ENDINGS = [".", "!", "?", "...", ":", ";"]
         DEFAULT_BREAK_MARKERS = []

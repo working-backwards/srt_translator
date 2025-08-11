@@ -42,9 +42,9 @@ def test_settings_manager():
 
     # Verify data integrity
     assert loaded_terms == test_terms, f"Terms mismatch: {loaded_terms} != {test_terms}"
-    assert loaded_termbase == test_termbase, (
-        f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
-    )
+    assert (
+        loaded_termbase == test_termbase
+    ), f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
     print("✓ Data integrity verified")
 
     # Test freshness check

@@ -3,8 +3,8 @@
 import json
 import logging
 import os
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from .translation_config import TranslationConfig
 

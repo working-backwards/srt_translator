@@ -1,15 +1,18 @@
+#!/usr/bin/env python3
 """
-File Selection Section
-Handles SRT file selection and output directory management
+File Selection Section for the SRT Translator GUI.
 """
 
 import logging
 import os
-from typing import List
+from pathlib import Path
+from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -17,6 +20,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 

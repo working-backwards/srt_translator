@@ -1,25 +1,28 @@
+#!/usr/bin/env python3
 """
-AI Configuration Section
-Handles AI-powered configuration generation and display
+AI Configuration Section for the SRT Translator GUI.
 """
 
-from PySide6.QtCore import Qt
+import json
+from typing import Any, Dict, List, Optional
+
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QProgressBar,
     QPushButton,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
-
-from srt_core.config.language_config import language_config
-
 
 from .dnt_terms_editor import DNTTermsEditor
 from .termbase_editor import TermbaseEditor

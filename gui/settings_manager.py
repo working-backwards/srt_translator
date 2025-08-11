@@ -1,15 +1,13 @@
+#!/usr/bin/env python3
 """
-Settings Manager for SRT Translator GUI
-Handles persistent storage of user preferences and settings
+Settings manager for the SRT Translator GUI.
 """
 
-import json
 import logging
-import os
 import threading
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
 
 from PySide6.QtCore import QSettings
 

@@ -142,12 +142,12 @@ class SRTFixer:
             filename=filename_match.group(1).strip(),
             subtitle_number=subtitle_identifier,
             phantom_placeholder=phantom_match.group(1).strip(),
-            original_text=original_text_match.group(1).strip()
-            if original_text_match
-            else "",
-            translated_text=translated_text_match.group(1).strip()
-            if translated_text_match
-            else "",
+            original_text=(
+                original_text_match.group(1).strip() if original_text_match else ""
+            ),
+            translated_text=(
+                translated_text_match.group(1).strip() if translated_text_match else ""
+            ),
         )
         self.phantoms.append(phantom)
 

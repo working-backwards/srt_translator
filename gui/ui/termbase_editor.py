@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-Termbase Editor Widget
-
-Provides a user interface for editing termbase entries across multiple languages.
-Allows adding, editing, and removing terms and their translations.
+Termbase Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
@@ -108,14 +105,14 @@ class TermbaseEditor(QWidget):
         self.table.itemSelectionChanged.connect(self.update_button_states)
         self.table.itemChanged.connect(self.on_table_item_changed)
 
-    def set_termbase(self, termbase: Dict[str, Dict[str, str]]):
+    def set_termbase(self, termbase: dict):
         """Set the termbase data."""
         self.termbase = termbase.copy()
         self.languages = list(termbase.keys()) if termbase else []
         self.refresh_table()
         self.update_count_label()
 
-    def get_termbase(self) -> Dict[str, Dict[str, str]]:
+    def get_termbase(self) -> dict:
         """Get the current termbase data."""
         return self.termbase.copy()
 
@@ -319,7 +316,7 @@ class TermbaseEditor(QWidget):
         self.update_count_label()
         self.termbase_changed.emit(self.termbase)
 
-    def _add_term_to_termbase(self, english_term: str, translations: Dict[str, str]):
+    def _add_term_to_termbase(self, english_term: str, translations: dict):
         """Add a new term to the termbase."""
         for language, translation in translations.items():
             if language not in self.termbase:
@@ -327,9 +324,7 @@ class TermbaseEditor(QWidget):
             if translation.strip():
                 self.termbase[language][english_term] = translation.strip()
 
-    def _update_term_translations(
-        self, english_term: str, translations: Dict[str, str]
-    ):
+    def _update_term_translations(self, english_term: str, translations: dict):
         """Update translations for an existing term."""
         for language, translation in translations.items():
             if language not in self.termbase:
@@ -346,7 +341,7 @@ class TermbaseEditor(QWidget):
             if english_term in language_termbase:
                 del language_termbase[english_term]
 
-    def is_modified(self, original_termbase: Dict[str, Dict[str, str]]) -> bool:
+    def is_modified(self, original_termbase: dict) -> bool:
         """Check if the termbase has been modified from the original."""
         return self.termbase != original_termbase
 
@@ -354,7 +349,7 @@ class TermbaseEditor(QWidget):
 class AddTermDialog(QDialog):
     """Dialog for adding a new English term and its translations to the termbase."""
 
-    def __init__(self, languages: List[str], parent=None):
+    def __init__(self, languages: list, parent=None):
         super().__init__(parent)
         self.languages = languages
         self.english_term = ""
@@ -425,7 +420,7 @@ class AddTermDialog(QDialog):
             bool(english_term) and has_translations
         )
 
-    def get_data(self) -> Tuple[str, Dict[str, str]]:
+    def get_data(self) -> Tuple[str, dict]:
         """Get the entered data."""
         english_term = self.english_input.text().strip()
         translations = {
@@ -441,8 +436,8 @@ class EditTermDialog(QDialog):
     def __init__(
         self,
         english_term: str,
-        current_translations: Dict[str, str],
-        languages: List[str],
+        current_translations: dict,
+        languages: list,
         parent=None,
     ):
         super().__init__(parent)
@@ -500,7 +495,7 @@ class EditTermDialog(QDialog):
 
         self.button_box = button_box
 
-    def populate_data(self, current_translations: Dict[str, str]):
+    def populate_data(self, current_translations: dict):
         """Populate the dialog with current translation data."""
         for language in self.languages:
             translation = current_translations.get(language, "")
@@ -511,7 +506,7 @@ class EditTermDialog(QDialog):
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
 
-    def get_translations(self) -> Dict[str, str]:
+    def get_translations(self) -> dict:
         """Get the current translations."""
         return {
             language: self.translations[language].text().strip()

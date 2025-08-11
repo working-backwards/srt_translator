@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
 """
-Translation Section
-Handles translation controls and progress display
+Translation Section for the SRT Translator GUI.
 """
 
+from typing import Callable, Optional
+
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -11,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 

@@ -1,16 +1,15 @@
+#!/usr/bin/env python3
 """
-Main Window for SRT Translator GUI - Refactored Version
-Uses modular components for better maintainability
+Main window for the SRT Translator application.
 """
 
 import logging
 import os
-import sys
-import psutil
-from typing import Dict, List
+import pathlib
+from typing import Optional
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal, QTimer
-from PySide6.QtGui import QFont
+import psutil
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -22,7 +21,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 
 from srt_core.utils.logging_setup import setup_logging
 
@@ -50,7 +48,8 @@ class SRTTranslatorMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Set up logging for the GUI application (only once in worker; avoid duplicate files)
+        # Set up logging for the GUI application (only once in worker;
+        # avoid duplicate files)
         self.log_file = None
         self.logger = logging.getLogger(__name__)
         self.logger.info("SRT Translator GUI started")
@@ -98,7 +97,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)  # 10px margin from window edges
+        main_layout.setContentsMargins(10, 10, 10, 10)  # 10px margin from edges
         main_layout.setSpacing(20)  # 20px vertical spacing between sections
 
         # Create title bar
@@ -325,7 +324,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         api_key = self.settings_manager.load_api_key()
 
         self.logger.info(
-            f"Starting AI configuration generation with {len(selected_files)} files and {len(target_languages)} languages"
+            f"Starting AI configuration generation with {len(selected_files)} "
+            f"files and {len(target_languages)} languages"
         )
 
         # Validate inputs

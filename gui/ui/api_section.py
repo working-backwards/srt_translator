@@ -1,12 +1,14 @@
+#!/usr/bin/env python3
 """
-API Configuration Section
-Handles OpenAI API key input and connection testing
+API Configuration Section for the SRT Translator GUI.
 """
 
-import logging
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,

@@ -5,13 +5,13 @@ Creates executables and prepares release packages for distribution.
 """
 
 import os
-import sys
 import platform
-import subprocess
 import shutil
+import subprocess
+import sys
 import zipfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

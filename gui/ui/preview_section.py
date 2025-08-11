@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """
-Preview Section Widget
-
-Shows users a preview of how their AI-generated configuration will affect translations.
-Provides before/after comparison to help users understand the impact.
+Preview Section for the SRT Translator GUI.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,

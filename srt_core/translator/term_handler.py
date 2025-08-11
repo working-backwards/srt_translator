@@ -1,16 +1,14 @@
+#!/usr/bin/env python3
 """
-Term Handler for DNT (Do Not Translate) Processing
-
-This module handles the replacement and restoration of terms that should not be translated.
-DNT terms are replaced with placeholders before translation to prevent the AI from
-translating them, then restored after translation.
+Term handler for the SRT Translator.
 """
 
 import logging
 import re
-from typing import Dict, List
+from typing import Optional
 
 from srt_core.config.settings import DNT_TERMS
+from srt_core.utils.logging_setup import log_placeholder_issue
 
 
 class TermHandler:

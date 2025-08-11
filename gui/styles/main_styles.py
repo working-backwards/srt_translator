@@ -1,6 +1,6 @@
+#!/usr/bin/env python3
 """
-Main Application Styles
-Contains all CSS styling for the SRT Translator GUI
+Main styles for the SRT Translator GUI.
 """
 
 MAIN_STYLESHEET = """

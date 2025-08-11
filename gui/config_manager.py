@@ -1,12 +1,13 @@
+#!/usr/bin/env python3
 """
-GUI Configuration Manager
-Handles the three-tier fallback system for translation configurations
+Configuration manager for the SRT Translator GUI.
 """
 
 import json
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from .settings_manager import SettingsManager
 

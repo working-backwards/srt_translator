@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
 """
-Custom Toggle Button with Smooth Rotation Animation
-Provides a chevron button that rotates smoothly when toggled
+Toggle Button for the SRT Translator GUI.
 """
 
-from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QTimer
+from typing import Callable, Optional
+
+from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, Qt
 from PySide6.QtWidgets import QPushButton
 
 

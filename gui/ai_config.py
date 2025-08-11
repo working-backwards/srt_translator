@@ -1,6 +1,6 @@
+#!/usr/bin/env python3
 """
-AI Configuration Generator
-Handles AI-powered analysis of SRT content to generate translation configurations
+AI Configuration management for the SRT Translator.
 """
 
 import json
@@ -8,14 +8,12 @@ import logging
 import os
 import re
 import unicodedata
-from typing import Dict, List, Optional
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
-
-from srt_core.translator.srt_parser import SRTParser
-
 from srt_core.config.language_config import language_config
+from srt_core.translator.srt_parser import SRTParser
 
 
 class AIConfigGenerator:

@@ -1,12 +1,16 @@
-"""Configuration abstraction layer for translation system"""
+#!/usr/bin/env python3
+"""
+Translation configuration for the SRT Translator.
+"""
 
 import json
 import logging
 import os
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from srt_core.config.language_config import language_config
+from .language_config import language_config
 
 
 def _mask_tail(value: str, visible: int = 4) -> str:
@@ -114,9 +118,9 @@ class TranslationConfig:
 def build_config_from_gui(settings_manager) -> TranslationConfig:
     """Build configuration from GUI settings manager"""
     # Defensive check to prevent CLI/GUI code path mixing
-    assert os.getenv("GUI_MODE") != "false", (
-        "build_config_from_gui() should never run in CLI mode"
-    )
+    assert (
+        os.getenv("GUI_MODE") != "false"
+    ), "build_config_from_gui() should never run in CLI mode"
 
     # Get current state from settings manager (thread-safe)
     config_state = settings_manager.get_current_state()

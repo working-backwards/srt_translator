@@ -2,12 +2,11 @@ import json
 import logging
 import os
 import re
-import srt
-from datetime import datetime
-from typing import List, Tuple
 
 # Import unified language configuration
 import time
+from datetime import datetime
+from typing import List, Tuple
 
 import srt
 from openai import OpenAI
@@ -685,7 +684,6 @@ Status: AI Hallucination in batch translation - Remove this placeholder
         current_batch = []
 
         # Get language-specific sentence boundary rules
-        from srt_core.config.language_config import language_config
 
         lang_rules = language_config.get_language_rules(target_lang)
         sentence_endings = tuple(lang_rules["sentence_endings"])

@@ -1,30 +1,31 @@
+#!/usr/bin/env python3
 """
-DNT Terms Editor Widget
-
-Provides a user-friendly interface for editing AI-generated DNT terms.
-Allows users to add, remove, and modify terms that should remain in English.
+DNT Terms Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
-
-from srt_core.config.language_config import language_config
 
 
 class DNTTermsEditor(QWidget):

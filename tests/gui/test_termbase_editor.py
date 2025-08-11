@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+Test script for Termbase Editor
+"""
+
 import sys
 
 from PySide6.QtCore import Qt
@@ -12,7 +17,6 @@ from PySide6.QtWidgets import (
 
 from gui.ui.termbase_editor import TermbaseEditor
 
-#!/usr/bin/env python3
 """
 Test script for Termbase Editor
 """

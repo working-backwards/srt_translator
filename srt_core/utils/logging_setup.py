@@ -1,6 +1,12 @@
+#!/usr/bin/env python3
+"""
+Logging setup for the SRT Translator.
+"""
+
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from srt_core.config.settings import LOG_MODE

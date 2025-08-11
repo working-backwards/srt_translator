@@ -1,21 +1,21 @@
+import json
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Dict, List
 
-
+from srt_core.config.config_resolver import ConfigResolver
 from srt_core.config.settings import (
+    DNT_TERMS,
     FIX_AGGRESSIVENESS,
     SOURCE_DIR,
     TARGET_LANGUAGES,
-    DNT_TERMS,
     TERMBASE,
 )
 from srt_core.config.translation_config import (
     TranslationConfig,
     build_config_from_parameters,
 )
-from srt_core.config.config_resolver import ConfigResolver
 from srt_core.translator.fixer import SRTFixer
 from srt_core.translator.translator import SRTTranslator
 from srt_core.utils.logging_setup import setup_logging
@@ -261,7 +261,6 @@ def translate_srt_files(
 
         tmp_path = os.path.join(batch_dir, "manifest.tmp.json")
         final_path = os.path.join(batch_dir, "manifest.json")
-        import json
 
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
