@@ -84,14 +84,16 @@ This release candidate represents a major milestone in the SRT Translator projec
 
 **Breaking Changes:**
 - Package import paths have changed from `srt_core.*` to `srt_translator.core.*`
-- CLI entry point is now `srt-translator` instead of `run_cli.py`
-- GUI entry point is now `srt-translator-gui` instead of `run_gui.py`
+- CLI entry point is now `srt-cli` instead of `run_cli.py`
+- GUI entry point is now `srtx` instead of `run_gui.py`
 
 **Migration Guide:**
 If you're upgrading from a previous version:
 1. Uninstall the old package: `pip uninstall srt-translator`
 2. Install the new version: `pip install -e .`
-3. Update any scripts to use the new entry points
+3. Update any scripts to use the new console scripts:
+   - Use `srtx` instead of `python run_gui.py`
+   - Use `srt-cli` instead of `python run_cli.py`
 4. Update import statements if you're using the package programmatically
 
 ### Version 0.1.0

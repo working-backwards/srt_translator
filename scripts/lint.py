@@ -61,30 +61,30 @@ def main():
 
     # 1. Format code with Black
     success &= run_command(
-        ["black", "--check", "srt_core", "gui", "tests", "scripts"],
+        ["black", "--check", "srt_translator", "tests", "scripts"],
         "Black code formatting check",
     )
 
     # 2. Sort imports with isort
     success &= run_command(
-        ["isort", "--check-only", "--diff", "srt_core", "gui", "tests", "scripts"],
+        ["isort", "--check-only", "--diff", "srt_translator", "tests", "scripts"],
         "isort import sorting check",
     )
 
     # 3. Run flake8
     success &= run_command(
-        ["flake8", "--max-line-length=88", "srt_core", "gui", "tests", "scripts"],
+        ["flake8", "--max-line-length=88", "srt_translator", "tests", "scripts"],
         "flake8 style checking",
     )
 
     # 4. Run pylint
     success &= run_command(
-        ["pylint", "srt_core", "gui", "tests"], "pylint code analysis"
+        ["pylint", "srt_translator", "tests"], "pylint code analysis"
     )
 
     # 5. Run mypy (optional - can be skipped if too strict)
     try:
-        success &= run_command(["mypy", "srt_core", "gui"], "mypy type checking")
+        success &= run_command(["mypy", "srt_translator"], "mypy type checking")
     except FileNotFoundError:
         logger.warning("\n⚠️  mypy not found. Install with: pip install mypy")
 

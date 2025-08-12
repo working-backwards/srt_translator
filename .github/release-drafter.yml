@@ -60,10 +60,10 @@ template: |
 
   ```bash
   # CLI
-  srt-translator --help
+  srt-cli --help
   
   # GUI
-  srt-translator-gui
+  srtx
   ```
 
   ## Documentation

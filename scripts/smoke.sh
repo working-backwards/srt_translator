@@ -117,8 +117,8 @@ fi
 
 # Test 4: Check GUI entry point
 print_header "Test 4: GUI Entry Point"
-if command -v srt-translator-gui &> /dev/null; then
-    GUI_HELP=$(srt-translator-gui --help 2>&1 || true)
+if command -v srtx &> /dev/null; then
+    GUI_HELP=$(srtx --help 2>&1 || true)
     if [[ $GUI_HELP =~ usage: ]]; then
         print_success "GUI entry point working"
     else

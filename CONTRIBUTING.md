@@ -67,10 +67,10 @@ cp env_example .env
 
 ```bash
 # Test CLI
-srt-translator --version
+srt-cli --version
 
 # Test GUI
-srt-translator-gui
+srtx
 
 # Run tests
 pytest

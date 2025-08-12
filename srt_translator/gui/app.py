@@ -20,9 +20,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     """Launch the GUI application with lazy dependency loading"""
     # Parse command line arguments first
-    parser = argparse.ArgumentParser(
-        description="SRT Translator GUI", prog="srt-translator-gui"
-    )
+    parser = argparse.ArgumentParser(description="SRT Translator GUI", prog="srtx")
     parser.add_argument(
         "--version",
         action="version",

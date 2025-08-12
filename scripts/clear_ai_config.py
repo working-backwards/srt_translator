@@ -10,8 +10,7 @@ import sys
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Get logger for this module
@@ -23,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 def main():
     try:
-        from gui.settings_manager import SettingsManager
+        from srt_translator.gui.settings_manager import SettingsManager
 
         logger.info("Clearing AI-generated configuration...")
         settings_manager = SettingsManager()

@@ -29,7 +29,7 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 
 ### For CLI Users
 - Follow the developer installation process below (clone repository, setup Python environment)
-- Run `python run_cli.py` after configuring your `.env` file
+- Run `srt-cli` after configuring your `.env` file
 
 See **INSTALLATION.md** for building per‑platform and packaging details.
 
@@ -50,6 +50,13 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 ## Installation
 
+### Console Scripts (Recommended)
+
+After installation, you can use these simple commands from any terminal:
+
+- **GUI**: `srtx` - Launches the graphical interface
+- **CLI**: `srt-cli` - Launches the command-line interface
+
 ### For Content Creators (Executable)
 
 1. **Download** the latest release for your platform
@@ -67,7 +74,7 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
    - Windows: `venv\Scripts\activate`
    - Mac/Linux: `source venv/bin/activate`
 4. **Install**: `pip install -e .`
-5. **Run**: `python run_gui.py`
+5. **Run**: `srtx`
 
 ### Developers: Build Binaries (macOS/Windows/Linux)
 
@@ -88,22 +95,22 @@ Build commands:
 - Windows (no console window):
 ```
 pyinstaller --noconsole --name SRT-Translator \
-  --add-data "config\\languages.json;config" \
-  run_gui.py
+  --add-data "srt_translator/core/config/languages.json;srt_translator/core/config" \
+  srt_translator/gui/main_window.py
 ```
 
 - macOS (GUI app bundle):
 ```
 pyinstaller --windowed --name SRT-Translator \
-  --add-data "config/languages.json:config" \
-  run_gui.py
+  --add-data "srt_translator/core/config/languages.json:srt_translator/core/config" \
+  srt_translator/gui/main_window.py
 ```
 
 - Linux (one-folder recommended for Qt apps):
 ```
 pyinstaller --windowed --name SRT-Translator \
-  --add-data "config/languages.json:config" \
-  run_gui.py
+  --add-data "srt_translator/core/config/languages.json:config" \
+  srt_translator/gui/main_window.py
 ```
 
 Output is created in `dist/`. On macOS you will get `SRT-Translator.app`; on Windows `SRT-Translator\SRT-Translator.exe`.
@@ -198,7 +205,7 @@ For multi‑hour translation jobs, you'll want to prevent your Mac from going to
 **Option 2: Terminal Command (For users familiar with Mac Terminal)**
 If you're comfortable using Terminal, you can run the app with a command that keeps the system awake:
 ```
-caffeinate -imsu python3 run_gui.py
+caffeinate -imsu srtx
 ```
 
 **Note:** Both methods will keep your Mac awake during long translations while allowing the screen to sleep to save power. The app will continue working in the background, and you can check progress in the logs.
@@ -383,8 +390,8 @@ The termbase is a JSON file that ensures consistent translations for important b
 3. **Hybrid Approach**: Start with AI generation, then manually refine
 
 **CLI Mode Usage:**
-- Place your `termbase.json` file in the project root directory (same level as `run_cli.py`)
-- The CLI will automatically load it when you run `python run_cli.py`
+- Place your `termbase.json` file in the project root directory
+- The CLI will automatically load it when you run `srt-cli`
 - No environment variable configuration needed for the termbase
 
 ### Example Configuration

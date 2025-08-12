@@ -321,9 +321,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  srt-translator                    # Translate files in default source directory
-  srt-translator file1.srt         # Translate specific file
-  srt-translator --help            # Show this help message
+  srt-cli                    # Translate files in default source directory
+srt-cli file1.srt         # Translate specific file
+srt-cli --help            # Show this help message
         """,
     )
 
@@ -351,9 +351,8 @@ Examples:
             # Use ConfigResolver to get configuration for default behavior
             config = ConfigResolver.get_translation_config_for_cli()
             # For CLI mode without specific files, use the default source directory
-            # This maintains backward compatibility while enforcing the new architecture
-            # Note: SOURCE_DIR should come from config, not global import
-            source_dir = "original_captions"  # Default value, should come from config
+            # Use default source directory for CLI mode
+            source_dir = "original_captions"  # Default value
             if os.path.exists(source_dir):
                 file_paths = [
                     os.path.join(source_dir, f)

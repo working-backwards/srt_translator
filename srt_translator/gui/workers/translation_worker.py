@@ -259,30 +259,6 @@ class TranslationWorker(QObject):
             self.logger.error(f"Error setting up AI configuration: {e}")
             # Don't raise - this is not critical for translation
 
-    def update_env_dnt_terms(self, _dnt_terms: List[str]):
-        """Update DNT terms (DEPRECATED - use settings manager instead)"""
-        self.logger.warning(
-            "update_env_dnt_terms() is deprecated - use settings manager instead"
-        )
-        # This method is kept for backward compatibility but does nothing
-        # DNT terms should be passed directly to translation functions
-
-    def update_termbase(self, _language: str, _termbase: Dict[str, str]):
-        """Update termbase (DEPRECATED - use settings manager instead)"""
-        self.logger.warning(
-            "update_termbase() is deprecated - use settings manager instead"
-        )
-        # This method is kept for backward compatibility but does nothing
-        # Termbase should be passed directly to translation functions
-
-    def update_env_languages(self):
-        """Update environment languages (DEPRECATED - use direct parameters instead)"""
-        self.logger.warning(
-            "update_env_languages() is deprecated - use direct parameters instead"
-        )
-        # This method is kept for backward compatibility but does nothing
-        # Languages are now passed directly to translate_srt_files()
-
     def run_fixer(self):
         """Run the fixer to clean up translation issues"""
         if not hasattr(self, "translation_results") or not self.log_file:

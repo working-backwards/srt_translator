@@ -585,7 +585,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
             return {}
 
     def _parse_termbase_response(self, response_text: str) -> Dict[str, str]:
-        """Parse the AI response for termbase (legacy method)"""
+        """Parse the AI response for termbase"""
         try:
             # Clean the response text
             cleaned = response_text.strip()

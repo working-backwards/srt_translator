@@ -48,15 +48,15 @@ If you want to create executables from source:
    - Windows:
      ```bash
      pyinstaller --noconsole --name SRT-Translator \
-       --add-data "config\\languages.json;config" \
-       run_gui.py
+       --add-data "srt_translator/core/config/languages.json;srt_translator/core/config" \
+       srt_translator/gui/main_window.py
      ```
    - macOS:
      ```bash
       # Build a Finder app (.app bundle)
       pyinstaller --windowed --name SRT-Translator \
-        --add-data "config/languages.json:config" \
-        run_gui.py
+        --add-data "srt_translator/core/config/languages.json:srt_translator/core/config" \
+        srt_translator/gui/main_window.py
       
       # Build/update only the single-file console-launchable binary
       # (uses the provided .spec and places output in dist/SRT-Translator)
@@ -65,8 +65,8 @@ If you want to create executables from source:
    - Linux:
      ```bash
      pyinstaller --windowed --name SRT-Translator \
-       --add-data "config/languages.json:config" \
-       run_gui.py
+       --add-data "srt_translator/core/config/languages.json:config" \
+       srt_translator/gui/main_window.py
      ```
 5. **Find executables** in the `dist/` folder
 
@@ -119,10 +119,10 @@ If you want to create executables from source:
 5. **Run the application**:
    ```bash
    # GUI version
-   python run_gui.py
+   srtx
    
    # CLI version
-   python run_cli.py
+   srt-cli
    ```
 
 ### macOS: Prevent Sleep for Long Runs
@@ -130,7 +130,7 @@ If you want to create executables from source:
 For multi‑hour jobs, use `caffeinate` to keep the system awake while allowing the display to sleep:
 
 ```bash
-caffeinate -imsu python3 run_gui.py
+caffeinate -imsu srtx
 ## 🔁 Rebuilding (macOS)
 
 Use these depending on what you need to refresh:
@@ -144,18 +144,18 @@ Use these depending on what you need to refresh:
 - Rebuild a fresh Finder app (.app bundle):
   ```bash
   rm -rf dist/SRT-Translator.app build
-  pyinstaller --windowed --name SRT-Translator \
-    --clean --noconfirm \
-    --add-data "config/languages.json:config" \
-    run_gui.py
+       pyinstaller --windowed --name SRT-Translator \
+       --clean --noconfirm \
+       --add-data "srt_translator/core/config/languages.json:srt_translator/core/config" \
+       srt_translator/gui/main_window.py
   # Open it
   open dist/SRT-Translator.app
   ```
 
 - Quick local test without packaging:
-  ```bash
-  python run_gui.py
-  ```
+   ```bash
+   srtx
+   ```
 
 ```
 
@@ -204,7 +204,7 @@ Flags:
 
 1. **Run the GUI**:
    ```bash
-   python run_gui.py
+   srtx
    ```
 
 2. **Verify the interface loads** without errors
@@ -220,7 +220,7 @@ Flags:
 
 2. **Run translation**:
    ```bash
-   python run_cli.py
+   srt-cli
    ```
 
 3. **Check output** in `translated_srt_files/` directory
@@ -306,7 +306,12 @@ Flags:
 
 3. **Test the installation**:
    ```bash
-   python run_tests.py
+   # Test the console scripts
+   srtx --help
+   srt-cli --help
+   
+   # Run tests if available
+   python -m pytest tests/  # or your test command
    ```
 
 ---

@@ -11,8 +11,7 @@ from pathlib import Path
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Get logger for this module
@@ -51,12 +50,12 @@ def main():
 
     # 1. Format code with Black
     success &= run_command(
-        ["black", "srt_core", "gui", "tests", "scripts"], "Black code formatting"
+        ["black", "srt_translator", "tests", "scripts"], "Black code formatting"
     )
 
     # 2. Sort imports with isort
     success &= run_command(
-        ["isort", "srt_core", "gui", "tests", "scripts"], "isort import sorting"
+        ["isort", "srt_translator", "tests", "scripts"], "isort import sorting"
     )
 
     logger.info("=" * 60)

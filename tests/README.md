@@ -21,12 +21,16 @@ tests/
 
 ### All Tests
 ```bash
-python run_tests.py
+# Using pytest directly (recommended)
+pytest tests/ -v
+
+# Or if you have a custom test runner
+python -m pytest tests/ -v
 ```
 
 ### GUI Tests Only
 ```bash
-python run_tests.py gui
+pytest tests/gui/ -v
 ```
 
 ### Using pytest directly

@@ -105,8 +105,6 @@ class SettingsManager:
             new_state.target_languages = languages.copy()
             self._state = new_state
         self._persist_state(self._state)
-        # Also update legacy storage for backward compatibility
-        self.save_target_languages(languages)
 
     def get_current_dnt_terms(self) -> List[str]:
         """Get current DNT terms (thread-safe)"""
@@ -156,7 +154,119 @@ class SettingsManager:
             self.logger.warning(f"Failed to load state, using defaults: {e}")
         return ConfigState(target_languages={}, dnt_terms=[], termbase={})
 
-    # === LEGACY METHODS (for backward compatibility) ===
+    def load_last_input_directory(self) -> str:
+        """Load last used input directory"""
+        return self.settings.value("last_input_directory", "")
+
+    def save_last_output_directory(self, directory: str) -> None:
+        """Save last used output directory"""
+        self.settings.setValue("last_output_directory", directory)
+
+    def load_last_output_directory(self) -> str:
+        """Load last used output directory"""
+        return self.settings.value("last_output_directory", "")
+
+    def save_selected_files(self, file_paths: List[str]) -> None:
+        """Save list of selected files"""
+        self.settings.setValue("selected_files", file_paths)
+
+    def load_selected_files(self) -> List[str]:
+        """Load list of selected files"""
+        return self.settings.value("selected_files", [])
+
+    def save_window_geometry(self, geometry: bytes) -> None:
+        """Save window geometry"""
+        self.settings.setValue("window_geometry", geometry)
+
+    def load_window_geometry(self) -> Optional[bytes]:
+        """Load window geometry"""
+        return self.settings.value("window_geometry", None)
+
+    def clear_all_settings(self) -> None:
+        """Clear all settings"""
+        self.settings.clear()
+        # Reset current state
+        with self._lock:
+            self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
+
+    def save_ai_config(
+        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
+    ) -> None:
+        """Save AI-generated configuration"""
+        # Save AI configuration
+        self.settings.setValue("ai_dnt_terms", dnt_terms)
+        self.settings.setValue("ai_termbase", termbase)
+        self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
+
+        # Also update current state
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.dnt_terms = dnt_terms.copy()
+            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
+            self._state = new_state
+
+        # Calculate and store file hash for change detection
+        file_hash = self._calculate_file_hash()
+        self.settings.setValue("ai_config_file_hash", file_hash)
+
+    def load_ai_config(
+        self,
+    ) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
+        """Load AI-generated configuration"""
+        dnt_terms = self.settings.value("ai_dnt_terms", [])
+        termbase = self.settings.value("ai_termbase", {})
+        return dnt_terms, termbase
+
+    def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
+        """Check if AI configuration is recent"""
+        timestamp_str = self.settings.value("ai_config_timestamp", "")
+        if not timestamp_str:
+            return False
+
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str)
+            age = datetime.now() - timestamp
+            return age.days <= max_age_days
+        except (ValueError, TypeError):
+            return False
+
+    def has_ai_config(self) -> bool:
+        """Check if AI configuration exists"""
+        dnt_terms, termbase = self.load_ai_config()
+        return bool(dnt_terms or termbase)
+
+    def clear_ai_config(self) -> None:
+        """Clear AI configuration"""
+        self.settings.remove("ai_dnt_terms")
+        self.settings.remove("ai_termbase")
+        self.settings.remove("ai_config_timestamp")
+        self.settings.remove("ai_config_file_hash")
+
+        # Also clear from current state
+        with self._lock:
+            new_state = self._state.copy()
+            new_state.dnt_terms = []
+            new_state.termbase = {}
+            self._state = new_state
+
+    def get_ai_config_age_days(self) -> Optional[int]:
+        """Get age of AI configuration in days"""
+        timestamp_str = self.settings.value("ai_config_timestamp", "")
+        if not timestamp_str:
+            return None
+
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str)
+            age = datetime.now() - timestamp
+            return age.days
+        except (ValueError, TypeError):
+            return None
+
+    def get_adaptive_popular_languages(self) -> List[str]:
+        """Get popular languages for the UI"""
+        from srt_translator.core.config.language_config import language_config
+
+        return language_config.get_popular_languages()
 
     def save_api_key(self, api_key: str) -> None:
         """Save API key to settings"""
@@ -296,114 +406,6 @@ class SettingsManager:
     def save_last_input_directory(self, directory: str) -> None:
         """Save last used input directory"""
         self.settings.setValue("last_input_directory", directory)
-
-    def load_last_input_directory(self) -> str:
-        """Load last used input directory"""
-        return self.settings.value("last_input_directory", "")
-
-    def save_last_output_directory(self, directory: str) -> None:
-        """Save last used output directory"""
-        self.settings.setValue("last_output_directory", directory)
-
-    def load_last_output_directory(self) -> str:
-        """Load last used output directory"""
-        return self.settings.value("last_output_directory", "")
-
-    def save_selected_files(self, file_paths: List[str]) -> None:
-        """Save list of selected files"""
-        self.settings.setValue("selected_files", file_paths)
-
-    def load_selected_files(self) -> List[str]:
-        """Load list of selected files"""
-        return self.settings.value("selected_files", [])
-
-    def save_window_geometry(self, geometry: bytes) -> None:
-        """Save window geometry"""
-        self.settings.setValue("window_geometry", geometry)
-
-    def load_window_geometry(self) -> Optional[bytes]:
-        """Load window geometry"""
-        return self.settings.value("window_geometry", None)
-
-    def clear_all_settings(self) -> None:
-        """Clear all settings"""
-        self.settings.clear()
-        # Reset current state
-        with self._lock:
-            self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
-
-    def save_ai_config(
-        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
-    ) -> None:
-        """Save AI-generated configuration"""
-        # Save to legacy storage
-        self.settings.setValue("ai_dnt_terms", dnt_terms)
-        self.settings.setValue("ai_termbase", termbase)
-        self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
-
-        # Also update current state
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.dnt_terms = dnt_terms.copy()
-            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
-            self._state = new_state
-
-        # Calculate and store file hash for change detection
-        file_hash = self._calculate_file_hash()
-        self.settings.setValue("ai_config_file_hash", file_hash)
-
-    def load_ai_config(
-        self,
-    ) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
-        """Load AI-generated configuration"""
-        dnt_terms = self.settings.value("ai_dnt_terms", [])
-        termbase = self.settings.value("ai_termbase", {})
-        return dnt_terms, termbase
-
-    def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
-        """Check if AI configuration is recent"""
-        timestamp_str = self.settings.value("ai_config_timestamp", "")
-        if not timestamp_str:
-            return False
-
-        try:
-            timestamp = datetime.fromisoformat(timestamp_str)
-            age = datetime.now() - timestamp
-            return age.days <= max_age_days
-        except (ValueError, TypeError):
-            return False
-
-    def has_ai_config(self) -> bool:
-        """Check if AI configuration exists"""
-        dnt_terms, termbase = self.load_ai_config()
-        return bool(dnt_terms or termbase)
-
-    def clear_ai_config(self) -> None:
-        """Clear AI configuration"""
-        self.settings.remove("ai_dnt_terms")
-        self.settings.remove("ai_termbase")
-        self.settings.remove("ai_config_timestamp")
-        self.settings.remove("ai_config_file_hash")
-
-        # Also clear from current state
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.dnt_terms = []
-            new_state.termbase = {}
-            self._state = new_state
-
-    def get_ai_config_age_days(self) -> Optional[int]:
-        """Get age of AI configuration in days"""
-        timestamp_str = self.settings.value("ai_config_timestamp", "")
-        if not timestamp_str:
-            return None
-
-        try:
-            timestamp = datetime.fromisoformat(timestamp_str)
-            age = datetime.now() - timestamp
-            return age.days
-        except (ValueError, TypeError):
-            return None
 
     def _calculate_file_hash(self) -> str:
         """Calculate hash of selected files for change detection"""

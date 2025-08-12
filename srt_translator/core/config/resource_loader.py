@@ -1,4 +1,4 @@
-# srt_core/config/resource_loader.py
+# srt_translator/core/config/resource_loader.py
 from __future__ import annotations
 
 import json
@@ -21,7 +21,7 @@ def load_languages():
     try:
         # Python 3.9+: resources.files
         data = (
-            resources.files("srt_core.config")
+            resources.files("srt_translator.core.config")
             .joinpath("languages.json")
             .read_text(encoding="utf-8")
         )

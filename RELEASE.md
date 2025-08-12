@@ -110,8 +110,8 @@ python -m build
 pip install dist/*.whl
 
 # Verify entry points work
-srt-translator --version
-srt-translator-gui --help
+srt-cli --version
+srtx --help
 ```
 
 ### 6. Create RC Tag
@@ -136,7 +136,7 @@ git push origin v1.0.0rc1
 pip install --index-url https://test.pypi.org/simple/ srt-translator==1.0.0rc1
 
 # Verify functionality
-srt-translator --version
+srt-cli --version
 ```
 
 ## Final Release Process

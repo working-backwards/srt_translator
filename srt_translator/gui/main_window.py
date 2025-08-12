@@ -485,7 +485,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             except Exception:
                 # Fallback to simple error message
                 pass
-        
+
         # Fallback to simple error message
         QMessageBox.warning(
             self,
@@ -818,11 +818,47 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.error(f"Error sampling memory: {e}")
 
 
-def main():
-    """Main function for testing the GUI"""
-    from PySide6.QtWidgets import QApplication
+def main(argv=None):
+    """Main function for the GUI application"""
+    import argparse
+    from importlib.metadata import version, PackageNotFoundError
 
-    app = QApplication(sys.argv)
-    window = SRTTranslatorMainWindow()
-    window.show()
-    sys.exit(app.exec())
+    def _print_version():
+        try:
+            print(f"SRT Translator {version('srt-translator')}")
+        except PackageNotFoundError:
+            # Fallback if running from source without installed dist name
+            print("SRT Translator")
+
+    def launch_gui():
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication(sys.argv)
+        window = SRTTranslatorMainWindow()
+        window.show()
+        sys.exit(app.exec())
+
+    parser = argparse.ArgumentParser(
+        prog="srtx",
+        description=(
+            "Launch the SRT Translator graphical user interface.\n"
+            "Use the GUI to select subtitle files, choose target languages,\n"
+            "and configure translation settings."
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        "-v",
+        action="store_true",
+        help="Show the application version and exit.",
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.version:
+        _print_version()
+        return 0  # argparse already uses stdout; exit code 0
+
+    # Default: launch GUI
+    launch_gui()

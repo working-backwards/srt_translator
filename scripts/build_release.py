@@ -88,8 +88,8 @@ If you prefer to work with the source code:
 
 3. **Run the application**:
    ```bash
-   python run_gui.py    # GUI version
-   python run_cli.py    # CLI version
+   srtx              # GUI version
+   srt-cli           # CLI version
    ```
 
 ## System Requirements

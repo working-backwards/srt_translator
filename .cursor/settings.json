@@ -18,8 +18,7 @@
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.stubPath": "./typings",
     "python.analysis.extraPaths": [
-        "./srt_core",
-        "./gui"
+        "./srt_translator"
     ],
     "files.associations": {
         "*.py": "python"

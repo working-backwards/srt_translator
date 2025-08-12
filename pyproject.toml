@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["srt_translator*"]
-exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_logs*", "original_captions*", "translated_srt_files*", "srt_core*", "gui*"]
+exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_logs*", "original_captions*", "translated_srt_files*"]
 
 [tool.setuptools.package-data]
 "srt_translator.gui" = ["**/*.ui", "**/*.qss", "assets/**"]
@@ -48,8 +48,8 @@ gui = [
 
 # Build scripts
 [project.scripts]
-srt-translator = "srt_translator.cli.app:main"
-srt-translator-gui = "srt_translator.gui.app:main"
+srtx = "srt_translator.gui.main_window:main"
+srt-cli = "srt_translator.cli.app:main"
 
 # PyInstaller configuration
 #[tool.pyinstaller]

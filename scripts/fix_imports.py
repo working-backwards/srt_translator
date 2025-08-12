@@ -10,8 +10,7 @@ from pathlib import Path
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Get logger for this module
@@ -101,9 +100,9 @@ def main():
     # Files with known E402 errors
     files_to_fix = [
         "scripts/run_fixer_only.py",
-        "srt_core/config/settings.py",
-        "srt_core/main.py",
-        "srt_core/translator/translator.py",
+        "srt_translator/core/config/settings.py",
+        "srt_translator/core/main.py",
+        "srt_translator/core/translator/translator.py",
         "tests/conftest.py",
         "tests/gui/test_termbase_editor.py",
         "tests/gui/test_editors_integration.py",

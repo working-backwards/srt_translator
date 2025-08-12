@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['run_gui.py'],
+    ['srt_translator/gui/main_window.py'],
     pathex=[],
     binaries=[],
-    datas=[('config\\\\languages.json', 'config')],
-    hiddenimports=[],
+    datas=[('srt_translator/core/config/languages.json', 'srt_translator/core/config')],
+    hiddenimports=['srt_translator.core', 'srt_translator.gui'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

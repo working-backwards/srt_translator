@@ -62,9 +62,9 @@ def main(argv: list[str] | None = None) -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  srt-translator                 # Run with default settings
-  srt-translator --debug         # Enable debug logging
-  srt-translator --version       # Show version information
+  srt-cli                 # Run with default settings
+srt-cli --debug         # Enable debug logging
+srt-cli --version       # Show version information
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")

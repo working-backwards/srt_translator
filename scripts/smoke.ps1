@@ -127,7 +127,7 @@ try {
 # Test 4: Check GUI entry point
 Write-Header "Test 4: GUI Entry Point"
 try {
-    $guiHelp = srt-translator-gui --help 2>&1
+    $guiHelp = srtx --help 2>&1
     if ($guiHelp -match "usage:") {
         Write-Success "GUI entry point working"
     } else {

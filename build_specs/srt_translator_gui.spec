@@ -5,18 +5,18 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path.cwd()
-ENTRY = str(ROOT / "run_gui.py")
+ENTRY = str(ROOT / "srt_translator" / "gui" / "main_window.py")
 
 # Bundle data if present (adjust/remove if you don't use it)
 DATAS = []
 lang_json = ROOT / "config" / "languages.json"
 if lang_json.exists():
-    # put inside runtime temp under srt_core/config
-    DATAS.append((str(lang_json), "srt_core/config"))
+    # put inside runtime temp under srt_translator/core/config
+    DATAS.append((str(lang_json), "srt_translator/core/config"))
 
 # Bring in dynamic packages defensively
 HIDDEN_IMPORTS = []
-for pkg in ("srt_core", "gui"):
+for pkg in ("srt_translator.core", "srt_translator.gui"):
     try:
         HIDDEN_IMPORTS += collect_submodules(pkg)
     except Exception:

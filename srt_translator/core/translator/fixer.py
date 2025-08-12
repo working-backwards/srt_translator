@@ -102,7 +102,7 @@ class SRTFixer:
     def _parse_phantom_placeholder(self, entry):
         """Parse phantom placeholder issues.
 
-        Supports both the legacy format (with "Subtitle Number", "Original Text",
+        Supports both the older format (with "Subtitle Number", "Original Text",
         and "Translated Text") and the newer batch format:
 
             File: <name>.srt
@@ -120,8 +120,8 @@ class SRTFixer:
         filename_match = re.search(r"File: (.+?)(?:\n|$)", entry)
         phantom_match = re.search(r"Phantom Placeholder: (.+?)(?:\n|$)", entry)
 
-        # Legacy optional fields
-        subtitle_match_legacy = re.search(r"Subtitle Number: (.+?)(?:\n|$)", entry)
+        # Optional fields for older format
+        subtitle_match_old = re.search(r"Subtitle Number: (.+?)(?:\n|$)", entry)
         original_text_match = re.search(r"Original Text: (.+?)(?:\n|$)", entry)
         translated_text_match = re.search(r"Translated Text: (.+?)(?:\n|$)", entry)
 
@@ -139,8 +139,8 @@ class SRTFixer:
         assert phantom_match is not None
 
         # Derive a subtitle identifier for bookkeeping (not strictly used in fixing)
-        if subtitle_match_legacy:
-            subtitle_identifier = subtitle_match_legacy.group(1).strip()  # type: ignore[union-attr]
+        if subtitle_match_old:
+            subtitle_identifier = subtitle_match_old.group(1).strip()  # type: ignore[union-attr]
         elif batch_match:
             # e.g., "batch_22_subs_123-127"
             subtitle_identifier = f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"  # type: ignore[union-attr]

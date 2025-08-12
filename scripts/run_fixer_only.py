@@ -6,8 +6,8 @@ import sys
 
 from dotenv import load_dotenv
 
-from srt_core.config.settings import FIX_AGGRESSIVENESS, OUTPUT_BASE_DIR
-from srt_core.translator.fixer import SRTFixer
+from srt_translator.core.config.settings import FIX_AGGRESSIVENESS, OUTPUT_BASE_DIR
+from srt_translator.core.translator.fixer import SRTFixer
 
 #!/usr/bin/env python3
 """
@@ -23,7 +23,7 @@ logging.basicConfig(
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
-# Add parent directory to path so we can import srt_core module
+# Add parent directory to path so we can import srt_translator module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -69,8 +69,8 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_fixer_only.py --log-file path/to/log/file.log
-  python run_fixer_only.py --log-file path/to/log/file.log --output-dir path/to/translations
+  python scripts/run_fixer_only.py --log-file path/to/log/file.log
+  python scripts/run_fixer_only.py --log-file path/to/log/file.log --output-dir path/to/translations
         """,
     )
 

@@ -21,7 +21,6 @@ SOURCE_DIR = (
 )
 
 # Paths are provided via TranslationConfig at runtime now.
-# Keep environment fallbacks for legacy code paths where needed.
 OUTPUT_BASE_DIR = os.environ.get(
     "OUTPUT_DIRECTORY", os.path.join(BASE_DIR, "translated_srt_files")
 )
