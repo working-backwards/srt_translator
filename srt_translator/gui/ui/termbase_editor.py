@@ -6,8 +6,7 @@ Termbase Editor for the SRT Translator GUI.
 import logging
 from typing import Dict, List, Tuple
 
-from PySide6.QtCore import Signal
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QDialog,
@@ -42,7 +41,9 @@ class TermbaseEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.termbase: Dict[str, Dict[str, str]] = {}  # {language: {english_term: translation}}
+        self.termbase: Dict[str, Dict[str, str]] = (
+            {}
+        )  # {language: {english_term: translation}}
         self.languages: List[str] = []
         self._updating_table = False  # Flag to prevent signal loops
         self.setup_ui()
@@ -112,6 +113,9 @@ class TermbaseEditor(QWidget):
         self.languages = list(termbase.keys()) if termbase else []
         self.refresh_table()
         self.update_count_label()
+        # Emit signal to notify of changes
+        if not self._updating_table:
+            self.termbase_changed.emit(self.termbase)
 
     def get_termbase(self) -> dict:
         """Get the current termbase data."""

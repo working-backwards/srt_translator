@@ -4,7 +4,7 @@ Language configuration for the SRT Translator.
 """
 
 import logging
-from typing import Dict, List, Optional, Any, cast
+from typing import Any, Dict, List, Optional, cast
 
 from .languages_data import LANGUAGES_JSON
 
@@ -14,10 +14,13 @@ class LanguageConfig:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.config: Dict[str, Any] = self.load_config()
+        self._config: Optional[Dict[str, Any]] = None
 
     def load_config(self) -> dict:
         """Load language configuration from JSON file using resource loader"""
+        if self._config is not None:
+            return self._config
+
         try:
             # Use the resource loader which handles both package resources and repo paths
             config = LANGUAGES_JSON
@@ -30,10 +33,18 @@ class LanguageConfig:
                 self.logger.info(
                     "Loaded language config with unknown number of languages"
                 )
+            self._config = config
             return config
         except Exception as e:
             self.logger.error(f"Error loading language config: {e}")
-            return self.get_fallback_config()
+            fallback = self.get_fallback_config()
+            self._config = fallback
+            return fallback
+
+    @property
+    def config(self) -> dict:
+        """Get configuration, loading if necessary"""
+        return self.load_config()
 
     def get_fallback_config(self) -> dict:
         """Get fallback configuration if JSON file is unavailable"""
@@ -185,5 +196,7 @@ class LanguageConfig:
         return None
 
 
-# Global instance for easy access
-language_config = LanguageConfig()
+# Create instance only when needed, not at import time
+def get_language_config() -> LanguageConfig:
+    """Get language configuration instance (lazy initialization)"""
+    return LanguageConfig()

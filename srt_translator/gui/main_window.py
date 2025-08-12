@@ -8,8 +8,7 @@ import os
 import sys
 
 import psutil
-from PySide6.QtCore import QObject, QThread, QTimer, Signal
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -21,7 +20,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 
 from .ai_config import AIConfigGenerator
 from .config_manager import GUIConfigManager
@@ -821,7 +819,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 def main(argv=None):
     """Main function for the GUI application"""
     import argparse
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError, version
 
     def _print_version():
         try:

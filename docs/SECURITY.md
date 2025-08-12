@@ -35,7 +35,7 @@ Only the following **safe, non-sensitive** files are included:
 
 ### ✅ Required Application Files
 - `config/languages.json` - Language definitions (no sensitive data)
-- `.env.example` - Template file (no real API keys)
+- `examples/env_example` - Template file (no real API keys)
 
 ### ✅ Application Code
 - All Python source code
@@ -83,7 +83,7 @@ The GUI application is designed to work **without** a `.env` file:
 
 ### ✅ Safe to Distribute
 - The executable itself (after security verification)
-- `.env.example` file (template only)
+- `examples/env_example` file (template only)
 - `QUICK_START.md` (installation instructions)
 
 ### ❌ Never Distribute

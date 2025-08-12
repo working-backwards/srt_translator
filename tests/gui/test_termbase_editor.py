@@ -1,120 +1,87 @@
-import sys
+"""
+Tests for the Termbase Editor.
+"""
+
 import logging
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QApplication,
-    QHBoxLayout,
-    QMainWindow,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+import pytest
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-
-"""
-Test script for Termbase Editor
-"""
-
-sys.path.insert(0, "gui")
+logger = logging.getLogger(__name__)
 
 
-class TestWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Termbase Editor Test")
-        self.setGeometry(100, 100, 800, 600)
+class TestTermbaseEditor:
+    """Test class for Termbase Editor functionality."""
 
+    def test_editor_creation(self, qapp):
+        """Test that the termbase editor can be created."""
+        editor = TermbaseEditor()
+        assert editor is not None
+        assert hasattr(editor, "get_termbase")
+        assert hasattr(editor, "set_termbase")
+
+    def test_set_and_get_termbase(self, qapp, sample_termbase):
+        """Test setting and getting termbase."""
+        editor = TermbaseEditor()
+
+        editor.set_termbase(sample_termbase)
+        retrieved_termbase = editor.get_termbase()
+
+        assert retrieved_termbase == sample_termbase
+
+    def test_empty_termbase(self, qapp):
+        """Test handling of empty termbase."""
+        editor = TermbaseEditor()
+
+        editor.set_termbase({})
+        retrieved_termbase = editor.get_termbase()
+
+        assert retrieved_termbase == {}
+
+    def test_termbase_changed_signal(self, qapp, sample_termbase):
+        """Test that the termbase_changed signal is emitted."""
+        editor = TermbaseEditor()
+        received_termbase = []
+
+        def on_termbase_changed(termbase):
+            received_termbase.append(termbase)
+
+        editor.termbase_changed.connect(on_termbase_changed)
+
+        # Set termbase to trigger signal
+        editor.set_termbase(sample_termbase)
+
+        # Process events to allow signal to be emitted
+        qapp.processEvents()
+
+        assert len(received_termbase) > 0
+        assert received_termbase[-1] == sample_termbase
+
+    def test_editor_integration(self, qapp, sample_termbase):
+        """Test editor integration in a window context."""
+        window = QMainWindow()
+        window.setWindowTitle("Termbase Editor Test")
+        window.setGeometry(100, 100, 800, 600)
+
+        # Create central widget
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        window.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
         # Create the termbase editor
-        self.termbase_editor = TermbaseEditor()
+        editor = TermbaseEditor()
+        layout.addWidget(editor)
 
-        # Test data - Termbase with language-specific translations
-        # Note: DNT_TERMS would be separate and language-agnostic
-        test_termbase = {
-            "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO", "Amazon": "Amazon"},
-            "French": {
-                "API": "API",
-                "CEO": "PDG",  # French translation
-                "CFO": "DF",  # French translation
-                "Amazon": "Amazon",
-            },
-        }
+        # Test termbase
+        editor.set_termbase(sample_termbase)
 
-        self.termbase_editor.set_termbase(test_termbase)
-        self.termbase_editor.termbase_changed.connect(self.on_termbase_changed)
+        # Verify termbase was set
+        retrieved_termbase = editor.get_termbase()
+        assert retrieved_termbase == sample_termbase
 
-        # Test buttons
-        button_layout = QHBoxLayout()
-
-        get_btn = QPushButton("Get Current Termbase")
-        get_btn.clicked.connect(self.get_current_termbase)
-
-        clear_btn = QPushButton("Clear Termbase")
-        clear_btn.clicked.connect(self.clear_termbase)
-
-        button_layout.addWidget(get_btn)
-        button_layout.addWidget(clear_btn)
-        button_layout.addStretch()
-
-        layout.addWidget(self.termbase_editor)
-        layout.addLayout(button_layout)
-
-    def on_termbase_changed(self, termbase):
-        logger = logging.getLogger(__name__)
-        logger.info(f"Termbase changed: {len(termbase)} languages")
-        for language, terms in termbase.items():
-            logger.info(f"  {language}: {len(terms)} terms")
-
-    def get_current_termbase(self):
-        termbase = self.termbase_editor.get_termbase()
-        logger = logging.getLogger(__name__)
-        logger.info(f"Current termbase: {len(termbase)} languages")
-        for language, terms in termbase.items():
-            logger.info(f"  {language}: {terms}")
-
-    def clear_termbase(self):
-        self.termbase_editor.set_termbase({})
-
-
-def main():
-    app = QApplication(sys.argv)
-    app.setStyleSheet(
-        """
-        QMainWindow { 
-            background-color: #f5f5f5;
-        }
-        QTableWidget {
-            background-color: white;
-            gridline-color: #d0d0d0;
-        }
-        QTableWidget::item {
-            padding: 4px;
-        }
-        QTableWidget::item:selected {
-            background-color: #0078d4;
-            color: white;
-        }
-        QHeaderView::section {
-            background-color: #f0f0f0;
-            padding: 6px;
-            border: 1px solid #d0d0d0;
-            font-weight: bold;
-        }
-    """
-    )
-
-    window = TestWindow()
-    window.show()
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
+        # Clean up
+        window.close()

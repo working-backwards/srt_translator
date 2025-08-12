@@ -10,7 +10,7 @@ from typing import List
 import srt
 from openai import OpenAI
 
-from srt_translator.core.config.language_config import language_config
+from srt_translator.core.config.language_config import get_language_config
 from srt_translator.core.translator.srt_parser import SRTParser
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.logging_setup import log_placeholder_issue
@@ -691,7 +691,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
         current_batch = []
 
         # Get language-specific sentence boundary rules
-
+        language_config = get_language_config()
         lang_rules = language_config.get_language_rules(target_lang)
         sentence_endings = tuple(lang_rules["sentence_endings"])
         break_markers = lang_rules["break_markers"]

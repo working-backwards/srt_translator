@@ -11,12 +11,12 @@ import time
 import uuid
 from collections import deque
 from contextlib import redirect_stdout
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
-from srt_translator.core.config.translation_config import build_config_from_gui
+from srt_translator.core.config.models import TranslationConfig
 
 # Import fixer for automatic cleanup after translation
 from srt_translator.core.translator.fixer import SRTFixer
@@ -117,23 +117,49 @@ class TranslationWorker(QObject):
 
             # Build configuration from GUI settings manager
             if self.settings_manager:
-                config = build_config_from_gui(self.settings_manager)
+                # Load DNT terms and termbase from settings manager BEFORE creating config
+                dnt_terms, termbase = self.settings_manager.load_ai_config()
+
+                # Build config from settings manager with actual data
+                raw_config = {
+                    "api_key": self.api_key,
+                    "output_directory": self.output_directory or "translated_srt_files",
+                    "target_languages": self.target_languages,
+                    "openai_model": "gpt-4o-mini",
+                    "batch_size": "5",
+                    "aggressiveness": "0.75",
+                    "log_mode": "Standard",
+                    "dnt_terms": dnt_terms,
+                    "termbase": termbase,
+                }
+
+                config = TranslationConfig.from_raw(raw_config, mode="GUI")
                 self.logger.info(
-                    f"Using configuration from settings manager: {config.to_log_string()}"
+                    f"Using configuration from settings manager: {len(config.target_languages)} languages"
                 )
+                self.logger.info(f"DNT terms loaded: {len(config.dnt_terms)}")
+                self.logger.info(f"Termbase languages loaded: {len(config.termbase)}")
+                if config.termbase:
+                    self.logger.info(
+                        f"Termbase languages: {list(config.termbase.keys())}"
+                    )
             else:
                 # Fallback to direct parameters
-                from srt_translator.core.config.translation_config import (
-                    build_config_from_parameters,
-                )
+                raw_config = {
+                    "target_languages": self.target_languages,
+                    "api_key": self.api_key,
+                    "output_directory": self.output_directory,
+                    "openai_model": "gpt-4o-mini",
+                    "batch_size": "5",
+                    "aggressiveness": "0.75",
+                    "log_mode": "Standard",
+                    "dnt_terms": [],
+                    "termbase": {},
+                }
 
-                config = build_config_from_parameters(
-                    target_languages=self.target_languages,
-                    api_key=self.api_key,
-                    output_directory=self.output_directory,
-                )
+                config = TranslationConfig.from_raw(raw_config, mode="GUI")
                 self.logger.info(
-                    f"Using configuration from direct parameters: {config.to_log_string()}"
+                    f"Using configuration from direct parameters: {len(config.target_languages)} languages"
                 )
 
             # Check for cooperative stop before starting translation
@@ -145,38 +171,16 @@ class TranslationWorker(QObject):
             # Capture both stdout and logging output
             from srt_translator.core.main import translate_srt_files
 
-            # Create a custom log handler to capture log messages with throttling
-            class LogCaptureHandler(logging.Handler):
-                def __init__(self, worker_instance):
-                    super().__init__()
-                    self.worker = worker_instance
-
-                def emit(self, record):
-                    msg = self.format(record)
-                    # Use throttled emission to prevent GUI hammering
-                    self.worker._throttled_emit(self.worker.progress_updated, msg)
-
-            # Add our custom handler to both session logger and root logger for complete coverage
-            log_handler = LogCaptureHandler(self)
-            log_handler.setFormatter(logging.Formatter("%(message)s"))
-            session_logger.addHandler(log_handler)
-
-            # Also add to root logger to catch all logging output
-            root_logger = logging.getLogger()
-            root_logger.addHandler(log_handler)
+            # Let the core engine handle its own logging to files
+            # The GUI will display progress through the existing progress signals
 
             # Capture stdout output
             output = io.StringIO()
-            try:
-                with redirect_stdout(output):
-                    # Call translation with configuration object
-                    results = translate_srt_files(
-                        file_paths=self.selected_files, config=config
-                    )
-            finally:
-                # Always clean up handlers, even on error
-                session_logger.removeHandler(log_handler)
-                root_logger.removeHandler(log_handler)
+            with redirect_stdout(output):
+                # Call translation with configuration object
+                results = translate_srt_files(
+                    file_paths=self.selected_files, config=config
+                )
 
             # Remember returned paths for fixer and UI
             self.log_file = results.get("log_file") if results else None

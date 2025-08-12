@@ -5,10 +5,10 @@ Tests basic functionality: parse SRT, verify structure, write output
 """
 
 import logging
-import sys
 import os
-import tempfile
 import shutil
+import sys
+import tempfile
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
@@ -92,7 +92,7 @@ def test_cli_entry_point():
     logger.info("🔧 Testing CLI entry point...")
 
     try:
-        from srt_translator.core.main import main
+        from srt_translator.core.main import translate_srt_files
 
         logger.info("✅ CLI main function found and importable")
         return True

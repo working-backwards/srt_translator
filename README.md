@@ -323,10 +323,13 @@ The SRT Translator requires these parameters to function:
 5. **AI Configuration**: Generate DNT terms and termbase automatically
 
 #### **For CLI Users:**
-1. **Create `.env` file** in project root with required parameters
-2. **Configure input directory** with `INPUT_DIRECTORY=path/to/your/srt/files` (optional, defaults to `./original_captions/` relative to project root)
-3. **Configure languages** in `TARGET_LANGUAGES` environment variable
-4. **Set up DNT terms** and termbase.json manually (optional)
+1. **Copy the example configuration file** to your project root:
+   - **Windows/Linux/macOS:** `cp examples/env_example .env`
+   - **Windows (PowerShell):** `Copy-Item examples/env_example .env`
+2. **Edit the `.env` file** with your actual values
+3. **Configure input directory** with `INPUT_DIRECTORY=path/to/your/srt/files` (optional, defaults to `./original_captions/` relative to project root)
+4. **Configure languages** in `TARGET_LANGUAGES` environment variable
+5. **Set up DNT terms** and termbase.json manually (optional)
 
 ### Example CLI Configuration (.env file)
 ```bash
@@ -348,17 +351,25 @@ FIX_AGGRESSIVENESS=0.75
 
 ### Environment Variables (For Advanced Users)
 
-If you're installing from source, you can configure these settings:
+**Important Configuration Policy:**
+The CLI reads configuration from `.env` files only. OS environment variables are ignored for all settings **except** `OPENAI_API_KEY`, which may be provided via OS environment and overrides `.env` if both are present.
 
 **Required:**
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `TARGET_LANGUAGES`: Dictionary of target languages
+- `OPENAI_API_KEY`: Your OpenAI API key (may also be set via OS environment)
 
-**Optional:**
-- `INPUT_DIRECTORY`: Directory containing your .srt files (default: `./original_captions/` relative to project root)
-- `DNT_TERMS`: JSON array format (e.g., `["term1", "term2", "term3"]`)
+**Optional (`.env` only):**
+- `TARGET_LANGUAGES`: Dictionary of target languages (JSON or CSV format)
+- `DNT_TERMS`: Terms not to translate (JSON array or CSV format)
 - `OPENAI_MODEL`: AI model to use (default: gpt-4o-mini)
+- `BATCH_SIZE`: Translation batch size (default: 5)
 - `AGGRESSIVENESS`: Auto-fix level 0-1 (default: 0.75)
+- `LOG_MODE`: Logging verbosity (Standard/Verbose, default: Standard)
+- `OUTPUT_DIRECTORY`: Where to save translations (default: translated_srt_files)
+- `TERMBASE_PATH`: Path to termbase file (default: termbase.json)
+
+**Format Examples:**
+- `TARGET_LANGUAGES`: `{"Spanish": "es", "French": "fr"}` or `Spanish,French`
+- `DNT_TERMS`: `["YourName", "YourCompany"]` or `YourName,YourCompany`
 
 ### Termbase Configuration
 

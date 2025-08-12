@@ -6,7 +6,9 @@ Configuration manager for the SRT Translator GUI.
 import json
 import logging
 import os
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
+
+from srt_translator.core.config.language_config import LanguageConfig
 
 from .settings_manager import SettingsManager
 
@@ -99,9 +101,8 @@ class GUIConfigManager:
 
         # Try language name to code mapping
         try:
-            from srt_translator.core.config.language_config import language_config
-
-            all_languages = language_config.get_all_languages()
+            config = LanguageConfig()
+            all_languages = config.get_all_languages()
 
             for code, lang_info in all_languages.items():
                 if lang_info.get("name") == target_language:

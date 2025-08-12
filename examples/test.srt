@@ -1,0 +1,19 @@
+1
+00:00:01,000 --> 00:00:04,000
+Hello world
+
+2
+00:00:05,000 --> 00:00:08,000
+This is a test subtitle file
+
+3
+00:00:09,000 --> 00:00:12,000
+Used for testing and examples
+
+4
+00:00:13,000 --> 00:00:16,000
+Contains multiple subtitle entries
+
+5
+00:00:17,000 --> 00:00:20,000
+Perfect for smoke tests and documentation

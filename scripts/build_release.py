@@ -49,7 +49,7 @@ def create_release_package():
         "README.md",
         "LICENSE",
         "config/languages.json",
-        ".env.example",
+        "examples/env_example",
     ]
 
     for file_path in essential_files:
@@ -65,7 +65,7 @@ def create_release_package():
 
 1. **Extract** this package to a folder on your computer
 2. **Configure API Key**: 
-   - Copy `.env.example` to `.env`
+   - Copy `examples/env_example` to `.env`
    - Edit `.env` and add your OpenAI API key
 3. **Run the Application**: Double-click `SRT-Translator.exe`
 4. **Add Your Files**: Place `.srt` files in the `original_captions` folder

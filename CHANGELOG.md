@@ -17,11 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CODE_OF_CONDUCT.md for community standards
 - RELEASE.md with release process documentation
 - CHANGELOG.md for change tracking
+- Safe upper bounds on all critical dependencies
+- Organized repository structure with docs/ and examples/ folders
 
 ### Changed
 - Replaced print() statements with proper logging in CLI
 - Updated CI workflow to use unified package structure
 - Enhanced security scanning with pip-audit integration
+- **BREAKING CHANGE**: CLI configuration policy updated - OS environment variables are now ignored for all settings except OPENAI_API_KEY
+- **BREAKING CHANGE**: CLI now reads configuration from .env files only (OS env ignored for non-API key settings)
+- Repository root reorganized for better maintainability
 
 ### Fixed
 - SRT writer edge case for empty output directories
@@ -95,6 +100,12 @@ If you're upgrading from a previous version:
    - Use `srtx` instead of `python run_gui.py`
    - Use `srt-cli` instead of `python run_cli.py`
 4. Update import statements if you're using the package programmatically
+
+**Configuration Changes (Breaking):**
+- CLI now reads configuration from `.env` files only
+- OS environment variables are ignored for all settings except `OPENAI_API_KEY`
+- To migrate: Copy `examples/env_example` to `.env` and edit with your values
+- API key can still be set via OS environment variable (overrides .env)
 
 ### Version 0.1.0
 This was the initial experimental release with basic functionality. It served as a proof of concept and foundation for the current version.

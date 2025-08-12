@@ -1,79 +1,91 @@
-import sys
+"""
+Tests for the DNT Terms Editor.
+"""
+
 import logging
 
-from PySide6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+import pytest
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-
-# Add the gui directory to the path
-sys.path.insert(0, "gui")
+logger = logging.getLogger(__name__)
 
 
-class TestWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("DNT Terms Editor Test")
-        self.setGeometry(100, 100, 600, 400)
+class TestDNTTermsEditor:
+    """Test class for DNT Terms Editor functionality."""
+
+    def test_editor_creation(self, qapp):
+        """Test that the DNT terms editor can be created."""
+        editor = DNTTermsEditor()
+        assert editor is not None
+        assert hasattr(editor, "get_terms")
+        assert hasattr(editor, "set_terms")
+
+    def test_set_and_get_terms(self, qapp):
+        """Test setting and getting terms."""
+        editor = DNTTermsEditor()
+        test_terms = ["API", "CEO", "CFO", "Amazon", "Google", "Microsoft"]
+
+        editor.set_terms(test_terms)
+        retrieved_terms = editor.get_terms()
+
+        assert retrieved_terms == test_terms
+
+    def test_terms_changed_signal(self, qapp):
+        """Test that the terms_changed signal is emitted."""
+        editor = DNTTermsEditor()
+        received_terms = []
+
+        def on_terms_changed(terms):
+            received_terms.append(terms)
+
+        editor.terms_changed.connect(on_terms_changed)
+
+        # Set terms to trigger signal
+        test_terms = ["API", "CEO"]
+        editor.set_terms(test_terms)
+
+        # Process events to allow signal to be emitted
+        qapp.processEvents()
+
+        assert len(received_terms) > 0
+        assert received_terms[-1] == test_terms
+
+    def test_empty_terms(self, qapp):
+        """Test handling of empty terms list."""
+        editor = DNTTermsEditor()
+
+        editor.set_terms([])
+        retrieved_terms = editor.get_terms()
+
+        assert retrieved_terms == []
+
+    def test_editor_integration(self, qapp):
+        """Test editor integration in a window context."""
+        window = QMainWindow()
+        window.setWindowTitle("DNT Terms Editor Test")
+        window.setGeometry(100, 100, 600, 400)
 
         # Create central widget
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        window.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
         # Create the DNT terms editor
-        self.terms_editor = DNTTermsEditor()
+        editor = DNTTermsEditor()
+        layout.addWidget(editor)
 
-        # Add some test terms
+        # Test terms
         test_terms = ["API", "CEO", "CFO", "Amazon", "Google", "Microsoft"]
-        self.terms_editor.set_terms(test_terms)
+        editor.set_terms(test_terms)
 
-        # Connect the terms_changed signal
-        self.terms_editor.terms_changed.connect(self.on_terms_changed)
+        # Verify terms were set
+        retrieved_terms = editor.get_terms()
+        assert retrieved_terms == test_terms
 
-        # Add a test button
-        test_button = QPushButton("Get Current Terms")
-        test_button.clicked.connect(self.get_current_terms)
-
-        # Add widgets to layout
-        layout.addWidget(self.terms_editor)
-        layout.addWidget(test_button)
-
-    def on_terms_changed(self, terms):
-        logger = logging.getLogger(__name__)
-        logger.info(f"Terms changed: {terms}")
-
-    def get_current_terms(self):
-        terms = self.terms_editor.get_terms()
-        logger = logging.getLogger(__name__)
-        logger.info(f"Current terms: {terms}")
-
-
-def main():
-    app = QApplication(sys.argv)
-
-    # Apply some basic styling
-    app.setStyleSheet(
-        """
-        QMainWindow {
-            background-color: #f5f5f5;
-        }
-    """
-    )
-
-    window = TestWindow()
-    window.show()
-
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
+        # Clean up
+        window.close()

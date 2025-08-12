@@ -1,178 +1,123 @@
-import os
-import sys
+"""
+Tests for Editors Integration.
+"""
+
 import logging
 
-from PySide6.QtCore import Qt
+import pytest
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
+from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
+from srt_translator.gui.ui.termbase_editor import TermbaseEditor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-
-"""
-Integration test for both DNT Terms Editor and Termbase Editor
-"""
-
-sys.path.insert(0, ".")
+logger = logging.getLogger(__name__)
 
 
-class TestWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Editors Integration Test")
-        self.setGeometry(100, 100, 1000, 700)
+class TestEditorsIntegration:
+    """Test class for Editors Integration functionality."""
 
+    def test_editors_creation(self, qapp):
+        """Test that both editors can be created together."""
+        dnt_editor = DNTTermsEditor()
+        termbase_editor = TermbaseEditor()
+
+        assert dnt_editor is not None
+        assert termbase_editor is not None
+
+    def test_editors_integration_window(self, qapp, sample_dnt_terms, sample_termbase):
+        """Test that both editors work together in a window."""
+        window = QMainWindow()
+        window.setWindowTitle("Editors Integration Test")
+        window.setGeometry(100, 100, 1000, 700)
+
+        # Create central widget
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        window.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
+        # Create both editors
+        dnt_editor = DNTTermsEditor()
+        termbase_editor = TermbaseEditor()
+
+        # Add editors to layout
+        layout.addWidget(dnt_editor)
+        layout.addWidget(termbase_editor)
+
         # Test data
-        # DNT_TERMS: Language-agnostic terms that should not be translated
-        self.test_dnt_terms = [
-            "API",
-            "CEO",
-            "CFO",
-            "Amazon",
-            "Google",
-            "Microsoft",
-        ]
+        dnt_editor.set_terms(sample_dnt_terms)
+        termbase_editor.set_termbase(sample_termbase)
 
-        # Termbase: Language-specific translations of English terms
-        self.test_termbase = {
-            "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO", "Amazon": "Amazon"},
-            "French": {
-                "API": "API",
-                "CEO": "PDG",  # French translation
-                "CFO": "DF",  # French translation
-                "Amazon": "Amazon",
-            },
-            "German": {
-                "API": "API",
-                "CEO": "Geschäftsführer",  # German translation
-                "CFO": "CFO",
-                "Amazon": "Amazon",
-            },
-        }
+        # Verify data was set
+        retrieved_dnt_terms = dnt_editor.get_terms()
+        retrieved_termbase = termbase_editor.get_termbase()
 
-        # Instructions
-        instructions = QLabel(
-            "Click 'Open Edit Dialog' to test the integrated editors.\n"
-            "The dialog will show both DNT Terms and Termbase editors in tabs."
-        )
-        instructions.setStyleSheet(
-            "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
-        )
-        layout.addWidget(instructions)
+        assert retrieved_dnt_terms == sample_dnt_terms
+        assert retrieved_termbase == sample_termbase
 
-        # Test buttons
-        button_layout = QHBoxLayout()
+        # Clean up
+        window.close()
 
-        open_dialog_btn = QPushButton("Open Edit Dialog")
-        open_dialog_btn.clicked.connect(self.open_edit_dialog)
+    def test_editors_signals(self, qapp, sample_dnt_terms, sample_termbase):
+        """Test that both editors emit signals correctly."""
+        dnt_editor = DNTTermsEditor()
+        termbase_editor = TermbaseEditor()
 
-        test_data_btn = QPushButton("Show Test Data")
-        test_data_btn.clicked.connect(self.show_test_data)
+        dnt_received = []
+        termbase_received = []
 
-        button_layout.addWidget(open_dialog_btn)
-        button_layout.addWidget(test_data_btn)
-        button_layout.addStretch()
+        def on_dnt_changed(terms):
+            dnt_received.append(terms)
 
-        layout.addLayout(button_layout)
+        def on_termbase_changed(termbase):
+            termbase_received.append(termbase)
 
-        # Status label
-        self.status_label = QLabel("Ready to test editors integration")
-        self.status_label.setStyleSheet("padding: 10px; color: #666;")
-        layout.addWidget(self.status_label)
+        dnt_editor.terms_changed.connect(on_dnt_changed)
+        termbase_editor.termbase_changed.connect(on_termbase_changed)
 
-        layout.addStretch()
+        # Trigger signals
+        dnt_editor.set_terms(sample_dnt_terms)
+        termbase_editor.set_termbase(sample_termbase)
 
-    def open_edit_dialog(self):
-        """Open the EditConfigurationDialog with test data."""
-        self.status_label.setText("Opening edit dialog...")
+        # Process events
+        qapp.processEvents()
 
-        dialog = EditConfigurationDialog(self.test_dnt_terms, self.test_termbase, self)
+        assert len(dnt_received) > 0
+        assert len(termbase_received) > 0
+        assert dnt_received[-1] == sample_dnt_terms
+        assert termbase_received[-1] == sample_termbase
 
-        if dialog.exec():
-            modified_terms, modified_termbase = dialog.get_modified_config()
-            has_changes = dialog.has_changes()
+    def test_editors_data_consistency(self, qapp):
+        """Test that editors maintain data consistency."""
+        dnt_editor = DNTTermsEditor()
+        termbase_editor = TermbaseEditor()
 
-            if has_changes:
-                self.status_label.setText(
-                    f"Dialog closed with changes:\n"
-                    f"Terms: {len(modified_terms)} (was {len(self.test_dnt_terms)})\n"
-                    f"Termbase languages: {len(modified_termbase)} (was {len(self.test_termbase)})"
-                )
-                logger = logging.getLogger(__name__)
-                logger.info(f"Modified terms: {modified_terms}")
-                logger.info(f"Modified termbase: {modified_termbase}")
-            else:
-                self.status_label.setText("Dialog closed without changes")
-        else:
-            self.status_label.setText("Dialog cancelled")
+        # Set initial data
+        initial_dnt = ["API", "CEO"]
+        initial_termbase = {"Spanish": {"API": "API"}}
 
-    def show_test_data(self):
-        """Display the test data being used."""
-        logger = logging.getLogger(__name__)
-        logger.info("=== Test Data ===")
-        logger.info(f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}")
-        logger.info(f"Termbase ({len(self.test_termbase)} languages):")
-        for language, terms in self.test_termbase.items():
-            logger.info(f"  {language}: {len(terms)} terms - {list(terms.keys())}")
-        logger.info("================")
+        dnt_editor.set_terms(initial_dnt)
+        termbase_editor.set_termbase(initial_termbase)
 
-        self.status_label.setText("Test data displayed in console")
+        # Verify initial state
+        assert dnt_editor.get_terms() == initial_dnt
+        assert termbase_editor.get_termbase() == initial_termbase
 
+        # Change data
+        new_dnt = ["API", "CEO", "CFO"]
+        new_termbase = {"Spanish": {"API": "API", "CEO": "CEO"}}
 
-def main():
-    app = QApplication(sys.argv)
-    app.setStyleSheet(
-        """
-        QMainWindow { 
-            background-color: #f5f5f5;
-        }
-        QPushButton {
-            padding: 8px 16px;
-            background-color: #0078d4;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background-color: #106ebe;
-        }
-        QPushButton:pressed {
-            background-color: #005a9e;
-        }
-        QTabWidget::pane {
-            border: 1px solid #d0d0d0;
-            background-color: white;
-        }
-        QTabBar::tab {
-            background-color: #f0f0f0;
-            padding: 8px 16px;
-            margin-right: 2px;
-        }
-        QTabBar::tab:selected {
-            background-color: white;
-            border-bottom: 2px solid #0078d4;
-        }
-    """
-    )
+        dnt_editor.set_terms(new_dnt)
+        termbase_editor.set_termbase(new_termbase)
 
-    window = TestWindow()
-    window.show()
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
+        # Verify new state
+        assert dnt_editor.get_terms() == new_dnt
+        assert termbase_editor.get_termbase() == new_termbase

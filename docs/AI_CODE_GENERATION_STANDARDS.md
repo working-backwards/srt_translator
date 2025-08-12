@@ -4,7 +4,59 @@ This document provides specific guidelines for AI-generated code to ensure consi
 
 ## 🎯 **CRITICAL: Always Follow These Rules**
 
-### 1. Import Order (MOST IMPORTANT)
+### 0. Core Engine Architecture (NEVER VIOLATE)
+
+**The core engine (`srt_translator/core/`) must follow strict architecture rules:**
+
+- **NEVER import from global settings modules** (`srt_translator.core.config.settings`)
+- **NEVER use `os.environ` or `os.getenv` for configuration**
+- **NEVER use hardcoded default values for configurable parameters**
+- **ONLY read configuration from `TranslationConfig` objects passed as parameters**
+- **ALWAYS require complete `TranslationConfig` objects - no Optional config parameters**
+- **CRASH with clear error if `TranslationConfig` is missing required fields**
+
+**Correct data flow:**
+```
+CLI/GUI → TranslationConfig → Core Engine
+     ↑           ↑              ↑
+  Collects    Contains      ONLY reads
+  params      ALL params    from config
+```
+
+**Example of CORRECT pattern:**
+```python
+def translate_srt_files(file_paths: List[str], config: TranslationConfig):
+    batch_size = config.batch_size  # Read from config object
+    if not config.api_key:
+        raise ValueError("TranslationConfig.api_key is required")
+```
+
+### 1. Code Quality Tools (MOST IMPORTANT)
+
+**After making any Python code changes, automatically run the project's code quality tools:**
+
+```bash
+# 1. Auto-fix formatting issues
+python scripts/fix_formatting.py
+
+# 2. Run all quality checks
+python scripts/lint.py
+```
+
+**What these tools enforce:**
+- **Black**: PEP 8 formatting (88 char line length, consistent style)
+- **isort**: Import organization and sorting
+- **flake8**: Style and error checking  
+- **pylint**: Code quality and best practices
+- **mypy**: Type checking (optional but recommended)
+
+**Why this approach:**
+- Uses your existing project configuration
+- No need to remember individual tool commands
+- Automatically enforces project-specific standards
+- Consistent with existing team workflow
+
+### 2. Import Order (CRITICAL)
 
 **ALWAYS structure imports in this exact order:**
 

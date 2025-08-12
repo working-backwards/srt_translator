@@ -16,8 +16,10 @@ This guide covers two installation methods for the SRT Translator application.
 2. **Extract the package** to a folder on your computer
 
 3. **Configure your API key**:
-   - Copy `.env.example` to `.env`
-   - Edit `.env` and add your OpenAI API key:
+   - Copy `examples/env_example` to `.env`:
+  - **Windows/Linux/macOS:** `cp examples/env_example .env`
+  - **Windows (PowerShell):** `Copy-Item examples/env_example .env`
+- Edit `.env` and add your OpenAI API key:
      ```
      OPENAI_API_KEY=your_api_key_here
      ```
@@ -111,7 +113,7 @@ If you want to create executables from source:
 4. **Configure your environment**:
    ```bash
    # Copy the example configuration
-   cp .env.example .env
+   cp examples/env_example .env
    
    # Edit .env and add your OpenAI API key
    ```
@@ -191,11 +193,15 @@ Flags:
 ### Configuring the API Key
 
 **For Executable Users:**
-1. Copy `.env.example` to `.env`
+1. Copy `examples/env_example` to `.env`:
+   - **Windows/Linux/macOS:** `cp examples/env_example .env`
+   - **Windows (PowerShell):** `Copy-Item examples/env_example .env`
 2. Edit `.env` and add: `OPENAI_API_KEY=your_key_here`
 
 **For Source Code Users:**
-1. Copy `.env.example` to `.env`
+1. Copy `examples/env_example` to `.env`:
+   - **Windows/Linux/macOS:** `cp examples/env_example .env`
+   - **Windows (PowerShell):** `Copy-Item examples/env_example .env`
 2. Edit `.env` and add: `OPENAI_API_KEY=your_key_here`
 
 ## 🧪 Testing the Installation

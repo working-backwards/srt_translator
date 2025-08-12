@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from srt_translator.core.config.language_config import language_config
+from srt_translator.core.config.language_config import LanguageConfig
 
 
 class LanguageSection(QGroupBox):
@@ -30,6 +30,7 @@ class LanguageSection(QGroupBox):
         self.settings_manager = settings_manager
         self.setObjectName("languageSection")
         self.target_languages = {}
+        self.language_config = LanguageConfig()
 
         self.setup_ui()
         self.populate_language_list()
@@ -54,7 +55,7 @@ class LanguageSection(QGroupBox):
 
         self.language_checkboxes = {}
         for i, code in enumerate(popular_language_codes):
-            name = language_config.get_language_name(code)
+            name = self.language_config.get_language_name(code)
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
             checkbox.setProperty(
@@ -111,7 +112,7 @@ class LanguageSection(QGroupBox):
     def populate_language_list(self):
         """Populate the full language list using unified language configuration"""
         # Get all languages from unified config
-        all_languages = language_config.get_language_names()
+        all_languages = self.language_config.get_language_names()
 
         # Sort languages alphabetically by display name
         sorted_languages = sorted(all_languages.items(), key=lambda x: x[1])
@@ -282,7 +283,7 @@ class LanguageSection(QGroupBox):
 
         # Recreate popular languages grid with new languages
         for i, code in enumerate(new_popular_codes):
-            name = language_config.get_language_name(code)
+            name = self.language_config.get_language_name(code)
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
             checkbox.setProperty("language_code", code)

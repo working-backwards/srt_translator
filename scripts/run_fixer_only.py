@@ -6,7 +6,7 @@ import sys
 
 from dotenv import load_dotenv
 
-from srt_translator.core.config.settings import FIX_AGGRESSIVENESS, OUTPUT_BASE_DIR
+from srt_translator.core.config.models import TranslationConfig
 from srt_translator.core.translator.fixer import SRTFixer
 
 #!/usr/bin/env python3
@@ -43,12 +43,12 @@ def run_fixer_only(log_file_path=None, output_directory=None):
         return
 
     # Use provided output directory or default
-    translations_dir = output_directory or OUTPUT_BASE_DIR
+    translations_dir = output_directory or "translated_srt_files"
 
     logger.info(f"Using log file: {log_file_path}")
     logger.info(f"Using translations directory: {translations_dir}")
 
-    # Run the fixer
+    # Run the fixer with default aggressiveness
     fixer = SRTFixer(log_file_path, translations_dir)
     fixer.parse_log_file()
 
@@ -56,7 +56,7 @@ def run_fixer_only(log_file_path=None, output_directory=None):
         logger.info(
             f"Found {len(fixer.issues)} regular issues and {len(fixer.phantoms)} phantom placeholders to fix"
         )
-        fixer.fix_srt_files(aggressiveness=FIX_AGGRESSIVENESS)
+        fixer.fix_srt_files(aggressiveness=0.75)  # Default aggressiveness
     else:
         logger.info("No issues found in log file")
 

@@ -13,7 +13,7 @@ from typing import Dict, List
 
 from openai import OpenAI
 
-from srt_translator.core.config.language_config import language_config
+from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.srt_parser import SRTParser
 
 
@@ -43,11 +43,13 @@ class AIConfigGenerator:
 
     def get_supported_languages(self) -> List[str]:
         """Get all supported languages from unified configuration"""
-        return language_config.get_language_codes()
+        config = LanguageConfig()
+        return config.get_language_codes()
 
     def get_supported_language_names(self) -> List[str]:
         """Get all supported language names from unified configuration"""
-        return list(language_config.get_language_names().values())
+        config = LanguageConfig()
+        return list(config.get_language_names().values())
 
     def extract_subtitle_content(self, srt_files: List[str]) -> str:
         """
@@ -205,8 +207,9 @@ EXAMPLE FORMAT:
 
             # Convert language codes to structured format for the AI prompt
             language_names = []
+            config = LanguageConfig()
             for lang_code in valid_languages:
-                lang_name = language_config.get_language_name(lang_code)
+                lang_name = config.get_language_name(lang_code)
                 if lang_name:
                     language_names.append({"code": lang_code, "name": lang_name})
                 else:

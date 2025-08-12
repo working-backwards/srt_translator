@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSettings
 
-from srt_translator.core.config.language_config import language_config
+from srt_translator.core.config.language_config import LanguageConfig
 
 
 @dataclass
@@ -262,12 +262,6 @@ class SettingsManager:
         except (ValueError, TypeError):
             return None
 
-    def get_adaptive_popular_languages(self) -> List[str]:
-        """Get popular languages for the UI"""
-        from srt_translator.core.config.language_config import language_config
-
-        return language_config.get_popular_languages()
-
     def save_api_key(self, api_key: str) -> None:
         """Save API key to settings"""
         self.settings.setValue("api_key", api_key)
@@ -295,10 +289,11 @@ class SettingsManager:
 
     def save_target_languages_from_codes(self, language_codes: List[str]) -> None:
         """Save target languages from list of language codes using unified config"""
+        config = LanguageConfig()
         languages = {}
         for code in language_codes:
-            if language_config.validate_language_code(code):
-                name = language_config.get_language_name(code)
+            if config.validate_language_code(code):
+                name = config.get_language_name(code)
                 languages[name] = code
 
         self.save_target_languages(languages)
@@ -310,7 +305,8 @@ class SettingsManager:
 
     def get_popular_languages(self) -> List[str]:
         """Get popular languages from unified config"""
-        return language_config.get_popular_languages()
+        config = LanguageConfig()
+        return config.get_popular_languages()
 
     def get_adaptive_popular_languages(self) -> List[str]:
         """
@@ -321,9 +317,10 @@ class SettingsManager:
             - User's frequently used languages
             - Default popular languages to fill remaining slots
         """
-        popular_limit = language_config.get_popular_limit()
+        config = LanguageConfig()
+        popular_limit = config.get_popular_limit()
         user_preferences = self.load_user_popular_languages()
-        default_popular = language_config.get_popular_languages()
+        default_popular = config.get_popular_languages()
 
         # If user has no preferences, use default popular languages
         if not user_preferences:
@@ -393,7 +390,8 @@ class SettingsManager:
         )
 
         # Get top used languages
-        popular_limit = language_config.get_popular_limit()
+        config = LanguageConfig()
+        popular_limit = config.get_popular_limit()
         top_languages = [lang_code for lang_code, _ in sorted_languages[:popular_limit]]
 
         # Save as user's preferred popular languages
@@ -401,7 +399,8 @@ class SettingsManager:
 
     def get_all_languages(self) -> Dict[str, str]:
         """Get all available languages from unified config"""
-        return language_config.get_all_languages()
+        config = LanguageConfig()
+        return config.get_all_languages()
 
     def save_last_input_directory(self, directory: str) -> None:
         """Save last used input directory"""
