@@ -3,9 +3,18 @@
 GUI Entry Point for SRT Translator
 """
 
+import logging
 import sys
 import os
 import argparse
+
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -65,7 +74,7 @@ def main() -> None:
 
         except Exception as e:
             # If QSettings fails, we'll use defaults
-            print(f"Warning: Could not load GUI settings: {e}")
+            logger.warning(f"Warning: Could not load GUI settings: {e}")
 
     # Call the bridge BEFORE importing any core modules
     prepare_environment_from_settings()

@@ -8,7 +8,14 @@ import os
 import sys
 import tempfile
 import zipfile
+import logging
 from pathlib import Path
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def check_executable_security(executable_path):
@@ -21,12 +28,13 @@ def check_executable_security(executable_path):
     Returns:
         Tuple of (is_safe, issues_found)
     """
+    logger = logging.getLogger(__name__)
     if not os.path.exists(executable_path):
-        print(f"❌ Error: Executable not found at {executable_path}")
+        logger.error(f"❌ Error: Executable not found at {executable_path}")
         return False, ["Executable not found"]
 
-    print(f"🔍 Checking executable: {executable_path}")
-    print(f"📏 File size: {os.path.getsize(executable_path) / (1024 * 1024):.1f} MB")
+    logger.info(f"🔍 Checking executable: {executable_path}")
+    logger.info(f"📏 File size: {os.path.getsize(executable_path) / (1024 * 1024):.1f} MB")
 
     # List of sensitive files/patterns to check for
     sensitive_patterns = [
@@ -47,7 +55,7 @@ def check_executable_security(executable_path):
             with zipfile.ZipFile(executable_path, "r") as zip_ref:
                 file_list = zip_ref.namelist()
 
-                print(f"📁 Found {len(file_list)} files in executable")
+                logger.info(f"📁 Found {len(file_list)} files in executable")
 
                 # Check for sensitive patterns
                 for pattern in sensitive_patterns:
@@ -63,11 +71,11 @@ def check_executable_security(executable_path):
                 # Check for any JSON files that might be termbase
                 json_files = [f for f in file_list if f.endswith(".json")]
                 if json_files:
-                    print(f"📄 JSON files found: {json_files}")
+                    logger.info(f"📄 JSON files found: {json_files}")
 
         except zipfile.BadZipFile:
             # Not a ZIP file, try to search for patterns in binary content
-            print("⚠️  Executable is not a ZIP file, checking binary content...")
+            logger.warning("⚠️  Executable is not a ZIP file, checking binary content...")
 
             with open(executable_path, "rb") as f:
                 content = f.read()
@@ -82,22 +90,23 @@ def check_executable_security(executable_path):
 
     # Report results
     if issues_found:
-        print("\n❌ SECURITY ISSUES FOUND:")
+        logger.error("\n❌ SECURITY ISSUES FOUND:")
         for issue in issues_found:
-            print(f"   • {issue}")
+            logger.error(f"   • {issue}")
         return False, issues_found
     else:
-        print("\n✅ SECURITY CHECK PASSED")
-        print("   • No sensitive files found in executable")
-        print("   • No API keys detected")
-        print("   • No user data included")
+        logger.info("\n✅ SECURITY CHECK PASSED")
+        logger.info("   • No sensitive files found in executable")
+        logger.info("   • No API keys detected")
+        logger.info("   • No user data included")
         return True, []
 
 
 def main():
     """Main function to run security verification."""
-    print("🔒 SRT Translator Security Verification")
-    print("=" * 50)
+    logger = logging.getLogger(__name__)
+    logger.info("🔒 SRT Translator Security Verification")
+    logger.info("=" * 50)
 
     # Look for executable in common locations
     possible_paths = [
@@ -116,25 +125,25 @@ def main():
             break
 
     if not executable_path:
-        print("❌ No executable found. Please run the build script first.")
-        print("\nExpected locations:")
+        logger.error("❌ No executable found. Please run the build script first.")
+        logger.error("\nExpected locations:")
         for path in possible_paths:
-            print(f"   • {path}")
+            logger.error(f"   • {path}")
         return 1
 
     # Run security check
     is_safe, issues = check_executable_security(executable_path)
 
-    print("\n" + "=" * 50)
+    logger.info("\n" + "=" * 50)
     if is_safe:
-        print("🎉 Your executable is safe to distribute!")
-        print("   • No sensitive data included")
-        print("   • Users can safely run without exposing your API keys")
+        logger.info("🎉 Your executable is safe to distribute!")
+        logger.info("   • No sensitive data included")
+        logger.info("   • Users can safely run without exposing your API keys")
         return 0
     else:
-        print("⚠️  Security issues detected!")
-        print("   • Do not distribute this executable")
-        print("   • Rebuild with the updated security settings")
+        logger.warning("⚠️  Security issues detected!")
+        logger.warning("   • Do not distribute this executable")
+        logger.warning("   • Rebuild with the updated security settings")
         return 1
 
 

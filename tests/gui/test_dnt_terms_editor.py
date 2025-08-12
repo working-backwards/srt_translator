@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -9,6 +10,9 @@ from PySide6.QtWidgets import (
 )
 
 from gui.ui.dnt_terms_editor import DNTTermsEditor
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 # Add the gui directory to the path
 sys.path.insert(0, "gui")
@@ -44,11 +48,13 @@ class TestWindow(QMainWindow):
         layout.addWidget(test_button)
 
     def on_terms_changed(self, terms):
-        print(f"Terms changed: {terms}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Terms changed: {terms}")
 
     def get_current_terms(self):
         terms = self.terms_editor.get_terms()
-        print(f"Current terms: {terms}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Current terms: {terms}")
 
 
 def main():

@@ -349,7 +349,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 f"Received response from OpenAI ({len(result_text)} characters)"
             )
             # Debug: Log the first 500 characters of the response to see what we're getting
-            print(f"DEBUG: Response preview: {result_text[:500]}...")
+            self.logger.debug(f"Response preview: {result_text[:500]}...")
             self.logger.info(f"Response preview: {result_text[:500]}...")
 
             parsed_termbase = self._parse_comprehensive_termbase_response(result_text)
@@ -529,12 +529,12 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
 
             # Parse termbase results
             termbase_data = raw_data.get("termbase_results", [])
-            print(
-                f"DEBUG: termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}"
+            self.logger.debug(
+                f"termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}"
             )
             if not termbase_data:
                 self.logger.warning("No termbase_results found in AI response.")
-                print("DEBUG: No termbase_results found in AI response")
+                self.logger.debug("No termbase_results found in AI response")
                 return {}
 
             # Use filtered_terms for the actual termbase generation

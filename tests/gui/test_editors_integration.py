@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -13,6 +14,9 @@ from PySide6.QtWidgets import (
 )
 
 from gui.ui.ai_config_section import EditConfigurationDialog
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 """
 Integration test for both DNT Terms Editor and Termbase Editor
@@ -107,8 +111,9 @@ class TestWindow(QMainWindow):
                     f"Terms: {len(modified_terms)} (was {len(self.test_dnt_terms)})\n"
                     f"Termbase languages: {len(modified_termbase)} (was {len(self.test_termbase)})"
                 )
-                print(f"Modified terms: {modified_terms}")
-                print(f"Modified termbase: {modified_termbase}")
+                logger = logging.getLogger(__name__)
+                logger.info(f"Modified terms: {modified_terms}")
+                logger.info(f"Modified termbase: {modified_termbase}")
             else:
                 self.status_label.setText("Dialog closed without changes")
         else:
@@ -116,12 +121,13 @@ class TestWindow(QMainWindow):
 
     def show_test_data(self):
         """Display the test data being used."""
-        print("=== Test Data ===")
-        print(f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}")
-        print(f"Termbase ({len(self.test_termbase)} languages):")
+        logger = logging.getLogger(__name__)
+        logger.info("=== Test Data ===")
+        logger.info(f"DNT Terms ({len(self.test_dnt_terms)}): {self.test_dnt_terms}")
+        logger.info(f"Termbase ({len(self.test_termbase)} languages):")
         for language, terms in self.test_termbase.items():
-            print(f"  {language}: {len(terms)} terms - {list(terms.keys())}")
-        print("================")
+            logger.info(f"  {language}: {len(terms)} terms - {list(terms.keys())}")
+        logger.info("================")
 
         self.status_label.setText("Test data displayed in console")
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Release build script for SRT Translator.
-Creates executables and prepares release packages for distribution.
+Build release package for SRT Translator.
+Creates executables and packages them for distribution.
 """
 
+import logging
 import os
 import platform
 import shutil
@@ -13,10 +14,18 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pyinstaller_build import main as build_executables
+from build import main as build_executables
 
 
 def create_release_package():
@@ -47,7 +56,7 @@ def create_release_package():
         if os.path.exists(file_path):
             dest_path = os.path.join(package_path, os.path.basename(file_path))
             shutil.copy2(file_path, dest_path)
-            print(f"✅ Copied {file_path}")
+            logger.info(f"✅ Copied {file_path}")
 
     # Create quick start guide
     quick_start = f"""# SRT Translator - Quick Start Guide
@@ -123,40 +132,40 @@ For issues and questions:
                 arc_name = os.path.relpath(file_path, package_path)
                 zipf.write(file_path, arc_name)
 
-    print(f"✅ Created release package: {zip_path}")
+    logger.info(f"✅ Created release package: {zip_path}")
     return zip_path
 
 
 def main():
     """Main release build function."""
-    print("🚀 Building SRT Translator Release")
-    print(f"Platform: {platform.system()} {platform.machine()}")
-    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("🚀 Building SRT Translator Release")
+    logger.info(f"Platform: {platform.system()} {platform.machine()}")
+    logger.info(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Check if executables already exist
     gui_exe_path = "dist/SRT-Translator-GUI.exe"
     if os.path.exists(gui_exe_path):
-        print(f"\n✅ Executable already exists: {gui_exe_path}")
-        print("📦 Skipping build step...")
+        logger.info(f"\n✅ Executable already exists: {gui_exe_path}")
+        logger.info("📦 Skipping build step...")
     else:
         # Build executables
-        print("\n📦 Building executables...")
+        logger.info("\n📦 Building executables...")
         try:
             build_executables()
         except Exception as e:
-            print(f"❌ Failed to build executables: {e}")
+            logger.error(f"❌ Failed to build executables: {e}")
             sys.exit(1)
 
     # Create release package
-    print("\n📋 Creating release package...")
+    logger.info("\n📋 Creating release package...")
     try:
         release_path = create_release_package()
-        print(f"\n🎉 Release build completed successfully!")
-        print(f"📦 Release package: {release_path}")
-        print(f"📁 Executables: dist/")
-        print(f"📋 Documentation: release/")
+        logger.info(f"\n🎉 Release build completed successfully!")
+        logger.info(f"📦 Release package: {release_path}")
+        logger.info(f"📁 Executables: dist/")
+        logger.info(f"📋 Documentation: release/")
     except Exception as e:
-        print(f"❌ Failed to create release package: {e}")
+        logger.error(f"❌ Failed to create release package: {e}")
         sys.exit(1)
 
 

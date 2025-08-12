@@ -1,0 +1,161 @@
+# Cursor Rules for SRT Translator Project
+# This file configures how AI assistants should behave when working with this project
+
+## 🏗️ CORE ENGINE ARCHITECTURE RULES (CRITICAL - NEVER VIOLATE)
+
+### 🚫 FORBIDDEN IN CORE ENGINE (srt_translator/core/):
+- **NEVER import from `srt_translator.core.config.settings` or any global settings module**
+- **NEVER use `os.environ` or `os.getenv` for configuration**
+- **NEVER read global configuration variables**
+- **NEVER use hardcoded default values for configurable parameters**
+- **NEVER implement fallback logic to external configuration sources**
+
+### ✅ REQUIRED IN CORE ENGINE:
+- **ONLY read configuration from `TranslationConfig` objects passed as parameters**
+- **ALWAYS require complete `TranslationConfig` objects - no Optional config parameters**
+- **CRASH with clear error if `TranslationConfig` is missing required fields**
+- **Pure functions that depend only on their explicit parameters**
+
+### 🔄 CORRECT DATA FLOW (NEVER BREAK THIS):
+```
+CLI/GUI → TranslationConfig → Core Engine
+     ↑           ↑              ↑
+  Collects    Contains      ONLY reads
+  params      ALL params    from config
+```
+
+### 📍 SPECIFIC ENFORCEMENT POINTS:
+- `srt_translator/core/main.py` - Must only read from TranslationConfig
+- `srt_translator/core/translator/` - Must only read from TranslationConfig  
+- `srt_translator/core/config/` - Must only read from TranslationConfig
+- `srt_translator/core/utils/` - Must only read from TranslationConfig
+
+### 🚨 VIOLATION EXAMPLES (DON'T DO THESE):
+```python
+# ❌ FORBIDDEN - Global settings import
+from srt_translator.core.config.settings import SOURCE_DIR
+
+# ❌ FORBIDDEN - Environment variable lookup
+batch_size = int(os.getenv("BATCH_SIZE", 5))
+
+# ❌ FORBIDDEN - Hardcoded default
+fix_aggressiveness = 0.75
+
+# ❌ FORBIDDEN - Optional config parameter
+def translate_srt_files(config: Optional[TranslationConfig] = None):
+```
+
+### ✅ CORRECT PATTERN (ALWAYS DO THIS):
+```python
+# ✅ CORRECT - Required config parameter
+def translate_srt_files(file_paths: List[str], config: TranslationConfig):
+
+# ✅ CORRECT - Read only from config
+batch_size = config.batch_size
+fix_aggressiveness = config.fix_aggressiveness
+
+# ✅ CORRECT - Crash if config incomplete
+if not config.api_key:
+    raise ValueError("TranslationConfig.api_key is required")
+```
+
+## 🐍 Python Code Standards
+
+### Logging Requirements
+- **ALWAYS use proper logging instead of print() statements**
+- Import logging at the top of every Python file: `import logging`
+- Set up logging configuration: `logging.basicConfig(level=logging.INFO)`
+- Use `logger = logging.getLogger(__name__)` in functions/classes
+- Use appropriate log levels: `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`
+- Never use `print()` statements in production code
+
+### Logging Examples
+```python
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+def some_function():
+    logger = logging.getLogger(__name__)
+    logger.info("This is an info message")
+    logger.warning("This is a warning")
+    logger.error("This is an error")
+    logger.debug("This is debug info")
+```
+
+### Test Files
+- Test files should also use logging, not print statements
+- Use `logger.info()` for test progress and results
+- Use `logger.error()` for test failures
+
+### Scripts and Utilities
+- All scripts (build.py, verify_security.py, etc.) must use logging
+- CLI output should use logging with appropriate levels
+- Never use print() for status messages or errors
+
+## 🏗️ Code Style
+- Follow PEP 8 standards
+- Use type hints where appropriate
+- Include docstrings for all functions and classes
+- Use f-strings for string formatting
+
+## 🏗️ Project Structure
+- Maintain the existing package structure: `srt_translator.{core,cli,gui}`
+- Follow the established import patterns
+- Use relative imports within packages when appropriate
+
+## 🚨 Error Handling
+- Use proper exception handling with logging
+- Log errors with context information
+- Provide user-friendly error messages in GUI/CLI
+
+## 📦 Dependencies
+- Minimize external dependencies
+- Use standard library when possible
+- Document any new dependencies added
+
+## 🧪 Testing
+- Write tests for new functionality
+- Use pytest framework
+- Aim for high test coverage
+- Use logging in tests for better debugging
+
+## 🔒 Security
+- Never log sensitive information (API keys, passwords)
+- Use environment variables for configuration
+- Validate all user inputs
+- Follow security best practices
+
+## 📚 Documentation
+- Update docstrings when modifying functions
+- Keep README and other docs current
+- Document any breaking changes
+
+## ⚡ Performance
+- Use lazy loading for heavy dependencies
+- Optimize for memory usage in large file processing
+- Profile performance-critical sections
+
+## 💻 Platform Compatibility
+- Ensure code works on Windows, macOS, and Linux
+- Use platform-agnostic path handling
+- Test on Python 3.9-3.12
+
+## 🧠 Remember
+- **Logging over print() - ALWAYS**
+- **Core engine ONLY reads from TranslationConfig - NEVER from global settings**
+- **Follow existing patterns in the codebase**
+- **Write tests for new functionality**
+- **Document changes clearly**
+- **Maintain backward compatibility when possible**
+
+## 🚨 CRITICAL REMINDER
+When working with the core engine (srt_translator/core/):
+1. **NEVER import global settings**
+2. **NEVER use environment variables**
+3. **NEVER use hardcoded defaults**
+4. **ONLY read from TranslationConfig objects**
+5. **If you need a configurable parameter, add it to TranslationConfig class**
+
+Violating these rules will break the app's architecture and introduce fragility. The core engine must remain pure and only consume the configuration objects passed to it.

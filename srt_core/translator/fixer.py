@@ -1,11 +1,16 @@
 import os
 import re
+import logging
 from dataclasses import dataclass
 from typing import Dict, List
 
 import srt
 
 from srt_core.translator.srt_parser import SRTParser
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,7 +48,9 @@ class SRTFixer:
     def parse_log_file(self):
         """Parse the log file and extract placeholder issues and phantom placeholders"""
         if not os.path.exists(self.log_file):
-            print(f"Log file {self.log_file} does not exist. Skipping fixing step.")
+            logger.warning(
+                f"Log file {self.log_file} does not exist. Skipping fixing step."
+            )
             return
 
         with open(self.log_file, "r", encoding="utf-8") as f:
@@ -166,7 +173,7 @@ class SRTFixer:
         for lang_name, lang_code in TARGET_LANGUAGES.items():
             lang_name_to_code[lang_name] = lang_code
 
-        print(f"Language mapping: {lang_name_to_code}")
+        logger.info(f"Language mapping: {lang_name_to_code}")
 
         # Only process language directories that correspond to TARGET_LANGUAGES
         target_language_codes = set(code.upper() for code in TARGET_LANGUAGES.values())
@@ -180,7 +187,7 @@ class SRTFixer:
             if lang_dir not in target_language_codes:
                 continue
 
-            print(f"Processing language directory: {lang_dir}")
+            logger.info(f"Processing language directory: {lang_dir}")
 
             # Get regular issues for this language that should be fixed based on aggressiveness
             language_issues = [
@@ -199,16 +206,18 @@ class SRTFixer:
                 or phantom.language == lang_dir
             ]
 
-            print(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
+            logger.info(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
             if language_phantoms:
-                print(f"  Phantom languages: {[p.language for p in language_phantoms]}")
+                logger.info(
+                    f"  Phantom languages: {[p.language for p in language_phantoms]}"
+                )
 
             for filename in os.listdir(lang_path):
                 if not filename.endswith(".srt"):
                     continue
 
                 file_path = os.path.join(lang_path, filename)
-                print(f"  Processing file: {filename}")
+                logger.info(f"  Processing file: {filename}")
 
                 # Fix regular issues
                 self._fix_srt_file_regular_issues(file_path, language_issues)
@@ -226,19 +235,19 @@ class SRTFixer:
         for lang_name, lang_code in TARGET_LANGUAGES.items():
             lang_name_to_code[lang_name] = lang_code
 
-        print(f"Language mapping: {lang_name_to_code}")
+        logger.info(f"Language mapping: {lang_name_to_code}")
 
         # Process only the specified files
         for file_path in file_paths:
             if not os.path.exists(file_path):
-                print(f"File not found: {file_path}")
+                logger.warning(f"File not found: {file_path}")
                 continue
 
             # Extract language directory and filename from the full path
             lang_dir = os.path.basename(os.path.dirname(file_path))
             filename = os.path.basename(file_path)
 
-            print(f"Processing specific file: {filename} in {lang_dir}")
+            logger.info(f"Processing specific file: {filename} in {lang_dir}")
 
             # Get regular issues for this language that should be fixed based on aggressiveness
             language_issues = [
@@ -257,7 +266,7 @@ class SRTFixer:
                 or phantom.language == lang_dir
             ]
 
-            print(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
+            logger.info(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
 
             # Fix regular issues
             self._fix_srt_file_regular_issues(file_path, language_issues)
@@ -308,7 +317,7 @@ class SRTFixer:
         # Filter phantoms for this specific file
         file_phantoms = [p for p in phantoms if p.filename == base_filename]
         if not file_phantoms:
-            print(f"    No phantoms found for {base_filename}")
+            logger.warning(f"    No phantoms found for {base_filename}")
             return
 
         subtitles = self.parser.parse_file(file_path)
@@ -365,13 +374,13 @@ class SRTFixer:
                         dnt_terms_fixed += 1
                         changed = True
 
-                        print(
+                        logger.info(
                             f"    Fixed DNT_TERM placeholder {placeholder} in subtitle {subtitle.index}"
                         )
 
         if changed:
             self.parser.write_file(file_path, subtitles)
-            print(
+            logger.info(
                 f"  Fixed {dnt_terms_fixed} DNT_TERM placeholders in {os.path.basename(file_path)}"
             )
             self.dnt_terms_fixed_count += dnt_terms_fixed
@@ -386,14 +395,14 @@ class SRTFixer:
         ) or (aggressiveness >= 0.5 and "missing" in issue.translated_context)
 
     def report_status(self):
-        print(f"Total regular issues found: {len(self.issues)}")
-        print(f"Total phantom placeholders found: {len(self.phantoms)}")
-        print(f"Regular placeholders fixed: {self.fixed_count}")
-        print(f"Phantom placeholders removed: {self.phantom_fixed_count}")
-        print(f"DNT_TERM placeholders removed: {self.dnt_terms_fixed_count}")
+        logger.info(f"Total regular issues found: {len(self.issues)}")
+        logger.info(f"Total phantom placeholders found: {len(self.phantoms)}")
+        logger.info(f"Regular placeholders fixed: {self.fixed_count}")
+        logger.info(f"Phantom placeholders removed: {self.phantom_fixed_count}")
+        logger.info(f"DNT_TERM placeholders removed: {self.dnt_terms_fixed_count}")
         if self.phantoms:
-            print("\nPhantom placeholders detected and removed:")
+            logger.info("\nPhantom placeholders detected and removed:")
             for phantom in self.phantoms:
-                print(
+                logger.info(
                     f"  - {phantom.filename}, subtitle {phantom.subtitle_number}: {phantom.phantom_placeholder}"
                 )

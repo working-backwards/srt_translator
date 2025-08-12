@@ -1,5 +1,6 @@
 import argparse
 import glob
+import logging
 import os
 import sys
 
@@ -14,6 +15,13 @@ Standalone script to run the SRT fixer on existing translated files.
 This script can be run independently to fix issues in already-translated SRT files.
 """
 
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 # Add parent directory to path so we can import srt_core module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,31 +34,31 @@ def run_fixer_only(log_file_path=None, output_directory=None):
     """Run only the fixer on existing translation files"""
 
     if not log_file_path:
-        print("Error: No log file specified. Please provide a log file path.")
-        print("Usage: python run_fixer_only.py --log-file <path_to_log_file>")
+        logger.error("Error: No log file specified. Please provide a log file path.")
+        logger.error("Usage: python run_fixer_only.py --log-file <path_to_log_file>")
         return
 
     if not os.path.exists(log_file_path):
-        print(f"Error: Log file not found: {log_file_path}")
+        logger.error(f"Error: Log file not found: {log_file_path}")
         return
 
     # Use provided output directory or default
     translations_dir = output_directory or OUTPUT_BASE_DIR
 
-    print(f"Using log file: {log_file_path}")
-    print(f"Using translations directory: {translations_dir}")
+    logger.info(f"Using log file: {log_file_path}")
+    logger.info(f"Using translations directory: {translations_dir}")
 
     # Run the fixer
     fixer = SRTFixer(log_file_path, translations_dir)
     fixer.parse_log_file()
 
     if fixer.issues or fixer.phantoms:
-        print(
+        logger.info(
             f"Found {len(fixer.issues)} regular issues and {len(fixer.phantoms)} phantom placeholders to fix"
         )
         fixer.fix_srt_files(aggressiveness=FIX_AGGRESSIVENESS)
     else:
-        print("No issues found in log file")
+        logger.info("No issues found in log file")
 
     fixer.report_status()
 

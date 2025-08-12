@@ -7,16 +7,30 @@ from __future__ import annotations
 import os
 import json
 import argparse
+import logging
 from dotenv import load_dotenv, find_dotenv
 
 
+def setup_logging(debug: bool = False) -> None:
+    """Set up logging configuration for CLI."""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+        ],
+    )
+
+
 def bootstrap_env() -> None:
+    """Bootstrap environment variables from .env file."""
     # Preserve old behavior: let .env override OUTPUT_DIRECTORY if one is set in the OS env
     if "OUTPUT_DIRECTORY" in os.environ:
         current_output_dir = os.environ["OUTPUT_DIRECTORY"]
         del os.environ["OUTPUT_DIRECTORY"]
         print(
-            f"Note: Clearing system OUTPUT_DIRECTORY '{current_output_dir}' to use .env file value"
+            f"Clearing system OUTPUT_DIRECTORY '{current_output_dir}' to use .env file value"
         )
 
     # Load the nearest .env starting from the current working dir
@@ -41,8 +55,6 @@ def bootstrap_env() -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    bootstrap_env()
-
     parser = argparse.ArgumentParser(
         description="SRT Translator CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -50,14 +62,35 @@ def main(argv: list[str] | None = None) -> None:
 Examples:
   srt-translator                 # Run with default settings
   srt-translator --debug         # Enable debug logging
+  srt-translator --version       # Show version information
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--version", action="store_true", help="Show version information"
+    )
     args = parser.parse_args(argv)
+
+    # Handle version flag first
+    if args.version:
+        try:
+            from srt_translator import __version__
+
+            print(f"SRT Translator CLI v{__version__}")
+            return
+        except ImportError:
+            print("SRT Translator CLI (version unknown)")
+            return
+
+    # Set up logging
+    setup_logging(args.debug)
+    logger = logging.getLogger(__name__)
+
+    bootstrap_env()
 
     if args.debug:
         os.environ["DEBUG_MODE"] = "true"
-        print("🔍 Debug mode enabled - detailed logging will be shown")
+        logger.debug("Debug mode enabled - detailed logging will be shown")
 
     # Build configuration from CLI environment variables
     try:
@@ -65,27 +98,41 @@ Examples:
 
         config = build_config_from_cli()
     except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("   Make sure you have installed the package: pip install -e .")
+        logger.error(f"Import error: {e}")
+        logger.error("Make sure you have installed the package: pip install -e .")
         raise SystemExit(1)
 
     # Check if API key is available
     if not config.api_key:
-        print("❌ Error: OPENAI_API_KEY environment variable is not set")
-        print("Please set your OpenAI API key in the .env file or environment")
+        logger.error("OPENAI_API_KEY environment variable is not set")
+        logger.error("Please set your OpenAI API key in the .env file or environment")
         raise SystemExit(1)
 
     # Call main function with the configuration
     try:
         from srt_translator.core.main import translate_srt_files
 
-        translate_srt_files(config=config)
+        # For CLI mode, use the default source directory if no specific files provided
+        source_dir = "original_captions"  # Default source directory
+        if os.path.exists(source_dir):
+            file_paths = [
+                os.path.join(source_dir, f)
+                for f in os.listdir(source_dir)
+                if f.endswith(".srt")
+            ]
+            if file_paths:
+                translate_srt_files(file_paths=file_paths, config=config)
+            else:
+                logger.info(f"No .srt files found in {source_dir}")
+        else:
+            logger.error(f"Source directory {source_dir} does not exist")
+            raise SystemExit(1)
     except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("   Make sure you have installed the package: pip install -e .")
+        logger.error(f"Import error: {e}")
+        logger.error("Make sure you have installed the package: pip install -e .")
         raise SystemExit(1)
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
         raise SystemExit(1)
 
 

@@ -1,8 +1,17 @@
 import argparse
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
+
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 # For older python-dotenv versions, manually clear OUTPUT_DIRECTORY
 # to ensure .env file values take precedence over system environment variables
@@ -11,7 +20,7 @@ if "OUTPUT_DIRECTORY" in os.environ:
     current_output_dir = os.environ["OUTPUT_DIRECTORY"]
     # Clear it so .env file can set it
     del os.environ["OUTPUT_DIRECTORY"]
-    print(
+    logger.info(
         f"Note: Clearing system OUTPUT_DIRECTORY '{current_output_dir}' to use .env file value"
     )
 
@@ -29,7 +38,7 @@ if "TARGET_LANGUAGES" not in os.environ:
         "Chinese (Simplified)": "zh-Hans",
     }
     os.environ["TARGET_LANGUAGES"] = json.dumps(default_languages)
-    print(f"Using default TARGET_LANGUAGES: {os.environ['TARGET_LANGUAGES']}")
+    logger.info(f"Using default TARGET_LANGUAGES: {os.environ['TARGET_LANGUAGES']}")
 
 if "OPENAI_MODEL" not in os.environ:
     os.environ["OPENAI_MODEL"] = "gpt-4o-mini"
@@ -47,8 +56,8 @@ if "LOG_MODE" not in os.environ:
 if "OUTPUT_DIRECTORY" not in os.environ:
     os.environ["OUTPUT_DIRECTORY"] = "translated_srt_files"
 
-from srt_core import main
-from srt_core.config.translation_config import build_config_from_cli
+from srt_translator.core import main
+from srt_translator.core.config.translation_config import build_config_from_cli
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -68,15 +77,15 @@ Examples:
     # Set debug logging if requested
     if args.debug:
         os.environ["DEBUG_MODE"] = "true"
-        print("🔍 Debug mode enabled - detailed logging will be shown")
+        logger.info("🔍 Debug mode enabled - detailed logging will be shown")
 
     # Build configuration from CLI environment variables
     config = build_config_from_cli()
 
     # Check if API key is available
     if not config.api_key:
-        print("❌ Error: OPENAI_API_KEY environment variable is not set")
-        print("Please set your OpenAI API key in the .env file or environment")
+        logger.error("❌ Error: OPENAI_API_KEY environment variable is not set")
+        logger.error("Please set your OpenAI API key in the .env file or environment")
         exit(1)
 
     # Call main function with the configuration

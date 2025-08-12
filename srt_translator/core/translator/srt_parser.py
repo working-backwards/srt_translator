@@ -3,10 +3,14 @@
 SRT parser for the SRT Translator.
 """
 
+import logging
 import os
 from typing import List
 
 import srt
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class SRTParser:
@@ -47,15 +51,11 @@ class SRTParser:
                 # Try next encoding if this one fails
                 continue
             except Exception as e:
-                import logging
-
-                logging.error(f"Error reading {filepath}: {e}")
+                logger.error(f"Error reading {filepath}: {e}")
                 return []
         else:
             # All encodings failed
-            import logging
-
-            logging.error(f"Could not decode {filepath} with supported encodings.")
+            logger.error(f"Could not decode {filepath} with supported encodings.")
             return []
 
         # Parse the SRT content into subtitle objects
@@ -63,9 +63,7 @@ class SRTParser:
             subtitles = list(srt.parse(content))
             return subtitles
         except Exception as e:
-            import logging
-
-            logging.error(f"Error parsing SRT content in {filepath}: {e}")
+            logger.error(f"Error parsing SRT content in {filepath}: {e}")
             return []
 
     @staticmethod
@@ -92,6 +90,4 @@ class SRTParser:
             with open(filepath, "w", encoding="utf-8") as file:
                 file.write(srt_content)
         except Exception as e:
-            import logging
-
-            logging.error(f"Error writing {filepath}: {e}")
+            logger.error(f"Error writing {filepath}: {e}")

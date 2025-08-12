@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -11,6 +12,9 @@ from PySide6.QtWidgets import (
 )
 
 from gui.ui.termbase_editor import TermbaseEditor
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 """
 Test script for Termbase Editor
@@ -64,15 +68,17 @@ class TestWindow(QMainWindow):
         layout.addLayout(button_layout)
 
     def on_termbase_changed(self, termbase):
-        print(f"Termbase changed: {len(termbase)} languages")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Termbase changed: {len(termbase)} languages")
         for language, terms in termbase.items():
-            print(f"  {language}: {len(terms)} terms")
+            logger.info(f"  {language}: {len(terms)} terms")
 
     def get_current_termbase(self):
         termbase = self.termbase_editor.get_termbase()
-        print(f"Current termbase: {len(termbase)} languages")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Current termbase: {len(termbase)} languages")
         for language, terms in termbase.items():
-            print(f"  {language}: {terms}")
+            logger.info(f"  {language}: {terms}")
 
     def clear_termbase(self):
         self.termbase_editor.set_termbase({})

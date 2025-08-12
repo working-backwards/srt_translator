@@ -4,8 +4,18 @@ Simple script to clear AI-generated configuration from the GUI settings.
 Run this from the project root directory.
 """
 
+import logging
 import os
 import sys
+
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 # Add the project root to the path (scripts/ is one level down)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -15,12 +25,12 @@ def main():
     try:
         from gui.settings_manager import SettingsManager
 
-        print("Clearing AI-generated configuration...")
+        logger.info("Clearing AI-generated configuration...")
         settings_manager = SettingsManager()
 
         # Check what's currently stored
         dnt_terms, termbase = settings_manager.load_ai_config()
-        print(
+        logger.info(
             f"Current AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )
 
@@ -29,18 +39,18 @@ def main():
 
         # Verify it's cleared
         dnt_terms, termbase = settings_manager.load_ai_config()
-        print(
+        logger.info(
             f"After clearing: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )
 
-        print("✅ AI configuration cleared successfully!")
+        logger.info("✅ AI configuration cleared successfully!")
 
     except ImportError as e:
-        print(f"❌ Import error: {e}")
-        print("Make sure you're running this from the project root directory")
+        logger.error(f"❌ Import error: {e}")
+        logger.error("Make sure you're running this from the project root directory")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"❌ Error: {e}")
         sys.exit(1)
 
 

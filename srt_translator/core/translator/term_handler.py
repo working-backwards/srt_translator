@@ -6,8 +6,6 @@ Term handler for the SRT Translator.
 import logging
 import re
 
-from srt_translator.core.config.settings import DNT_TERMS
-
 
 class TermHandler:
     """
@@ -17,13 +15,14 @@ class TermHandler:
     technical terms, or proper nouns that should remain in the original language.
     """
 
-    def __init__(self, dnt_terms=None):
-        # Use provided DNT terms or fall back to environment variable for backward compatibility
-        if dnt_terms is not None:
-            self.dnt_terms = sorted(dnt_terms, key=len, reverse=True)
-        else:
-            # Fall back to environment variable for backward compatibility
-            self.dnt_terms = sorted(DNT_TERMS, key=len, reverse=True)
+    def __init__(self, dnt_terms):
+        # DNT terms must be provided - no fallbacks to global settings
+        if dnt_terms is None:
+            raise ValueError(
+                "dnt_terms must be provided. TermHandler cannot fall back to global settings."
+            )
+
+        self.dnt_terms = sorted(dnt_terms, key=len, reverse=True)
 
     def replace_dnt_terms(self, text):
         """

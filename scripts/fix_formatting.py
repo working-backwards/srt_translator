@@ -4,30 +4,40 @@ Auto-fix formatting script for the SRT Translator project.
 Automatically fixes code formatting issues.
 """
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
 
 def run_command(cmd, description):
     """Run a command and handle errors."""
-    print(f"\n{'=' * 60}")
-    print(f"Running: {description}")
-    print(f"Command: {' '.join(cmd)}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info(f"Running: {description}")
+    logger.info(f"Command: {' '.join(cmd)}")
+    logger.info("=" * 60)
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print("✅ SUCCESS")
+        logger.info("✅ SUCCESS")
         if result.stdout:
-            print(result.stdout)
+            logger.info(result.stdout)
         return True
     except subprocess.CalledProcessError as e:
-        print("❌ FAILED")
+        logger.error("❌ FAILED")
         if e.stdout:
-            print("STDOUT:", e.stdout)
+            logger.error("STDOUT:", e.stdout)
         if e.stderr:
-            print("STDERR:", e.stderr)
+            logger.error("STDERR:", e.stderr)
         return False
 
 
@@ -35,7 +45,7 @@ def main():
     """Run all auto-fixing tools."""
     project_root = Path(__file__).parent.parent
 
-    print("🔧 Auto-fixing code formatting issues...")
+    logger.info("🔧 Auto-fixing code formatting issues...")
 
     success = True
 
@@ -49,15 +59,15 @@ def main():
         ["isort", "srt_core", "gui", "tests", "scripts"], "isort import sorting"
     )
 
-    print(f"\n{'=' * 60}")
+    logger.info("=" * 60)
     if success:
-        print("🎉 All formatting issues have been fixed!")
-        print("\nNext steps:")
-        print("1. Review the changes with: git diff")
-        print("2. Run linting check: python scripts/lint.py")
+        logger.info("🎉 All formatting issues have been fixed!")
+        logger.info("Next steps:")
+        logger.info("1. Review the changes with: git diff")
+        logger.info("2. Run linting check: python scripts/lint.py")
         sys.exit(0)
     else:
-        print("❌ Some fixes failed. Please check the errors above.")
+        logger.error("❌ Some fixes failed. Please check the errors above.")
         sys.exit(1)
 
 

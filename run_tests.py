@@ -3,15 +3,25 @@
 Test runner for SRT Translator
 """
 
+import logging
 import os
 import subprocess
 import sys
 
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
 
 def run_tests():
     """Run all tests using pytest"""
-    print("Running SRT Translator tests...")
-    print("=" * 50)
+    logger.info("Running SRT Translator tests...")
+    logger.info("=" * 50)
 
     # Run tests with pytest
     cmd = [sys.executable, "-m", "pytest", "tests/", "-v"]
@@ -20,15 +30,15 @@ def run_tests():
         result = subprocess.run(cmd, capture_output=False, text=True)
         return result.returncode
     except FileNotFoundError:
-        print("Error: pytest not found. Please install pytest:")
-        print("pip install pytest")
+        logger.error("Error: pytest not found. Please install pytest:")
+        logger.error("pip install pytest")
         return 1
 
 
 def run_gui_tests():
     """Run GUI tests specifically"""
-    print("Running GUI tests...")
-    print("=" * 30)
+    logger.info("Running GUI tests...")
+    logger.info("=" * 30)
 
     cmd = [sys.executable, "-m", "pytest", "tests/gui/", "-v"]
 
@@ -36,8 +46,8 @@ def run_gui_tests():
         result = subprocess.run(cmd, capture_output=False, text=True)
         return result.returncode
     except FileNotFoundError:
-        print("Error: pytest not found. Please install pytest:")
-        print("pip install pytest")
+        logger.error("Error: pytest not found. Please install pytest:")
+        logger.error("pip install pytest")
         return 1
 
 

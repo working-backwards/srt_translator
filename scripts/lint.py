@@ -4,30 +4,39 @@ Linting and formatting script for the SRT Translator project.
 Runs all code quality tools in the correct order.
 """
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
 
 def run_command(cmd, description):
     """Run a command and handle errors."""
-    print(f"\n{'=' * 60}")
-    print(f"Running: {description}")
-    print(f"Command: {' '.join(cmd)}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info(f"Running: {description}")
+    logger.info(f"Command: {' '.join(cmd)}")
+    logger.info("=" * 60)
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print("✅ SUCCESS")
+        logger.info("✅ SUCCESS")
         if result.stdout:
-            print(result.stdout)
+            logger.info(result.stdout)
         return True
     except subprocess.CalledProcessError as e:
-        print("❌ FAILED")
+        logger.error("❌ FAILED")
         if e.stdout:
-            print("STDOUT:", e.stdout)
+            logger.error(f"STDOUT: {e.stdout}")
         if e.stderr:
-            print("STDERR:", e.stderr)
+            logger.error(f"STDERR: {e.stderr}")
         return False
 
 
@@ -46,7 +55,7 @@ def main():
         )
     ]
 
-    print(f"Found {len(python_files)} Python files to process")
+    logger.info(f"Found {len(python_files)} Python files to process")
 
     success = True
 
@@ -77,14 +86,14 @@ def main():
     try:
         success &= run_command(["mypy", "srt_core", "gui"], "mypy type checking")
     except FileNotFoundError:
-        print("\n⚠️  mypy not found. Install with: pip install mypy")
+        logger.warning("\n⚠️  mypy not found. Install with: pip install mypy")
 
-    print(f"\n{'=' * 60}")
+    logger.info("=" * 60)
     if success:
-        print("🎉 All checks passed!")
+        logger.info("🎉 All checks passed!")
         sys.exit(0)
     else:
-        print("❌ Some checks failed. Please fix the issues above.")
+        logger.error("❌ Some checks failed. Please fix the issues above.")
         sys.exit(1)
 
 

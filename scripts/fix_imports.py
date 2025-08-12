@@ -3,9 +3,19 @@
 Script to fix import order issues (E402 errors) in the project.
 """
 
+import logging
 import re
 import sys
 from pathlib import Path
+
+# Set up logging - ALWAYS include this
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def fix_imports_in_file(file_path):
@@ -80,7 +90,7 @@ def fix_imports_in_file(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        print(f"Fixed imports in {file_path}")
+        logger.info(f"Fixed imports in {file_path}")
         return True
 
     return False
@@ -108,8 +118,8 @@ def main():
             if fix_imports_in_file(file_path):
                 fixed_count += 1
 
-    print(f"\nFixed import order issues in {fixed_count} files.")
-    print("Run 'flake8 --select E402' to verify the fixes.")
+    logger.info(f"\nFixed import order issues in {fixed_count} files.")
+    logger.info("Run 'flake8 --select E402' to verify the fixes.")
 
 
 if __name__ == "__main__":

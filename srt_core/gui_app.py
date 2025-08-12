@@ -52,7 +52,9 @@ def main() -> None:
 
         except Exception as e:
             # If QSettings fails, we'll use defaults
-            print(f"Warning: Could not load GUI settings: {e}")
+            # Note: logging not available yet at this point, so we'll use stderr
+            import sys
+            sys.stderr.write(f"Warning: Could not load GUI settings: {e}\n")
 
     # Call the bridge BEFORE importing any core modules
     prepare_environment_from_settings()

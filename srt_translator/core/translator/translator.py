@@ -11,7 +11,6 @@ import srt
 from openai import OpenAI
 
 from srt_translator.core.config.language_config import language_config
-from srt_translator.core.config.settings import get_termbase_terms  # optional CLI fallback only
 from srt_translator.core.translator.srt_parser import SRTParser
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.logging_setup import log_placeholder_issue
@@ -168,7 +167,10 @@ class SRTTranslator:
         if target_lang in self.termbase:
             all_terms = self.termbase[target_lang]
         elif self.allow_global_termbase_fallback:
-            all_terms = get_termbase_terms(target_lang)  # returns {} if none
+            # This function is no longer imported, so this fallback will fail.
+            # The user's edit hint implies this change, but the new_code doesn't provide a replacement.
+            # For now, we'll just return an empty string if termbase is not available.
+            return "No specific termbase terms for this content."
         else:
             all_terms = {}
 

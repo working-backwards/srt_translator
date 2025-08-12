@@ -45,6 +45,9 @@ def translate_srt_files(
 ):
     """Translate SRT files. If config is provided, use it. Otherwise, use individual parameters or fall back to global settings."""
 
+    # Get logger for this module
+    logger = logging.getLogger(__name__)
+
     # If TranslationConfig is provided, use it
     if config is not None:
         translation_config = config
@@ -68,7 +71,7 @@ def translate_srt_files(
 
     if file_paths is None:
         if not os.path.exists(SOURCE_DIR):
-            print(f"Source directory {SOURCE_DIR} does not exist.")
+            logger.error(f"Source directory {SOURCE_DIR} does not exist.")
             return {
                 "success": False,
                 "total_files": 0,
@@ -96,9 +99,9 @@ def translate_srt_files(
     log_file = os.path.join(batch_dir, f"translation_issues_{ts_str}.log")
     setup_logging(log_file_override=log_file)
 
-    print(f"Batch folder: {batch_dir}")
-    print(f"Log file: {log_file}")
-    print(f"Translating with batch size: {translation_config.batch_size}")
+    logger.info(f"Batch folder: {batch_dir}")
+    logger.info(f"Log file: {log_file}")
+    logger.info(f"Translating with batch size: {translation_config.batch_size}")
 
     # Create translator with configuration
     translator = SRTTranslator(
@@ -162,11 +165,11 @@ def translate_srt_files(
                 error_details = summary["error_details"]
                 if isinstance(error_details, list):
                     error_details.append(f"{filename} ({lang_name}): {e}")
-                print(f"Error translating {filename} to {lang_name}: {e}")
+                logger.error(f"Error translating {filename} to {lang_name}: {e}")
 
         # Run fixer after each SRT file is complete
         if FIX_AGGRESSIVENESS > 0 and current_file_translations:
-            logging.info(f"Running automatic fixes for {filename}...")
+            logger.info(f"Running automatic fixes for {filename}...")
             fixer = SRTFixer(log_file, batch_dir)
             fixer.parse_log_file()
             fixer.fix_specific_srt_files(
@@ -178,19 +181,19 @@ def translate_srt_files(
     summary["unique_languages"] = len(translation_config.target_languages)
 
     # Print summary
-    logging.info("\n=== Translation Summary ===")
-    logging.info(f"Files processed: {summary['total_files']}")
-    logging.info(f"Languages processed: {summary['unique_languages']}")
-    logging.info(f"Total translation operations: {summary['total_operations']}")
-    logging.info(f"Successful translations: {summary['successes']}")
-    logging.info(f"Skipped (empty/corrupt): {summary['skipped']}")
-    logging.info(f"Errors: {summary['errors']}")
+    logger.info("\n=== Translation Summary ===")
+    logger.info(f"Files processed: {summary['total_files']}")
+    logger.info(f"Languages processed: {summary['unique_languages']}")
+    logger.info(f"Total translation operations: {summary['total_operations']}")
+    logger.info(f"Successful translations: {summary['successes']}")
+    logger.info(f"Skipped (empty/corrupt): {summary['skipped']}")
+    logger.info(f"Errors: {summary['errors']}")
     error_details = summary["error_details"]
     if isinstance(error_details, list) and error_details:
-        logging.info("Error details:")
+        logger.info("Error details:")
         for detail in error_details:
-            logging.info(f"  - {detail}")
-    logging.info("==========================\n")
+            logger.info(f"  - {detail}")
+    logger.info("==========================\n")
 
     # Build minimal manifest (Option B)
     try:
@@ -275,19 +278,19 @@ def translate_srt_files(
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, final_path)
-        logging.info(f"Manifest written: {os.path.relpath(final_path, batch_dir)}")
+        logger.info(f"Manifest written: {os.path.relpath(final_path, batch_dir)}")
 
         # Write termbase and DNT terms to the same output directory
         try:
             # Debug logging to see what data we have
-            logging.info(
+            logger.info(
                 f"Writing configuration files - Termbase keys: {list(translation_config.termbase.keys()) if translation_config.termbase else 'None'}"
             )
-            logging.info(
+            logger.info(
                 f"Writing configuration files - DNT terms count: {len(translation_config.dnt_terms) if translation_config.dnt_terms else 0}"
             )
             if translation_config.dnt_terms:
-                logging.info(
+                logger.info(
                     f"Writing configuration files - DNT terms sample: {translation_config.dnt_terms[:5]}"
                 )
 
@@ -297,7 +300,7 @@ def translate_srt_files(
             with open(termbase_tmp, "w", encoding="utf-8") as f:
                 json.dump(translation_config.termbase, f, ensure_ascii=False, indent=2)
             os.replace(termbase_tmp, termbase_path)
-            logging.info(
+            logger.info(
                 f"Termbase written: {os.path.relpath(termbase_path, batch_dir)}"
             )
 
@@ -311,16 +314,16 @@ def translate_srt_files(
             with open(dnt_tmp, "w", encoding="utf-8") as f:
                 json.dump(dnt_terms_data, f, ensure_ascii=False, indent=2)
             os.replace(dnt_tmp, dnt_terms_path)
-            logging.info(
+            logger.info(
                 f"DNT terms written: {os.path.relpath(dnt_terms_path, batch_dir)}"
             )
 
         except Exception as e:
-            logging.warning(f"Failed to write termbase or DNT terms: {e}")
+            logger.warning(f"Failed to write termbase or DNT terms: {e}")
 
-        logging.info(f"Batch folder: {batch_dir}")
+        logger.info(f"Batch folder: {batch_dir}")
     except Exception as e:
-        logging.warning(f"Failed to write manifest: {e}")
+        logger.warning(f"Failed to write manifest: {e}")
 
     # Return results for GUI integration
     return {
@@ -338,6 +341,9 @@ def translate_srt_files(
 def main():
     """Main CLI entry point for SRT Translator"""
     import argparse
+
+    # Get logger for this function
+    logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(
         description="SRT Translator - AI-powered subtitle translation tool",
@@ -374,7 +380,7 @@ Examples:
             config = ConfigResolver.get_translation_config_for_cli()
             translate_srt_files(config=config)
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         exit(1)
 
 

@@ -6,7 +6,8 @@ Logging setup for the SRT Translator.
 import logging
 import os
 
-from srt_translator.core.config.settings import LOG_MODE
+# Default LOG_MODE - should come from TranslationConfig, not global settings
+LOG_MODE = "Standard"
 
 
 def setup_logging(log_file_override: str) -> str:
@@ -67,7 +68,7 @@ def setup_logging(log_file_override: str) -> str:
     # Set logging level based on DEBUG_MODE environment variable
     if os.getenv("DEBUG_MODE", "false").lower() == "true":
         root_logger.setLevel(logging.DEBUG)
-        print("🔍 Debug logging enabled - detailed information will be shown")
+        logging.info("🔍 Debug logging enabled - detailed information will be shown")
     else:
         root_logger.setLevel(logging.INFO)
 

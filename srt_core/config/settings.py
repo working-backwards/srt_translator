@@ -1,5 +1,10 @@
 import json
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Dynamically calculate BASE_DIR based on the project's root
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -17,8 +22,10 @@ OUTPUT_BASE_DIR = os.environ.get(
     "OUTPUT_DIRECTORY", os.path.join(BASE_DIR, "translated_srt_files")
 )
 
-print(f"BASE_DIR: {os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))}")
-print(f"SOURCE_DIR: {SOURCE_DIR}")
+logger.info(
+    f"BASE_DIR: {os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))}"
+)
+logger.info(f"SOURCE_DIR: {SOURCE_DIR}")
 
 # General settings
 # Default source language (normalized to lowercase)
@@ -45,7 +52,7 @@ if "TARGET_LANGUAGES" not in os.environ:
     # GUI mode - use empty default, will be provided as parameters
     TARGET_LANGUAGES = {}
     TARGET_LANGUAGES_TEXT = "{}"
-    print("GUI mode detected - TARGET_LANGUAGES will be provided as parameters")
+    logger.info("GUI mode detected - TARGET_LANGUAGES will be provided as parameters")
 else:
     # CLI mode - load from environment variables
     TARGET_LANGUAGES_TEXT = os.environ["TARGET_LANGUAGES"]
@@ -62,7 +69,7 @@ else:
             normalized_target_languages[lang_name] = lang_code.lower()
 
         TARGET_LANGUAGES = normalized_target_languages
-        print(
+        logger.info(
             f"Using TARGET_LANGUAGES from environment with {len(TARGET_LANGUAGES)} languages (normalized to lowercase)"
         )
     except json.JSONDecodeError as e:
@@ -87,12 +94,12 @@ def load_termbase():
         try:
             with open(TERMBASE_PATH, "r", encoding="utf-8") as f:
                 TERMBASE = json.load(f)
-            print(f"Loaded termbase with {len(TERMBASE)} languages")
+            logger.info(f"Loaded termbase with {len(TERMBASE)} languages")
         except (json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"Warning: Could not load termbase: {e}")
+            logger.warning(f"Warning: Could not load termbase: {e}")
             TERMBASE = {}
     else:
-        print("No termbase found - using default translations")
+        logger.info("No termbase found - using default translations")
 
 
 # Load termbase on import

@@ -30,6 +30,7 @@ class TranslationConfig:
     api_key: Optional[str] = None
     model_name: str = "gpt-4o-mini"
     batch_size: int = 5
+    fix_aggressiveness: float = 0.75  # Aggressiveness of automatic placeholder fixes
     logger: Optional[logging.Logger] = None
     mode: str = "CLI"  # "GUI" or "CLI" - indicates the execution mode
 
@@ -151,6 +152,7 @@ def build_config_from_gui(settings_manager) -> TranslationConfig:
         or "translated_srt_files",
         model_name=model_name,
         batch_size=batch_size,
+        fix_aggressiveness=float(os.getenv("AGGRESSIVENESS", "0.75")),
         mode="GUI",
     )
 
@@ -161,10 +163,32 @@ def build_config_from_cli() -> TranslationConfig:
     target_languages_str = os.getenv("TARGET_LANGUAGES", "{}")
     dnt_terms_str = os.getenv("DNT_TERMS", "[]")
 
-    # Load termbase from physical file in root directory (not from environment variable)
-    from .settings import TERMBASE
+    # Load termbase directly from physical file in project root directory
+    # This keeps the core engine agnostic about how parameters were collected
+    termbase = {}
 
-    termbase = TERMBASE
+    # Calculate path to project root: from srt_translator/core/config/ go up 3 levels to project root
+    current_file = __file__  # srt_translator/core/config/translation_config.py
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+    )
+    termbase_path = os.path.join(project_root, "termbase.json")
+
+    if os.path.exists(termbase_path):
+        try:
+            with open(termbase_path, "r", encoding="utf-8") as f:
+                termbase = json.load(f)
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Loaded termbase with {len(termbase)} languages from {termbase_path}"
+            )
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load termbase from {termbase_path}: {e}")
+            termbase = {}
+    else:
+        logger = logging.getLogger(__name__)
+        logger.info(f"No termbase found at {termbase_path} - using empty termbase")
 
     try:
         target_languages = json.loads(target_languages_str)
@@ -185,6 +209,7 @@ def build_config_from_cli() -> TranslationConfig:
         api_key=os.getenv("OPENAI_API_KEY"),
         model_name=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         batch_size=batch_size,
+        fix_aggressiveness=float(os.getenv("AGGRESSIVENESS", "0.75")),
         mode="CLI",
     )
 
@@ -195,6 +220,7 @@ def build_config_from_parameters(
     termbase: Optional[Dict[str, Dict[str, str]]] = None,
     output_directory: Optional[str] = None,
     api_key: Optional[str] = None,
+    fix_aggressiveness: Optional[float] = None,
     logger: Optional[logging.Logger] = None,
 ) -> TranslationConfig:
     """Build configuration from explicit parameters"""
@@ -206,6 +232,7 @@ def build_config_from_parameters(
         api_key=api_key,
         model_name=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         batch_size=int(os.getenv("BATCH_SIZE", 5)),
+        fix_aggressiveness=fix_aggressiveness or 0.75,
         logger=logger,
         mode="CLI",
     )
