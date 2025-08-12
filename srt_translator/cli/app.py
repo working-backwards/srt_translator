@@ -29,7 +29,8 @@ def bootstrap_env() -> None:
     if "OUTPUT_DIRECTORY" in os.environ:
         current_output_dir = os.environ["OUTPUT_DIRECTORY"]
         del os.environ["OUTPUT_DIRECTORY"]
-        print(
+        logger = logging.getLogger(__name__)
+        logger.info(
             f"Clearing system OUTPUT_DIRECTORY '{current_output_dir}' to use .env file value"
         )
 
@@ -45,7 +46,8 @@ def bootstrap_env() -> None:
             "Chinese (Simplified)": "zh-Hans",
         }
         os.environ["TARGET_LANGUAGES"] = json.dumps(default_languages)
-        print(f"Using default TARGET_LANGUAGES: {os.environ['TARGET_LANGUAGES']}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Using default TARGET_LANGUAGES: {os.environ['TARGET_LANGUAGES']}")
 
     os.environ.setdefault("OPENAI_MODEL", "gpt-4o-mini")
     os.environ.setdefault("BATCH_SIZE", "5")

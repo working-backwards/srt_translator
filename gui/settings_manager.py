@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSettings
 
-from srt_core.config.language_config import language_config
+from srt_translator.core.config.language_config import language_config
 
 
 @dataclass

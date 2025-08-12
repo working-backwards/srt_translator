@@ -13,8 +13,8 @@ from typing import Dict, List
 
 from openai import OpenAI
 
-from srt_core.config.language_config import language_config
-from srt_core.translator.srt_parser import SRTParser
+from srt_translator.core.config.language_config import language_config
+from srt_translator.core.translator.srt_parser import SRTParser
 
 
 class AIConfigGenerator:

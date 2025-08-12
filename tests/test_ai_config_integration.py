@@ -5,9 +5,9 @@ import logging
 
 from PySide6.QtWidgets import QApplication
 
-from gui.ai_config import AIConfigGenerator
-from gui.config_manager import GUIConfigManager
-from gui.settings_manager import SettingsManager
+from srt_translator.gui.ai_config import AIConfigGenerator
+from srt_translator.gui.config_manager import GUIConfigManager
+from srt_translator.gui.settings_manager import SettingsManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +38,9 @@ def test_settings_manager():
 
     # Save AI config
     settings_manager.save_ai_config(test_terms, test_termbase)
-    logger.info(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages")
+    logger.info(
+        f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages"
+    )
 
     # Load AI config
     loaded_terms, loaded_termbase = settings_manager.load_ai_config()
@@ -107,7 +109,9 @@ def test_ai_config_generator():
         logger.info("✓ AIConfigGenerator instantiated successfully")
 
         # Test supported languages
-        logger.info(f"✓ Supported languages: {len(generator.get_supported_languages())}")
+        logger.info(
+            f"✓ Supported languages: {len(generator.get_supported_languages())}"
+        )
 
     except Exception as e:
         logger.info(f"⚠ AIConfigGenerator test skipped: {e}")

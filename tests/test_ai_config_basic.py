@@ -2,9 +2,9 @@ import logging
 import os
 import sys
 
-from gui.ai_config import AIConfigGenerator
-from gui.config_manager import GUIConfigManager
-from gui.settings_manager import SettingsManager
+from srt_translator.gui.ai_config import AIConfigGenerator
+from srt_translator.gui.config_manager import GUIConfigManager
+from srt_translator.gui.settings_manager import SettingsManager
 
 #!/usr/bin/env python3
 """
@@ -75,7 +75,9 @@ def test_ai_config_system():
         ai_generator = AIConfigGenerator("test-key")
         logger.info("AI Config Generator created successfully")
         logger.info(f"Max content length: {ai_generator.MAX_CONTENT_LENGTH}")
-        logger.info(f"Supported languages: {len(ai_generator.get_supported_languages())}")
+        logger.info(
+            f"Supported languages: {len(ai_generator.get_supported_languages())}"
+        )
     except Exception as e:
         logger.info(f"AI Config Generator test (expected error): {e}")
 

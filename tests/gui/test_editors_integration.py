@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.ui.ai_config_section import EditConfigurationDialog
+from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

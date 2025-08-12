@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.ui.termbase_editor import TermbaseEditor
+from srt_translator.gui.ui.termbase_editor import TermbaseEditor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

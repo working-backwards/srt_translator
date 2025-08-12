@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui.ui.dnt_terms_editor import DNTTermsEditor
+from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
