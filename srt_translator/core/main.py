@@ -4,22 +4,22 @@ import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union, TypedDict
 
-from srt_core import __version__
-from srt_core.config.config_resolver import ConfigResolver
-from srt_core.config.settings import (
+from srt_translator import __version__
+from srt_translator.core.config.config_resolver import ConfigResolver
+from srt_translator.core.config.settings import (
     DNT_TERMS,
     FIX_AGGRESSIVENESS,
     SOURCE_DIR,
     TARGET_LANGUAGES,
     TERMBASE,
 )
-from srt_core.config.translation_config import (
+from srt_translator.core.config.translation_config import (
     TranslationConfig,
     build_config_from_parameters,
 )
-from srt_core.translator.fixer import SRTFixer
-from srt_core.translator.translator import SRTTranslator
-from srt_core.utils.logging_setup import setup_logging
+from srt_translator.core.translator.fixer import SRTFixer
+from srt_translator.core.translator.translator import SRTTranslator
+from srt_translator.core.utils.logging_setup import setup_logging
 
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().

@@ -2,9 +2,16 @@
 requires = ["setuptools>=45", "wheel", "pyinstaller>=5.0.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["srt_translator*"]
+exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_logs*", "original_captions*", "translated_srt_files*", "srt_core*", "gui*"]
+
+[tool.setuptools.package-data]
+"srt_translator.gui" = ["**/*.ui", "**/*.qss", "assets/**"]
+
 [project]
 name = "srt-translator"
-version = "1.0.0"
+version = "1.0.0rc1"
 description = "A subtitle translation tool with CLI and GUI interfaces"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
@@ -35,11 +42,14 @@ dev = [
     "pip-tools>=7.0.0",
     "ruff>=0.1.0",
 ]
+gui = [
+    "PySide6>=6.6.0",
+]
 
 # Build scripts
 [project.scripts]
-srt-translator-cli = "srt_core.main:translate_srt_files"
-srt-translator-gui = "run_gui:main"
+srt-translator = "srt_translator.cli.app:main"
+srt-translator-gui = "srt_translator.gui.app:main"
 
 # PyInstaller configuration
 #[tool.pyinstaller]
@@ -75,7 +85,7 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
-known_first_party = ["srt_core", "gui"]
+known_first_party = ["srt_translator"]
 known_third_party = ["openai", "srt", "dotenv"]
 skip = ["venv", ".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache"]
 
