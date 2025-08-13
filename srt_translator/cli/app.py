@@ -9,6 +9,7 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -61,20 +62,32 @@ Examples:
     # Collect raw configuration and build TranslationConfig
     try:
         from srt_translator.cli.config_loader import collect_cli_raw
-        from srt_translator.core.config.models import TranslationConfig
+        from srt_translator.api import TranslationConfiguration, Translator
 
         raw_config = collect_cli_raw()
-        config = TranslationConfig.from_raw(raw_config, mode="CLI")
+        api_cfg = TranslationConfiguration(
+            files=None,  # set after enumeration
+            output_dir=Path(raw_config.get("output_directory", "translated_srt_files")),
+            target_languages=raw_config.get("target_languages"),
+            dnt_terms=raw_config.get("dnt_terms"),
+            termbase=raw_config.get("termbase") or {},
+            openai_model=raw_config.get("openai_model", "gpt-4o-mini"),
+            batch_size=int(raw_config.get("batch_size", 5)),
+            aggressiveness=float(raw_config.get("aggressiveness", 0.75)),
+            log_mode=raw_config.get("log_mode", "Standard"),
+            api_key=raw_config.get("api_key"),
+            mode="CLI",
+        )
 
         logger.info("Configuration loaded successfully")
         logger.debug(f"API key source: {raw_config.get('api_key_source', 'unknown')}")
 
         # Debug logging for termbase and DNT terms
         if args.debug:
-            logger.debug(f"DNT terms count: {len(config.dnt_terms)}")
-            logger.debug(f"Termbase languages count: {len(config.termbase)}")
-            if config.termbase:
-                logger.debug(f"Termbase languages: {list(config.termbase.keys())}")
+            logger.debug(f"DNT terms count: {len(api_cfg.dnt_terms)}")
+            logger.debug(f"Termbase languages count: {len(api_cfg.termbase)}")
+            if api_cfg.termbase:
+                logger.debug(f"Termbase languages: {list(api_cfg.termbase.keys())}")
             else:
                 logger.warning(
                     "No termbase loaded - check if termbase.json exists and is accessible"
@@ -90,25 +103,22 @@ Examples:
 
     # Call main function with the configuration
     try:
-        from srt_translator.core.main import translate_srt_files
-
-        # For CLI mode, use the default source directory if no specific files provided
-        source_dir = "original_captions"  # Default source directory
-        if os.path.exists(source_dir):
-            file_paths = [
-                os.path.join(source_dir, f)
-                for f in os.listdir(source_dir)
-                if f.endswith(".srt")
-            ]
-            if file_paths:
-                logger.info(f"Found {len(file_paths)} .srt files to translate")
-                translate_srt_files(file_paths=file_paths, config=config)
-                logger.info("Translation completed successfully")
-            else:
-                logger.info(f"No .srt files found in {source_dir}")
-        else:
-            logger.error(f"Source directory {source_dir} does not exist")
+        input_dir = raw_config.get("input_directory", "original_captions")
+        if not os.path.exists(input_dir):
+            logger.error(f"INPUT_DIRECTORY not found: {input_dir}")
             return 1
+        files = [
+            Path(input_dir) / f
+            for f in sorted(os.listdir(input_dir))
+            if f.endswith(".srt")
+        ]
+        if not files:
+            logger.info(f"No .srt files found in {input_dir}")
+            return 0
+        logger.info(f"Found {len(files)} .srt files to translate")
+        cfg_with_files = api_cfg.__class__(**{**api_cfg.__dict__, "files": files})
+        Translator(cfg_with_files).run()
+        logger.info("Translation completed successfully")
 
     except ImportError as e:
         logger.error(f"Import error: {e}")

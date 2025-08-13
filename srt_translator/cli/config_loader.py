@@ -43,28 +43,28 @@ def collect_cli_raw() -> dict:
     # Load termbase data directly from file
     termbase_data = {}
     termbase_path = env_file.get("TERMBASE_PATH", "termbase.json")
-    
+
     if not os.path.isabs(termbase_path):
         # Find project root by looking for pyproject.toml or setup.py
         current_dir = Path.cwd()
         project_root = None
-        
+
         # Walk up directories to find project root
         for parent in [current_dir] + list(current_dir.parents):
             if (parent / "pyproject.toml").exists() or (parent / "setup.py").exists():
                 project_root = parent
                 break
-        
+
         if project_root:
             termbase_path = str(project_root / termbase_path)
         else:
             # Fallback to current directory if project root not found
             termbase_path = str(current_dir / termbase_path)
-    
+
     # Load the actual termbase data
     if os.path.exists(termbase_path):
         try:
-            with open(termbase_path, 'r', encoding='utf-8') as f:
+            with open(termbase_path, "r", encoding="utf-8") as f:
                 termbase_data = json.load(f)
         except Exception as e:
             # Log warning but continue with empty termbase
@@ -80,6 +80,9 @@ def collect_cli_raw() -> dict:
         "aggressiveness": env_file.get("AGGRESSIVENESS", "0.75"),
         "log_mode": env_file.get("LOG_MODE", "Standard"),
         "output_directory": env_file.get("OUTPUT_DIRECTORY", "translated_srt_files"),
+        "input_directory": env_file.get(
+            "INPUT_DIRECTORY", "original_captions"
+        ),  # ← Add this
         "target_languages": env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS)),
         "dnt_terms": env_file.get("DNT_TERMS", "[]"),
         "termbase": termbase_data,  # Actual data, not file path

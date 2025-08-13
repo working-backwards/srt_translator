@@ -14,6 +14,7 @@ This document provides specific guidelines for AI-generated code to ensure consi
 - **ONLY read configuration from `TranslationConfig` objects passed as parameters**
 - **ALWAYS require complete `TranslationConfig` objects - no Optional config parameters**
 - **CRASH with clear error if `TranslationConfig` is missing required fields**
+- **A instance cof Translator can only run one batch at a time**
 
 **Correct data flow:**
 ```
@@ -218,25 +219,8 @@ def process_data(data: list[str]) -> None:
         raise
 ```
 
-### 7. Configuration
 
-**Use environment variables:**
-
-```python
-import os
-from typing import Final
-
-# Constants
-DEFAULT_BATCH_SIZE: Final[int] = 5
-
-# Configuration
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", str(DEFAULT_BATCH_SIZE)))
-API_KEY = os.getenv("OPENAI_API_KEY")
-if not API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
-```
-
-### 8. String Formatting
+### 7. String Formatting
 
 **Use f-strings:**
 
@@ -292,25 +276,6 @@ def save_json(file_path: str, data: dict[str, Any]) -> None:
     """Save data to JSON file safely."""
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-```
-
-### Environment Configuration
-
-```python
-import os
-from typing import Final
-
-# Required environment variables
-REQUIRED_ENV_VARS: Final[tuple[str, ...]] = (
-    "OPENAI_API_KEY",
-    "SOURCE_LANG",
-)
-
-def validate_environment() -> None:
-    """Validate required environment variables."""
-    missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables: {missing_vars}")
 ```
 
 ### Testing Template

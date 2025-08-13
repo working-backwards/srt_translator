@@ -210,6 +210,20 @@ def translate_srt_files(
     except Exception as e:
         logger.warning(f"Failed to write manifest: {e}")
 
+    # Always run the fixer after translation
+    try:
+        if log_file and batch_dir:
+            logger.info("Running automatic SRT fixer on translated files...")
+            fixer = SRTFixer(log_file, batch_dir)
+            fixer.parse_log_file()
+            fixer.fix_srt_files(aggressiveness=translation_config.aggressiveness)
+            fixer.report_status()
+            logger.info("Automatic SRT fixes completed.")
+        else:
+            logger.warning("Fixer skipped (missing log_file or batch_dir).")
+    except Exception as e:
+        logger.error(f"Automatic SRT fixer failed: {e}", exc_info=True)
+
     # Return results for GUI integration
     return {
         "success": summary["errors"] == 0,

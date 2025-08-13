@@ -16,10 +16,14 @@ from typing import Any, Dict, List, Optional
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
-from srt_translator.core.config.models import TranslationConfig
+from srt_translator.api import TranslationConfiguration, Translator
 
-# Import fixer for automatic cleanup after translation
-from srt_translator.core.translator.fixer import SRTFixer
+# (Fixer now runs in core automatically)
+# Stream core logs into the GUI box safely
+from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
+import logging
+from pathlib import Path
+from logging import Handler
 
 
 class TranslationWorker(QObject):
@@ -56,6 +60,10 @@ class TranslationWorker(QObject):
         self._emit_buf: deque[str] = deque(maxlen=500)  # Bound the buffer
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
+        # Logging bridge state
+        self._log_listener = None
+        self._log_queue_handler = None
+        self._log_logger = None
 
     def request_stop(self):
         """Request cooperative stop of the worker"""
@@ -64,6 +72,40 @@ class TranslationWorker(QObject):
     def is_stopped(self):
         """Check if stop has been requested"""
         return self._stop.is_set()
+
+    # === Logging bridge ===
+    def _append_log_to_ui(self, text: str, levelno: int, extra: dict) -> None:
+        self._throttled_emit(self.progress_updated, text)
+
+    def _start_logging_bridge(self) -> None:
+        try:
+            self._log_logger, self._log_queue_handler, self._log_listener = (
+                make_gui_logging_pipeline(
+                    logger_name="srt_translator",
+                    name_prefix_filter=("srt_translator",),
+                    append_callback=self._append_log_to_ui,
+                    file_handler=None,  # core already writes logs to file
+                    queue_size=1000,
+                    level=logging.INFO,
+                )
+            )
+        except Exception:
+            logging.getLogger("srt_translator").exception(
+                "Failed to start GUI logging bridge"
+            )
+
+    def _stop_logging_bridge(self) -> None:
+        try:
+            if self._log_listener:
+                self._log_listener.stop()
+            if self._log_logger and self._log_queue_handler:
+                self._log_logger.removeHandler(self._log_queue_handler)
+        except Exception:
+            logging.getLogger("srt_translator").exception(
+                "Failed to stop GUI logging bridge"
+            )
+        finally:
+            self._log_listener = self._log_queue_handler = self._log_logger = None
 
     def _throttled_emit(self, signal, message):
         """Emit signal with throttling to prevent GUI hammering"""
@@ -81,6 +123,7 @@ class TranslationWorker(QObject):
 
     def run(self):
         """Run the translation process"""
+        self._start_logging_bridge()
         try:
             # Debug logging for target languages
             self.logger.info(
@@ -121,45 +164,45 @@ class TranslationWorker(QObject):
                 dnt_terms, termbase = self.settings_manager.load_ai_config()
 
                 # Build config from settings manager with actual data
-                raw_config = {
-                    "api_key": self.api_key,
-                    "output_directory": self.output_directory or "translated_srt_files",
-                    "target_languages": self.target_languages,
-                    "openai_model": "gpt-4o-mini",
-                    "batch_size": "5",
-                    "aggressiveness": "0.75",
-                    "log_mode": "Standard",
-                    "dnt_terms": dnt_terms,
-                    "termbase": termbase,
-                }
-
-                config = TranslationConfig.from_raw(raw_config, mode="GUI")
-                self.logger.info(
-                    f"Using configuration from settings manager: {len(config.target_languages)} languages"
+                api_cfg = TranslationConfiguration(
+                    files=[Path(p) for p in self.selected_files],
+                    output_dir=Path(self.output_directory or "translated_srt_files"),
+                    target_languages=self.target_languages,
+                    dnt_terms=dnt_terms,
+                    termbase=termbase,
+                    openai_model="gpt-4o-mini",
+                    batch_size=5,
+                    aggressiveness=0.75,
+                    log_mode="Standard",
+                    api_key=self.api_key,
+                    mode="GUI",
                 )
-                self.logger.info(f"DNT terms loaded: {len(config.dnt_terms)}")
-                self.logger.info(f"Termbase languages loaded: {len(config.termbase)}")
-                if config.termbase:
+                self.logger.info(
+                    f"Using configuration from settings manager: {len(api_cfg.target_languages)} languages"
+                )
+                self.logger.info(f"DNT terms loaded: {len(api_cfg.dnt_terms)}")
+                self.logger.info(f"Termbase languages loaded: {len(api_cfg.termbase)}")
+                if api_cfg.termbase:
                     self.logger.info(
-                        f"Termbase languages: {list(config.termbase.keys())}"
+                        f"Termbase languages: {list(api_cfg.termbase.keys())}"
                     )
             else:
                 # Fallback to direct parameters
-                raw_config = {
-                    "target_languages": self.target_languages,
-                    "api_key": self.api_key,
-                    "output_directory": self.output_directory,
-                    "openai_model": "gpt-4o-mini",
-                    "batch_size": "5",
-                    "aggressiveness": "0.75",
-                    "log_mode": "Standard",
-                    "dnt_terms": [],
-                    "termbase": {},
-                }
-
-                config = TranslationConfig.from_raw(raw_config, mode="GUI")
+                api_cfg = TranslationConfiguration(
+                    files=[Path(p) for p in self.selected_files],
+                    output_dir=Path(self.output_directory or "translated_srt_files"),
+                    target_languages=self.target_languages,
+                    dnt_terms=[],
+                    termbase={},
+                    openai_model="gpt-4o-mini",
+                    batch_size=5,
+                    aggressiveness=0.75,
+                    log_mode="Standard",
+                    api_key=self.api_key,
+                    mode="GUI",
+                )
                 self.logger.info(
-                    f"Using configuration from direct parameters: {len(config.target_languages)} languages"
+                    f"Using configuration from direct parameters: {len(api_cfg.target_languages)} languages"
                 )
 
             # Check for cooperative stop before starting translation
@@ -169,7 +212,7 @@ class TranslationWorker(QObject):
 
             # Run the translation
             # Capture both stdout and logging output
-            from srt_translator.core.main import translate_srt_files
+            from srt_translator.api import Translator as _GuiTranslator
 
             # Let the core engine handle its own logging to files
             # The GUI will display progress through the existing progress signals
@@ -178,9 +221,7 @@ class TranslationWorker(QObject):
             output = io.StringIO()
             with redirect_stdout(output):
                 # Call translation with configuration object
-                results = translate_srt_files(
-                    file_paths=self.selected_files, config=config
-                )
+                results = _GuiTranslator(api_cfg).run()
 
             # Remember returned paths for fixer and UI
             self.log_file = results.get("log_file") if results else None
@@ -214,22 +255,7 @@ class TranslationWorker(QObject):
             # Store results for potential fixer use
             self.translation_results = results
 
-            # Run automatic fixes after successful translation
-            if results and results.get("success", False):
-                self._throttled_emit(
-                    self.progress_updated,
-                    "Running automatic fixes on translated files...",
-                )
-                try:
-                    self.run_fixer()
-                    self._throttled_emit(
-                        self.progress_updated, "Automatic fixes completed successfully"
-                    )
-                except Exception as e:
-                    self.logger.error(f"Error running fixer: {e}")
-                    self._throttled_emit(
-                        self.progress_updated, f"Warning: Automatic fixes failed: {e}"
-                    )
+            # (Fixer runs in core automatically; nothing to do here)
 
             # Emit completion via signal (thread-safe)
             self.translation_completed.emit(results)
@@ -239,6 +265,8 @@ class TranslationWorker(QObject):
             self.logger.error(error_msg, exc_info=True)
             # Emit error via signal (thread-safe)
             self.translation_error.emit(error_msg)
+        finally:
+            self._stop_logging_bridge()
 
     def setup_ai_configuration(self):
         """Set up AI configuration from settings manager (if available)"""
@@ -263,35 +291,4 @@ class TranslationWorker(QObject):
             self.logger.error(f"Error setting up AI configuration: {e}")
             # Don't raise - this is not critical for translation
 
-    def run_fixer(self):
-        """Run the fixer to clean up translation issues"""
-        if not hasattr(self, "translation_results") or not self.log_file:
-            self.logger.warning(
-                "No translation results or log file available for fixing"
-            )
-            return
-
-        try:
-            self.progress_updated.emit("Running automatic fixes on translated files...")
-
-            # Create fixer instance
-            fixer = SRTFixer(
-                self.log_file,
-                self.batch_dir or self.output_directory or "translated_srt_files",
-            )
-
-            # Parse log file for issues
-            fixer.parse_log_file()
-
-            # Run fixes
-            fixer.fix_srt_files(aggressiveness=0.75)
-
-            # Report status
-            fixer.report_status()
-
-            self.progress_updated.emit("Automatic fixes completed")
-
-        except Exception as e:
-            error_msg = f"Error running fixer: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
-            self.progress_updated.emit(f"Warning: {error_msg}")
+    # (no fixer here; core owns fixes)
