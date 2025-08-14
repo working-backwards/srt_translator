@@ -130,7 +130,8 @@ ruff format srt_translator/ tests/
 mypy srt_translator/
 
 # Security scanning
-bandit srt_translator/
+bandit -r srt_translator/
+safety check --full-report
 ```
 
 ### Pre-commit Hooks
@@ -147,7 +148,7 @@ The pre-commit hooks will automatically:
 - Format code with Ruff
 - Fix linting issues
 - Run type checking
-- Scan for security issues
+- Scan for security issues (Bandit + Safety)
 - Ensure consistent code quality across all commits
 
 ## Testing

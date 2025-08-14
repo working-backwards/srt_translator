@@ -19,7 +19,7 @@ jobs:
         with: { python-version: '3.11' }
       - run: python -m pip install -U pip
       - run: pip install .[dev]
-      - run: ruff . && black --check . && mypy srt_translator
+      - run: ruff check . && ruff format --check . && mypy srt_translator
       - run: pytest -m "not gui" -q
 
   package-install:
@@ -51,3 +51,14 @@ jobs:
               print("GUI import ok")
           except Exception as e:
               raise SystemExit(1)
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python -m pip install -U pip
+      - run: pip install safety bandit
+      - run: safety check --full-report
+      - run: bandit -r srt_translator

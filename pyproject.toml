@@ -29,10 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "pylint>=2.17.0",
-    "flake8>=6.0.0",
+    "ruff>=0.1.0",
     "mypy>=1.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -40,7 +37,6 @@ dev = [
     "safety>=2.3.0",
     "bandit>=1.7.0",
     "pip-tools>=7.0.0",
-    "ruff>=0.1.0",
 ]
 gui = [
     "PySide6>=6.6.0,<7.0.0",
@@ -56,119 +52,25 @@ srtx-cli = "srt_translator.cli.app:main"
 # PyInstaller is configured via spec files in `build_specs/`.
 # This section was removed to keep `pyproject.toml` TOML‑valid.
 
-# Black configuration
-[tool.black]
-line-length = 88
-target-version = ['py39']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | venv
-  | build
-  | dist
-)/
-'''
-
-# isort configuration
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-known_first_party = ["srt_translator"]
-known_third_party = ["openai", "srt", "dotenv"]
-skip = ["venv", ".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache"]
-
-# Pylint configuration
-[tool.pylint.messages_control]
-disable = [
-    "C0114",  # missing-module-docstring
-    "C0115",  # missing-class-docstring
-    "C0116",  # missing-function-docstring
-    "C0301",  # line-too-long (handled by black)
-    "R0903",  # too-few-public-methods
-    "R0913",  # too-many-arguments
-    "R0914",  # too-many-locals
-    "R0915",  # too-many-statements
-    "R0902",  # too-many-instance-attributes
-    "R0904",  # too-many-public-methods
-    "R0917",  # too-many-positional-arguments
-    "W0621",  # redefined-outer-name (common in tests)
-    "W0622",  # redefined-builtin
-    "W0703",  # broad-except
-    "W0612",  # unused-variable
-    "W0611",  # unused-import
-    "W1203",  # logging-fstring-interpolation (f-strings are fine)
-    "R0801",  # duplicate-code (normal in UI patterns)
-    "E0611",  # no-name-in-module (PySide6 detection issue)
-]
-
-[tool.pylint.master]
-ignore = ["venv", ".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache"]
-
-[tool.pylint.format]
-max-line-length = 88
-good-names = ["i", "j", "k", "ex", "Run", "_", "id", "db"]
-
-[tool.pylint.design]
-max-args = 10
-max-locals = 20
-max-returns = 10
-max-branches = 15
-max-statements = 60
-max-parents = 7
-max-attributes = 10
-min-public-methods = 0
-max-public-methods = 30
-
-[tool.pylint.similarities]
-min-similarity-lines = 4
-ignore-comments = "yes"
-ignore-docstrings = "yes"
-ignore-imports = "yes"
-
-# Flake8 configuration
-[tool.flake8]
-max-line-length = 88
-extend-ignore = [
-    "E203",  # whitespace before ':'
-    "W503",  # line break before binary operator
-]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    ".venv",
-    "venv",
-    ".pytest_cache",
-    ".mypy_cache",
-]
-
-# Ruff configuration for import enforcement
+# Ruff configuration (replaces Black, isort, flake8, pylint)
 [tool.ruff]
 line-length = 100
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "TID"]
-# TID = flake8-tidy-imports rules
-
-# Note: We'll use a different approach for import enforcement
-# The current ruff rules are too broad for our use case
-# We'll implement this with custom linting rules or CI checks
+# E = pycodestyle errors, F = pyflakes, I = isort, B = flake8-bugbear, TID = flake8-tidy-imports
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# Note: Pylint and Flake8 configurations removed - now handled by Ruff
 
 # MyPy configuration (optional but recommended)
 [tool.mypy]
@@ -177,6 +79,11 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false  # Relaxed for existing codebase
 disallow_incomplete_defs = false  # Relaxed for existing codebase
+
+# Safety configuration for dependency vulnerability scanning
+[tool.safety]
+# Safety will scan requirements and installed packages for known vulnerabilities
+# Run with: safety check --full-report
 check_untyped_defs = true
 disallow_untyped_decorators = false  # Relaxed for existing codebase
 no_implicit_optional = true

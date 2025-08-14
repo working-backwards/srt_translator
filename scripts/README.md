@@ -40,6 +40,10 @@ ruff check . --fix
 # Type checking
 mypy srt_translator
 
+# Security scanning
+bandit -r srt_translator
+safety check --full-report
+
 # Run all quality checks
 pre-commit run --all-files
 ```
@@ -47,6 +51,8 @@ pre-commit run --all-files
 ### **What These Tools Do**
 - **Ruff**: Fast Python linter and formatter (replaces Black, isort, flake8)
 - **MyPy**: Static type checker
+- **Bandit**: Security linting for Python code
+- **Safety**: Dependency vulnerability scanning
 - **Pre-commit**: Automatically runs all tools on commit
 
 ### `verify_security.py`
