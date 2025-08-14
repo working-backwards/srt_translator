@@ -18,9 +18,7 @@ class LogMode(str, Enum):
 class TranslationConfig:
     target_languages: Dict[str, str]  # e.g., {"Spanish": "es", ...}
     dnt_terms: List[str]
-    termbase: Dict[
-        str, Dict[str, str]
-    ]  # target_lang_code -> {canonical_term -> translation}
+    termbase: Dict[str, Dict[str, str]]  # target_lang_code -> {canonical_term -> translation}
     output_directory: Path
     api_key: str
     model_name: str
@@ -59,9 +57,7 @@ class TranslationConfig:
             langs_raw = raw.get("target_languages")
             if isinstance(langs_raw, str):
                 langs_map = normalize_target_languages(
-                    parse_json_or_csv(
-                        langs_raw, expect_mapping=True, field_name="target_languages"
-                    )
+                    parse_json_or_csv(langs_raw, expect_mapping=True, field_name="target_languages")
                 )
             else:
                 langs_map = normalize_target_languages(langs_raw)
@@ -73,9 +69,7 @@ class TranslationConfig:
         try:
             dnt_raw = raw.get("dnt_terms")
             if isinstance(dnt_raw, str):
-                dnt_list = parse_json_or_csv(
-                    dnt_raw, expect_mapping=False, field_name="dnt_terms"
-                )
+                dnt_list = parse_json_or_csv(dnt_raw, expect_mapping=False, field_name="dnt_terms")
             else:
                 dnt_list = dnt_raw or []
         except ValueError as e:
@@ -98,9 +92,7 @@ class TranslationConfig:
             batch_size = 5
 
         try:
-            aggressiveness = validate_float_range(
-                raw.get("aggressiveness", 0.75), "aggressiveness"
-            )
+            aggressiveness = validate_float_range(raw.get("aggressiveness", 0.75), "aggressiveness")
         except ValueError as e:
             errors.append(str(e))
             aggressiveness = 0.75

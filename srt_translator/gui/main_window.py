@@ -81,9 +81,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Set up window properties according to style guide"""
         self.setWindowTitle("SRT Translator")
         self.setFixedSize(800, 700)  # Fixed size as per style guide
-        self.setWindowFlags(
-            Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint
-        )
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
 
     def setup_ui(self):
         """Set up the user interface using modular components"""
@@ -106,9 +104,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         content_container = QFrame()
         content_container.setObjectName("contentContainer")
         content_layout = QVBoxLayout(content_container)
-        content_layout.setContentsMargins(
-            30, 20, 30, 20
-        )  # 30px from left edge, 20px other margins
+        content_layout.setContentsMargins(30, 20, 30, 20)  # 30px from left edge, 20px other margins
         content_layout.setSpacing(20)  # 20px vertical spacing between sections
 
         # Create modular sections
@@ -349,9 +345,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             )
             return
 
-        self.logger.info(
-            f"Selected files: {[os.path.basename(f) for f in selected_files]}"
-        )
+        self.logger.info(f"Selected files: {[os.path.basename(f) for f in selected_files]}")
         self.logger.info(f"Target languages: {list(target_languages.values())}")
 
         # Initialize AI config generator if not already done
@@ -386,15 +380,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                     self.logger.info("AI Config Worker: Generating DNT terms")
                     # Generate DNT terms
                     dnt_terms = self.ai_generator.generate_dnt_terms(content)
-                    self.logger.info(
-                        f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
-                    )
+                    self.logger.info(f"AI Config Worker: Generated {len(dnt_terms)} DNT terms")
 
                     self.logger.info("AI Config Worker: Generating termbase")
                     # Generate termbase
-                    termbase = self.ai_generator.generate_termbase(
-                        content, self.languages
-                    )
+                    termbase = self.ai_generator.generate_termbase(content, self.languages)
                     self.logger.info(
                         f"AI Config Worker: Generated termbase for {len(termbase)} languages"
                     )
@@ -468,9 +458,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get detailed error information
         if self.ai_config_generator is not None:
             try:
-                error_details = self.ai_config_generator.get_error_details(
-                    Exception(error_message)
-                )
+                error_details = self.ai_config_generator.get_error_details(Exception(error_message))
                 title = error_details.get("title", "AI Configuration Failed")
                 message = error_details.get("message", error_message)
                 suggestion = error_details.get("suggestion", "")
@@ -699,16 +687,12 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker.moveToThread(self.translation_thread)
 
         # Connect worker signals to handlers
-        self.translation_worker.progress_updated.connect(
-            self.translation_section.update_log_output
-        )
+        self.translation_worker.progress_updated.connect(self.translation_section.update_log_output)
         self.translation_worker.translation_completed.connect(self.translation_finished)
         self.translation_worker.translation_error.connect(self.translation_error)
 
         # Connect thread lifecycle signals for proper cleanup
-        self.translation_worker.translation_completed.connect(
-            self.translation_thread.quit
-        )
+        self.translation_worker.translation_completed.connect(self.translation_thread.quit)
         self.translation_worker.translation_error.connect(self.translation_thread.quit)
         self.translation_thread.finished.connect(self.translation_worker.deleteLater)
         self.translation_thread.finished.connect(self.translation_thread.deleteLater)
@@ -729,9 +713,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Log the results being processed
         logging.info(f"Processing translation results: {results}")
-        self.translation_section.update_log_output(
-            f"Processing translation results: {results}"
-        )
+        self.translation_section.update_log_output(f"Processing translation results: {results}")
 
         # Show results dialog
         show_translation_results(self, results)
@@ -774,9 +756,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Save current settings
         self.settings_manager.save_api_key(self.api_section.get_api_key())
         self.settings_manager.save_selected_files(self.file_section.selected_files)
-        self.settings_manager.save_target_languages(
-            self.language_section.target_languages
-        )
+        self.settings_manager.save_target_languages(self.language_section.target_languages)
 
         event.accept()
 
@@ -793,16 +773,12 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self._mem_sample_count = 1
 
             if self._mem_sample_count % 10 == 0:  # Every 5 minutes
-                self.logger.debug(
-                    f"Memory usage: {growth_mb:.1f} MB growth since start"
-                )
+                self.logger.debug(f"Memory usage: {growth_mb:.1f} MB growth since start")
 
             # Warn if memory growth exceeds 1GB
             if growth_mb > 1000 and not self._memory_warning_shown:
                 self._memory_warning_shown = True
-                self.logger.warning(
-                    f"High memory usage detected: {growth_mb:.1f} MB growth"
-                )
+                self.logger.warning(f"High memory usage detected: {growth_mb:.1f} MB growth")
 
                 # Show warning to user
                 QMessageBox.warning(

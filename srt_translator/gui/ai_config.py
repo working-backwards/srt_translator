@@ -37,9 +37,7 @@ class AIConfigGenerator:
         self.MAX_CONTENT_TOKENS = (
             100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
         )
-        self.MAX_CONTENT_LENGTH = (
-            400000  # Character limit as fallback (roughly 100K tokens)
-        )
+        self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
 
     def get_supported_languages(self) -> List[str]:
         """Get all supported languages from unified configuration"""
@@ -192,17 +190,13 @@ EXAMPLE FORMAT:
             supported_languages = self.get_supported_languages()
             self.logger.info(f"Supported languages count: {len(supported_languages)}")
 
-            valid_languages = [
-                lang for lang in target_languages if lang in supported_languages
-            ]
+            valid_languages = [lang for lang in target_languages if lang in supported_languages]
             self.logger.info(f"Valid languages from input: {valid_languages}")
 
             if not valid_languages:
                 self.logger.warning("No valid target languages provided")
                 self.logger.warning(f"Input languages: {target_languages}")
-                self.logger.warning(
-                    f"Supported languages sample: {supported_languages[:10]}"
-                )
+                self.logger.warning(f"Supported languages sample: {supported_languages[:10]}")
                 return {}
 
             # Convert language codes to structured format for the AI prompt
@@ -213,22 +207,16 @@ EXAMPLE FORMAT:
                 if lang_name:
                     language_names.append({"code": lang_code, "name": lang_name})
                 else:
-                    self.logger.warning(
-                        f"Could not get language name for code: {lang_code}"
-                    )
+                    self.logger.warning(f"Could not get language name for code: {lang_code}")
 
             if not language_names:
-                self.logger.warning(
-                    "Could not get language names for codes: %s", valid_languages
-                )
+                self.logger.warning("Could not get language names for codes: %s", valid_languages)
                 return {}
 
             self.logger.info(f"Generating termbase for {len(language_names)} languages")
 
             # Generate comprehensive termbase for all languages at once
-            termbase = self._generate_comprehensive_termbase(
-                content, language_names, dnt_terms
-            )
+            termbase = self._generate_comprehensive_termbase(content, language_names, dnt_terms)
 
             self.logger.info(f"Generated termbase for {len(termbase)} languages")
             return termbase
@@ -348,9 +336,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
             if result_text is None:
                 raise ValueError("OpenAI response content is None")
             result_text = result_text.strip()
-            self.logger.info(
-                f"Received response from OpenAI ({len(result_text)} characters)"
-            )
+            self.logger.info(f"Received response from OpenAI ({len(result_text)} characters)")
             # Debug: Log the first 500 characters of the response to see what we're getting
             self.logger.debug(f"DEBUG: Response preview: {result_text[:500]}...")
             self.logger.info(f"Response preview: {result_text[:500]}...")
@@ -462,9 +448,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
 
             # Check if response appears to be truncated
             if not cleaned.endswith("}"):
-                self.logger.warning(
-                    "Response appears to be truncated - attempting to fix JSON"
-                )
+                self.logger.warning("Response appears to be truncated - attempting to fix JSON")
                 # Try to find the last complete object and close it
                 last_complete = cleaned.rfind("}")
                 if last_complete > 0:
@@ -482,12 +466,8 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 # Clean up the error message to avoid format specifier issues
                 if isinstance(error_msg, str):
                     # Remove any JSON-like content that might cause format issues
-                    clean_error = (
-                        error_msg.split('"')[0] if '"' in error_msg else error_msg
-                    )
-                    clean_error = (
-                        clean_error.split("{")[0] if "{" in clean_error else clean_error
-                    )
+                    clean_error = error_msg.split('"')[0] if '"' in error_msg else error_msg
+                    clean_error = clean_error.split("{")[0] if "{" in clean_error else clean_error
                     clean_error = clean_error.strip()
                     if clean_error:
                         error_msg = clean_error
@@ -498,9 +478,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
             extracted_terms = raw_data.get("extracted_terms", [])
             if extracted_terms:
                 if isinstance(extracted_terms[0], dict):  # Detailed with reasoning
-                    self.logger.info(
-                        f"AI extracted {len(extracted_terms)} terms with reasons:"
-                    )
+                    self.logger.info(f"AI extracted {len(extracted_terms)} terms with reasons:")
 
                     # Temporarily disable DNT filtering to debug the issue
                     filtered_terms = extracted_terms
@@ -514,13 +492,9 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                         reason = item.get("reason", "No reason provided")
                         if term:
                             if i < 20:
-                                self.logger.info(
-                                    f"  Pass #1 ({i + 1}/20): {term}: {reason}"
-                                )
+                                self.logger.info(f"  Pass #1 ({i + 1}/20): {term}: {reason}")
                             else:
-                                self.logger.info(
-                                    f"  Pass #2 ({i - 19}/10): {term}: {reason}"
-                                )
+                                self.logger.info(f"  Pass #2 ({i - 19}/10): {term}: {reason}")
                 elif isinstance(extracted_terms[0], str):  # Simple list
                     self.logger.info(
                         f"AI extracted {len(extracted_terms)} terms: {', '.join(extracted_terms)}"
@@ -567,18 +541,14 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 termbase = lang.get("termbase", {})
                 if code and isinstance(termbase, dict):
                     parsed[code] = termbase
-                    self.logger.debug(
-                        f"Parsed {len(termbase)} terms for language: {code}"
-                    )
+                    self.logger.debug(f"Parsed {len(termbase)} terms for language: {code}")
                 else:
                     self.logger.warning(f"Invalid termbase entry for language: {lang}")
 
             return parsed
 
         except json.JSONDecodeError as e:
-            self.logger.error(
-                f"JSON decode error in comprehensive termbase response: {e}"
-            )
+            self.logger.error(f"JSON decode error in comprehensive termbase response: {e}")
             self.logger.debug(f"Raw response: {response_text}")
             return {}
 
@@ -602,11 +572,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
 
             # Ensure it's a dict and all values are strings
             if isinstance(termbase, dict):
-                return {
-                    str(k).strip(): str(v).strip()
-                    for k, v in termbase.items()
-                    if k and v
-                }
+                return {str(k).strip(): str(v).strip() for k, v in termbase.items() if k and v}
             else:
                 self.logger.warning("AI response is not a dictionary format")
                 return {}
@@ -629,19 +595,13 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
         except Exception as e:
             error_msg = str(e).lower()
             if "invalid" in error_msg or "authentication" in error_msg:
-                self.logger.error(
-                    "Invalid API key - please check your key at platform.openai.com"
-                )
-            elif (
-                "quota" in error_msg or "billing" in error_msg or "credits" in error_msg
-            ):
+                self.logger.error("Invalid API key - please check your key at platform.openai.com")
+            elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
                 self.logger.error(
                     "Insufficient API credits - please add credits to your OpenAI account"
                 )
             elif "rate" in error_msg:
-                self.logger.error(
-                    "Rate limit exceeded - please wait a moment and try again"
-                )
+                self.logger.error("Rate limit exceeded - please wait a moment and try again")
             elif "network" in error_msg or "connection" in error_msg:
                 self.logger.error(
                     "Network connection issue - please check your internet connection"
@@ -694,9 +654,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 "message": "Please check your internet connection",
                 "suggestion": "Check your internet connection and try again",
             }
-        elif "content" in error_msg and (
-            "too small" in error_msg or "insufficient" in error_msg
-        ):
+        elif "content" in error_msg and ("too small" in error_msg or "insufficient" in error_msg):
             return {
                 "type": "insufficient_content",
                 "title": "Insufficient Content for Analysis",

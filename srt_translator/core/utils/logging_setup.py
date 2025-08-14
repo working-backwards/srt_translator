@@ -38,9 +38,7 @@ def setup_logging(log_file_override: str) -> str:
 
     # Create a file handler for the batch log
     file_handler = logging.FileHandler(log_file_override, encoding="utf-8")
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    )
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
     # Add the file handler to the translation logger
     translation_logger.addHandler(file_handler)
@@ -54,13 +52,9 @@ def setup_logging(log_file_override: str) -> str:
 def log_placeholder_issue(issue_type, issue_details):
     """Log placeholder issues with a reason description and subtitle number"""
     fixable_status = (
-        "Computer-fixable"
-        if issue_details.get("fixable", False)
-        else "Requires human review"
+        "Computer-fixable" if issue_details.get("fixable", False) else "Requires human review"
     )
-    reason_description = issue_details.get(
-        "reason_description", "No specific reason provided."
-    )
+    reason_description = issue_details.get("reason_description", "No specific reason provided.")
     subtitle_number = issue_details.get("subtitle_number", "Unknown")
 
     logging.warning(

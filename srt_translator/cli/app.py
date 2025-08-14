@@ -36,9 +36,7 @@ Examples:
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument(
-        "--version", action="store_true", help="Show version information"
-    )
+    parser.add_argument("--version", action="store_true", help="Show version information")
     args = parser.parse_args(argv)
 
     # Handle version flag first
@@ -107,11 +105,7 @@ Examples:
         if not os.path.exists(input_dir):
             logger.error(f"INPUT_DIRECTORY not found: {input_dir}")
             return 1
-        files = [
-            Path(input_dir) / f
-            for f in sorted(os.listdir(input_dir))
-            if f.endswith(".srt")
-        ]
+        files = [Path(input_dir) / f for f in sorted(os.listdir(input_dir)) if f.endswith(".srt")]
         if not files:
             logger.info(f"No .srt files found in {input_dir}")
             return 0

@@ -91,13 +91,13 @@ pip install -e .[gui]  # Includes GUI dependencies
 
 1. **Clone the repository**
 2. **Create virtual environment**: `python -m venv venv`
-3. **Activate environment**: 
+3. **Activate environment**:
    - Windows: `venv\Scripts\activate`
    - Mac/Linux: `source venv/bin/activate`
-4. **Install**: 
+4. **Install**:
    - CLI only: `pip install -e .`
    - With GUI: `pip install -e .[gui]`
-5. **Run**: 
+5. **Run**:
    - CLI: `srtx`
    - GUI: `srtx-gui` (if installed with GUI extras)
 
@@ -184,8 +184,8 @@ Both tools can be created automatically by uploading a few representative subtit
 ### 4. Example Output Structure
 
 By default, outputs are written to your OS’s standard application data directory:
-macOS ~/Library/Application Support/srt-translator/translated_files/, 
-Windows %LOCALAPPDATA%\srt-translator\translated_files\, 
+macOS ~/Library/Application Support/srt-translator/translated_files/,
+Windows %LOCALAPPDATA%\srt-translator\translated_files\,
 Linux ~/.local/share/srt-translator/translated_files/.
 
 You can override this location in the GUI or in your .env file for the CLI.
@@ -238,7 +238,7 @@ For multi‑hour translation jobs, you'll want to prevent your Mac from going to
 
 **Option 1: System Settings (Recommended for most users)**
 1. Go to **System Settings** → **Battery**
-2. Disable **Low Power Mode** 
+2. Disable **Low Power Mode**
 3. Enable **"Prevent automatic sleeping when the display is off"** under Power Adapter settings
 
 **Option 2: Terminal Command (For users familiar with Mac Terminal)**
@@ -467,6 +467,8 @@ INPUT_DIRECTORY=./my_subtitle_files
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
+**We use pre-commit hooks to ensure code quality.** See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
@@ -474,5 +476,3 @@ This project is licensed under the [MIT License](LICENSE).
 ## Support
 
 For issues and feature requests, please use the [GitHub issues page](https://github.com/working-backwards/srt_translator/issues).
-
-

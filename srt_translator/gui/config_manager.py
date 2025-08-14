@@ -242,15 +242,11 @@ class GUIConfigManager:
         # Check if AI config is recent
         if not self.settings_manager.has_recent_ai_config():
             age_days = self.settings_manager.get_ai_config_age_days()
-            issues.append(
-                f"AI configuration is {age_days} days old (older than 30 days)"
-            )
+            issues.append(f"AI configuration is {age_days} days old (older than 30 days)")
 
         # Check if files have changed
         if self.settings_manager.has_files_changed():
-            issues.append(
-                "Selected files have changed since AI configuration was generated"
-            )
+            issues.append("Selected files have changed since AI configuration was generated")
 
         # Validate DNT terms
         dnt_terms, _ = self.settings_manager.load_ai_config()
@@ -279,9 +275,7 @@ class GUIConfigManager:
         return {
             "dnt_terms_count": len(dnt_terms),
             "termbase_languages": list(termbases.keys()),
-            "total_termbase_terms": sum(
-                len(termbase) for termbase in termbases.values()
-            ),
+            "total_termbase_terms": sum(len(termbase) for termbase in termbases.values()),
             "source_info": source_info,
             "ai_config_valid": is_valid,
             "ai_config_issues": issues,

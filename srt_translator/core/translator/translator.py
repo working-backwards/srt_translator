@@ -63,9 +63,7 @@ class SRTTranslator:
         self.parser = SRTParser()
 
         # Log configuration information
-        self.logger.info(
-            f"SRTTranslator initialized with {len(self.dnt_terms)} DNT terms"
-        )
+        self.logger.info(f"SRTTranslator initialized with {len(self.dnt_terms)} DNT terms")
         self.logger.info(
             f"SRTTranslator initialized with termbase for {len(self.termbase)} languages"
         )
@@ -107,9 +105,7 @@ class SRTTranslator:
 
         # Targets
         codes = list(tgt.values())
-        lines.append(
-            f"Targets ({len(codes)}): {', '.join(codes) if codes else '(none)'}"
-        )
+        lines.append(f"Targets ({len(codes)}): {', '.join(codes) if codes else '(none)'}")
 
         # DNT
         lines.append(f"DNT terms ({len(dnt)}):")
@@ -185,9 +181,7 @@ class SRTTranslator:
         if not relevant_terms:
             return "No specific termbase terms for this content."
 
-        return "\n".join(
-            [f'- "{en}" → "{trans}"' for en, trans in relevant_terms.items()]
-        )
+        return "\n".join([f'- "{en}" → "{trans}"' for en, trans in relevant_terms.items()])
 
     def _get_builtin_prompt(self, target_lang, termbase_block):
         """Built-in fallback prompt with termbase injection"""
@@ -254,9 +248,7 @@ Only refuse to translate if content is truly untranslatable. If so, return: "I c
 Return a complete, valid SRT block with the same subtitle count, structure, and timestamps as the input.
 """
 
-    def translate_subtitle(
-        self, text, target_lang, filename, subtitle_number=None, summary=None
-    ):
+    def translate_subtitle(self, text, target_lang, filename, subtitle_number=None, summary=None):
         """Translate a single subtitle text"""
         # Use unified language config (no mapping needed for standard ISO codes)
         mapped_target_lang = target_lang
@@ -446,12 +438,8 @@ Status: AI Hallucination - Remove this placeholder
             else:
                 # Issue 2: Position mismatch - DNT term moved to different context
                 # Get the surrounding context (words before/after) for both original and translated
-                original_context = self.term_handler.get_context(
-                    original_text, original_term
-                )
-                translated_context = self.term_handler.get_context(
-                    translated_text, placeholder
-                )
+                original_context = self.term_handler.get_context(original_text, original_term)
+                translated_context = self.term_handler.get_context(translated_text, placeholder)
 
                 # Check if contexts are similar (same surrounding words)
                 if (
@@ -499,9 +487,7 @@ Status: AI Hallucination - Remove this placeholder
         subtitles = self.parser.parse_file(input_filepath)
 
         if not subtitles:
-            logging.warning(
-                f"No subtitles found in {input_filepath}. Skipping translation."
-            )
+            logging.warning(f"No subtitles found in {input_filepath}. Skipping translation.")
             return
 
         # Sort and reindex subtitles to ensure proper order
@@ -593,7 +579,11 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                 )
                 # Log the prompt and model response for debugging
                 logging.info(
-                    f"\n--- BATCH PARSING EXCEPTION for {filename} (batch starting at subtitle {batch[0].index}) ---\nEXCEPTION: {e}\nPROMPT:\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
+                    f"\n--- BATCH PARSING EXCEPTION for {filename} "
+                    f"(batch starting at subtitle {batch[0].index}) ---\n"
+                    f"EXCEPTION: {e}\nPROMPT:\n{prompt}\n"
+                    f"--- MODEL RESPONSE ---\n{translated_batch_srt}\n"
+                    f"--- END ERROR LOG ---\n"
                 )
                 for sub in batch:
                     sub.content = self.translate_subtitle(
@@ -611,7 +601,8 @@ Status: AI Hallucination in batch translation - Remove this placeholder
         final_subtitles = list(srt.sort_and_reindex(final_subtitles))
 
         logging.info(
-            f"Final output: {len(final_subtitles)} subtitles (filtered from {len(translated_subtitles)} total)"
+            f"Final output: {len(final_subtitles)} subtitles "
+            f"(filtered from {len(translated_subtitles)} total)"
         )
 
         # Log timing boundaries for verification
@@ -754,9 +745,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             logging.debug(
                 f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}"
             )
-            logging.debug(
-                f"REDISTRIBUTION DETAILS for {filename}: 1:1 mapping with clamped edges"
-            )
+            logging.debug(f"REDISTRIBUTION DETAILS for {filename}: 1:1 mapping with clamped edges")
             return redistributed
 
         # Case 2: fewer translations than original → spread evenly across whole batch, no blanks
@@ -810,9 +799,7 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                     index=original_batch[i].index,
                     start=original_batch[i].start,
                     end=original_batch[i].end,
-                    content=(
-                        "\n".join(c for c in chunk if c)
-                    ),  # newline separator reads better
+                    content=("\n".join(c for c in chunk if c)),  # newline separator reads better
                 )
             )
 

@@ -51,9 +51,7 @@ And writer functionality"""
             logger.info(f'   {i}. {sub.start} --> {sub.end}: "{sub.content}"')
         return True
     else:
-        logger.error(
-            f"❌ SRT parsing failed: expected 2 subtitles, got {len(subtitles)}"
-        )
+        logger.error(f"❌ SRT parsing failed: expected 2 subtitles, got {len(subtitles)}")
         return False
 
 
@@ -74,9 +72,7 @@ def test_srt_writing():
         with open("output.srt", "r", encoding="utf-8") as f:
             content = f.read()
         if "Hello world" in content and "Testing SRT parser" in content:
-            logger.info(
-                "✅ SRT writing successful: output.srt created with correct content"
-            )
+            logger.info("✅ SRT writing successful: output.srt created with correct content")
             return True
         else:
             logger.error("❌ SRT writing failed: output file missing expected content")

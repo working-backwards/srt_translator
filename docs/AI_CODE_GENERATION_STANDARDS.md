@@ -47,7 +47,7 @@ python scripts/lint.py
 **What these tools enforce:**
 - **Black**: PEP 8 formatting (88 char line length, consistent style)
 - **isort**: Import organization and sorting
-- **flake8**: Style and error checking  
+- **flake8**: Style and error checking
 - **pylint**: Code quality and best practices
 - **mypy**: Type checking (optional but recommended)
 
@@ -124,7 +124,7 @@ def main():
 
 class MyClass:
     """Class docstring."""
-    
+
     def __init__(self, param: str):
         """Initialize the class."""
         self.param = param
@@ -146,15 +146,15 @@ def process_file(
 ) -> bool:
     """
     Process a file with the given configuration.
-    
+
     Args:
         file_path: Path to the input file
         output_dir: Directory for output files
         config: Optional configuration dictionary
-        
+
     Returns:
         True if processing succeeded, False otherwise
-        
+
     Raises:
         FileNotFoundError: If input file doesn't exist
         ValueError: If configuration is invalid
@@ -167,17 +167,17 @@ def process_file(
 ```python
 class FileProcessor:
     """Handles file processing operations."""
-    
+
     def __init__(self, config: dict[str, any] | None = None):
         """
         Initialize the file processor.
-        
+
         Args:
             config: Configuration dictionary
         """
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
-    
+
     def process(self, file_path: str) -> bool:
         """Process a single file."""
         pass
@@ -210,7 +210,7 @@ logger = logging.getLogger(__name__)
 def process_data(data: list[str]) -> None:
     """Process data with proper logging."""
     logger.info("Processing %d items", len(data))
-    
+
     try:
         # Process data
         logger.debug("Data processed successfully")
@@ -248,7 +248,7 @@ def read_file(file_path: str) -> str:
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
-    
+
     return path.read_text(encoding="utf-8")
 
 def write_file(file_path: str, content: str) -> None:
@@ -293,16 +293,16 @@ from srt_core.translator.translator import SRTTranslator
 
 class TestSRTTranslator:
     """Test cases for SRTTranslator."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
         self.translator = SRTTranslator("en")
-    
+
     def test_translate_file_success(self):
         """Test successful file translation."""
         # Test implementation
         pass
-    
+
     def test_translate_file_not_found(self):
         """Test translation with missing file."""
         with pytest.raises(FileNotFoundError):
@@ -360,39 +360,39 @@ SUPPORTED_FORMATS = (".srt", ".txt")
 
 class SRTProcessor:
     """Handles SRT file processing operations."""
-    
+
     def __init__(self, config: Dict[str, Any] | None = None):
         """
         Initialize the SRT processor.
-        
+
         Args:
             config: Optional configuration dictionary
         """
         self.config = config or {}
         self.translator = SRTTranslator(SOURCE_LANG)
-    
+
     def process_files(self, file_paths: List[str]) -> Dict[str, Any]:
         """
         Process multiple SRT files.
-        
+
         Args:
             file_paths: List of file paths to process
-            
+
         Returns:
             Dictionary with processing results
-            
+
         Raises:
             FileNotFoundError: If any file doesn't exist
             ValueError: If configuration is invalid
         """
         logger.info("Processing %d files", len(file_paths))
-        
+
         results = {
             "processed": 0,
             "failed": 0,
             "errors": []
         }
-        
+
         for file_path in file_paths:
             try:
                 self._process_single_file(file_path)
@@ -401,17 +401,17 @@ class SRTProcessor:
                 logger.error("Failed to process %s: %s", file_path, e)
                 results["failed"] += 1
                 results["errors"].append(f"{file_path}: {e}")
-        
-        logger.info("Processing complete: %d processed, %d failed", 
+
+        logger.info("Processing complete: %d processed, %d failed",
                    results["processed"], results["failed"])
         return results
-    
+
     def _process_single_file(self, file_path: str) -> None:
         """Process a single SRT file."""
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-        
+
         logger.debug("Processing file: %s", file_path)
         # Processing logic here
 
@@ -428,4 +428,4 @@ if __name__ == "__main__":
 
 ---
 
-**Remember:** These standards ensure code quality, maintainability, and consistency. Always follow them when generating new code! 
+**Remember:** These standards ensure code quality, maintainability, and consistency. Always follow them when generating new code!

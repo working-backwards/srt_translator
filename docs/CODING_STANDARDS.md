@@ -91,4 +91,4 @@ When working with the core engine (`srt_translator/core/`):
 4. **ONLY read from TranslationConfig objects**
 5. **If you need a configurable parameter, add it to TranslationConfig class**
 
-Violating these rules will break the app's architecture and introduce fragility. The core engine must remain pure and only consume the configuration objects passed to it. 
+Violating these rules will break the app's architecture and introduce fragility. The core engine must remain pure and only consume the configuration objects passed to it.

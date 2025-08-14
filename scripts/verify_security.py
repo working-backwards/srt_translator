@@ -10,9 +10,7 @@ import sys
 import zipfile
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def check_executable_security(executable_path):
@@ -31,9 +29,7 @@ def check_executable_security(executable_path):
         return False, ["Executable not found"]
 
     logger.info(f"🔍 Checking executable: {executable_path}")
-    logger.info(
-        f"📏 File size: {os.path.getsize(executable_path) / (1024 * 1024):.1f} MB"
-    )
+    logger.info(f"📏 File size: {os.path.getsize(executable_path) / (1024 * 1024):.1f} MB")
 
     # List of sensitive files/patterns to check for
     sensitive_patterns = [
@@ -74,9 +70,7 @@ def check_executable_security(executable_path):
 
         except zipfile.BadZipFile:
             # Not a ZIP file, try to search for patterns in binary content
-            logger.warning(
-                "⚠️  Executable is not a ZIP file, checking binary content..."
-            )
+            logger.warning("⚠️  Executable is not a ZIP file, checking binary content...")
 
             with open(executable_path, "rb") as f:
                 content = f.read()

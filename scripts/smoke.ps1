@@ -2,14 +2,14 @@
 <#
 .SYNOPSIS
     Smoke test script for SRT Translator on Windows
-    
+
 .DESCRIPTION
     This script performs basic functionality tests to ensure SRT Translator
     is working correctly before release.
-    
+
 .PARAMETER Debug
     Enable debug output
-    
+
 .EXAMPLE
     .\smoke.ps1
     .\smoke.ps1 -Debug
@@ -72,7 +72,7 @@ try {
     if ($pythonVersion -match "Python (\d+\.\d+\.\d+)") {
         $version = $matches[1]
         Write-Success "Python $version found"
-        
+
         # Check if it's a supported version
         if ($version -match "^3\.(9|10|11|12)") {
             Write-Success "Python version $version is supported"
@@ -144,7 +144,7 @@ try {
     $testFile = "tests/fixtures/test_sample.srt"
     if (Test-Path $testFile) {
         Write-Success "Test SRT file found"
-        
+
         # Test basic parsing
         $content = Get-Content $testFile -Raw
         if ($content -match "Hello, this is a test subtitle") {
@@ -168,7 +168,7 @@ import srt_translator.core.config.translation_config
 import srt_translator.core.main
 print('All core modules imported successfully')
 " 2>&1
-    
+
     if ($importTest -match "All core modules imported successfully") {
         Write-Success "Core modules import successfully"
     } else {
@@ -187,7 +187,7 @@ from srt_translator.core.config.translation_config import TranslationConfig
 config = TranslationConfig()
 print('Configuration system working')
 " 2>&1
-    
+
     if ($configTest -match "Configuration system working") {
         Write-Success "Configuration system working"
     } else {

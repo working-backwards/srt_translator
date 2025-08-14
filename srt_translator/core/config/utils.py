@@ -7,9 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Sequence, Union
 
 
-def parse_json_or_csv(
-    val: str | None, *, expect_mapping: bool, field_name: str = "value"
-):
+def parse_json_or_csv(val: str | None, *, expect_mapping: bool, field_name: str = "value"):
     """Parse JSON or CSV string into appropriate data structure."""
     if not val or not val.strip():
         return {} if expect_mapping else []
@@ -48,9 +46,7 @@ def normalize_target_languages(
 
     # Handle string input
     if isinstance(val, str):
-        return parse_json_or_csv(
-            val, expect_mapping=True, field_name="target_languages"
-        )
+        return parse_json_or_csv(val, expect_mapping=True, field_name="target_languages")
 
     raise ValueError(f"Invalid target_languages format: {type(val)}")
 
@@ -119,8 +115,6 @@ def validate_float_range(
         raise ValueError(f"{field_name} must be a number, got '{value}'")
 
     if float_val < min_val or float_val > max_val:
-        raise ValueError(
-            f"{field_name} must be between {min_val} and {max_val}, got {float_val}"
-        )
+        raise ValueError(f"{field_name} must be between {min_val} and {max_val}, got {float_val}")
 
     return float_val

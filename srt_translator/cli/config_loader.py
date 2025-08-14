@@ -80,9 +80,7 @@ def collect_cli_raw() -> dict:
         "aggressiveness": env_file.get("AGGRESSIVENESS", "0.75"),
         "log_mode": env_file.get("LOG_MODE", "Standard"),
         "output_directory": env_file.get("OUTPUT_DIRECTORY", "translated_srt_files"),
-        "input_directory": env_file.get(
-            "INPUT_DIRECTORY", "original_captions"
-        ),  # ← Add this
+        "input_directory": env_file.get("INPUT_DIRECTORY", "original_captions"),  # ← Add this
         "target_languages": env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS)),
         "dnt_terms": env_file.get("DNT_TERMS", "[]"),
         "termbase": termbase_data,  # Actual data, not file path

@@ -147,9 +147,7 @@ class TermHandler:
 
             # Calculate relative position shift (as percentage of sentence length)
             max_allowed_shift = min(3, len(orig_words) // 2)
-            position_shift = abs(
-                orig_pos / len(orig_words) - trans_pos / len(trans_words)
-            )
+            position_shift = abs(orig_pos / len(orig_words) - trans_pos / len(trans_words))
 
             # Return True if position shift is within acceptable range
             return position_shift < (max_allowed_shift / len(orig_words))

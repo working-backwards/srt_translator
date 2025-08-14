@@ -62,7 +62,7 @@ def create_release_package():
 ## For Content Creators (Simple Installation)
 
 1. **Extract** this package to a folder on your computer
-2. **Configure API Key**: 
+2. **Configure API Key**:
    - Copy `examples/env_example` to `.env`
    - Edit `.env` and add your OpenAI API key
 3. **Run the Application**: Double-click `SRT-Translator.exe`

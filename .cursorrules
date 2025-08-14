@@ -26,7 +26,7 @@ CLI/GUI → TranslationConfig → Core Engine
 
 ### 📍 SPECIFIC ENFORCEMENT POINTS:
 - `srt_translator/core/main.py` - Must only read from TranslationConfig
-- `srt_translator/core/translator/` - Must only read from TranslationConfig  
+- `srt_translator/core/translator/` - Must only read from TranslationConfig
 - `srt_translator/core/config/` - Must only read from TranslationConfig
 - `srt_translator/core/utils/` - Must only read from TranslationConfig
 

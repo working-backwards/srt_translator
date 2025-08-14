@@ -78,9 +78,7 @@ class SettingsManager:
                         self.logger.info("Loading AI configuration into current state")
                         new_state = self._state.copy()
                         new_state.dnt_terms = ai_dnt_terms.copy()
-                        new_state.termbase = {
-                            k: v.copy() for k, v in ai_termbase.items()
-                        }
+                        new_state.termbase = {k: v.copy() for k, v in ai_termbase.items()}
                         self._state = new_state
                 except Exception as e:
                     self.logger.warning(f"Failed to load AI configuration: {e}")
@@ -189,9 +187,7 @@ class SettingsManager:
         with self._lock:
             self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
 
-    def save_ai_config(
-        self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]
-    ) -> None:
+    def save_ai_config(self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
         self.settings.setValue("ai_dnt_terms", dnt_terms)
@@ -330,13 +326,9 @@ class SettingsManager:
         # fill the remaining slots with default popular languages
         if len(user_preferences) < popular_limit:
             # Get default languages that aren't already in user preferences
-            remaining_defaults = [
-                code for code in default_popular if code not in user_preferences
-            ]
+            remaining_defaults = [code for code in default_popular if code not in user_preferences]
             # Fill up to the limit
-            additional_languages = remaining_defaults[
-                : popular_limit - len(user_preferences)
-            ]
+            additional_languages = remaining_defaults[: popular_limit - len(user_preferences)]
             return user_preferences + additional_languages
 
         # If user has enough preferences, use them (up to the limit)

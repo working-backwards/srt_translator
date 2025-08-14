@@ -185,9 +185,7 @@ def translate_srt_files(
             with open(termbase_tmp, "w", encoding="utf-8") as f:
                 json.dump(translation_config.termbase, f, ensure_ascii=False, indent=2)
             os.replace(termbase_tmp, termbase_path)
-            logger.info(
-                f"Termbase written: {os.path.relpath(termbase_path, batch_dir)}"
-            )
+            logger.info(f"Termbase written: {os.path.relpath(termbase_path, batch_dir)}")
 
             # dnt_terms.json
             dnt_tmp = os.path.join(batch_dir, "dnt_terms.tmp.json")
@@ -199,9 +197,7 @@ def translate_srt_files(
             with open(dnt_tmp, "w", encoding="utf-8") as f:
                 json.dump(dnt_terms_data, f, ensure_ascii=False, indent=2)
             os.replace(dnt_tmp, dnt_terms_path)
-            logger.info(
-                f"DNT terms written: {os.path.relpath(dnt_terms_path, batch_dir)}"
-            )
+            logger.info(f"DNT terms written: {os.path.relpath(dnt_terms_path, batch_dir)}")
 
         except Exception as e:
             logger.warning(f"Failed to write termbase or DNT terms: {e}")

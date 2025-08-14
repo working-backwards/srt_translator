@@ -3,7 +3,6 @@
 Translation Section for the SRT Translator GUI.
 """
 
-
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,

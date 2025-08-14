@@ -49,14 +49,10 @@ def main():
     success = True
 
     # 1. Format code with Black
-    success &= run_command(
-        ["black", "srt_translator", "tests", "scripts"], "Black code formatting"
-    )
+    success &= run_command(["black", "srt_translator", "tests", "scripts"], "Black code formatting")
 
     # 2. Sort imports with isort
-    success &= run_command(
-        ["isort", "srt_translator", "tests", "scripts"], "isort import sorting"
-    )
+    success &= run_command(["isort", "srt_translator", "tests", "scripts"], "isort import sorting")
 
     logger.info("=" * 60)
     if success:

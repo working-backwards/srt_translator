@@ -26,13 +26,9 @@ class LanguageConfig:
             config = LANGUAGES_JSON
             languages = config.get("languages", {})
             if isinstance(languages, dict):
-                self.logger.info(
-                    f"Loaded language config with {len(languages)} languages"
-                )
+                self.logger.info(f"Loaded language config with {len(languages)} languages")
             else:
-                self.logger.info(
-                    "Loaded language config with unknown number of languages"
-                )
+                self.logger.info("Loaded language config with unknown number of languages")
             self._config = config
             return config
         except Exception as e:

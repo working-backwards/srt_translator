@@ -72,7 +72,7 @@ PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
 if [[ $PYTHON_VERSION =~ Python\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
     VERSION="${BASH_REMATCH[1]}"
     print_success "Python $VERSION found"
-    
+
     # Check if it's a supported version
     if [[ $VERSION =~ ^3\.(9|10|11|12) ]]; then
         print_success "Python version $VERSION is supported"
@@ -134,7 +134,7 @@ print_header "Test 5: SRT Parsing"
 TEST_FILE="tests/fixtures/test_sample.srt"
 if [[ -f "$TEST_FILE" ]]; then
     print_success "Test SRT file found"
-    
+
     # Test basic parsing
     if grep -q "Hello, this is a test subtitle" "$TEST_FILE"; then
         print_success "SRT file content readable"

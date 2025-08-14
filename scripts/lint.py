@@ -78,9 +78,7 @@ def main():
     )
 
     # 4. Run pylint
-    success &= run_command(
-        ["pylint", "srt_translator", "tests"], "pylint code analysis"
-    )
+    success &= run_command(["pylint", "srt_translator", "tests"], "pylint code analysis")
 
     # 5. Run mypy (optional - can be skipped if too strict)
     try:

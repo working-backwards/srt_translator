@@ -2,5 +2,3 @@
 """
 Editors Integration for the SRT Translator GUI.
 """
-
-

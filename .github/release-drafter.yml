@@ -61,7 +61,7 @@ template: |
   ```bash
   # CLI
   srt-cli --help
-  
+
   # GUI
   srtx
   ```

@@ -148,11 +148,13 @@ class TranslationWorker(QObject):
 
             # Debug logging
             self.logger.info(
-                f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages"
+                f"Starting translation with {len(self.selected_files)} files and "
+                f"{len(self.target_languages)} languages"
             )
             self._throttled_emit(
                 self.progress_updated,
-                f"Starting translation with {len(self.selected_files)} files and {len(self.target_languages)} languages",
+                f"Starting translation with {len(self.selected_files)} files and "
+                f"{len(self.target_languages)} languages",
             )
 
             # Build configuration from GUI settings manager
@@ -175,7 +177,8 @@ class TranslationWorker(QObject):
                     mode="GUI",
                 )
                 self.logger.info(
-                    f"Using configuration from settings manager: {len(api_cfg.target_languages)} languages"
+                    f"Using configuration from settings manager: "
+                    f"{len(api_cfg.target_languages)} languages"
                 )
                 self.logger.info(f"DNT terms loaded: {len(api_cfg.dnt_terms)}")
                 self.logger.info(f"Termbase languages loaded: {len(api_cfg.termbase)}")
@@ -199,7 +202,8 @@ class TranslationWorker(QObject):
                     mode="GUI",
                 )
                 self.logger.info(
-                    f"Using configuration from direct parameters: {len(api_cfg.target_languages)} languages"
+                    f"Using configuration from direct parameters: "
+                    f"{len(api_cfg.target_languages)} languages"
                 )
 
             # Check for cooperative stop before starting translation

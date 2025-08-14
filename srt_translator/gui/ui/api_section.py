@@ -3,7 +3,6 @@
 API Configuration Section for the SRT Translator GUI.
 """
 
-
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -100,9 +99,7 @@ class APISection(QGroupBox):
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
 
-    def connect_signals(
-        self, test_connection_callback, edit_key_callback, toggle_callback
-    ):
+    def connect_signals(self, test_connection_callback, edit_key_callback, toggle_callback):
         """Connect button signals to callbacks"""
         self.test_connection_btn.clicked.connect(test_connection_callback)
         self.test_connection_btn_connected.clicked.connect(test_connection_callback)

@@ -122,26 +122,33 @@ We follow [PEP 8](https://pep8.org/) with some modifications:
 We use several tools to maintain code quality:
 
 ```bash
-# Format code
-black srt_translator/ tests/
-isort srt_translator/ tests/
-
-# Lint code
-pylint srt_translator/
-flake8 srt_translator/
+# Format and lint code
+ruff --fix srt_translator/ tests/
+ruff format srt_translator/ tests/
 
 # Type checking
 mypy srt_translator/
+
+# Security scanning
+bandit srt_translator/
 ```
 
 ### Pre-commit Hooks
 
-Install pre-commit hooks for automatic formatting:
+Install pre-commit hooks for automatic formatting and quality checks:
 
 ```bash
 pip install pre-commit
 pre-commit install
+pre-commit run --all-files  # Run on all files initially
 ```
+
+The pre-commit hooks will automatically:
+- Format code with Ruff
+- Fix linting issues
+- Run type checking
+- Scan for security issues
+- Ensure consistent code quality across all commits
 
 ## Testing
 

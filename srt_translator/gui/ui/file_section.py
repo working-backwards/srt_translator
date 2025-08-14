@@ -180,9 +180,7 @@ class FileSection(QGroupBox):
 
     def get_output_directory(self) -> str:
         """Get the currently selected output directory"""
-        return (
-            self.output_directory if self.output_directory else "translated_srt_files"
-        )
+        return self.output_directory if self.output_directory else "translated_srt_files"
 
     def set_output_directory(self, directory: str):
         """Set the output directory and update the display"""

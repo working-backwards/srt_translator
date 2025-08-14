@@ -67,7 +67,7 @@ python scripts/build_gui.py
       pyinstaller --windowed --name SRT-Translator \
         --add-data "srt_translator/core/config/languages.json:srt_translator/core/config" \
         srt_translator/gui/main_window.py
-      
+
       # Build/update only the single-file console-launchable binary
       # (uses the provided .spec and places output in dist/SRT-Translator)
       pyinstaller build_specs/srt_translator_gui.spec --noconfirm --clean
@@ -127,7 +127,7 @@ pip install -e .[gui]  # Includes GUI dependencies
    # Windows
    python -m venv venv
    venv\Scripts\activate
-   
+
    # macOS/Linux
    python -m venv venv
    source venv/bin/activate
@@ -137,10 +137,10 @@ pip install -e .[gui]  # Includes GUI dependencies
    ```bash
    # Install with development dependencies (note the quotes for zsh)
    pip install -e '.[dev]'
-   
+
    # Or install without dev dependencies
    pip install -e .
-   
+
    # For GUI support, include the gui extra
    pip install -e '.[gui]'
    ```
@@ -149,7 +149,7 @@ pip install -e .[gui]  # Includes GUI dependencies
    ```bash
    # Copy the example configuration
    cp examples/env_example .env
-   
+
    # Edit .env and add your OpenAI API key
    ```
 
@@ -157,7 +157,7 @@ pip install -e .[gui]  # Includes GUI dependencies
    ```bash
    # CLI version
    srtx
-   
+
    # GUI version (if installed with GUI extras)
    srtx-gui
    ```
@@ -369,7 +369,7 @@ scripts/
    # Test the console scripts
    srtx --help
    srtx-gui --help  # if installed with GUI extras
-   
+
    # Run tests if available
    python -m pytest tests/  # or your test command
    ```
@@ -395,4 +395,4 @@ srt_translator/
 └── api.py          # High-level API for both interfaces
 ```
 
-**Need help?** Check the [README.md](README.md) for detailed usage instructions or open an issue on GitHub. 
+**Need help?** Check the [README.md](README.md) for detailed usage instructions or open an issue on GitHub.

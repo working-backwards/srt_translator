@@ -81,24 +81,18 @@ class AIConfigSection(QGroupBox):
         self.edit_btn = QPushButton("Edit Settings")
         self.edit_btn.setObjectName("secondaryButton")
         self.edit_btn.setEnabled(False)  # Will be enabled when config is generated
-        self.edit_btn.setToolTip(
-            "Review and modify the AI-generated translation settings"
-        )
+        self.edit_btn.setToolTip("Review and modify the AI-generated translation settings")
 
         self.regenerate_btn = QPushButton("Regenerate")
         self.regenerate_btn.setObjectName("secondaryButton")
-        self.regenerate_btn.setEnabled(
-            False
-        )  # Will be enabled when config is generated
+        self.regenerate_btn.setEnabled(False)  # Will be enabled when config is generated
         self.regenerate_btn.setToolTip(
             "Generate new translation settings based on current file selection"
         )
 
         self.view_details_btn = QPushButton("View Details")
         self.view_details_btn.setObjectName("secondaryButton")
-        self.view_details_btn.setEnabled(
-            False
-        )  # Will be enabled when config is generated
+        self.view_details_btn.setEnabled(False)  # Will be enabled when config is generated
         self.view_details_btn.setToolTip(
             "View detailed information about current translation settings"
         )
@@ -123,9 +117,7 @@ class AIConfigSection(QGroupBox):
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
 
         # DNT (Do Not Translate) display
-        dnt_label = QLabel(
-            "🚫 Do Not Translate (DNT) - Terms that stay in original language:"
-        )
+        dnt_label = QLabel("🚫 Do Not Translate (DNT) - Terms that stay in original language:")
         self.dnt_display = QTextEdit()
         self.dnt_display.setObjectName("dntDisplay")
         self.dnt_display.setReadOnly(True)
@@ -236,9 +228,7 @@ class AIConfigSection(QGroupBox):
             # Show a summary of the termbase
             total_terms = sum(len(lang_termbase) for lang_termbase in termbase.values())
             languages = list(termbase.keys())
-            summary = (
-                f"Generated for {len(languages)} languages: {', '.join(languages[:3])}"
-            )
+            summary = f"Generated for {len(languages)} languages: {', '.join(languages[:3])}"
             if len(languages) > 3:
                 summary += f" (+{len(languages) - 3} more)"
             summary += f"\nTotal terms: {total_terms}"
@@ -341,6 +331,6 @@ class EditConfigurationDialog(QDialog):
 
     def has_changes(self) -> bool:
         """Check if any changes were made."""
-        return self.terms_editor.is_modified(
-            self.dnt_terms
-        ) or self.termbase_editor.is_modified(self.termbase)
+        return self.terms_editor.is_modified(self.dnt_terms) or self.termbase_editor.is_modified(
+            self.termbase
+        )

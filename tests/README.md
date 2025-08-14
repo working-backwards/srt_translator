@@ -61,4 +61,4 @@ pytest tests/test_ai_config_integration.py -v
 - GUI tests are standalone applications that can be run directly
 - Unit tests use pytest framework
 - All tests are designed to run without external dependencies (except for the core application)
-- The `conftest.py` file provides common fixtures and configuration 
+- The `conftest.py` file provides common fixtures and configuration

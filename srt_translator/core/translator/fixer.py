@@ -47,9 +47,7 @@ class SRTFixer:
     def parse_log_file(self):
         """Parse the log file and extract placeholder issues and phantom placeholders"""
         if not os.path.exists(self.log_file):
-            logger.warning(
-                f"Log file {self.log_file} does not exist. Skipping fixing step."
-            )
+            logger.warning(f"Log file {self.log_file} does not exist. Skipping fixing step.")
             return
 
         with open(self.log_file, "r", encoding="utf-8") as f:
@@ -68,16 +66,12 @@ class SRTFixer:
 
     def _parse_placeholder_issue(self, entry):
         """Parse regular placeholder position mismatch issues"""
-        timestamp_match = re.search(
-            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry
-        )
+        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry)
         language_match = re.search(r"Language: (.+?)(?:\n|$)", entry)
         original_term_match = re.search(r"Original Term: (.+?)(?:\n|$)", entry)
         placeholder_match = re.search(r"Placeholder: (.+?)(?:\n|$)", entry)
         original_context_match = re.search(r"Original Context: (.+?)(?:\n|$)", entry)
-        translated_context_match = re.search(
-            r"Translated Context: (.+?)(?:\n|$)", entry
-        )
+        translated_context_match = re.search(r"Translated Context: (.+?)(?:\n|$)", entry)
 
         if all(
             [
@@ -111,9 +105,7 @@ class SRTFixer:
             Phantom Placeholder: __DNT_TERM_0__
         """
         # Optional timestamp
-        timestamp_match = re.search(
-            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry
-        )
+        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})", entry)
 
         # Common fields
         language_match = re.search(r"Language: (.+?)(?:\n|$)", entry)
@@ -126,9 +118,7 @@ class SRTFixer:
         translated_text_match = re.search(r"Translated Text: (.+?)(?:\n|$)", entry)
 
         # New batch-format optional fields
-        batch_match = re.search(
-            r"Batch:\s*(\d+)\s*\(subtitles\s*([0-9]+)-([0-9]+)\)", entry
-        )
+        batch_match = re.search(r"Batch:\s*(\d+)\s*\(subtitles\s*([0-9]+)-([0-9]+)\)", entry)
 
         if not (language_match and filename_match and phantom_match):
             return
@@ -143,7 +133,9 @@ class SRTFixer:
             subtitle_identifier = subtitle_match_old.group(1).strip()  # type: ignore[union-attr]
         elif batch_match:
             # e.g., "batch_22_subs_123-127"
-            subtitle_identifier = f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"  # type: ignore[union-attr]
+            subtitle_identifier = (
+                f"batch_{batch_match.group(1)}_subs_{batch_match.group(2)}-{batch_match.group(3)}"  # type: ignore[union-attr]
+            )
         else:
             subtitle_identifier = "unknown"
 
@@ -153,9 +145,7 @@ class SRTFixer:
             filename=filename_match.group(1).strip(),
             subtitle_number=subtitle_identifier,
             phantom_placeholder=phantom_match.group(1).strip(),
-            original_text=(
-                original_text_match.group(1).strip() if original_text_match else ""
-            ),
+            original_text=(original_text_match.group(1).strip() if original_text_match else ""),
             translated_text=(
                 translated_text_match.group(1).strip() if translated_text_match else ""
             ),
@@ -185,15 +175,11 @@ class SRTFixer:
             logger.info(f"Processing language directory: {lang_dir}")
 
             # Find phantoms for this language
-            language_phantoms = [
-                p for p in self.phantoms if p.language.upper() == lang_dir.upper()
-            ]
+            language_phantoms = [p for p in self.phantoms if p.language.upper() == lang_dir.upper()]
 
             if language_phantoms:
                 logger.info(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
-                logger.info(
-                    f"  Phantom languages: {[p.language for p in language_phantoms]}"
-                )
+                logger.info(f"  Phantom languages: {[p.language for p in language_phantoms]}")
 
                 # Process each SRT file in this language directory
                 for filename in os.listdir(lang_path):
@@ -208,8 +194,7 @@ class SRTFixer:
                         [
                             issue
                             for issue in self.issues
-                            if lang_name_to_code.get(issue.language, issue.language)
-                            == lang_dir
+                            if lang_name_to_code.get(issue.language, issue.language) == lang_dir
                             and self._should_fix_issue(issue, aggressiveness)
                         ],
                     )
@@ -219,9 +204,7 @@ class SRTFixer:
                         os.path.join(lang_path, filename), language_phantoms, filename
                     )
 
-    def fix_specific_srt_files(
-        self, file_paths: List[str], aggressiveness: float = 0.75
-    ):
+    def fix_specific_srt_files(self, file_paths: List[str], aggressiveness: float = 0.75):
         """Fix specific SRT files based on the parsed log file"""
         if not self.phantoms:
             logger.info("No phantom placeholders to fix")
@@ -246,9 +229,7 @@ class SRTFixer:
             logger.info(f"Processing specific file: {filename} in {lang_dir}")
 
             # Find phantoms for this language
-            language_phantoms = [
-                p for p in self.phantoms if p.language.upper() == lang_dir.upper()
-            ]
+            language_phantoms = [p for p in self.phantoms if p.language.upper() == lang_dir.upper()]
 
             if language_phantoms:
                 logger.info(f"  Found {len(language_phantoms)} phantoms for {lang_dir}")
@@ -259,8 +240,7 @@ class SRTFixer:
                     [
                         issue
                         for issue in self.issues
-                        if lang_name_to_code.get(issue.language, issue.language)
-                        == lang_dir
+                        if lang_name_to_code.get(issue.language, issue.language) == lang_dir
                         and self._should_fix_issue(issue, aggressiveness)
                     ],
                 )
@@ -268,9 +248,7 @@ class SRTFixer:
                 # Fix phantom placeholders (always)
                 self._fix_srt_file_phantoms(file_path, language_phantoms, filename)
 
-    def _fix_srt_file_regular_issues(
-        self, file_path: str, issues: List[PlaceholderIssue]
-    ):
+    def _fix_srt_file_regular_issues(self, file_path: str, issues: List[PlaceholderIssue]):
         """Fix regular placeholder issues in a single SRT file using srt package"""
         if not issues:
             return

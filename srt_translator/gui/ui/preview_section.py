@@ -371,5 +371,9 @@ class PreviewSection(QWidget):
 
     def _load_default_sample(self):
         """Load default sample text."""
-        default_sample = "Welcome to our business course. The CEO will discuss the company's API integration with Amazon Web Services. The CFO has prepared the quarterly report."
+        default_sample = (
+            "Welcome to our business course. The CEO will discuss the company's "
+            "API integration with Amazon Web Services. The CFO has prepared the "
+            "quarterly report."
+        )
         self.sample_text_edit.setText(default_sample)

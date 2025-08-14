@@ -121,4 +121,4 @@ If you encounter security issues:
 1. Check this documentation
 2. Run the security verification script
 3. Review the build configuration
-4. Contact the development team if needed 
+4. Contact the development team if needed

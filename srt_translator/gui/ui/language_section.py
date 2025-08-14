@@ -46,9 +46,7 @@ class LanguageSection(QGroupBox):
         layout.addWidget(popular_label)
 
         popular_grid = QGridLayout()
-        popular_grid.setVerticalSpacing(
-            25
-        )  # 25px between checkbox rows as per style guide
+        popular_grid.setVerticalSpacing(25)  # 25px between checkbox rows as per style guide
 
         # Get adaptive popular languages from settings manager
         popular_language_codes = self.settings_manager.get_adaptive_popular_languages()
@@ -58,9 +56,7 @@ class LanguageSection(QGroupBox):
             name = self.language_config.get_language_name(code)
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
-            checkbox.setProperty(
-                "language_code", code
-            )  # Store language code for tracking
+            checkbox.setProperty("language_code", code)  # Store language code for tracking
             self.language_checkboxes[code] = checkbox
             popular_grid.addWidget(checkbox, i // 3, i % 3)
 
@@ -227,9 +223,7 @@ class LanguageSection(QGroupBox):
             # Debug: Verify synchronization
             total_checkboxes = len(self.language_checkboxes)
             checked_checkboxes = sum(
-                1
-                for checkbox in self.language_checkboxes.values()
-                if checkbox.isChecked()
+                1 for checkbox in self.language_checkboxes.values() if checkbox.isChecked()
             )
             logging.info(
                 f"Load verification: {checked_checkboxes}/{total_checkboxes} checkboxes checked, {len(self.target_languages)} languages in target_languages"
