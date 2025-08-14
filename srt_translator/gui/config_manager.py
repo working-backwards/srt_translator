@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Tuple
 
 from srt_translator.core.config.language_config import LanguageConfig
 
-from .settings_manager import SettingsManager
+from srt_translator.gui.settings_manager import SettingsManager
 
 
 class GUIConfigManager:

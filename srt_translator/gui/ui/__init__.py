@@ -1,6 +1,6 @@
 # UI Components Package
 
-from .toggle_button import AnimatedToggleButton
+from srt_translator.gui.ui.toggle_button import AnimatedToggleButton
 
 __all__ = [
     "AnimatedToggleButton",

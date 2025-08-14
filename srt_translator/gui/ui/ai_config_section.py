@@ -17,9 +17,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .dnt_terms_editor import DNTTermsEditor
-from .termbase_editor import TermbaseEditor
-from .toggle_button import AnimatedToggleButton
+from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
+from srt_translator.gui.ui.termbase_editor import TermbaseEditor
+from srt_translator.gui.ui.toggle_button import AnimatedToggleButton
 
 
 class AIConfigSection(QGroupBox):

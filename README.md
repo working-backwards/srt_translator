@@ -54,8 +54,8 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 After installation, you can use these simple commands from any terminal:
 
-- **CLI**: `srtx` - Launches the command-line interface
-- **GUI**: `srtx-gui` - Launches the graphical interface (requires `pip install srt-translator[gui]`)
+- **GUI**: `srtx` - Launches the graphical interface (default, requires `pip install srt-translator[gui]`)
+- **CLI**: `srtx-cli` - Launches the command-line interface
 
 ### For Content Creators (Executable)
 
@@ -71,13 +71,13 @@ After installation, you can use these simple commands from any terminal:
 ### CLI Only (Lightweight)
 ```bash
 pip install srt-translator
-srtx --help
+srtx-cli --help
 ```
 
 ### With GUI Support
 ```bash
 pip install srt-translator[gui]
-srtx-gui
+srtx
 ```
 
 ### From Source (Development)
@@ -98,8 +98,8 @@ pip install -e .[gui]  # Includes GUI dependencies
    - CLI only: `pip install -e .`
    - With GUI: `pip install -e .[gui]`
 5. **Run**:
-   - CLI: `srtx`
-   - GUI: `srtx-gui` (if installed with GUI extras)
+   - CLI: `srtx-cli`
+   - GUI: `srtx` (if installed with GUI extras)
 
 ### Developers: Build Binaries (macOS/Windows/Linux)
 

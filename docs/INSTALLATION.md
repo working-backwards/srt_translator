@@ -93,7 +93,7 @@ srtx --help
 For users who want the full graphical interface:
 ```bash
 pip install srt-translator[gui]
-srtx-gui
+srtx
 ```
 
 ### From Source (Development)
@@ -155,11 +155,11 @@ pip install -e .[gui]  # Includes GUI dependencies
 
 5. **Run the application**:
    ```bash
-   # CLI version
+   # GUI version (if installed with GUI extras)
    srtx
 
-   # GUI version (if installed with GUI extras)
-   srtx-gui
+   # CLI version
+   srtx-cli
    ```
 
 ### macOS: Prevent Sleep for Long Runs
@@ -368,7 +368,7 @@ scripts/
    ```bash
    # Test the console scripts
    srtx --help
-   srtx-gui --help  # if installed with GUI extras
+   srtx-cli --help  # if installed with CLI extras
 
    # Run tests if available
    python -m pytest tests/  # or your test command
@@ -381,8 +381,8 @@ scripts/
 ### CLI/GUI Separation
 The SRT Translator now has a clean separation between CLI and GUI components:
 
-- **CLI (`srtx`)**: Lightweight, works on headless servers, no GUI dependencies
-- **GUI (`srtx-gui`)**: Full graphical interface, requires PySide6
+- **CLI (`srtx-cli`)**: Lightweight, works on headless servers, no GUI dependencies
+- **GUI (`srtx`)**: Full graphical interface, requires PySide6
 - **Core Engine**: Shared translation logic used by both interfaces
 - **Dependencies**: CLI can be installed without GUI dependencies for server deployments
 

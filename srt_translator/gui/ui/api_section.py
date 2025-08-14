@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .toggle_button import AnimatedToggleButton
+from srt_translator.gui.ui.toggle_button import AnimatedToggleButton
 
 
 class APISection(QGroupBox):

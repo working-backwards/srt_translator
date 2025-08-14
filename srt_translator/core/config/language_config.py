@@ -6,7 +6,7 @@ Language configuration for the SRT Translator.
 import logging
 from typing import Any, Dict, Optional, cast
 
-from .languages_data import LANGUAGES_JSON
+from srt_translator.core.config.languages_data import LANGUAGES_JSON
 
 
 class LanguageConfig:

@@ -32,13 +32,13 @@ class TranslationConfig:
         cls, raw: Mapping[str, Any], *, mode: Literal["CLI", "GUI"]
     ) -> "TranslationConfig":
         """Build TranslationConfig from raw configuration data with validation."""
-        from .utils import (
+        from srt_translator.core.config.utils import (
             normalize_target_languages,
             parse_json_or_csv,
             validate_float_range,
             validate_positive_int,
         )
-        from .validation import ConfigValidationError
+        from srt_translator.core.config.validation import ConfigValidationError
 
         errors: List[str] = []
         warnings: List[str] = []
