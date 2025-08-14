@@ -4,14 +4,15 @@ Tests for the exponential backoff retry functionality.
 This module tests the retry logic, decorators, and various retry scenarios.
 """
 
-import logging
-import pytest
 import time
 from unittest.mock import Mock, patch
+
+import pytest
+
 from srt_translator.core.utils.retries import (
-    with_backoff,
     retry_on_network_error,
     retry_on_openai_error,
+    with_backoff,
 )
 
 

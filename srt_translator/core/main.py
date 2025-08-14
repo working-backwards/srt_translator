@@ -7,8 +7,8 @@ Provides the core translation functionality for both CLI and GUI interfaces.
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, TypedDict, Union
+from datetime import datetime
+from typing import List, TypedDict
 
 from srt_translator import __version__
 from srt_translator.core.config.models import TranslationConfig

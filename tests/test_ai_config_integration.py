@@ -1,9 +1,6 @@
 import logging
-import os
 import sys
 import traceback
-
-from PySide6.QtWidgets import QApplication
 
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager

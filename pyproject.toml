@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "pyinstaller>=5.0.0"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -8,6 +8,7 @@ exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_lo
 
 [tool.setuptools.package-data]
 "srt_translator.gui" = ["**/*.ui", "**/*.qss", "assets/**"]
+"srt_translator.core.config" = ["languages.json"]
 
 [project]
 name = "srt-translator"
@@ -22,9 +23,8 @@ dependencies = [
     "openai>=1.0.0,<2.0.0",
     "python-dotenv>=0.19.0,<2.0.0",
     "srt>=3.5.2,<4.0.0",
-    "PySide6>=6.6.0,<7.0.0",
     "tiktoken>=0.5.0,<1.0.0",
-    "psutil>=5.9.0,<6.0.0",
+    "psutil>=5.9.0,<7.0.0",
 ]
 
 [project.optional-dependencies]
@@ -43,13 +43,13 @@ dev = [
     "ruff>=0.1.0",
 ]
 gui = [
-    "PySide6>=6.6.0",
+    "PySide6>=6.6.0,<7.0.0",
 ]
 
 # Build scripts
 [project.scripts]
-srtx = "srt_translator.gui.main_window:main"
-srt-cli = "srt_translator.cli.app:main"
+srtx = "srt_translator.cli.app:main"
+srtx-gui = "srt_translator.gui.main_window:main"
 
 # PyInstaller configuration
 #[tool.pyinstaller]
@@ -154,6 +154,21 @@ exclude = [
     ".pytest_cache",
     ".mypy_cache",
 ]
+
+# Ruff configuration for import enforcement
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "TID"]
+# TID = flake8-tidy-imports rules
+
+# Note: We'll use a different approach for import enforcement
+# The current ruff rules are too broad for our use case
+# We'll implement this with custom linting rules or CI checks
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
 
 # MyPy configuration (optional but recommended)
 [tool.mypy]

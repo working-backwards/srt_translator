@@ -1,12 +1,10 @@
 import argparse
-import glob
 import logging
 import os
 import sys
 
 from dotenv import load_dotenv
 
-from srt_translator.core.config.models import TranslationConfig
 from srt_translator.core.translator.fixer import SRTFixer
 
 #!/usr/bin/env python3

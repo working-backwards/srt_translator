@@ -4,7 +4,7 @@ Pure utility functions for configuration parsing and normalization.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Dict, Sequence, Union
 
 
 def parse_json_or_csv(

@@ -8,7 +8,6 @@ import logging
 import os
 import shutil
 import sys
-import tempfile
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(

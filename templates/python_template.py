@@ -5,9 +5,8 @@ Copy this template and modify as needed for new files.
 """
 
 import logging
-import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(

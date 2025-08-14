@@ -13,7 +13,7 @@ class ConfigValidationError(ValueError):
         self.warnings = warnings or []
 
         # Build error message
-        error_lines = [f"Configuration validation failed:"]
+        error_lines = ["Configuration validation failed:"]
         for error in self.errors:
             error_lines.append(f"  ❌ {error}")
 

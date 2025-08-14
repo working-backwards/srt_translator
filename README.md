@@ -28,8 +28,8 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 - Add your `.srt` files and click **Translate All Files**
 
 ### For CLI Users
-- Follow the developer installation process below (clone repository, setup Python environment)
-- Run `srt-cli` after configuring your `.env` file
+- Install with `pip install srt-translator`
+- Run `srtx` after configuring your `.env` file
 
 See **INSTALLATION.md** for building per‑platform and packaging details.
 
@@ -54,8 +54,8 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 After installation, you can use these simple commands from any terminal:
 
-- **GUI**: `srtx` - Launches the graphical interface
-- **CLI**: `srt-cli` - Launches the command-line interface
+- **CLI**: `srtx` - Launches the command-line interface
+- **GUI**: `srtx-gui` - Launches the graphical interface (requires `pip install srt-translator[gui]`)
 
 ### For Content Creators (Executable)
 
@@ -66,6 +66,27 @@ After installation, you can use these simple commands from any terminal:
 
 **Note**: Windows may show security warnings because this is free, open-source software. This is normal and safe.
 
+## Installation Options
+
+### CLI Only (Lightweight)
+```bash
+pip install srt-translator
+srtx --help
+```
+
+### With GUI Support
+```bash
+pip install srt-translator[gui]
+srtx-gui
+```
+
+### From Source (Development)
+```bash
+git clone https://github.com/working-backwards/srt_translator.git
+cd srt_translator
+pip install -e .[gui]  # Includes GUI dependencies
+```
+
 ### For Developers (Source Code)
 
 1. **Clone the repository**
@@ -73,8 +94,12 @@ After installation, you can use these simple commands from any terminal:
 3. **Activate environment**: 
    - Windows: `venv\Scripts\activate`
    - Mac/Linux: `source venv/bin/activate`
-4. **Install**: `pip install -e .`
-5. **Run**: `srtx`
+4. **Install**: 
+   - CLI only: `pip install -e .`
+   - With GUI: `pip install -e .[gui]`
+5. **Run**: 
+   - CLI: `srtx`
+   - GUI: `srtx-gui` (if installed with GUI extras)
 
 ### Developers: Build Binaries (macOS/Windows/Linux)
 
@@ -86,12 +111,19 @@ Prerequisites:
 - Install dependencies and PyInstaller
 
 ```
-pip install -e .
+pip install -e .[gui]
 pip install pyinstaller
 ```
 
 Build commands:
 
+**Quick Build (Recommended):**
+```bash
+# Use the provided build script
+python scripts/build_gui.py
+```
+
+**Manual Build:**
 - Windows (no console window):
 ```
 pyinstaller --noconsole --name SRT-Translator \
@@ -150,6 +182,13 @@ The SRT Translator app supports two professional tools that work together to imp
 Both tools can be created automatically by uploading a few representative subtitle files and clicking "Generate Translation Settings." The app analyzes your content and uses AI to suggest DNT terms and generate a Termbase for each selected language. While optional, these tools are highly recommended for videos that contain brand names, industry jargon, or educational content—helping ensure your translations are clear, accurate, and consistent across all languages.
 
 ### 4. Example Output Structure
+
+By default, outputs are written to your OS’s standard application data directory:
+macOS ~/Library/Application Support/srt-translator/translated_files/, 
+Windows %LOCALAPPDATA%\srt-translator\translated_files\, 
+Linux ~/.local/share/srt-translator/translated_files/.
+
+You can override this location in the GUI or in your .env file for the CLI.
 
 After translation, your files will be organized in batch-specific directories with language subfolders:
 
@@ -330,6 +369,8 @@ The SRT Translator requires these parameters to function:
 3. **Configure input directory** with `INPUT_DIRECTORY=path/to/your/srt/files` (optional, defaults to `./original_captions/` relative to project root)
 4. **Configure languages** in `TARGET_LANGUAGES` environment variable
 5. **Set up DNT terms** and termbase.json manually (optional)
+
+**Note**: The CLI (`srtx`) works independently of the GUI and can be installed on headless servers without GUI dependencies.
 
 ### Example CLI Configuration (.env file)
 ```bash

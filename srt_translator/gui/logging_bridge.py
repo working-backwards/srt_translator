@@ -1,6 +1,8 @@
 # srt_translator/gui/logging_bridge.py
 from __future__ import annotations
-import logging, queue
+
+import logging
+import queue
 from logging.handlers import QueueHandler, QueueListener
 from typing import Callable, Iterable, Optional
 

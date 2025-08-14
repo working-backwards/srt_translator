@@ -4,8 +4,6 @@ Script to fix import order issues (E402 errors) in the project.
 """
 
 import logging
-import re
-import sys
 from pathlib import Path
 
 # Set up logging - ALWAYS include this

@@ -3,7 +3,6 @@
 Typed configuration models for SRT Translator.
 """
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path

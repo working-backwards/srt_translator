@@ -5,25 +5,22 @@ Translation Worker for the SRT Translator GUI.
 
 import io
 import logging
-import sys
 import threading
 import time
 import uuid
 from collections import deque
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
-from srt_translator.api import TranslationConfiguration, Translator
+from srt_translator.api import TranslationConfiguration
 
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
-import logging
-from pathlib import Path
-from logging import Handler
 
 
 class TranslationWorker(QObject):
@@ -244,7 +241,8 @@ class TranslationWorker(QObject):
                         chunk = output_lines[i : i + 10]
                         self._throttled_emit(
                             self.progress_updated,
-                            f"Translation output (part {i // 10 + 1}): {'\n'.join(chunk)}",
+                            f"Translation output (part {i // 10 + 1}): "
+                            + "\n".join(chunk),
                         )
                 else:
                     self._throttled_emit(

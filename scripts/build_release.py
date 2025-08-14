@@ -8,11 +8,9 @@ import logging
 import os
 import platform
 import shutil
-import subprocess
 import sys
 import zipfile
 from datetime import datetime
-from pathlib import Path
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
@@ -160,10 +158,10 @@ def main():
     logger.info("\n📋 Creating release package...")
     try:
         release_path = create_release_package()
-        logger.info(f"\n🎉 Release build completed successfully!")
+        logger.info("\n🎉 Release build completed successfully!")
         logger.info(f"📦 Release package: {release_path}")
-        logger.info(f"📁 Executables: dist/")
-        logger.info(f"📋 Documentation: release/")
+        logger.info("📁 Executables: dist/")
+        logger.info("📋 Documentation: release/")
     except Exception as e:
         logger.error(f"❌ Failed to create release package: {e}")
         sys.exit(1)

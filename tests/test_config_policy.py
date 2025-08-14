@@ -8,8 +8,10 @@ This module tests that the configuration system follows the established policy:
 """
 
 import os
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, Mock
+
 from srt_translator.core.config.collect import collect_cli_config
 
 

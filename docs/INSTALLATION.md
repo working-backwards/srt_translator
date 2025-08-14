@@ -1,6 +1,6 @@
 # SRT Translator Installation Guide
 
-This guide covers two installation methods for the SRT Translator application.
+This guide covers installation methods for the SRT Translator application, with options for CLI-only, GUI, and development installations.
 
 ## 🚀 Quick Start (Content Creators)
 
@@ -47,6 +47,14 @@ If you want to create executables from source:
    pip install -e '.[dev]'
    ```
 4. **Build executables (PyInstaller quick path)**:
+
+**Quick Build (Recommended):**
+```bash
+# Use the provided build script
+python scripts/build_gui.py
+```
+
+**Manual Build:**
    - Windows:
      ```bash
      pyinstaller --noconsole --name SRT-Translator \
@@ -71,6 +79,30 @@ If you want to create executables from source:
        srt_translator/gui/main_window.py
      ```
 5. **Find executables** in the `dist/` folder
+
+## 📦 Installation Options
+
+### CLI Only (Lightweight)
+For users who want command-line functionality without GUI dependencies:
+```bash
+pip install srt-translator
+srtx --help
+```
+
+### With GUI Support
+For users who want the full graphical interface:
+```bash
+pip install srt-translator[gui]
+srtx-gui
+```
+
+### From Source (Development)
+For developers and contributors:
+```bash
+git clone https://github.com/working-backwards/srt_translator.git
+cd srt_translator
+pip install -e .[gui]  # Includes GUI dependencies
+```
 
 ## 🔧 Advanced Installation (Developers)
 
@@ -108,6 +140,9 @@ If you want to create executables from source:
    
    # Or install without dev dependencies
    pip install -e .
+   
+   # For GUI support, include the gui extra
+   pip install -e '.[gui]'
    ```
 
 4. **Configure your environment**:
@@ -120,11 +155,11 @@ If you want to create executables from source:
 
 5. **Run the application**:
    ```bash
-   # GUI version
+   # CLI version
    srtx
    
-   # CLI version
-   srt-cli
+   # GUI version (if installed with GUI extras)
+   srtx-gui
    ```
 
 ### macOS: Prevent Sleep for Long Runs
@@ -290,6 +325,25 @@ Flags:
 - **Deploy via internal distribution** systems
 - **Customize configuration** for your needs
 
+## 🛠️ Build Scripts
+
+### Script Organization
+All build and utility scripts are now organized in the `scripts/` directory:
+
+```
+scripts/
+├── build_gui.py          # PyInstaller wrapper for GUI executable
+├── build_release.py      # Standard Python package building
+├── smoke_test.py         # Testing utilities
+├── lint.py               # Linting utilities
+└── ... (other utilities)
+```
+
+### Using Build Scripts
+- **GUI Executable**: `python scripts/build_gui.py`
+- **Package Building**: `python scripts/build_release.py`
+- **Standard Python Build**: `python -m build` (now works correctly)
+
 ## 🔄 Updates
 
 ### Updating Executables
@@ -314,12 +368,31 @@ Flags:
    ```bash
    # Test the console scripts
    srtx --help
-   srt-cli --help
+   srtx-gui --help  # if installed with GUI extras
    
    # Run tests if available
    python -m pytest tests/  # or your test command
    ```
 
 ---
+
+## 🏗️ Architecture Notes
+
+### CLI/GUI Separation
+The SRT Translator now has a clean separation between CLI and GUI components:
+
+- **CLI (`srtx`)**: Lightweight, works on headless servers, no GUI dependencies
+- **GUI (`srtx-gui`)**: Full graphical interface, requires PySide6
+- **Core Engine**: Shared translation logic used by both interfaces
+- **Dependencies**: CLI can be installed without GUI dependencies for server deployments
+
+### Package Structure
+```
+srt_translator/
+├── core/           # Pure translation logic (no GUI/CLI dependencies)
+├── cli/            # CLI-specific code (imports only from core)
+├── gui/            # GUI-specific code (imports only from core)
+└── api.py          # High-level API for both interfaces
+```
 
 **Need help?** Check the [README.md](README.md) for detailed usage instructions or open an issue on GitHub. 

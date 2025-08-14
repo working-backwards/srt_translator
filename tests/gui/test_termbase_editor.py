@@ -4,7 +4,6 @@ Tests for the Termbase Editor.
 
 import logging
 
-import pytest
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor

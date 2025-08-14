@@ -61,8 +61,8 @@ Examples:
 
     # Collect raw configuration and build TranslationConfig
     try:
-        from srt_translator.cli.config_loader import collect_cli_raw
         from srt_translator.api import TranslationConfiguration, Translator
+        from srt_translator.cli.config_loader import collect_cli_raw
 
         raw_config = collect_cli_raw()
         api_cfg = TranslationConfiguration(

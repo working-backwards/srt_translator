@@ -4,8 +4,6 @@ Tests for the DNT Terms Editor.
 
 import logging
 
-import pytest
-from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor

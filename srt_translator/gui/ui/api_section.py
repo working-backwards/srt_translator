@@ -3,8 +3,6 @@
 API Configuration Section for the SRT Translator GUI.
 """
 
-import logging
-from typing import Dict
 
 from PySide6.QtWidgets import (
     QGroupBox,

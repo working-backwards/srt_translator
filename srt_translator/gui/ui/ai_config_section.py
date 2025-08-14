@@ -3,7 +3,6 @@
 AI Configuration Section for the SRT Translator GUI.
 """
 
-from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -133,9 +132,9 @@ class AIConfigSection(QGroupBox):
         self.dnt_display.setPlaceholderText("DNT terms will appear here...")
         self.dnt_display.setMaximumHeight(80)
         self.dnt_display.setToolTip(
-            f"These terms will remain in the original language in all translated subtitles.\n"
+            "These terms will remain in the original language in all translated subtitles.\n"
             "Includes company names, people, technical acronyms, and branded terms.\n"
-            f'Example: "Amazon" stays "Amazon" instead of being translated.'
+            'Example: "Amazon" stays "Amazon" instead of being translated.'
         )
 
         # Termbase display

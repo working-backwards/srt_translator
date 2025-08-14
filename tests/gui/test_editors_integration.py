@@ -4,12 +4,8 @@ Tests for Editors Integration.
 
 import logging
 
-import pytest
-from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QMainWindow,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )

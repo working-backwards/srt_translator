@@ -7,9 +7,7 @@ Checks if sensitive files are accidentally included in the executable.
 import logging
 import os
 import sys
-import tempfile
 import zipfile
-from pathlib import Path
 
 # Set up logging
 logging.basicConfig(

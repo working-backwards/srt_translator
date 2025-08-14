@@ -9,7 +9,7 @@ import logging
 import os
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QSettings

@@ -829,7 +829,14 @@ def main(argv=None):
             print("SRT Translator")
 
     def launch_gui():
-        from PySide6.QtWidgets import QApplication
+        try:
+            from PySide6.QtWidgets import QApplication
+        except ImportError as e:
+            print(
+                "PySide6 is required for the GUI. Install with: pip install 'srt-translator[gui]'",
+                flush=True,
+            )
+            raise SystemExit(1) from e
 
         app = QApplication(sys.argv)
         window = SRTTranslatorMainWindow()

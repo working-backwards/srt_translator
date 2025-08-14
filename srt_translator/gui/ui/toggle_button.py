@@ -3,7 +3,7 @@
 Toggle Button for the SRT Translator GUI.
 """
 
-from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QTimer
+from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation
 from PySide6.QtWidgets import QPushButton
 
 

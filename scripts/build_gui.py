@@ -4,11 +4,11 @@ Simple build wrapper for SRT Translator.
 Builds the GUI executable using PyInstaller.
 """
 
+import logging
 import os
 import platform
 import subprocess
 import sys
-import logging
 
 # Set up logging
 logging.basicConfig(
@@ -50,7 +50,7 @@ def main():
         )
 
         logger.info("✅ Successfully built GUI executable!")
-        logger.info(f"📁 Executable created in: dist/windows/")
+        logger.info("📁 Executable created in: dist/windows/")
 
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ Build failed: {e}")
