@@ -25,17 +25,29 @@ python scripts/clear_ai_config.py
 ### `build_release.py`
 Builds release packages for distribution.
 
-### `fix_formatting.py`
-Fixes code formatting issues across the project.
+## Modern Code Quality Tools
 
-### `fix_imports.py`
-Fixes import statement issues.
+The project now uses modern, industry-standard tools instead of custom scripts:
 
-### `lint.py`
-Runs linting checks on the codebase.
+### **Code Formatting & Linting**
+```bash
+# Format all code
+ruff format .
 
-### `run_fixer_only.py`
-Runs only the auto-fixer without other checks.
+# Check and fix linting issues
+ruff check . --fix
+
+# Type checking
+mypy srt_translator
+
+# Run all quality checks
+pre-commit run --all-files
+```
+
+### **What These Tools Do**
+- **Ruff**: Fast Python linter and formatter (replaces Black, isort, flake8)
+- **MyPy**: Static type checker
+- **Pre-commit**: Automatically runs all tools on commit
 
 ### `verify_security.py`
 Verifies security aspects of the codebase.
