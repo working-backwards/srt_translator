@@ -1,0 +1,46 @@
+site_name: SRT Translator
+site_description: Free MIT-licensed SRT translation tool for creators and developers
+site_url: https://workingbackwards.github.io/srt_translator/
+repo_url: https://github.com/workingbackwards/srt_translator
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      primary: indigo
+      accent: indigo
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - codehilite
+
+nav:
+  - Home: index.md
+  - Use the App:
+      - Quick Start: INSTALLATION.md
+      - GUI User Manual: GUI_USER_MANUAL.md
+      - Troubleshooting & FAQ: GUI_USER_MANUAL.md
+  - Build & Contribute:
+      - Dev Installation: INSTALLATION.md
+      - Coding Standards: CODING_STANDARDS.md
+      - GitHub Security Setup: GITHUB_SECURITY_SETUP.md
+      - Security Quick Reference: SECURITY_QUICK_REFERENCE.md
+  - Security:
+      - Distribution Safety: SECURITY.md
+
+extra:
+  social:
+    - icon: simple/github
+      link: https://github.com/workingbackwards/srt_translator

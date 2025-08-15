@@ -69,3 +69,6 @@ htmlcov/
 design_docs/
 *.design.md
 gui_design*.md
+
+# MkDocs build output
+site/
