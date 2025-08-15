@@ -6,7 +6,7 @@ Thank you for using the SRT Translator. This guide is your friendly companion. I
 
 ### What the application does
 
-The SRT Translator reads your original SRT subtitle files, translates them into one or more target languages, and writes clean, well‑timed SRT files to an output folder. It keeps your important terms intact when you tell it which words or phrases should never be translated. It can also apply a custom termbase so your business terms remain consistent.
+The SRT Translator reads your original SRT subtitle files, translates them into one or more target languages, and writes clean, well‑timed SRT files to an output folder. It keeps your important terms intact when you tell it which words or phrases should never be translated. It can also apply a custom termbase so your business terms remain consistent. The application processes files one at a time to ensure quality and prevent resource conflicts.
 
 ---
 
@@ -31,7 +31,7 @@ This section stores your OpenAI API key. The application uses this key to contac
 
 ### Files & Output
 
-This section lets you choose the folder that contains your original SRT files and the folder where translated files will be written. The application never deletes or modifies your original files. It reads them and writes new files to the output directory.
+This section lets you choose the folder that contains your original SRT files and the folder where translated files will be written. The application never deletes or modifies your original files. It reads them and writes new files to the output directory. The output directory will contain translated SRT files, a manifest of all translations, your DNT terms, termbase, and detailed log files for troubleshooting.
 
 ### Language Selection
 
@@ -47,7 +47,7 @@ This section starts and monitors your translation. It shows progress and it writ
 
 ### Preview (optional)
 
-Some builds include a preview section. If you see it, you can preview how a translated SRT block will look before you translate the entire file. This is helpful if you are adjusting your DNT terms or your termbase.
+Some builds include a preview section. If you see it, you can preview how a translated SRT block will look before you translate the entire file. This is helpful if you are adjusting your DNT terms or your termbase. The preview shows exactly how your DNT terms and termbase will be applied to a small sample of text.
 
 ---
 
@@ -62,7 +62,12 @@ These steps describe a typical translation workflow in complete sentences.
 5. (Optional) Open the Termbase editor. Add consistent translations for business terms so the output remains professional and predictable.
 6. Click Translate All Files. Watch the progress bar and the live log. The application creates a separate translated SRT for each target language.
 7. The application automatically runs fixes after each SRT file is translated to all languages. You will see "Running automatic fixes for [filename]..." in the log.
-8. When the translation completes, open the output folder. Review the files in your media player or subtitle editor.
+8. When the translation completes, open the output folder. You'll find:
+   - Translated SRT files (one per target language)
+   - A manifest file listing all translations
+   - Your DNT terms and termbase files
+   - Detailed log files for troubleshooting
+   Review the translated files in your media player or subtitle editor.
 
 If you notice a term that should not have been translated, add it to your DNT list and translate again. If you want a term to be translated in a specific way, add it to the termbase and translate again. The application will respect your preferences.
 
@@ -82,6 +87,14 @@ A termbase is a list of terms and their preferred translations for one or more l
 
 The application keeps subtitle numbering and structure stable. It processes the file in batches so the model can understand context. It enforces the start time of the first subtitle and the end time of the last subtitle within each batch. This clamping prevents drift across batches. When the model returns fewer or more subtitles than expected, the application redistributes content within the same time boundaries. It does not create blank subtitles. It produces clean output that players can read easily.
 
+### Batch Processing Details
+
+The application uses intelligent batching that respects sentence boundaries when possible. This means subtitles are grouped together in a way that maintains context for better translation quality. The batch size is automatically optimized based on your content, and the application ensures that each batch maintains proper timing relationships.
+
+### Single-Batch Processing
+
+The application processes one translation batch at a time to ensure quality and prevent resource conflicts. This means you cannot start multiple translations simultaneously - each file must complete before the next begins. This design choice ensures consistent performance and prevents API rate limit issues.
+
 ---
 
 ## Settings That Matter
@@ -92,7 +105,15 @@ The source language is the language of your original SRT file. The application d
 
 ### Output Directory
 
-The output directory is where the application writes the translated SRT files. You may choose any writable folder. The application creates language‑specific filenames so you can find results quickly.
+The output directory is where the application writes all translation-related files. You may choose any writable folder. The application creates language‑specific filenames for SRT files and organizes all output in one convenient location:
+
+- **Translated SRT files** with clear language indicators
+- **Manifest file** listing all translations performed
+- **DNT terms file** for your reference
+- **Termbase file** for your reference  
+- **Log files** with detailed translation information
+
+This organization makes it easy to track your work and troubleshoot any issues.
 
 ### Models
 
@@ -122,6 +143,20 @@ Add the term and its preferred translation to your termbase for that language. T
 
 Large files and many target languages take more time. You can translate fewer languages at once to speed things up. You can also select a faster model in the AI Configuration section. The log shows progress so you can see the work as it happens.
 
+### I get an error about "batch in progress."
+
+The application processes one translation at a time to ensure quality and prevent conflicts. If you see this error, wait for the current translation to complete before starting another. This design prevents API rate limit issues and ensures consistent performance.
+
+### What to do when translations fail.
+
+If a translation fails completely, the application will attempt to fall back to individual subtitle translation. Check the log files for detailed information about what went wrong. Common issues include:
+- API authentication problems (check your API key)
+- Network connectivity issues
+- Content that the AI model cannot process
+- File format problems
+
+The log files will show exactly what happened and where the process failed.
+
 ---
 
 ## Frequently Asked Questions
@@ -142,20 +177,26 @@ You can close the application at any time. When you reopen it, your settings rem
 
 Yes. You can use either. The application maps names to ISO codes for you. It shows your selections clearly in the interface.
 
+### What file formats are supported?
+
+The application currently supports standard SRT subtitle files. Make sure your input files have the `.srt` extension and follow the standard SRT format:
+- Subtitle number
+- Timestamp (HH:MM:SS,mmm → HH:MM:SS,mmm)
+- Subtitle text
+- Blank line between subtitles
+
+The application will validate your files and show any format issues in the log.
+
 ### Where can I find log files for troubleshooting?
 
-The application creates detailed log files that you can check if something goes wrong. You can find them here:
+The application creates detailed log files in your output directory that you can check if something goes wrong. These log files are automatically generated alongside your translated SRT files and contain detailed information about what happened during translation, including any errors or issues that the automatic fixer addressed.
 
-**Windows:**
-- `C:\Users\[YourUsername]\AppData\Local\SRTTranslator\Logs\`
-
-**macOS:**
-- `~/Library/Application Support/SRTTranslator/Logs/`
-
-**Linux:**
-- `~/.local/share/SRTTranslator/Logs/`
-
-Log files are named with timestamps like `translation_issues_20250807_171613.log`. They contain detailed information about what happened during translation, including any errors or issues that the automatic fixer addressed.
+The output directory contains:
+- **Translated SRT files** - Your main results
+- **Manifest file** - A summary of all translations performed
+- **DNT terms file** - Your "Do Not Translate" terms for reference
+- **Termbase file** - Your custom terminology for reference
+- **Log files** - Detailed translation logs with timestamps
 
 ---
 
@@ -165,8 +206,68 @@ Log files are named with timestamps like `translation_issues_20250807_171613.log
 - Build a small termbase for your domain. Consistent terminology improves quality and user trust.
 - Preview a small section before you translate a long file. This habit helps you confirm that your settings produce the tone you want.
 - Review translated files in a player that you trust. Adjust your lists and run the translation again if needed.
+- Use the manifest file to track which files have been translated and to which languages.
+- Check the log files if you encounter issues - they provide detailed information about what happened during translation.
+
+## Performance and Optimization Tips
+
+### Translation Speed
+- Process fewer target languages at once for faster results
+- Smaller SRT files translate more quickly than very long ones
+- The application automatically optimizes batch sizes for your content
+
+### Quality vs. Speed
+- The default model provides a good balance of quality and speed
+- For critical content, consider translating in smaller batches
+- Use the preview feature to test your settings before processing large files
+
+### Memory and Resource Usage
+- The application is designed to handle large subtitle files efficiently
+- Processing one file at a time ensures consistent performance
+- Log files are automatically managed to prevent disk space issues
+
+## Modern Features
+
+### Enhanced Output Organization
+The application now organizes all output files in one convenient location:
+- **Translated SRT files** are clearly named with language indicators
+- **Manifest file** provides a complete record of all translations
+- **Configuration files** (DNT terms, termbase) are saved for future reference
+- **Log files** contain detailed information for troubleshooting
+
+### Improved Error Handling
+- Clear error messages when translations cannot proceed
+- Automatic fallback to individual subtitle translation if batch translation fails
+- Detailed logging of all operations and decisions
+- Phantom placeholder detection to prevent AI hallucinations
+
+### Performance Optimizations
+- Single-batch processing ensures consistent performance
+- Rate limiting to respect API constraints
+- Efficient batch processing with sentence-aware boundaries
+- Memory-conscious file handling for large subtitle files
 
 ---
+
+## Best Practices and Workflow
+
+### Before You Start
+- Test your API key to ensure it's working
+- Review your DNT terms and termbase for accuracy
+- Use the preview feature to verify your settings
+- Choose an output directory that's easy to find
+
+### During Translation
+- Monitor the progress bar and log for any issues
+- Don't start multiple translations simultaneously
+- Keep the application running until completion
+- Check the log if you encounter any errors
+
+### After Translation
+- Review the manifest file to confirm all files were processed
+- Check a few translated files in your media player
+- Save your DNT terms and termbase for future use
+- Keep the log files for troubleshooting if needed
 
 ## Final Notes
 

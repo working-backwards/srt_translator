@@ -1,94 +1,124 @@
-# SRT Translator Coding Standards
+# SRT Translator — Coding Standards (Python 3.11+)
 
-## 🚨 CRITICAL ARCHITECTURE RULES (NEVER VIOLATE)
+This document is the single source of truth for code and repository standards. It supersedes older/AI‑specific guidance.
 
-### **1. CORE ENGINE ISOLATION**
-- **Core engine (`srt_translator/core/`) NEVER imports from GUI or CLI modules**
-- **Core engine ONLY reads from `TranslationConfig` objects passed as parameters**
-- **Core engine NEVER accesses environment variables, global settings, or file paths**
-- **Core engine NEVER calls `logging.basicConfig()` or configures logging**
+---
 
-### **2. LOGGING ARCHITECTURE**
-- **ONLY configure logging in entry points**: `cli/app.py`, `gui/app.py`, `__main__.py`
-- **Library modules get loggers and emit, but NEVER call `basicConfig()` or log on import**
-- **This prevents duplicate handlers, noisy logs, and surprises for library consumers**
+## 1) Architecture (NEVER VIOLATE)
 
-### **3. CONFIGURATION FLOW**
+### Core Engine Isolation
+- Core engine (`srt_translator/core/`) **never** imports from GUI/CLI modules.
+- Core engine **only** reads configuration from `TranslationConfig` objects passed as parameters.
+- Core engine **never** reads environment variables, global settings modules, or file paths directly.
+- Core engine **never** configures logging (no `basicConfig()`); it only obtains a module logger and emits.
+
+### Configuration Flow
 ```
-CLI/GUI → Load config from files/env → Create TranslationConfig → Pass to Core Engine
-     ↑           ↑                           ↑                    ↑
-  Entry point  I/O layer              Data object          Pure functions
+CLI/GUI → load config → create TranslationConfig → pass to Core Engine
+     ↑           ↑               ↑                        ↑
+  entry pt     I/O layer    data object               pure funcs
 ```
 
-## 🐍 Python Code Standards
+### Single‑Batch Translator Rule
+A `Translator` instance can run **only one batch at a time**. Starting a second batch while one is running must fail fast with a clear error (e.g., `RuntimeError("batch in progress")`). This constraint must be enforced by tests.
 
-### **Logging (CRITICAL)**
-- **NEVER use `print()` statements in production code**
-- **ALWAYS use proper logging**: `import logging; logger = logging.getLogger(__name__)`
-- **Use appropriate levels**: `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`
+---
 
-### **Code Style**
-- Follow PEP 8 standards
-- Use type hints where appropriate
-- Include docstrings for all functions and classes
-- Use f-strings for string formatting
+## 2) Logging
 
-## 🏗️ Project Structure
-- Maintain existing package structure: `srt_translator.{core,cli,gui}`
-- Follow established import patterns
-- Use relative imports within packages when appropriate
+- No `print()` in production code; always use the `logging` package.
+- Library pattern:
+  ```python
+  import logging
+  logger = logging.getLogger(__name__)
+  ```
+- Configure handlers/formatters **only** in entry points (`cli/app.py`, `gui/app.py`, `__main__.py`).
 
-## 🚨 Error Handling
-- Use proper exception handling with logging
-- Log errors with context information
-- Provide user-friendly error messages in GUI/CLI
+---
 
-## 📦 Dependencies
-- Minimize external dependencies
-- Use standard library when possible
-- Document any new dependencies added
+## 3) Style & Patterns
 
-## 🧪 Testing
-- Write tests for new functionality
-- Use pytest framework
-- Aim for high test coverage
-- Use logging in tests for better debugging
+### Imports (order)
+1) Standard library  
+2) Third‑party  
+3) Local package imports  
+(no imports after code execution)
 
-## 🔒 Security
-- Never log sensitive information (API keys, passwords)
-- Use environment variables ONLY for OpenAI API key
-- Validate all user inputs
-- Follow security best practices
+### Type hints & docstrings
+- Public functions/classes are fully typed.
+- Concise docstrings (one‑liner + key args/returns).
 
-## 📚 Documentation
-- Update docstrings when modifying functions
-- Keep README and other docs current
-- Document any breaking changes
+### Exceptions
+- Raise specific exceptions (`FileNotFoundError`, `ValueError`, etc.); avoid bare `Exception`.
 
-## ⚡ Performance
-- Use lazy loading for heavy dependencies
-- Optimize for memory usage in large file processing
-- Profile performance-critical sections
+### Strings
+- Prefer f‑strings for general formatting.
+- For logging, use parameterized messages:
+  ```python
+  logger.info("Processing %d files", len(files))
+  ```
 
-## 💻 Platform Compatibility
-- Ensure code works on Windows, macOS, and Linux
-- Use platform-agnostic path handling
-- Test on Python 3.9-3.12
+### Dependencies
+- Prefer the standard library; keep third‑party deps minimal and justified in PRs.
 
-## 🧠 Remember
-- **Logging over print() statements**
-- **Core engine isolation - NEVER import GUI/CLI modules**
-- **Configuration objects only - NEVER global settings**
-- **Follow existing patterns in the codebase**
-- **Write tests for new functionality**
-- **Document changes clearly**
+---
 
-## 🚨 CRITICAL REMINDER
-When working with the core engine (`srt_translator/core/`):
-1. **NEVER import from GUI or CLI modules**
-2. **NEVER use environment variables (except OpenAI key)**
-3. **NEVER use hardcoded defaults**
-4. **ONLY read from TranslationConfig objects**
-5. **If you need a configurable parameter, add it to TranslationConfig class**
+## 4) Testing & Security
 
-Violating these rules will break the app's architecture and introduce fragility. The core engine must remain pure and only consume the configuration objects passed to it.
+### Testing
+- Use **pytest**.
+- Write tests for new behavior and bug fixes.
+
+### Security
+- Never log secrets (API keys/tokens).
+- Validate inputs; avoid command injection and unsafe file operations.
+
+---
+
+## 5) Tooling & Local Checks (Python 3.11+)
+
+We use **pre‑commit**, **Ruff**, and **MyPy**.
+
+**One‑time setup**
+```bash
+pip install -U pre-commit ruff mypy
+pre-commit install
+```
+
+**Run checks locally**
+```bash
+ruff check .
+ruff format .
+mypy srt_translator
+pre-commit run --all-files
+pytest -q
+```
+
+**Security scanning (optional but recommended)**
+```bash
+# Check for dependency vulnerabilities
+safety check --full-report
+
+# Scan for common security issues in code
+bandit -r srt_translator
+```
+
+---
+
+## 6) Platforms & Versions
+
+- Python: **3.11+** (3.11, 3.12, 3.13 when stable)
+- OS: Windows, macOS, Linux
+
+---
+
+## 7) Before You Submit (Checklist)
+
+- [ ] Imports organized; none after code execution  
+- [ ] Type hints & docstrings updated  
+- [ ] Specific exceptions (no bare `Exception`)  
+- [ ] Logging used; no `print()`  
+- [ ] Inputs validated; no secrets logged  
+- [ ] `ruff check .` and `ruff format .` clean  
+- [ ] `mypy srt_translator` passes (or justified ignores)  
+- [ ] `pytest -q` passes (incl. single‑batch test)
