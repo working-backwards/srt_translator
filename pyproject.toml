@@ -12,7 +12,7 @@ exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_lo
 
 [project]
 name = "srt-translator"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "A subtitle translation tool with CLI and GUI interfaces"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}

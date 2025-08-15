@@ -39,7 +39,7 @@ A clear and concise description of what actually happened.
 - [ ] 3.12
 
 **SRT Translator Version:**
-- Version: [e.g., 1.0.0rc1]
+- Version: [e.g., 1.0.0]
 - Installation method: [e.g., pip install, source, etc.]
 
 ## Additional Context

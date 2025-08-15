@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package structure inconsistencies
 - Entry point configuration
 
-## [1.0.0rc1] - 2025-01-27
+## [1.0.0] - 2025-01-27
 
 ### Added
 - Unified package structure with `srt_translator.{core,cli,gui}` subpackages
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Notes
 
-### Version 1.0.0rc1
+### Version 1.0.0
 This release candidate represents a major milestone in the SRT Translator project. We've completely restructured the codebase to use a modern, organized package structure that makes the project more maintainable and easier to contribute to.
 
 **Key Improvements:**
