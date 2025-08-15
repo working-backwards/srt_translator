@@ -73,53 +73,152 @@ If you notice a term that should not have been translated, add it to your DNT li
 
 ---
 
-## Advanced Concepts Explained Simply
+## Understanding Translation (Advanced Concepts)
 
-### Do Not Translate (DNT) Terms
+> **For users who want to understand how the translation process works and how to get the best results.**
 
-DNT terms are exact strings that the translator preserves. They protect names, brands, acronyms, and sensitive phrases. You can add, remove, and reorder these terms. When a DNT placeholder appears during an intermediate step, the application keeps it unchanged so the final output remains correct. Use DNT terms when a word should never change.
+### Translation 101 (for Content Creators)
 
-### Custom Termbase
+#### Do-Not-Translate (DNT) Terms
 
-A termbase is a list of terms and their preferred translations for one or more languages. It helps your translations sound consistent and professional. You can provide a termbase for a single language or several languages. The translator applies the termbase when the terms appear in context. Use a termbase when you want consistent terminology across many files.
+A DNT list is a set of tokens we preserve exactly across languages—brand names, product names, file paths, hashtags, model numbers, proper nouns, commands, code, etc.
 
-### Timing and Structure
+**Why it matters:** Translation systems may "help" by changing names or formatting in ways that hurt comprehension, branding, or technical accuracy.
 
-The application keeps subtitle numbering and structure stable. It processes the file in batches so the model can understand context. It enforces the start time of the first subtitle and the end time of the last subtitle within each batch. This clamping prevents drift across batches. When the model returns fewer or more subtitles than expected, the application redistributes content within the same time boundaries. It does not create blank subtitles. It produces clean output that players can read easily.
+**Examples:**
+- **Brand/product names:** SuperCut, ProMix 3000
+- **Handles/hashtags:** @CreatorName, #NoFilter
+- **Technical strings:** Ctrl+C, CUDA, render_settings.json
+- **Part numbers / SKUs:** XC-200, M2-MAX
 
-### Batch Processing Details
+The SRT Translator passes your DNT list to the AI and also pre-protects it so it survives translation intact.
 
-The application uses intelligent batching that respects sentence boundaries when possible. This means subtitles are grouped together in a way that maintains context for better translation quality. The batch size is automatically optimized based on your content, and the application ensures that each batch maintains proper timing relationships.
+#### Custom Termbase
 
-### Single-Batch Processing
+A Termbase is your curated glossary mapping each source term to its preferred translations for each target language.
 
-The application processes one translation batch at a time to ensure quality and prevent resource conflicts. This means you cannot start multiple translations simultaneously - each file must complete before the next begins. This design choice ensures consistent performance and prevents API rate limit issues.
+Unlike the DNT list, the Termbase tells the translator how to translate important terms, ensuring consistency across all your videos.
 
----
+**Example Termbase:**
 
-## Settings That Matter
+| English | Spanish | Chinese (Simplified) |
+|---------|---------|---------------------|
+| lower third | rótulo | 下三分之一 |
+| b-roll | recurso | 补充镜头 |
+| cold open | apertura fría | 冷开场 |
+| operating cadence | cadencia operativa | 运营节奏 |
+| input metrics | métricas de entrada | 输入指标 |
+| jump cut | corte brusco | 跳切 |
+| call to action | llamada a la acción | 行动号召 |
 
-### Source and Target Languages
+The AI suggests a Termbase for each language based on your content. The lists do not need to be identical across languages — each is optimized for that language's context.
 
-The source language is the language of your original SRT file. The application defaults to English. You can change it if needed. The target languages are the languages you want to generate. You can map names to codes or simply select by name.
+### Why Subtitle Translation is Different from Document Translation
 
-### Output Directory
+Subtitles have timecodes, line-length constraints, and reading-speed limits. That creates unique challenges:
 
-The output directory is where the application writes all translation-related files. You may choose any writable folder. The application creates language‑specific filenames for SRT files and organizes all output in one convenient location:
+- **Lip-sync vs. readability:** We preserve your original timing, but translated text may need more or fewer characters. We prioritize readability and matching the speaker's intent over perfect lip movement.
+- **Segment structure changes:** A batch of 5 source subtitles might translate naturally into 4 or 6 in the target language. The app allows controlled merge/split, then fits results to your original timing grid.
+- **Punctuation and sentence boundaries:** Languages break sentences differently; we normalize punctuation for readability.
 
-- **Translated SRT files** with clear language indicators
-- **Manifest file** listing all translations performed
-- **DNT terms file** for your reference
-- **Termbase file** for your reference  
-- **Log files** with detailed translation information
+**In practice:** The app makes a best effort to keep your cues aligned with speaker turns and major pauses, while allowing small changes so the translation reads naturally.
 
-This organization makes it easy to track your work and troubleshoot any issues.
+### How SRT Translator Works
 
-### Models
+1. **Ingest your SRT** — already speaker-synced
+2. **Prepare terminology** — AI suggests DNT and Termbase candidates; you review/edit
+3. **Batching sentences** — We group subtitles into batches of around 5 subtitles before sending them to the translator. Through experimentation, this has proven to be a good balance between providing enough context for accurate translation and making it possible to reassemble the output into correctly timed subtitles.
+   - **GUI users:** Batch size is fixed at ~5
+   - **CLI (expert) users:** Batch size can be changed via command-line options
+4. **Translate with instructions** — The AI receives your DNT list, Termbase, and subtitle-specific constraints
+5. **Reassemble & retime** — We map translated text back to subtitles, allowing minimal merge/split, then snap results to your original timecodes
+6. **Quality passes** — After translation, we:
+   - Search for DNT terms and ensure they are present in the correct sentence order
+   - Replace incorrectly translated or misplaced DNT terms with the exact term from your list
+   - Flag cases for manual intervention where DNT placement can't be resolved automatically
+   - Perform other internal cleanup steps to preserve subtitle integrity
 
-The application uses reliable, cost‑effective models by default. If you want higher quality, you can select a stronger model in the AI Configuration section. If you want faster or cheaper results, you can select a lighter model. The defaults will serve most projects well.
+### Batching: Context vs. Reassembly
 
----
+Batching balances context for better translation against ease of reassembly into timed subtitles.
+
+**Why ~5?** More context helps the translator resolve pronouns and maintain tone, but very large batches can make timing reconstruction harder and occasionally confuse the translator. Through testing, 5 subtitles per batch is the sweet spot for most content.
+
+**GUI users don't need to worry about this** — it's fixed for optimal results. Advanced CLI users can override it if they have a special case.
+
+### Getting Great Results: DNT & Termbase Setup
+
+- **Start with AI suggestions** — Accept obvious DNT terms and promote important repeated terms to the Termbase
+- **Add variants** — Include common capitalization or plural forms in DNT if they must be preserved exactly
+- **Lock critical tokens** — File paths, JSON keys, function names should be in DNT
+- **Keep it lean** — Too many DNTs can over-constrain; focus on must-preserve items
+
+### Post-Translation Review Checklist
+
+- **DNT integrity:** All DNT terms are preserved exactly and in the right place
+- **Termbase consistency:** Terms match approved translations for each language
+- **Readability:** Lines are concise and easy to read at intended display speed
+- **Timing:** No overlaps, speaker changes align with cue changes
+- **Locale formatting:** Numbers, dates, and other formats match target language norms
+- **Tone/register:** Consistent with your audience
+
+### FAQ (Short)
+
+**Will the translated text match lip movement exactly?**
+
+No. We optimize for readability and timing with speaker intent, not exact lip flaps.
+
+**Why did the number of subtitles change after translation?**
+
+Some languages express ideas in more or fewer words. We allow small changes and then re-fit to your original timeline so the viewing rhythm stays intact.
+
+**Do I need a Termbase if I already have DNT?**
+
+Yes. DNT preserves exact tokens; the Termbase defines how domain terms should be translated.
+
+**How long will it take to translate my content?**
+
+Translation time depends on your content length and the number of target languages. The good news is that our system translates faster than real-time, so you won't be waiting as long as your video duration.
+
+**For a single language:**
+- **5 minutes of content:** 1-2 minutes to translate
+- **15 minutes of content:** 6-8 minutes to translate  
+- **30 minutes of content:** 12-16 minutes to translate
+- **60 minutes of content:** 24-32 minutes to translate
+
+**For multiple languages (processing in parallel):**
+
+| Content Length | 3 Languages | 5 Languages | 10 Languages | 12 Languages |
+|----------------|-------------|-------------|--------------|---------------|
+| 5 minutes     | 2-3 min     | 3-4 min     | 5-7 min      | 6-8 min       |
+| 15 minutes    | 18-24 min   | 30-40 min   | 1-1.3 hours  | 1.2-1.6 hours |
+| 30 minutes    | 36-48 min   | 1-1.3 hours | 2-2.6 hours  | 2.4-3.2 hours |
+| 60 minutes    | 1.2-1.6 hr | 2-2.6 hours | 4-5.2 hours  | 4.8-6.4 hours |
+
+**Real-world example:** A recent translation of 9 modules (ranging from 1 minute to 27 minutes each) to 12 languages took 5 hours and 18 minutes total. The system processed 108 translation operations successfully with zero errors.
+
+**Performance tip:** Translation speed is consistent across all languages. Spanish, Chinese, Arabic, and Japanese all translate at roughly the same speed, so you can plan your workflow confidently regardless of your target languages.
+
+**How much will it cost to translate my content?**
+
+Translation costs depend on content length, number of languages, and the AI model you choose. Our system uses GPT-4o-mini for optimal balance of quality and cost.
+
+**Cost factors:**
+- **Content length:** More content = more tokens = higher cost
+- **Language count:** Each language requires separate API calls
+- **Model efficiency:** GPT-4o-mini provides high quality at ~1/10th the cost of GPT-4
+
+**Estimated costs (using GPT-4o-mini):**
+
+| Content Length | 1 Language | 3 Languages | 5 Languages | 10 Languages | 12 Languages |
+|----------------|-------------|-------------|-------------|--------------|---------------|
+| 5 minutes     | $0.03 - $0.05 | $0.09 - $0.15 | $0.15 - $0.25 | $0.30 - $0.50 | $0.36 - $0.60 |
+| 15 minutes    | $0.08 - $0.12 | $0.24 - $0.36 | $0.40 - $0.60 | $0.80 - $1.20 | $0.96 - $1.44 |
+| 30 minutes    | $0.15 - $0.25 | $0.45 - $0.75 | $0.75 - $1.25 | $1.50 - $2.50 | $1.80 - $3.00 |
+| 60 minutes    | $0.30 - $0.50 | $0.90 - $1.50 | $1.50 - $2.50 | $3.00 - $5.00 | $3.60 - $6.00 |
+| 90 minutes    | $0.45 - $0.75 | $1.35 - $2.25 | $2.25 - $3.75 | $4.50 - $7.50 | $5.40 - $9.00 |
+
+
 
 ## Troubleshooting
 
@@ -138,10 +237,6 @@ Add those exact phrases to the DNT Terms list and run the translation again. The
 ### A business term needs a specific translation.
 
 Add the term and its preferred translation to your termbase for that language. Then translate again. The translator will apply your preference whenever it finds the term.
-
-### The application feels slow.
-
-Large files and many target languages take more time. You can translate fewer languages at once to speed things up. You can also select a faster model in the AI Configuration section. The log shows progress so you can see the work as it happens.
 
 ### I get an error about "batch in progress."
 
@@ -200,14 +295,7 @@ The output directory contains:
 
 ---
 
-## Tips for Better Results
 
-- Keep your DNT list focused. Add proper names and acronyms that should remain unchanged.
-- Build a small termbase for your domain. Consistent terminology improves quality and user trust.
-- Preview a small section before you translate a long file. This habit helps you confirm that your settings produce the tone you want.
-- Review translated files in a player that you trust. Adjust your lists and run the translation again if needed.
-- Use the manifest file to track which files have been translated and to which languages.
-- Check the log files if you encounter issues - they provide detailed information about what happened during translation.
 
 ## Performance and Optimization Tips
 
@@ -268,7 +356,3 @@ The application now organizes all output files in one convenient location:
 - Check a few translated files in your media player
 - Save your DNT terms and termbase for future use
 - Keep the log files for troubleshooting if needed
-
-## Final Notes
-
-This guide is meant to be your companion. It uses complete sentences so you can skim quickly or read carefully. If you follow the steps in order, you will create professional translations with minimal effort. If you ever feel unsure, return to the top, and read through the Getting Started and Step‑by‑Step sections again. They will bring you back on track.

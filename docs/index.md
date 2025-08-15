@@ -8,8 +8,8 @@ description: Free MIT-licensed SRT translation tool for content creators and dev
 Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to use.
 
 > Are you a content creator? Start here:
-- **Quick Start** → [Installation](INSTALLATION.md)
-- **Use the App (GUI)** → [GUI User Manual](GUI_USER_MANUAL.md)
+- **Use the App** → [GUI User Manual](GUI_USER_MANUAL.md)
+- **Installation Help** → [Quick Start](INSTALLATION.md)
 
 > Are you a developer? Start here:
 - **Dev Installation** → [Installation](INSTALLATION.md)
@@ -35,6 +35,9 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 2. **Set up** your OpenAI API key
 3. **Select** your SRT files and target languages
 4. **Translate** with one click
+
+**📖 Need detailed instructions?** → [GUI User Manual](GUI_USER_MANUAL.md)
+**🧠 Want to understand translation?** → [Translation Concepts](GUI_USER_MANUAL.md#understanding-translation-advanced-concepts)
 
 ## Features
 

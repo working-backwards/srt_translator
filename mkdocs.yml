@@ -29,8 +29,8 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Use the App:
-      - Quick Start: INSTALLATION.md
       - GUI User Manual: GUI_USER_MANUAL.md
+      - Quick Start: INSTALLATION.md
       - Troubleshooting & FAQ: GUI_USER_MANUAL.md
   - Build & Contribute:
       - Dev Installation: INSTALLATION.md
