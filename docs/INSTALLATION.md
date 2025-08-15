@@ -298,7 +298,7 @@ Flags:
 ### Getting Help
 
 1. **Check the logs** in `translation_logs/` directory
-2. **Review the README.md** for detailed information
+2. **Review the documentation** for detailed information
 3. **Open an issue** on GitHub with:
    - Your operating system and version
    - Python version
@@ -395,4 +395,4 @@ srt_translator/
 └── api.py          # High-level API for both interfaces
 ```
 
-**Need help?** Check the [README.md](README.md) for detailed usage instructions or open an issue on GitHub.
+**Need help?** Check the [documentation](index.md) for detailed usage instructions or open an issue on GitHub.
