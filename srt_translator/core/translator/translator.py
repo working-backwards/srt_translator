@@ -16,6 +16,14 @@ from srt_translator.core.translator.srt_parser import SRTParser
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.logging_setup import log_placeholder_issue
 
+# Import new utterance-based system components
+from .models import Subtitle, Utterance, ErrorPolicy, TranslationConfig
+from .language_config import LanguageConfig
+from .utterance_segmenter import UtteranceSegmenter
+from .utterance_translator import UtteranceTranslator
+from .reflow_engine import ReflowEngine
+from .utils import TranslationUtils
+
 # Update BAD_RESPONSE_PATTERNS to only check for the new phrase
 BAD_RESPONSE_PATTERNS = ["I cannot translate because"]
 
@@ -77,6 +85,10 @@ class SRTTranslator:
         allow_global_termbase_fallback: bool = False,
         model_name: str = "gpt-4o-mini",
         batch_size: int = 5,
+        # New utterance-based system configuration
+        languages_path: str = "languages.json",
+        error_policy: ErrorPolicy | str = ErrorPolicy.STRICT,
+        max_concurrency: int = 1,
     ):
         self.logger = logger or logging.getLogger(__name__)
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
@@ -97,6 +109,36 @@ class SRTTranslator:
         # Initialize term handler with provided DNT terms and termbase
         self.term_handler = TermHandler(dnt_terms=self.dnt_terms, termbase=self.termbase)
         self.parser = SRTParser()
+
+        # Initialize new utterance-based system components
+        # Convert error_policy to enum if it's a string
+        if isinstance(error_policy, str):
+            try:
+                self._error_policy = ErrorPolicy(error_policy.upper())
+            except ValueError:
+                self.logger.warning(f"Invalid error_policy '{error_policy}', using STRICT")
+                self._error_policy = ErrorPolicy.STRICT
+        else:
+            self._error_policy = error_policy
+            
+        self._max_concurrency = max_concurrency
+        
+        # Language configuration for CPS caps and family defaults
+        self._language_config = LanguageConfig(languages_path)
+        
+        # Utterance processing components
+        self._utterance_segmenter = UtteranceSegmenter(self._language_config)
+        self._reflow_engine = ReflowEngine(self._language_config)
+        self._translation_utils = TranslationUtils(self.logger)
+        
+        # Translation configuration
+        self._translation_config = TranslationConfig(
+            error_policy=error_policy,
+            max_concurrency=max_concurrency
+        )
+        
+        # Utterance translator (needs access to existing translation methods)
+        self._utterance_translator = UtteranceTranslator(self._translation_config, self.logger)
 
         # Single-batch enforcement mechanism
         self._batch_in_progress = False
@@ -993,10 +1035,161 @@ Status: AI Hallucination in batch translation - Remove this placeholder
         )
         return redistributed
 
-    # Update translate_file to call batch_translate_file by default
+    def translate_with_utterances(self, input_filepath, output_filepath, target_lang):
+        """
+        **NEW: Utterance-based translation system**
+        
+        Deterministic path:
+          - parse source
+          - segment utterances
+          - translate utterances in batches (5–8 items)
+          - reflow each utterance back into the original subtitle windows
+          - write target SRT using source times
+          - error policy gates
+        """
+        filename = os.path.basename(input_filepath)
+        
+        try:
+            # 1) Parse source (uses existing parser)
+            src_subs = self._translation_utils.parse_source_to_local_subtitles(
+                self.parser, input_filepath
+            )
+            if not src_subs:
+                raise RuntimeError("No subtitles parsed from source.")
+            
+            # 2) Segment utterances (language unknown at parse time; we rely on punctuation/time and target_lang for caps)
+            utts = self._utterance_segmenter.segment_utterances(src_subs, target_lang)
+            
+            self.logger.info(f"Segmented {len(src_subs)} subtitles into {len(utts)} utterances for {filename}")
+            
+            # 3) Translate utterances in batches of ~5–8 (list-in/list-out)
+            # Use existing translation methods as the translate function
+            def translate_utterance_batch(texts, lang):
+                """Wrapper to use existing batch translation logic."""
+                # Create dummy subtitle objects for the existing batch translator
+                dummy_subs = []
+                for i, text in enumerate(texts):
+                    dummy_sub = type('DummySubtitle', (), {
+                        'index': i + 1,
+                        'start': type('Time', (), {'total_seconds': lambda: 1.0})(),
+                        'end': type('Time', (), {'total_seconds': lambda: 2.0})(),
+                        'content': text
+                    })()
+                    dummy_subs.append(dummy_sub)
+                
+                # Use existing batch translation
+                batch_srt, _ = self.translate_srt_block(
+                    "\n".join(texts), target_lang, filename, 1, dummy_subs
+                )
+                
+                # Parse the result back into individual texts
+                try:
+                    parsed = list(srt.parse(batch_srt))
+                    return [sub.content.strip() for sub in parsed]
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse batch result, falling back to individual: {e}")
+                    # Fallback to individual translation
+                    return [self.translate_subtitle(text, lang, filename, i + 1) for i, text in enumerate(texts)]
+            
+            translations = self._utterance_translator.translate_with_concurrency(
+                utts, target_lang, translate_utterance_batch, batch_size=8
+            )
+            
+            # 4) Reflow per utterance back to original subtitles
+            tgt_subs = [None] * len(src_subs)  # type: ignore
+            utterance_failures = []
+            
+            for u, ttext in zip(utts, translations):
+                try:
+                    chunks = self._reflow_engine.reflow_to_subtitles(u, ttext, target_lang)
+                    
+                    # fill the same subtitle windows; preserve times verbatim
+                    if len(chunks) != (u.sub_end - u.sub_start + 1):
+                        raise RuntimeError(
+                            f"Internal reflow error: chunk count {len(chunks)} != subtitles in utterance {(u.sub_end - u.sub_start + 1)}"
+                        )
+                    
+                    for off, sub in enumerate(u.subtitles):
+                        txt = chunks[off]
+                        if not txt.strip():
+                            if self._error_policy == ErrorPolicy.STRICT:
+                                raise RuntimeError(f"Empty text after reflow at subtitle index {sub.index} (STRICT mode).")
+                            else:
+                                # BOUNDED/DEV mode: visible pass-through to keep structure
+                                self.logger.warning(f"{self._error_policy.value}: pass-through at subtitle {sub.index}")
+                                txt = sub.text
+                        
+                        tgt_subs[sub.index - 1] = Subtitle(
+                            index=sub.index, 
+                            start_ms=sub.start_ms, 
+                            end_ms=sub.end_ms, 
+                            text=txt.strip()
+                        )
+                        
+                except Exception as e:
+                    utterance_failures.append((u, str(e)))
+                    if self._error_policy == ErrorPolicy.STRICT:
+                        raise RuntimeError(f"Utterance reflow failed: {e}")
+                    elif self._error_policy == ErrorPolicy.BOUNDED:
+                        # Check if we've exceeded bounded limits
+                        if len(utterance_failures) > self._translation_config.bounded_max_exceptions:
+                            raise RuntimeError(f"Exceeded bounded exception limit: {len(utterance_failures)} failures")
+                        # Pass through source text for this utterance
+                        for sub in u.subtitles:
+                            tgt_subs[sub.index - 1] = Subtitle(
+                                index=sub.index, 
+                                start_ms=sub.start_ms, 
+                                end_ms=sub.end_ms, 
+                                text=sub.text
+                            )
+                    else:  # DEV mode
+                        self.logger.warning(f"DEV: pass-through at utterance {u.sub_start+1}-{u.sub_end+1}: {e}")
+                        for sub in u.subtitles:
+                            tgt_subs[sub.index - 1] = Subtitle(
+                                index=sub.index, 
+                                start_ms=sub.start_ms, 
+                                end_ms=sub.end_ms, 
+                                text=sub.text
+                            )
+            
+            # 5) Error policy gates: parity & exact timing (structure)
+            if any(s is None for s in tgt_subs):
+                missing = [i+1 for i, s in enumerate(tgt_subs) if s is None]
+                raise RuntimeError(f"Missing subtitles in target after reflow: {missing[:8]}{'...' if len(missing)>8 else ''}")
+            
+            if len(tgt_subs) != len(src_subs):
+                raise RuntimeError(f"Parity failure: src={len(src_subs)} vs tgt={len(tgt_subs)}")
+            
+            # (Exact time equality is guaranteed because we copied start/end)
+            
+            # 6) Write target using existing writer
+            self._translation_utils.write_local_subtitles_to_srt(
+                self.parser, tgt_subs, output_filepath
+            )
+            
+            self.logger.info(f"Utterance-based translation completed for {filename}")
+            return output_filepath
+            
+        except Exception as e:
+            self.logger.error(f"Utterance-based translation failed for {filename}: {e}")
+            raise
+
     def translate_file(self, input_filepath, output_filepath, target_lang):
         """Translate an entire SRT file using batching."""
         return self.batch_translate_file(input_filepath, output_filepath, target_lang)
+    
+    def translate_file_utterance_mode(self, input_filepath, output_filepath, target_lang):
+        """Translate using the new utterance-based system."""
+        return self.translate_with_utterances(input_filepath, output_filepath, target_lang)
+    
+    def get_translation_mode_info(self):
+        """Get information about available translation modes."""
+        return {
+            "current_mode": "utterance_based" if hasattr(self, '_utterance_segmenter') else "legacy_batch",
+            "error_policy": self._error_policy.value if hasattr(self, '_error_policy') else "N/A",
+            "max_concurrency": self._max_concurrency if hasattr(self, '_max_concurrency') else 1,
+            "languages_path": getattr(self._language_config, 'languages_path', 'N/A') if hasattr(self, '_language_config') else 'N/A'
+        }
 
 
 def clean_srt_output(text):
