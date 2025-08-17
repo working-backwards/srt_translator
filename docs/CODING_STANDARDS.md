@@ -19,8 +19,8 @@ CLI/GUI → load config → create TranslationConfig → pass to Core Engine
   entry pt     I/O layer    data object               pure funcs
 ```
 
-### Single‑Batch Translator Rule
-A `Translator` instance can run **only one batch at a time**. Starting a second batch while one is running must fail fast with a clear error (e.g., `RuntimeError("batch in progress")`). This constraint must be enforced by tests.
+### Single‑File Translator Rule
+A `Translator` instance can run **only one file at a time**. Starting a second file while one is running must fail fast with a clear error (e.g., `RuntimeError("translation in progress")`). This constraint must be enforced by tests.
 
 ---
 
@@ -121,4 +121,4 @@ bandit -r srt_translator
 - [ ] Inputs validated; no secrets logged  
 - [ ] `ruff check .` and `ruff format .` clean  
 - [ ] `mypy srt_translator` passes (or justified ignores)  
-- [ ] `pytest -q` passes (incl. single‑batch test)
+- [ ] `pytest -q` passes (incl. single‑file test)

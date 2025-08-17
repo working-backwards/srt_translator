@@ -46,11 +46,11 @@ The SRT Translator includes advanced quality hardening features that automatical
 
 **Problem**: Injecting all termbase entries can cause AI hallucinations and reduce relevance.
 
-**Solution**: Only inject termbase entries that are actually present in the current batch text.
+**Solution**: Only inject termbase entries that are actually present in the current utterance text.
 
 **Example**:
 - **Full termbase**: 50 terms across all business domains
-- **Current batch**: Only contains 15 relevant terms
+- **Current utterance**: Only contains 15 relevant terms
 - **Result**: Only 15 relevant terms are injected, improving translation quality
 
 **Benefits**:

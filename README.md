@@ -39,14 +39,15 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 - **Multi-language Translation**: Translate to multiple languages at once
 - **Preserve Important Terms**: Keep names, brands, and technical terms untranslated
-- **Maintains Timing**: Subtitle timing and formatting stay intact with improved batch boundary enforcement
+- **Maintains Timing**: Subtitle timing and formatting stay intact with deterministic utterance-based reflow
 - **Automatic Error Fixing**: Intelligently fixes common translation issues
 - **Professional Results**: High-quality translations suitable for public content
-- **Smart Batching**: Sentence-aware batch processing for better context and translation quality
+- **Smart Batching**: Utterance-aware processing for better context and translation quality
 - **Centralized Configuration**: Single source of truth for all translation settings
 - **Thread-Safe GUI**: Improved reliability for concurrent operations
 - **Quality Hardening**: Automatic filtering of numeric DNT terms and DNT precedence enforcement
 - **Enhanced Output**: Complete transparency into what was provided vs. what was used during translation
+- **Utterance-Based Translation**: New sentence-level processing system that eliminates timing drift while improving translation quality
 
 ---
 
@@ -393,12 +394,13 @@ A: Yes, only subtitle text is sent to OpenAI. Your video files stay local.
 
 ### Architecture Overview
 
-The SRT Translator now uses a **clean architecture** with centralized configuration management:
+The SRT Translator now uses a **clean architecture** with centralized configuration management and an **utterance-based translation system**:
 
 - **`TranslationConfig`**: Immutable configuration object containing all translation settings
 - **`ConfigResolver`**: Centralized logic for resolving configuration from different sources
 - **`SettingsManager`**: Single source of truth for GUI state management
 - **Environment Variables**: Used only for CLI mode, eliminated from GUI runtime
+- **Utterance-Based Processing**: Sentence-level translation with deterministic reflow to preserve timing
 
 ### Required Parameters
 

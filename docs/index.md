@@ -26,7 +26,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 - **AI-powered translation** using OpenAI models
 - **Term preservation** with Do Not Translate (DNT) terms
 - **Custom terminology** with termbase support
-- **Batch processing** for multiple files and languages
+- **Utterance-based processing** for multiple files and languages
 - **Professional output** with timing preservation
 
 ## Quick Start
@@ -43,7 +43,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 
 ### For Content Creators
 - **Simple GUI** - No technical knowledge required
-- **Batch Processing** - Handle multiple files at once
+- **File Processing** - Handle multiple files at once
 - **Language Support** - 100+ languages available
 - **Term Preservation** - Keep names, brands, and acronyms intact
 - **Quality Output** - Professional subtitle files ready for use

@@ -118,7 +118,7 @@ The AI suggests a Termbase for each language based on your content. The lists do
 Subtitles have timecodes, line-length constraints, and reading-speed limits. That creates unique challenges:
 
 - **Lip-sync vs. readability:** We preserve your original timing, but translated text may need more or fewer characters. We prioritize readability and matching the speaker's intent over perfect lip movement.
-- **Segment structure changes:** A batch of 5 source subtitles might translate naturally into 4 or 6 in the target language. The app allows controlled merge/split, then fits results to your original timing grid.
+- **Segment structure changes:** The app now uses utterance-based processing that groups subtitles by sentence boundaries, then reflows translated text back into the original timing windows to eliminate drift.
 - **Punctuation and sentence boundaries:** Languages break sentences differently; we normalize punctuation for readability.
 
 **In practice:** The app makes a best effort to keep your cues aligned with speaker turns and major pauses, while allowing small changes so the translation reads naturally.
@@ -127,9 +127,9 @@ Subtitles have timecodes, line-length constraints, and reading-speed limits. Tha
 
 1. **Ingest your SRT** — already speaker-synced
 2. **Prepare terminology** — AI suggests DNT and Termbase candidates; you review/edit
-3. **Batching sentences** — We group subtitles into batches of around 5 subtitles before sending them to the translator. Through experimentation, this has proven to be a good balance between providing enough context for accurate translation and making it possible to reassemble the output into correctly timed subtitles.
-   - **GUI users:** Batch size is fixed at ~5
-   - **CLI (expert) users:** Batch size can be changed via command-line options
+3. **Utterance-based processing** — We now group subtitles into utterances based on sentence boundaries and timing, then translate each utterance as a unit. This provides better context for accurate translation while maintaining perfect timing alignment.
+   - **GUI users:** Utterance processing is automatic and optimized
+   - **CLI (expert) users:** Can configure error policies and concurrency settings
 4. **Translate with instructions** — The AI receives your DNT list, Termbase, and subtitle-specific constraints
 5. **Reassemble & retime** — We map translated text back to subtitles, allowing minimal merge/split, then snap results to your original timecodes
 6. **Quality passes** — After translation, we:
@@ -138,13 +138,15 @@ Subtitles have timecodes, line-length constraints, and reading-speed limits. Tha
    - Flag cases for manual intervention where DNT placement can't be resolved automatically
    - Perform other internal cleanup steps to preserve subtitle integrity
 
-### Batching: Context vs. Reassembly
+### Utterance Processing: Context vs. Timing
 
-Batching balances context for better translation against ease of reassembly into timed subtitles.
+Utterance-based processing balances context for better translation against perfect timing preservation.
 
-**Why ~5?** More context helps the translator resolve pronouns and maintain tone, but very large batches can make timing reconstruction harder and occasionally confuse the translator. Through testing, 5 subtitles per batch is the sweet spot for most content.
+**How it works:** We group subtitles into natural utterances based on sentence boundaries, punctuation, and timing gaps. Each utterance is translated as a unit, then the translated text is reflowed back into the original subtitle windows to maintain exact timing.
 
-**GUI users don't need to worry about this** — it's fixed for optimal results. Advanced CLI users can override it if they have a special case.
+**Benefits:** Better translation quality through sentence-level context, while eliminating timing drift that was common with the old batch-based approach.
+
+**GUI users don't need to worry about this** — it's automatic and optimized. Advanced CLI users can configure error policies and concurrency settings.
 
 ### Getting Great Results: DNT & Termbase Setup
 
@@ -228,7 +230,7 @@ Please confirm your API key in the API Configuration section. Make sure your int
 
 ### The timing looks unusual in a few places.
 
-The application enforces batch boundaries. It clamps the first subtitle of each batch to the original batch start and clamps the last subtitle of each batch to the original batch end. If a model returns more or fewer subtitles than expected, the application redistributes content within the batch without creating blank lines. This approach prevents cross‑batch drift while keeping subtitles readable.
+The application now uses utterance-based processing that preserves exact timing. Each subtitle maintains its original start and end time, while the translated text is intelligently distributed across the available space. This approach eliminates timing drift completely while keeping subtitles readable and properly synchronized.
 
 ### Some terms should have stayed in English.
 
@@ -302,11 +304,11 @@ The output directory contains:
 ### Translation Speed
 - Process fewer target languages at once for faster results
 - Smaller SRT files translate more quickly than very long ones
-- The application automatically optimizes batch sizes for your content
+- The application automatically optimizes utterance processing for your content
 
 ### Quality vs. Speed
 - The default model provides a good balance of quality and speed
-- For critical content, consider translating in smaller batches
+- For critical content, the system maintains quality while preserving exact timing
 - Use the preview feature to test your settings before processing large files
 
 ### Memory and Resource Usage
@@ -325,14 +327,14 @@ The application now organizes all output files in one convenient location:
 
 ### Improved Error Handling
 - Clear error messages when translations cannot proceed
-- Automatic fallback to individual subtitle translation if batch translation fails
+- Automatic fallback to individual subtitle translation if utterance translation fails
 - Detailed logging of all operations and decisions
 - Phantom placeholder detection to prevent AI hallucinations
 
 ### Performance Optimizations
-- Single-batch processing ensures consistent performance
+- Single-file processing ensures consistent performance
 - Rate limiting to respect API constraints
-- Efficient batch processing with sentence-aware boundaries
+- Efficient utterance processing with sentence-aware boundaries
 - Memory-conscious file handling for large subtitle files
 
 ---
