@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CHANGELOG.md for change tracking
 - Safe upper bounds on all critical dependencies
 - Organized repository structure with docs/ and examples/ folders
+- **Quality Hardening**: Automatic filtering of numeric DNT terms for better localization
+- **DNT Precedence**: Automatic resolution of conflicts between DNT terms and termbase entries
+- **Relevant Termbase Injection**: Only injects termbase entries present in current batch text
+- **Enhanced Output Format**: Complete transparency into what was provided vs. what was used during translation
+- **Processing Summaries**: Detailed logs showing filtering results and quality improvements applied
 
 ### Changed
 - Replaced print() statements with proper logging in CLI
@@ -27,11 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING CHANGE**: CLI configuration policy updated - OS environment variables are now ignored for all settings except OPENAI_API_KEY
 - **BREAKING CHANGE**: CLI now reads configuration from .env files only (OS env ignored for non-API key settings)
 - Repository root reorganized for better maintainability
+- **Enhanced TermHandler**: Added tolerant matching for Latin terms (space/hyphen variations, possessives)
+- **Improved AI Config**: Added numeric filtering functions and enhanced DNT processing
+- **Enhanced Translator**: Added untranslated content detection with micro-context retry mechanism
 
 ### Fixed
 - SRT writer edge case for empty output directories
 - Package structure inconsistencies
 - Entry point configuration
+- **DNT Term Filtering**: Fixed issue where numeric DNT terms were blocking proper localization
+- **Termbase Collisions**: Resolved conflicts between DNT terms and termbase entries
+- **Output Transparency**: Fixed lack of visibility into what filtering was applied during translation
 
 ## [1.0.0] - 2025-01-27
 

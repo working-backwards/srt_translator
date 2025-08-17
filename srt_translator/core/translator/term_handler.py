@@ -5,6 +5,8 @@ Term handler for the SRT Translator.
 
 import logging
 import re
+import unicodedata
+from typing import Dict, List, Set
 
 
 class TermHandler:
@@ -15,16 +17,109 @@ class TermHandler:
     technical terms, or proper nouns that should remain in the original language.
     """
 
-    def __init__(self, dnt_terms):
+    def __init__(self, dnt_terms: List[str], termbase: Dict[str, str] = None):
         # DNT terms must be provided - no fallbacks to global settings
         if dnt_terms is None:
             raise ValueError(
                 "dnt_terms must be provided. TermHandler cannot fall back to global settings."
             )
 
-        self.dnt_terms = sorted(dnt_terms, key=len, reverse=True)
+        # Normalize and filter DNT terms
+        self.dnt_terms = self._normalize_dnt_terms(dnt_terms)
+        
+        # Store termbase if provided
+        self.termbase = termbase or {}
+        
+        # Compile tolerant regex patterns for Latin keys
+        self._compile_tolerant_patterns()
 
-    def replace_dnt_terms(self, text):
+    def _normalize_dnt_terms(self, dnt_terms: List[str]) -> List[str]:
+        """Normalize DNT terms for consistent matching (NFKC, lowercase)"""
+        normalized_terms = []
+        for term in dnt_terms:
+            if term and term.strip():
+                normalized = unicodedata.normalize("NFKC", term.lower().strip())
+                normalized_terms.append(normalized)
+        
+        # Sort by length (longest first) to avoid partial matches
+        return sorted(normalized_terms, key=len, reverse=True)
+
+    def _compile_tolerant_patterns(self):
+        """Compile regex patterns for tolerant matching of Latin keys"""
+        self.tolerant_patterns = {}
+        
+        for term in self.dnt_terms:
+            # Skip non-Latin terms (CJK, etc.)
+            if not self._is_latin_text(term):
+                continue
+                
+            # Create patterns for space/hyphen variations and possessives
+            # First escape the term, then replace spaces/hyphens with regex pattern
+            escaped_term = re.escape(term)
+            base_term = escaped_term.replace('\\ ', r'[\s\-]+').replace('\\-', r'[\s\-]+')
+            possessive_pattern = f"{base_term}['s]?"
+            
+            # Compile the pattern
+            try:
+                self.tolerant_patterns[term] = re.compile(possessive_pattern, re.IGNORECASE)
+            except re.error:
+                # Fallback to exact match if pattern compilation fails
+                self.tolerant_patterns[term] = re.compile(re.escape(term), re.IGNORECASE)
+
+    def _is_latin_text(self, text: str) -> bool:
+        """Check if text contains primarily Latin characters"""
+        latin_chars = sum(1 for c in text if unicodedata.category(c).startswith('L'))
+        return latin_chars > len(text) * 0.5
+
+    def _enforce_dnt_precedence(self, termbase: Dict[str, str]) -> Dict[str, str]:
+        """Remove termbase keys that collide with DNT terms after normalization"""
+        if not termbase:
+            return {}
+            
+        # Normalize termbase keys
+        normalized_tb = {}
+        for key, value in termbase.items():
+            if key and value:
+                normalized_key = unicodedata.normalize("NFKC", key.lower().strip())
+                normalized_tb[normalized_key] = value
+        
+        # Remove keys that collide with DNT terms
+        filtered_tb = {}
+        for key, value in normalized_tb.items():
+            # Check if this key collides with any DNT term
+            collision = False
+            for dnt_term in self.dnt_terms:
+                if key == dnt_term or key in dnt_term or dnt_term in key:
+                    collision = True
+                    logging.debug(f"Removing termbase key '{key}' due to DNT collision with '{dnt_term}'")
+                    break
+            
+            if not collision:
+                filtered_tb[key] = value
+        
+        if len(filtered_tb) != len(termbase):
+            logging.info(f"Filtered termbase: {len(termbase)} -> {len(filtered_tb)} (removed DNT collisions)")
+        
+        return filtered_tb
+
+    def relevant_termbase(self, text: str) -> Dict[str, str]:
+        """Return only termbase entries that are present in the given text"""
+        if not self.termbase or not text:
+            return {}
+        
+        # Normalize text for matching
+        normalized_text = unicodedata.normalize("NFKC", text.lower())
+        
+        # Find relevant termbase entries
+        relevant_entries = {}
+        for key, value in self.termbase.items():
+            if key and key.lower() in normalized_text:
+                relevant_entries[key] = value
+        
+        logging.debug(f"Relevant termbase: {len(self.termbase)} -> {len(relevant_entries)} entries")
+        return relevant_entries
+
+    def replace_dnt_terms(self, text: str) -> tuple[str, Dict[str, str]]:
         """
         Replace DNT terms with numbered placeholders before translation.
 
@@ -40,11 +135,16 @@ class TermHandler:
         """
         term_map = {}
         placeholder_count = 0
+        processed_text = text
 
         # Process each DNT term (longest first to avoid partial matches)
         for term in self.dnt_terms:
-            # Create regex pattern with word boundaries to match whole words only
-            pattern = r"\b{}\b".format(re.escape(term))
+            # Use tolerant patterns for Latin terms, exact match for others
+            if term in self.tolerant_patterns:
+                pattern = self.tolerant_patterns[term]
+            else:
+                # For non-Latin terms (CJK, etc.), use exact substring matching
+                pattern = re.compile(re.escape(term), re.IGNORECASE)
 
             def replace_term(match):
                 """Replace matched term with unique placeholder"""
@@ -55,9 +155,13 @@ class TermHandler:
                 return placeholder
 
             # Replace all occurrences of this term with placeholders
-            text = re.sub(pattern, replace_term, text)
+            processed_text = pattern.sub(replace_term, processed_text)
 
-        return text, term_map
+        return processed_text, term_map
+
+    def get_filtered_termbase(self) -> Dict[str, str]:
+        """Get termbase with DNT precedence enforced (collisions removed)"""
+        return self._enforce_dnt_precedence(self.termbase)
 
     def restore_dnt_terms(
         self,

@@ -68,16 +68,80 @@ def translate_srt_files(
     logger.info(f"Log file: {log_file}")
     logger.info(f"Translating with batch size: {translation_config.batch_size}")
 
-    # Create translator with configuration
+    # Apply numeric filtering to DNT terms before creating translator
+    filtered_dnt_terms = translation_config.dnt_terms
+    dnt_filtered_out = []
+    if translation_config.dnt_terms:
+        # Import the filtering function from ai_config
+        from srt_translator.gui.ai_config import AIConfigGenerator
+        temp_config = AIConfigGenerator("dummy_key")  # Temporary instance for filtering
+        filtered_dnt_terms, dnt_filtered_out = temp_config.filter_dnt_terms_with_metadata(translation_config.dnt_terms)
+        
+        if len(filtered_dnt_terms) != len(translation_config.dnt_terms):
+            logger.info(f"DNT terms filtered: {len(translation_config.dnt_terms)} → {len(filtered_dnt_terms)} (numeric items removed)")
+
+    # Create translator with filtered DNT terms
     translator = SRTTranslator(
-        dnt_terms=translation_config.dnt_terms,
+        dnt_terms=filtered_dnt_terms,
         termbase=translation_config.termbase,
         api_key=translation_config.api_key,
         allow_global_termbase_fallback=translation_config.mode
         == "CLI",  # GUI: no fallback; CLI: allow
         model_name=translation_config.model_name,
         batch_size=translation_config.batch_size,
+        logger=logger,  # Pass the configured logger
     )
+
+    # Capture filtering results for enhanced output
+    processing_summary = {
+        "dnt_terms": {
+            "provided": len(translation_config.dnt_terms) if translation_config.dnt_terms else 0,
+            "used": len(translator.term_handler.dnt_terms) if translator.term_handler.dnt_terms else 0,
+            "filtered": 0,
+            "filtering_details": []
+        },
+        "termbase": {
+            "provided_entries": 0,
+            "used_entries": 0,
+            "collisions_resolved": 0,
+            "filtering_details": {}
+        },
+        "quality_improvements": [
+            "Numeric DNT terms automatically filtered",
+            "DNT precedence enforced over termbase",
+            "Relevant-only termbase injection"
+        ]
+    }
+
+    # Calculate DNT filtering details
+    if translation_config.dnt_terms:
+        processing_summary["dnt_terms"]["filtered"] = len(dnt_filtered_out)
+        processing_summary["dnt_terms"]["filtering_details"] = dnt_filtered_out
+
+    # Calculate termbase filtering details
+    if translation_config.termbase:
+        total_provided = sum(len(lang_terms) for lang_terms in translation_config.termbase.values())
+        processing_summary["termbase"]["provided_entries"] = total_provided
+        
+        # Get filtered termbase from translator
+        filtered_tb = translator.term_handler.get_filtered_termbase()
+        total_used = sum(len(lang_terms) for lang_terms in filtered_tb.values())
+        processing_summary["termbase"]["used_entries"] = total_used
+        processing_summary["termbase"]["collisions_resolved"] = total_provided - total_used
+        
+        # Track what was filtered out per language
+        for lang_code in translation_config.termbase:
+            if lang_code in translation_config.termbase and lang_code in filtered_tb:
+                original_lang_terms = translation_config.termbase[lang_code]
+                filtered_lang_terms = filtered_tb[lang_code]
+                filtered_out_lang = set(original_lang_terms.keys()) - set(filtered_lang_terms.keys())
+                if filtered_out_lang:
+                    if "filtering_details" not in processing_summary["termbase"]:
+                        processing_summary["termbase"]["filtering_details"] = {}
+                    processing_summary["termbase"]["filtering_details"][lang_code] = {
+                        "filtered_out": list(filtered_out_lang),
+                        "reason": "DNT collision"
+                    }
 
     # Log configuration debug info using the new debug_log_config method
     SRTTranslator.debug_log_config(translation_config, full_termbase=True)
@@ -110,6 +174,11 @@ def translate_srt_files(
             lang_dir = os.path.join(batch_dir, lang_code.upper())
             os.makedirs(lang_dir, exist_ok=True)
             output_filepath = os.path.join(lang_dir, new_filename)
+
+            # Log progress: translated by X / Y
+            current_operation = summary["total_operations"]
+            total_operations = len(file_paths) * len(translation_config.target_languages)
+            logger.info(f"translated by {current_operation} / {total_operations} - {filename} → {lang_name}")
 
             try:
                 result = translator.translate_file(
@@ -161,50 +230,93 @@ def translate_srt_files(
             logger.info(f"  - {detail}")
     logger.info("==========================\n")
 
-    # Build minimal manifest (Option B)
+    # Build standardized artifacts using new utilities
     try:
-        # Write manifest.json
-        manifest_path = os.path.join(batch_dir, "manifest.json")
-        manifest_data = {
+        from srt_translator.core.utils.run_summaries import (
+            create_dnt_summary,
+            create_termbase_summary,
+            create_manifest_summary,
+            write_run_artifacts,
+            get_filtering_rules,
+        )
+        
+        # Get filtering rules
+        filtering_rules = get_filtering_rules()
+        
+        # Create artifacts directory structure
+        artifacts_dir = os.path.join(batch_dir, "artifacts")
+        os.makedirs(artifacts_dir, exist_ok=True)
+        
+        # Write root-level manifest for backward compatibility
+        root_manifest_path = os.path.join(batch_dir, "manifest.json")
+        root_manifest_data = {
             "version": __version__,
             "timestamp": ts_str,
             "mode": translation_config.mode,
             "source_files": [os.path.basename(f) for f in file_paths],
             "target_languages": list(translation_config.target_languages.values()),
             "summary": summary,
+            "processing_summary": processing_summary,
         }
-        with open(manifest_path, "w", encoding="utf-8") as f:
-            json.dump(manifest_data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Manifest written: {os.path.relpath(manifest_path, batch_dir)}")
+        with open(root_manifest_path, "w", encoding="utf-8") as f:
+            json.dump(root_manifest_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"Root manifest written: {os.path.relpath(root_manifest_path, batch_dir)}")
 
-        # Write configuration files for reference
+        # Write per-language artifacts
         try:
-            # termbase.json
-            termbase_tmp = os.path.join(batch_dir, "termbase.tmp.json")
-            termbase_path = os.path.join(batch_dir, "termbase.json")
-            with open(termbase_tmp, "w", encoding="utf-8") as f:
-                json.dump(translation_config.termbase, f, ensure_ascii=False, indent=2)
-            os.replace(termbase_tmp, termbase_path)
-            logger.info(f"Termbase written: {os.path.relpath(termbase_path, batch_dir)}")
-
-            # dnt_terms.json
-            dnt_tmp = os.path.join(batch_dir, "dnt_terms.tmp.json")
-            dnt_terms_path = os.path.join(batch_dir, "dnt_terms.json")
-            dnt_terms_data = {
-                "description": "List of terms that should not be translated (Do Not Translate)",
-                "terms": translation_config.dnt_terms,
-            }
-            with open(dnt_tmp, "w", encoding="utf-8") as f:
-                json.dump(dnt_terms_data, f, ensure_ascii=False, indent=2)
-            os.replace(dnt_tmp, dnt_terms_path)
-            logger.info(f"DNT terms written: {os.path.relpath(dnt_terms_path, batch_dir)}")
+            # Get filtered termbase for comparison
+            filtered_tb = translator.term_handler.get_filtered_termbase()
+            
+            for lang_name, lang_code in translation_config.target_languages.items():
+                # Create DNT summary for this language
+                dnt_meta = create_dnt_summary(
+                    user_terms=translation_config.dnt_terms or [],
+                    filtered_terms=filtered_dnt_terms or [],
+                    filtered_out=processing_summary["dnt_terms"]["filtering_details"],
+                    lang_code=lang_code,
+                    filtering_rules=filtering_rules
+                )
+                
+                # Create termbase summary for this language
+                tb_meta = create_termbase_summary(
+                    user_termbase=translation_config.termbase or {},
+                    filtered_termbase=filtered_tb or {},
+                    collisions_removed=processing_summary["termbase"].get("filtering_details", {}),
+                    lang_code=lang_code,
+                    filtering_rules=filtering_rules
+                )
+                
+                # Create enriched manifest for this language
+                lang_manifest = create_manifest_summary(
+                    version=__version__,
+                    timestamp=ts_str,
+                    mode=translation_config.mode,
+                    source_files=[os.path.basename(f) for f in file_paths],
+                    target_languages=[lang_code],
+                    summary=summary,
+                    processing_summary=processing_summary,
+                    dnt_meta=dnt_meta,
+                    tb_meta=tb_meta
+                )
+                
+                # Write all artifacts for this language
+                dnt_path, tb_path, manifest_path = write_run_artifacts(
+                    artifacts_dir=artifacts_dir,
+                    lang_code=lang_code,
+                    dnt_meta=dnt_meta,
+                    tb_meta=tb_meta,
+                    manifest_data=lang_manifest
+                )
+                
+                logger.info(f"Language artifacts written for {lang_code}: {os.path.relpath(artifacts_dir, batch_dir)}/{lang_code}/")
 
         except Exception as e:
-            logger.warning(f"Failed to write termbase or DNT terms: {e}")
+            logger.warning(f"Failed to write per-language artifacts: {e}")
 
         logger.info(f"Batch folder: {batch_dir}")
+        logger.info(f"Artifacts directory: {os.path.relpath(artifacts_dir, batch_dir)}")
     except Exception as e:
-        logger.warning(f"Failed to write manifest: {e}")
+        logger.warning(f"Failed to write artifacts: {e}")
 
     # Always run the fixer after translation
     try:

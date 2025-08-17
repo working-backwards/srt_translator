@@ -45,6 +45,8 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 - **Smart Batching**: Sentence-aware batch processing for better context and translation quality
 - **Centralized Configuration**: Single source of truth for all translation settings
 - **Thread-Safe GUI**: Improved reliability for concurrent operations
+- **Quality Hardening**: Automatic filtering of numeric DNT terms and DNT precedence enforcement
+- **Enhanced Output**: Complete transparency into what was provided vs. what was used during translation
 
 ---
 
@@ -181,6 +183,30 @@ The SRT Translator app supports two professional tools that work together to imp
 **AI Generation Process:**
 Both tools can be created automatically by uploading a few representative subtitle files and clicking "Generate Translation Settings." The app analyzes your content and uses AI to suggest DNT terms and generate a Termbase for each selected language. While optional, these tools are highly recommended for videos that contain brand names, industry jargon, or educational content—helping ensure your translations are clear, accurate, and consistent across all languages.
 
+### 4. Quality Hardening Features
+
+The SRT Translator includes advanced quality improvements that automatically enhance translation results:
+
+**Automatic DNT Filtering:**
+- Numeric and number-like terms (e.g., "300 milliseconds", "2025", "6.7") are automatically filtered from DNT lists
+- Prevents these terms from blocking proper localization (e.g., "300毫秒" instead of "300 milliseconds")
+- Maintains important non-numeric DNT terms like brand names and technical acronyms
+
+**DNT Precedence Enforcement:**
+- DNT terms always take priority over termbase entries
+- Automatically resolves conflicts between DNT terms and termbase translations
+- Ensures consistent behavior across all languages
+
+**Relevant Termbase Injection:**
+- Only termbase entries actually present in the current batch are injected
+- Reduces AI hallucinations and improves translation relevance
+- Automatic size capping prevents termbase overload
+
+**Enhanced Output Transparency:**
+- Complete visibility into what was provided vs. what was actually used
+- Detailed filtering logs showing what was removed and why
+- Per-language processing summaries for quality validation
+
 ### 4. Example Output Structure
 
 By default, outputs are written to your OS’s standard application data directory:
@@ -190,20 +216,20 @@ Linux ~/.local/share/srt-translator/translated_files/.
 
 You can override this location in the GUI or in your .env file for the CLI.
 
-After translation, your files will be organized in batch-specific directories with language subfolders:
+After translation, your files will be organized in batch-specific directories with enhanced output files:
 
 ```
 Your Selected Output Directory/
 ├── translation-batch-20250810_111157-0700/
 │   ├── translation_issues_20250810_111157-0700.log
-│   ├── manifest.json
-│   ├── termbase.json
-│   ├── dnt_terms.json
-│   ├── ES/                    # Spanish translations
+│   ├── manifest.json                    # Enhanced with processing summary
+│   ├── termbase.json                    # Enhanced with filtering details
+│   ├── dnt_terms.json                   # Enhanced with filtering details
+│   ├── ES/                              # Spanish translations
 │   │   └── video1 - ES.srt
-│   ├── FR/                    # French translations
+│   ├── FR/                              # French translations
 │   │   └── video1 - FR.srt
-│   └── DE/                    # German translations
+│   └── DE/                              # German translations
 │       └── video1 - DE.srt
 └── translation-batch-20250810_143022-0700/
     ├── translation_issues_20250810_143022-0700.log
@@ -211,7 +237,55 @@ Your Selected Output Directory/
     └── ... (translated files)
 ```
 
+**Enhanced Output Files:**
+- **`manifest.json`**: Contains processing summary with DNT/termbase filtering counts
+- **`termbase.json`**: Shows both original and filtered termbase with collision resolution details
+- **`dnt_terms.json`**: Shows both original and filtered DNT terms with numeric filtering details
+
 **Note:** Each translation session creates a new batch directory with logs and configuration files, making it easier to track and manage translation sessions. The GUI shows a "Files & Output" section where you can browse and select SRT files, then choose where to save the translated versions.
+
+### Enhanced Output Format
+
+The SRT Translator now provides complete transparency into the translation process:
+
+**Processing Summary (in manifest.json):**
+```json
+{
+  "processing_summary": {
+    "dnt_terms": {
+      "provided": 25,
+      "used": 22,
+      "filtered": 3
+    },
+    "termbase": {
+      "provided_entries": 45,
+      "used_entries": 38,
+      "collisions_resolved": 7
+    },
+    "quality_improvements": [
+      "Numeric DNT terms automatically filtered",
+      "DNT precedence enforced over termbase",
+      "Relevant-only termbase injection"
+    ]
+  }
+}
+```
+
+**DNT Terms Details (in dnt_terms.json):**
+- **User provided**: Your original DNT terms
+- **Filtered for translation**: Terms actually used (numeric items removed)
+- **Filtering details**: What was removed and why
+
+**Termbase Details (in termbase.json):**
+- **User provided**: Your original termbase
+- **Filtered for translation**: Termbase actually used (DNT collisions resolved)
+- **Collision details**: What was removed due to DNT conflicts
+
+This transparency helps you:
+- **Validate quality improvements** applied during translation
+- **Debug configuration issues** by seeing exactly what was used
+- **Track changes** across different translation runs
+- **Share results** with reviewers or other team members
 
 ---
 

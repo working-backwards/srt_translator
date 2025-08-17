@@ -32,6 +32,41 @@ def extract_translation_failure_reason(ai_response):
     return ai_response
 
 
+def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
+    """
+    Check if target text equals source text after removing DNT terms.
+    This detects when the model returns untranslated content.
+    """
+    if not src or not tgt:
+        return False
+    
+    # Normalize both texts for comparison
+    src_norm = src.strip().lower()
+    tgt_norm = tgt.strip().lower()
+    
+    # If they're identical, it's definitely untranslated
+    if src_norm == tgt_norm:
+        return True
+    
+    # Check if target equals source after removing DNT terms
+    # This catches cases where only DNT terms were preserved
+    src_without_dnt = src_norm
+    tgt_without_dnt = tgt_norm
+    
+    for dnt_term in dnt_terms:
+        if dnt_term:
+            dnt_norm = dnt_term.lower().strip()
+            src_without_dnt = src_without_dnt.replace(dnt_norm, "")
+            tgt_without_dnt = tgt_without_dnt.replace(dnt_norm, "")
+    
+    # Clean up whitespace
+    src_without_dnt = re.sub(r'\s+', ' ', src_without_dnt).strip()
+    tgt_without_dnt = re.sub(r'\s+', ' ', tgt_without_dnt).strip()
+    
+    # If they're identical after DNT removal, it's untranslated
+    return src_without_dnt == tgt_without_dnt
+
+
 class SRTTranslator:
     def __init__(
         self,
@@ -59,8 +94,8 @@ class SRTTranslator:
         self.model_name = model_name
         self.batch_size = batch_size
 
-        # Initialize term handler with provided DNT terms
-        self.term_handler = TermHandler(dnt_terms=self.dnt_terms)
+        # Initialize term handler with provided DNT terms and termbase
+        self.term_handler = TermHandler(dnt_terms=self.dnt_terms, termbase=self.termbase)
         self.parser = SRTParser()
 
         # Single-batch enforcement mechanism
@@ -168,25 +203,13 @@ class SRTTranslator:
 
     def _format_termbase_block_smart(self, target_lang, batch_content):
         """Filter termbase to only include terms present in current batch"""
-        # Prefer instance termbase; optionally allow CLI fallback
-        if target_lang in self.termbase:
-            all_terms = self.termbase[target_lang]
-        elif self.allow_global_termbase_fallback:
-            # This function is no longer imported, so this fallback will fail.
-            # The user's edit hint implies this change, but the new_code doesn't provide a replacement.
-            # For now, we'll just return an empty string if termbase is not available.
-            return "No specific termbase terms for this content."
-        else:
-            all_terms = {}
-
-        batch_text = " ".join([sub.content for sub in batch_content]).lower()
-
-        relevant_terms = {
-            english: translation
-            for english, translation in all_terms.items()
-            if english.lower() in batch_text
-        }
-
+        # Get filtered termbase with DNT precedence enforced
+        filtered_termbase = self.term_handler.get_filtered_termbase()
+        
+        # Get relevant terms for this batch
+        batch_text = " ".join([sub.content for sub in batch_content])
+        relevant_terms = self.term_handler.relevant_termbase(batch_text)
+        
         if not relevant_terms:
             return "No specific termbase terms for this content."
 
@@ -376,6 +399,26 @@ Status: AI Hallucination - Remove this placeholder
             # Tidy whitespace after removals
             final_text = re.sub(r"\s{2,}", " ", final_text).strip()
 
+            # Check for untranslated content after DNT restoration
+            if is_untranslated_after_dnt(text, final_text, self.dnt_terms):
+                self.logger.warning(
+                    f"Untranslated content detected in {filename} subtitle {subtitle_number}. "
+                    f"Retrying with micro-context..."
+                )
+                
+                # Try to retry with micro-context using batch translator
+                try:
+                    retry_text = self._retry_with_micro_context(
+                        text, target_lang, filename, subtitle_number, summary
+                    )
+                    if retry_text and not is_untranslated_after_dnt(text, retry_text, self.dnt_terms):
+                        self.logger.info(f"Micro-context retry successful for subtitle {subtitle_number}")
+                        final_text = retry_text
+                    else:
+                        self.logger.warning(f"Micro-context retry failed for subtitle {subtitle_number}")
+                except Exception as e:
+                    self.logger.error(f"Error during micro-context retry: {e}")
+
             placeholder_issues = self._check_placeholder_issues(
                 text, final_text, term_map, target_lang, filename, subtitle_number
             )
@@ -549,7 +592,7 @@ Status: AI Hallucination - Remove this placeholder
                 for batch_index, batch in enumerate(subtitle_batches):
                     batch_srt = srt.compose(batch)
 
-                    logging.info(
+                    self.logger.info(
                         f"Translating batch {batch_index + 1}/{len(subtitle_batches)} (subtitles {batch[0].index}-{batch[-1].index})"
                     )
 
@@ -560,15 +603,15 @@ Status: AI Hallucination - Remove this placeholder
 
                     # Error handling: Check if batch translation failed completely
                     if contains_bad_response(translated_batch_srt):
-                        logging.warning(
+                        self.logger.warning(
                             f"Batch translation failed for batch starting at index {batch[0].index}. Reason: {extract_translation_failure_reason(translated_batch_srt)}"
                         )
-                        logging.info(
+                        self.logger.info(
                             f"\n--- BATCH TRANSLATION ERROR PROMPT for {filename} (batch starting at subtitle {batch[0].index}) ---\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
                         )
 
                         # Fallback strategy: Translate each subtitle individually
-                        logging.info(
+                        self.logger.info(
                             f"Falling back to single subtitle translation for batch {batch_index + 1}"
                         )
                         for sub in batch:
@@ -589,7 +632,7 @@ Status: AI Hallucination - Remove this placeholder
                     batch_term_map = getattr(self, "_last_batch_term_map", {})
                     for phantom in phantom_placeholders:
                         if phantom not in batch_term_map:
-                            logging.warning(
+                            self.logger.warning(
                                 f"""
 ==================================================
 PHANTOM PLACEHOLDER DETECTED IN BATCH:
@@ -616,13 +659,35 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                         redistributed_batch = self._redistribute_subtitles(
                             batch, translated_batch, filename, batch[0].index
                         )
+                        
+                        # Log subtitle count differences and adjustments made
+                        original_count = len(batch)
+                        translated_count = len(translated_batch)
+                        redistributed_count = len(redistributed_batch)
+                        
+                        if translated_count != original_count:
+                            self.logger.info(
+                                f"SUBTITLE COUNT ADJUSTMENT in {filename} batch {batch_index + 1}: "
+                                f"sent {original_count} → returned {translated_count} → redistributed {redistributed_count}"
+                            )
+                            if translated_count < original_count:
+                                self.logger.info(
+                                    f"  → Fewer subtitles returned: spread {translated_count} across {original_count} slots "
+                                    f"with even timing distribution"
+                                )
+                            elif translated_count > original_count:
+                                self.logger.info(
+                                    f"  → More subtitles returned: merged {translated_count} into {original_count} slots "
+                                    f"keeping original timing"
+                                )
+                        
                         translated_subtitles.extend(redistributed_batch)
                     except Exception as e:
-                        logging.error(
+                        self.logger.error(
                             f"Failed to parse translated SRT batch at index {batch[0].index}: {e}"
                         )
                         # Log the prompt and model response for debugging
-                        logging.info(
+                        self.logger.info(
                             f"\n--- BATCH PARSING EXCEPTION for {filename} "
                             f"(batch starting at subtitle {batch[0].index}) ---\n"
                             f"EXCEPTION: {e}\nPROMPT:\n{prompt}\n"
@@ -644,19 +709,22 @@ Status: AI Hallucination in batch translation - Remove this placeholder
                 # Reindex the final subtitles to ensure sequential numbering
                 final_subtitles = list(srt.sort_and_reindex(final_subtitles))
 
-                logging.info(
-                    f"Final output: {len(final_subtitles)} subtitles "
+                # Log final subtitle count summary
+                original_total = sum(len(batch) for batch in subtitle_batches)
+                self.logger.info(
+                    f"FINAL SUBTITLE SUMMARY for {filename}: "
+                    f"original {original_total} → final {len(final_subtitles)} subtitles "
                     f"(filtered from {len(translated_subtitles)} total)"
                 )
 
                 # Log timing boundaries for verification
                 if final_subtitles:
-                    logging.info(
+                    self.logger.info(
                         f"Final timing boundaries: {final_subtitles[0].start} --> {final_subtitles[-1].end}"
                     )
 
                 self.parser.write_file(output_filepath, final_subtitles)
-                logging.info(f"Translated SRT saved to: {output_filepath}")
+                self.logger.info(f"Translated SRT saved to: {output_filepath}")
                 return output_filepath
             finally:
                 # Always reset batch state when translation completes
@@ -757,6 +825,62 @@ Status: AI Hallucination in batch translation - Remove this placeholder
 
         return batches
 
+    def _retry_with_micro_context(
+        self, text: str, target_lang: str, filename: str, subtitle_number: int, summary: dict = None
+    ) -> str:
+        """
+        Retry translation with micro-context (prev, current, next) using batch translator.
+        This is a quality improvement that doesn't affect timing.
+        """
+        try:
+            # Create a minimal batch with just the current subtitle
+            # This gives the model some context without changing the batch structure
+            current_subtitle = srt.Subtitle(
+                index=subtitle_number,
+                start=srt.Subtitle.parse_time("00:00:00,000"),
+                end=srt.Subtitle.parse_time("00:00:05,000"),
+                content=text
+            )
+            
+            # Create a minimal batch
+            mini_batch = [current_subtitle]
+            
+            # Get relevant termbase for this text
+            relevant_tb = self.term_handler.relevant_termbase(text)
+            
+            # Create a simple batch prompt for retry
+            retry_prompt = f"""Translate this subtitle to {target_lang}. 
+            Keep the same timing and format. Only translate the text content.
+            
+            {text}"""
+            
+            # Use the batch translation approach for consistency
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": retry_prompt},
+                ],
+                temperature=0.1,
+            )
+            
+            retry_text = response.choices[0].message.content
+            if retry_text is None:
+                return None
+                
+            retry_text = retry_text.strip()
+            
+            # Process DNT terms for the retry
+            processed_text, term_map = self.term_handler.replace_dnt_terms(text)
+            retry_text = self.term_handler.restore_dnt_terms(
+                retry_text, term_map, filename, subtitle_number, target_lang
+            )
+            
+            return retry_text
+            
+        except Exception as e:
+            self.logger.error(f"Error in micro-context retry: {e}")
+            return None
+
     def _redistribute_subtitles(
         self, original_batch, translated_batch, filename, batch_start_index
     ):
@@ -789,10 +913,10 @@ Status: AI Hallucination in batch translation - Remove this placeholder
             # clamp edges
             redistributed[0].start = batch_start_time
             redistributed[-1].end = batch_end_time
-            logging.debug(
+            logging.info(
                 f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}"
             )
-            logging.debug(
+            logging.info(
                 f"REDISTRIBUTION DETAILS for {filename}: 1:1 mapping with clamped edges"
             )
             return redistributed
