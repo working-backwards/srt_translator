@@ -246,21 +246,6 @@ def translate_srt_files(
         # Create artifacts directory structure
         artifacts_dir = os.path.join(batch_dir, "artifacts")
         os.makedirs(artifacts_dir, exist_ok=True)
-        
-        # Write root-level manifest for backward compatibility
-        root_manifest_path = os.path.join(batch_dir, "manifest.json")
-        root_manifest_data = {
-            "version": __version__,
-            "timestamp": ts_str,
-            "mode": translation_config.mode,
-            "source_files": [os.path.basename(f) for f in file_paths],
-            "target_languages": list(translation_config.target_languages.values()),
-            "summary": summary,
-            "processing_summary": processing_summary,
-        }
-        with open(root_manifest_path, "w", encoding="utf-8") as f:
-            json.dump(root_manifest_data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Root manifest written: {os.path.relpath(root_manifest_path, batch_dir)}")
 
         # Write per-language artifacts
         try:

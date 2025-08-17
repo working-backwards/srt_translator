@@ -222,9 +222,19 @@ After translation, your files will be organized in batch-specific directories wi
 Your Selected Output Directory/
 ├── translation-batch-20250810_111157-0700/
 │   ├── translation_issues_20250810_111157-0700.log
-│   ├── manifest.json                    # Enhanced with processing summary
-│   ├── termbase.json                    # Enhanced with filtering details
-│   ├── dnt_terms.json                   # Enhanced with filtering details
+│   ├── artifacts/                       # Per-language artifacts
+│   │   ├── es/                         # Spanish artifacts
+│   │   │   ├── dnt_summary.json       # DNT terms summary
+│   │   │   ├── termbase_summary.json  # Termbase summary
+│   │   │   └── manifest.json          # Language-specific manifest
+│   │   ├── fr/                         # French artifacts
+│   │   │   ├── dnt_summary.json
+│   │   │   ├── termbase_summary.json
+│   │   │   └── manifest.json
+│   │   └── de/                         # German artifacts
+│   │       ├── dnt_summary.json
+│   │       ├── termbase_summary.json
+│   │       └── manifest.json
 │   ├── ES/                              # Spanish translations
 │   │   └── video1 - ES.srt
 │   ├── FR/                              # French translations
@@ -233,14 +243,13 @@ Your Selected Output Directory/
 │       └── video1 - DE.srt
 └── translation-batch-20250810_143022-0700/
     ├── translation_issues_20250810_143022-0700.log
-    ├── manifest.json
     └── ... (translated files)
 ```
 
 **Enhanced Output Files:**
-- **`manifest.json`**: Contains processing summary with DNT/termbase filtering counts
-- **`termbase.json`**: Shows both original and filtered termbase with collision resolution details
-- **`dnt_terms.json`**: Shows both original and filtered DNT terms with numeric filtering details
+- **`artifacts/<lang>/dnt_summary.json`**: DNT terms processing summary with filtering details
+- **`artifacts/<lang>/termbase_summary.json`**: Termbase processing summary with collision resolution
+- **`artifacts/<lang>/manifest.json`**: Language-specific manifest with complete metadata
 
 **Note:** Each translation session creates a new batch directory with logs and configuration files, making it easier to track and manage translation sessions. The GUI shows a "Files & Output" section where you can browse and select SRT files, then choose where to save the translated versions.
 
@@ -248,7 +257,7 @@ Your Selected Output Directory/
 
 The SRT Translator now provides complete transparency into the translation process:
 
-**Processing Summary (in manifest.json):**
+**Processing Summary (in artifacts/<lang>/manifest.json):**
 ```json
 {
   "processing_summary": {
@@ -271,12 +280,12 @@ The SRT Translator now provides complete transparency into the translation proce
 }
 ```
 
-**DNT Terms Details (in dnt_terms.json):**
+**DNT Terms Details (in artifacts/<lang>/dnt_summary.json):**
 - **User provided**: Your original DNT terms
 - **Filtered for translation**: Terms actually used (numeric items removed)
 - **Filtering details**: What was removed and why
 
-**Termbase Details (in termbase.json):**
+**Termbase Details (in artifacts/<lang>/termbase_summary.json):**
 - **User provided**: Your original termbase
 - **Filtered for translation**: Termbase actually used (DNT collisions resolved)
 - **Collision details**: What was removed due to DNT conflicts

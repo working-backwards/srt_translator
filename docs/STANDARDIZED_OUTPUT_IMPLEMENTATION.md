@@ -19,8 +19,7 @@ A comprehensive utility module that provides:
 The new output structure follows this pattern:
 ```
 translation-batch-<timestamp>/
-├── manifest.json                    # Root manifest (backward compatible)
-├── artifacts/                       # New per-language artifacts
+├── artifacts/                       # Per-language artifacts
 │   ├── es/                         # Spanish artifacts
 │   │   ├── dnt_summary.json       # DNT terms summary
 │   │   ├── termbase_summary.json  # Termbase summary
@@ -102,7 +101,6 @@ dnt_path, tb_path, manifest_path = write_run_artifacts(
 
 - **Replaced** the old output generation code with calls to the new utilities
 - **Added** per-language artifact creation
-- **Maintained** backward compatibility with root-level manifest.json
 - **Enhanced** metadata tracking for DNT and termbase filtering
 
 ### 2. `srt_translator/gui/ai_config.py`
@@ -221,13 +219,13 @@ Run the demo with:
 python3 examples/demo_standardized_output.py
 ```
 
-## Backward Compatibility
+## Output Structure
 
-The implementation maintains full backward compatibility:
-- Root-level `manifest.json` is still generated
-- Existing CLI and GUI workflows continue to work
-- No breaking changes to existing APIs
-- New artifacts are additive, not replacing existing functionality
+The new output structure is clean and focused:
+- Per-language artifacts in organized directories
+- No duplicate or backward compatibility files
+- Simple, consistent structure across all runs
+- All metadata contained within language-specific artifacts
 
 ## Future Enhancements
 
