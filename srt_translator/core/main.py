@@ -159,7 +159,7 @@ def translate_srt_files(
                     }
 
     # Log configuration debug info using the new debug_log_config method
-    SRTTranslator.debug_log_config(translation_config, full_termbase=True)
+    SRTTranslator.debug_log_config(translation_config, logger=logger, full_termbase=True)
 
     # Create summary with proper typing
     summary: SummaryDict = {

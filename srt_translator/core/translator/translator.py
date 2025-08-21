@@ -169,25 +169,39 @@ def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.
 # ---------------------------
 
 class SRTTranslator:
+    # Expert configuration - modify these values as needed
+    HARD_BATCH_LIMIT = 8  # Maximum subtitles per batch (safety cap)
+    
     def __init__(
         self,
+        *,
         dnt_terms: List[str],
         termbase: Dict[str, Dict[str, str]],
         api_key: str,
+        logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
         model_name: str = "gpt-4o-mini",
         batch_size: int = 5,
         error_policy: str = "STRICT",
-        logger: Optional[logging.Logger] = None,
         language_config: Optional[LanguageConfig] = None,
     ) -> None:
+        if logger is None:
+            raise ValueError("SRTTranslator requires an application logger (non-None).")
+        
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
         self.model_name = model_name
         self.batch_size = max(1, int(batch_size))
         self.error_policy = error_policy.upper()
-        self.logger = logger or logging.getLogger(__name__)
+        
+        # Make a namespaced child for clarity in logs
+        self.logger = logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
+        self.logger = self.logger.getChild("core.translator")
+        # If caller gave an adapter, re-wrap child with the same extra
+        if isinstance(logger, logging.LoggerAdapter):
+            self.logger = logging.LoggerAdapter(self.logger, logger.extra)
+            
         self.language_config = language_config or LanguageConfig()
 
         # Initialize TermHandler for DNT and termbase management
@@ -203,6 +217,58 @@ class SRTTranslator:
 
         self.client = OpenAI(api_key=api_key)
 
+    # --- Sentence-aware batching (no utterances) ----------------------------
+    def _create_batches(
+        self,
+        subtitles: List[Subtitle],
+        soft_limit: int,
+        hard_limit: int,
+        target_lang: str,
+    ) -> List[List[Subtitle]]:
+        """
+        Group consecutive subtitles into batches that prefer ending at a natural
+        sentence boundary once the soft limit is reached, without exceeding
+        the hard limit.  Each subtitle remains its own item (1:1 id mapping).
+        """
+        if not subtitles:
+            return []
+
+        batches: List[List[Subtitle]] = []
+        current: List[Subtitle] = []
+
+        # Pull language-specific rules from the injected language_config, if present.
+        # Falls back to a generic set if not available.
+        sentence_endings = (".", "!", "?", "…")
+        try:
+            if self.language_config:
+                rules = self.language_config.get_language_rules(target_lang) or {}
+                if isinstance(rules.get("sentence_endings"), list):
+                    sentence_endings = tuple(rules["sentence_endings"])  # type: ignore[assignment]
+        except Exception:
+            # Be permissive; logging is handled by the caller
+            pass
+
+        for sub in subtitles:
+            current.append(sub)
+
+            # If we hit the hard cap, cut the batch immediately.
+            if len(current) >= hard_limit:
+                batches.append(current)
+                current = []
+                continue
+
+            # If we've reached the soft target, prefer to break on a sentence end.
+            if len(current) >= soft_limit:
+                text = (sub.text or "").strip()
+                if any(text.endswith(end) for end in sentence_endings):
+                    batches.append(current)
+                    current = []
+
+        if current:
+            batches.append(current)
+
+        return batches
+
     # ---------- Public API ----------
 
     def translate_file(
@@ -212,7 +278,14 @@ class SRTTranslator:
         output_filepath: str,
         target_lang: str,
     ) -> None:
-        self.logger.info("Using subtitle-based translation system for %s → %s", os.path.basename(input_filepath), target_lang)
+        # Per-call context (add file/lang without reconfiguring handlers)
+        file_logger = logging.LoggerAdapter(self.logger, {
+            "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
+            "file": os.path.basename(input_filepath),
+            "lang": target_lang,
+        })
+        
+        file_logger.info("Using subtitle-based translation system for %s → %s", os.path.basename(input_filepath), target_lang)
 
         # 1) Load and parse SRT
         with open(input_filepath, "r", encoding="utf-8") as f:
@@ -223,15 +296,28 @@ class SRTTranslator:
 
         self.logger.info("Processing %d subtitles for %s", len(src_subs), os.path.basename(input_filepath))
 
-        # 2) Batch
-        batches = chunk(src_subs, self.batch_size)
+        # 2) Sentence-aware batching (each subtitle stays its own item)
+        batches = self._create_batches(
+            subtitles=src_subs,
+            soft_limit=int(self.batch_size),
+            hard_limit=self.HARD_BATCH_LIMIT,
+            target_lang=target_lang,
+        )
+        
+        file_logger.info(
+            "Using sentence-aware batching for %s → %s "
+            "(%d subtitles → %d batches; "
+            "soft=%d, hard=%d)",
+            os.path.basename(input_filepath), target_lang, len(src_subs), len(batches), 
+            self.batch_size, self.HARD_BATCH_LIMIT
+        )
         all_tgt_subs: List[Subtitle] = []
 
         # Language rules
         cps_soft, cps_hard = self._get_cps_caps(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
-            self.logger.info("Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches))
+            file_logger.info("Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches))
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
             src_items = [self.term_handler.apply_dnt_placeholders(s.text) for s in batch]
@@ -246,7 +332,7 @@ class SRTTranslator:
 
             # Validate count
             if len(items) != len(batch):
-                self.logger.warning("JSON batch count mismatch: expected %d, got %d", len(batch), len(items))
+                file_logger.warning("JSON batch count mismatch: expected %d, got %d", len(batch), len(items))
                 # Reformat pass (shape-only)
                 items = self._reformat_items_to_shape(
                     raw_src=src_items,
@@ -264,7 +350,7 @@ class SRTTranslator:
                 for idx, kinds in ph_issues.items():
                     inv = ",".join(sorted(kinds["invented"])) or "-"
                     mis = ",".join(sorted(kinds["missing"])) or "-"
-                    self.logger.warning("Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]", bi, idx, inv, mis)
+                    file_logger.warning("Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]", bi, idx, inv, mis)
 
                 if self.error_policy == "STRICT":
                     fixed = self._reformat_fix_placeholders(
@@ -291,7 +377,7 @@ class SRTTranslator:
                     msg = f"Empty translation for subtitle idx={batch[i].idx}"
                     if self.error_policy == "STRICT":
                         raise RuntimeError(msg)
-                    self.logger.warning("%s; falling back to source text (BOUNDED/DEV).", msg)
+                    file_logger.warning("%s; falling back to source text (BOUNDED/DEV).", msg)
                     tgt_texts[i] = src_raw
 
             # Format per subtitle (CPS; line breaks)
@@ -315,13 +401,13 @@ class SRTTranslator:
             f.write(out_text)
 
         # Defer fixes to core.main; just log what we produced.
-        if self.logger:
-            self.logger.debug(
+        if file_logger:
+            file_logger.debug(
                 "Translated %s → %s (lang=%s). Placeholder restoration will run in core.main Fixer pass.",
                 os.path.basename(input_filepath), os.path.basename(output_filepath), target_lang
             )
 
-        self.logger.info("Subtitle-based translation completed for %s", os.path.basename(input_filepath))
+        file_logger.info("Subtitle-based translation completed for %s", os.path.basename(input_filepath))
         return True
 
     # ---------- Core calls ----------
@@ -519,13 +605,15 @@ TARGET ITEMS (TO FIX):
         return "\n".join(rows)
 
     @staticmethod
-    def debug_log_config(cfg, logger=None, *, full_termbase=False, max_langs=12, max_terms_per_lang=8):
+    def debug_log_config(cfg, logger: logging.Logger, *, full_termbase=False, max_langs=12, max_terms_per_lang=8):
         """
         Emit a redacted, human-friendly config snapshot at DEBUG level.
         - full_termbase=False prints a per-language summary with samples.
         - Set full_termbase=True to pretty-print the entire termbase.
         """
-        log = logger or logging.getLogger(__name__)
+        if logger is None:
+            raise ValueError("Logger is required for debug_log_config; no fallback allowed.")
+        log = logger
         if not log.isEnabledFor(logging.DEBUG):
             return
 

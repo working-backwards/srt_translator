@@ -24,15 +24,40 @@ A `Translator` instance can run **only one file at a time**. Starting a second f
 
 ---
 
-## 2) Logging
+## 2) Logging (CRITICAL - NEVER VIOLATE)
 
-- No `print()` in production code; always use the `logging` package.
-- Library pattern:
-  ```python
-  import logging
-  logger = logging.getLogger(__name__)
-  ```
-- Configure handlers/formatters **only** in entry points (`cli/app.py`, `gui/app.py`, `__main__.py`).
+### One-Rule Policy
+**Only the app boundary (GUI worker or CLI main) configures logging. Every core module must use the logger it is passed and must never create handlers, call `basicConfig`, or log to the root/default logger.**
+
+### Implementation Rules
+- **Core modules**: Must require a logger parameter; no fallback to `logging.getLogger(__name__)`
+- **Entry points only**: Configure logging in `cli/app.py`, `gui/app.py`, `__main__.py`
+- **No side logs**: Core code never creates handlers, calls `basicConfig()`, or writes separate log files
+- **Unified logging**: One run log per execution, funneled through the app's logging system
+
+### Forbidden Patterns in Core Code
+```python
+# ❌ FORBIDDEN - Fallback to default logger
+logger = logger or logging.getLogger(__name__)
+
+# ❌ FORBIDDEN - Creating handlers
+logger.addHandler(logging.FileHandler(...))
+
+# ❌ FORBIDDEN - Global logging config
+logging.basicConfig(...)
+
+# ❌ FORBIDDEN - Root logger usage
+logging.info(...)
+```
+
+### Required Pattern in Core Code
+```python
+# ✅ REQUIRED - Require injected logger
+def __init__(self, *, logger: logging.Logger, ...):
+    if logger is None:
+        raise ValueError("Logger is required; no fallback allowed.")
+    self.logger = logger.getChild("module.name")
+```
 
 ---
 

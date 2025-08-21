@@ -61,11 +61,12 @@ if not config.api_key:
 
 ## 🐍 Python Code Standards
 
-### Logging Requirements
+### Logging Requirements (CRITICAL - NEVER VIOLATE)
 - **ALWAYS use proper logging instead of print() statements**
-- Import logging at the top of every Python file: `import logging`
-- Set up logging configuration: `logging.basicConfig(level=logging.INFO)`
-- Use `logger = logging.getLogger(__name__)` in functions/classes
+- **NEVER call `logging.basicConfig()` in core modules - only in entry points**
+- **NEVER use `logging.getLogger(__name__)` as a fallback - require injected logger**
+- **NEVER create handlers in core modules - only emit through injected logger**
+- **ALWAYS require logger parameter in core module constructors**
 - Use appropriate log levels: `logger.info()`, `logger.warning()`, `logger.error()`, `logger.debug()`
 - Never use `print()` statements in production code
 
@@ -73,15 +74,29 @@ if not config.api_key:
 ```python
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# ✅ CORRECT - Core module (requires injected logger)
+class CoreModule:
+    def __init__(self, *, logger: logging.Logger, ...):
+        if logger is None:
+            raise ValueError("Logger is required; no fallback allowed.")
+        self.logger = logger.getChild("core.module")
+    
+    def do_work(self):
+        self.logger.info("Processing work...")
 
-def some_function():
-    logger = logging.getLogger(__name__)
-    logger.info("This is an info message")
-    logger.warning("This is a warning")
-    logger.error("This is an error")
-    logger.debug("This is debug info")
+# ✅ CORRECT - Entry point (configures logging)
+def main():
+    logging.basicConfig(level=logging.INFO)  # Only here!
+    logger = logging.getLogger("app")
+    core = CoreModule(logger=logger)
+    core.do_work()
+
+# ❌ FORBIDDEN - Core module fallback
+def __init__(self, logger=None):
+    self.logger = logger or logging.getLogger(__name__)  # NO!
+
+# ❌ FORBIDDEN - Core module basicConfig
+logging.basicConfig(level=logging.INFO)  # NO!
 ```
 
 ### Test Files
