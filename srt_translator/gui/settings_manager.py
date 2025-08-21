@@ -59,11 +59,12 @@ class ConfigState:
 class SettingsManager:
     """Manages persistent settings for the SRT Translator GUI"""
 
-    def __init__(self):
+    def __init__(self, language_config: LanguageConfig):
         self.settings = QSettings("SRTTranslator", "SRTTranslator")
         self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
         self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
+        self.language_config = language_config
 
     # === CENTRALIZED STATE MANAGEMENT ===
 
@@ -285,11 +286,10 @@ class SettingsManager:
 
     def save_target_languages_from_codes(self, language_codes: List[str]) -> None:
         """Save target languages from list of language codes using unified config"""
-        config = LanguageConfig()
         languages = {}
         for code in language_codes:
-            if config.validate_language_code(code):
-                name = config.get_language_name(code)
+            if self.language_config.validate_language_code(code):
+                name = self.language_config.get_language_name(code)
                 languages[name] = code
 
         self.save_target_languages(languages)
@@ -301,22 +301,20 @@ class SettingsManager:
 
     def get_popular_languages(self) -> List[str]:
         """Get popular languages from unified config"""
-        config = LanguageConfig()
-        return config.get_popular_languages()
+        return self.language_config.get_popular_languages()
 
     def get_adaptive_popular_languages(self) -> List[str]:
         """
-        Get adaptive popular languages based on user preferences and usage
+        Get adaptive popular languages based on user preferences and usage.
 
         Returns:
             List of language codes for popular languages, combining:
             - User's frequently used languages
             - Default popular languages to fill remaining slots
         """
-        config = LanguageConfig()
-        popular_limit = config.get_popular_limit()
+        popular_limit = self.language_config.get_popular_limit()
         user_preferences = self.load_user_popular_languages()
-        default_popular = config.get_popular_languages()
+        default_popular = self.language_config.get_popular_languages()
 
         # If user has no preferences, use default popular languages
         if not user_preferences:
@@ -382,8 +380,7 @@ class SettingsManager:
         )
 
         # Get top used languages
-        config = LanguageConfig()
-        popular_limit = config.get_popular_limit()
+        popular_limit = self.language_config.get_popular_limit()
         top_languages = [lang_code for lang_code, _ in sorted_languages[:popular_limit]]
 
         # Save as user's preferred popular languages
@@ -391,8 +388,7 @@ class SettingsManager:
 
     def get_all_languages(self) -> Dict[str, str]:
         """Get all available languages from unified config"""
-        config = LanguageConfig()
-        return config.get_all_languages()
+        return self.language_config.get_all_languages()
 
     def save_last_input_directory(self, directory: str) -> None:
         """Save last used input directory"""

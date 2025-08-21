@@ -1,161 +1,525 @@
+# srt_translator/core/translator/translator.py
+from __future__ import annotations
+
 import json
 import logging
 import os
 import re
-import threading
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Set
 
-# Import unified language configuration
-import time
-from typing import List
+# Core imports
+from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
+from srt_translator.core.translator.term_handler import TermHandler
 
-import srt
+
+
+# OpenAI client
 from openai import OpenAI
 
-from srt_translator.core.config.language_config import get_language_config
-from srt_translator.core.translator.srt_parser import SRTParser
-from srt_translator.core.translator.term_handler import TermHandler
-from srt_translator.core.utils.logging_setup import log_placeholder_issue
+# ---------------------------
+# Fallback functions (if imports fail)
+# ---------------------------
 
-# Import new utterance-based system components
-from .models import Subtitle, Utterance, ErrorPolicy, TranslationConfig
-from .language_config import LanguageConfig
-from .utterance_segmenter import UtteranceSegmenter
-from .utterance_translator import UtteranceTranslator
-from .reflow_engine import ReflowEngine
-from .utils import TranslationUtils
-
-# Update BAD_RESPONSE_PATTERNS to only check for the new phrase
-BAD_RESPONSE_PATTERNS = ["I cannot translate because"]
-
-
-def contains_bad_response(text, patterns=BAD_RESPONSE_PATTERNS):
-    text_lower = text.lower()
-    return any(pattern.lower() in text_lower for pattern in patterns)
-
-
-def extract_translation_failure_reason(ai_response):
-    prefix = "I cannot translate because"
-    if ai_response.lower().startswith(prefix.lower()):
-        return ai_response[len(prefix) :].strip(" .")
-    return ai_response
-
-
-def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
+def _safe_format_subtitle_text(
+    text: str,
+    start_s: float,
+    end_s: float,
+    lang_code: str,
+    cps_soft: int,
+    cps_hard: int,
+    allow_overshoot_pct: float = 0.10,
+) -> str:
     """
-    Check if target text equals source text after removing DNT terms.
-    This detects when the model returns untranslated content.
+    Safe fallback for subtitle formatting if the main formatter is unavailable.
+    Simple wrapper with basic line wrapping and CPS enforcement.
     """
-    if not src or not tgt:
-        return False
-    
-    # Normalize both texts for comparison
-    src_norm = src.strip().lower()
-    tgt_norm = tgt.strip().lower()
-    
-    # If they're identical, it's definitely untranslated
-    if src_norm == tgt_norm:
-        return True
-    
-    # Check if target equals source after removing DNT terms
-    # This catches cases where only DNT terms were preserved
-    src_without_dnt = src_norm
-    tgt_without_dnt = tgt_norm
-    
-    for dnt_term in dnt_terms:
-        if dnt_term:
-            dnt_norm = dnt_term.lower().strip()
-            src_without_dnt = src_without_dnt.replace(dnt_norm, "")
-            tgt_without_dnt = tgt_without_dnt.replace(dnt_norm, "")
-    
-    # Clean up whitespace
-    src_without_dnt = re.sub(r'\s+', ' ', src_without_dnt).strip()
-    tgt_without_dnt = re.sub(r'\s+', ' ', tgt_without_dnt).strip()
-    
-    # If they're identical after DNT removal, it's untranslated
-    return src_without_dnt == tgt_without_dnt
+    try:
+        return format_subtitle_text(
+            text, start_s, end_s, lang_code, cps_soft, cps_hard, allow_overshoot_pct
+        )
+    except Exception:
+        # Very basic fallback: wrap to ~42 chars/line and trim if > hard cap
+        duration = max(0.001, end_s - start_s)
+        cap = int(cps_hard * duration * (1.0 + allow_overshoot_pct))
+        clean = " ".join(text.split())
+        if len(clean) > cap:
+            clean = clean[:cap].rstrip()
 
+        # naive 2-line wrap
+        if len(clean) <= 42:
+            return clean
+        mid = clean.rfind(" ", 0, min(len(clean), 42))
+        if mid == -1:
+            mid = 42
+        return clean[:mid].rstrip() + "\n" + clean[mid:].lstrip()
+
+
+
+# ---------------------------
+# Data models
+# ---------------------------
+
+@dataclass
+class Subtitle:
+    idx: int
+    start: str  # "HH:MM:SS,mmm"
+    end: str    # "HH:MM:SS,mmm"
+    text: str
+
+@dataclass
+class TranslationConfiguration:
+    target_languages: Dict[str, str]                  # {"Spanish":"es", ...}
+    dnt_terms: List[str]
+    termbase: Dict[str, Dict[str, str]]               # {"es": {"term": "term"}, "zh-hans": {...}}
+    batch_size: int
+    aggressiveness: float
+    api_key: str
+    model_name: str = "gpt-4o-mini"
+    error_policy: str = "STRICT"                      # "STRICT" | "BOUNDED" | "DEV"
+    mode: str = "GUI"                                 # "GUI" | "CLI"
+
+# ---------------------------
+# Utilities
+# ---------------------------
+
+SRT_BLOCK_RE = re.compile(
+    r"^\s*(\d+)\s*\n"                                 # index
+    r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*"
+    r"(\d{2}:\d{2}:\d{2},\d{3})\s*\n"
+    r"(.*?)(?=\n{2,}|\Z)",                            # text
+    re.DOTALL | re.MULTILINE,
+)
+
+TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
+
+PH_RE = re.compile(r"__DNT_TERM_(\d+)__")
+
+def _parse_time_to_seconds(ts: str) -> float:
+    m = TIME_RE.match(ts)
+    if not m:
+        return 0.0
+    h = int(m.group("h")); m_ = int(m.group("m")); s = int(m.group("s")); ms = int(m.group("ms"))
+    return h * 3600 + m_ * 60 + s + ms / 1000.0
+
+def parse_srt(text: str) -> List[Subtitle]:
+    subs: List[Subtitle] = []
+    for m in SRT_BLOCK_RE.finditer(text):
+        idx = int(m.group(1))
+        start = m.group(2)
+        end = m.group(3)
+        body = m.group(4).strip("\n")
+        subs.append(Subtitle(idx=idx, start=start, end=end, text=body))
+    return subs
+
+def render_srt(subs: Sequence[Subtitle]) -> str:
+    parts: List[str] = []
+    for i, sub in enumerate(subs, start=1):
+        parts.append(str(i))
+        parts.append(f"{sub.start} --> {sub.end}")
+        parts.append(sub.text.strip())
+        parts.append("")  # blank line
+    return "\n".join(parts).rstrip() + "\n"
+
+def chunk(seq: Sequence[Any], n: int) -> List[List[Any]]:
+    return [list(seq[i:i+n]) for i in range(0, len(seq), n)]
+
+def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) -> str:
+    lang = lang_code.lower()
+    if not termbase or lang not in termbase:
+        return "(none)"
+    pairs = termbase[lang]
+    if not pairs:
+        return "(none)"
+    # Render as "source → target" lines
+    lines = [f"- {src} → {tgt}" for src, tgt in pairs.items()]
+    return "\n".join(lines)
+
+# DNT placeholder validation helpers
+def _extract_ph_ids(text: str, ph_regex: re.Pattern) -> Set[str]:
+    return set(ph_regex.findall(text or ""))
+
+def validate_placeholders_pair(
+    src_items: List[str],
+    tgt_items: List[str],
+    allowed_ids: Set[str],
+    ph_regex: re.Pattern,
+) -> Dict[int, Dict[str, Set[str]]]:
+    issues: Dict[int, Dict[str, Set[str]]] = {}
+    for i, (src, tgt) in enumerate(zip(src_items, tgt_items)):
+        src_ids = _extract_ph_ids(src, ph_regex)
+        tgt_ids = _extract_ph_ids(tgt, ph_regex)
+        invented = {pid for pid in tgt_ids if pid not in allowed_ids}
+        missing  = {pid for pid in src_ids if pid not in tgt_ids}
+        if invented or missing:
+            issues[i] = {"invented": invented, "missing": missing}
+    return issues
+
+def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.Pattern) -> str:
+    if not invented_ids:
+        return text
+    def _sub(m):
+        pid = m.group(1)
+        return "" if pid in invented_ids else m.group(0)
+    return ph_regex.sub(_sub, text or "")
+
+# ---------------------------
+# SRTTranslator
+# ---------------------------
 
 class SRTTranslator:
     def __init__(
         self,
-        dnt_terms=None,
-        termbase=None,
-        api_key=None,
-        logger=None,
+        dnt_terms: List[str],
+        termbase: Dict[str, Dict[str, str]],
+        api_key: str,
         allow_global_termbase_fallback: bool = False,
         model_name: str = "gpt-4o-mini",
         batch_size: int = 5,
-        # New utterance-based system configuration
-        languages_path: str = "languages.json",
-        error_policy: ErrorPolicy | str = ErrorPolicy.STRICT,
-        max_concurrency: int = 1,
-    ):
-        self.logger = logger or logging.getLogger(__name__)
-        self.allow_global_termbase_fallback = allow_global_termbase_fallback
-
-        # Require API key to be provided explicitly
-        if not api_key:
-            raise ValueError("OpenAI API key must be provided as parameter")
-        self.api_key = api_key
-
-        self.client = OpenAI(api_key=self.api_key)
-
-        # Use provided DNT terms and termbase or fall back to defaults
+        error_policy: str = "STRICT",
+        logger: Optional[logging.Logger] = None,
+        language_config: Optional[LanguageConfig] = None,
+    ) -> None:
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
+        self.allow_global_termbase_fallback = allow_global_termbase_fallback
         self.model_name = model_name
-        self.batch_size = batch_size
+        self.batch_size = max(1, int(batch_size))
+        self.error_policy = error_policy.upper()
+        self.logger = logger or logging.getLogger(__name__)
+        self.language_config = language_config or LanguageConfig()
 
-        # Initialize term handler with provided DNT terms and termbase
-        self.term_handler = TermHandler(dnt_terms=self.dnt_terms, termbase=self.termbase)
-        self.parser = SRTParser()
-
-        # Initialize new utterance-based system components
-        # Convert error_policy to enum if it's a string
-        if isinstance(error_policy, str):
-            try:
-                self._error_policy = ErrorPolicy(error_policy.upper())
-            except ValueError:
-                self.logger.warning(f"Invalid error_policy '{error_policy}', using STRICT")
-                self._error_policy = ErrorPolicy.STRICT
-        else:
-            self._error_policy = error_policy
-            
-        self._max_concurrency = max_concurrency
-        
-        # Language configuration for CPS caps and family defaults
-        self._language_config = LanguageConfig(languages_path)
-        
-        # Utterance processing components
-        self._utterance_segmenter = UtteranceSegmenter(self._language_config)
-        self._reflow_engine = ReflowEngine(self._language_config)
-        self._translation_utils = TranslationUtils(self.logger)
-        
-        # Translation configuration
-        self._translation_config = TranslationConfig(
-            error_policy=error_policy,
-            max_concurrency=max_concurrency
+        # Initialize TermHandler for DNT and termbase management
+        self.term_handler = TermHandler(
+            dnt_terms=self.dnt_terms,
+            termbase=self.termbase,
+            lang_code=None,  # Will be set per file/lang
+            logger=self.logger,
         )
-        
-        # Utterance translator (needs access to existing translation methods)
-        self._utterance_translator = UtteranceTranslator(self._translation_config, self.logger)
 
-        # Single-batch enforcement mechanism
-        self._batch_in_progress = False
-        self._translation_lock = threading.Lock()
+        if OpenAI is None:
+            raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
 
-        # Log configuration information
-        self.logger.info(
-            f"SRTTranslator initialized with {len(self.dnt_terms)} DNT terms"
+        self.client = OpenAI(api_key=api_key)
+
+    # ---------- Public API ----------
+
+    def translate_file(
+        self,
+        *,
+        input_filepath: str,
+        output_filepath: str,
+        target_lang: str,
+    ) -> None:
+        self.logger.info("Using subtitle-based translation system for %s → %s", os.path.basename(input_filepath), target_lang)
+
+        # 1) Load and parse SRT
+        with open(input_filepath, "r", encoding="utf-8") as f:
+            src_text = f.read()
+        src_subs = parse_srt(src_text)
+        if not src_subs:
+            raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
+
+        self.logger.info("Processing %d subtitles for %s", len(src_subs), os.path.basename(input_filepath))
+
+        # 2) Batch
+        batches = chunk(src_subs, self.batch_size)
+        all_tgt_subs: List[Subtitle] = []
+
+        # Language rules
+        cps_soft, cps_hard = self._get_cps_caps(target_lang)
+
+        for bi, batch in enumerate(batches, start=1):
+            self.logger.info("Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches))
+
+            # Preprocess: apply DNT placeholders on a per-subtitle basis
+            src_items = [self.term_handler.apply_dnt_placeholders(s.text) for s in batch]
+
+            # Call JSON batch
+            items = self._translate_batch_json(
+                src_items=src_items,
+                target_lang=target_lang,
+                termbase=self.termbase,
+                batch_ids=[s.idx for s in batch],
+            )
+
+            # Validate count
+            if len(items) != len(batch):
+                self.logger.warning("JSON batch count mismatch: expected %d, got %d", len(batch), len(items))
+                # Reformat pass (shape-only)
+                items = self._reformat_items_to_shape(
+                    raw_src=src_items,
+                    raw_ids=[s.idx for s in batch],
+                    raw_tgt_text="\n".join([it.get("tgt", "") for it in items]) if isinstance(items, list) else str(items),
+                    expected_count=len(batch),
+                )
+
+            # Extract and validate placeholder usage
+            tgt_texts = [it.get("tgt", "") for it in items]
+            allowed_ph_ids = {m.group(1) for ph in self.term_handler.placeholder_map.keys() for m in [self.term_handler.placeholder_regex.search(ph)] if m}
+            ph_issues = validate_placeholders_pair(src_items, tgt_texts, allowed_ph_ids, self.term_handler.placeholder_regex)
+
+            if ph_issues:
+                for idx, kinds in ph_issues.items():
+                    inv = ",".join(sorted(kinds["invented"])) or "-"
+                    mis = ",".join(sorted(kinds["missing"])) or "-"
+                    self.logger.warning("Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]", bi, idx, inv, mis)
+
+                if self.error_policy == "STRICT":
+                    fixed = self._reformat_fix_placeholders(
+                        src_items=src_items,
+                        tgt_items=tgt_texts,
+                        ids=[s.idx for s in batch],
+                        allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
+                    )
+                    if fixed is None:
+                        raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
+                    tgt_texts = fixed
+                elif self.error_policy in ("BOUNDED", "DEV"):
+                    # Remove invented; warn about missing but do not invent content.
+                    for i, kinds in ph_issues.items():
+                        if kinds["invented"]:
+                            tgt_texts[i] = strip_invented_placeholders(tgt_texts[i], kinds["invented"], self.term_handler.placeholder_regex)
+
+            # Restore DNT placeholders to originals
+            tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
+
+            # Empty guard (STRICT/BOUNDED behavior)
+            for i, (src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
+                if not tgt_raw.strip():
+                    msg = f"Empty translation for subtitle idx={batch[i].idx}"
+                    if self.error_policy == "STRICT":
+                        raise RuntimeError(msg)
+                    self.logger.warning("%s; falling back to source text (BOUNDED/DEV).", msg)
+                    tgt_texts[i] = src_raw
+
+            # Format per subtitle (CPS; line breaks)
+            for s, tgt in zip(batch, tgt_texts):
+                start_s = _parse_time_to_seconds(s.start)
+                end_s = _parse_time_to_seconds(s.end)
+                formatted = format_subtitle_text(
+                    lang_code=target_lang.lower(),
+                    text=tgt,
+                    start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
+                    end_ms=int(end_s * 1000),      # Convert seconds to milliseconds
+                    cps_soft=cps_soft,
+                    cps_hard=cps_hard,
+                    overshoot_pct=0.10,
+                )
+                all_tgt_subs.append(Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted))
+
+        # 3) Render and write
+        out_text = render_srt(all_tgt_subs)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write(out_text)
+
+        # Defer fixes to core.main; just log what we produced.
+        if self.logger:
+            self.logger.debug(
+                "Translated %s → %s (lang=%s). Placeholder restoration will run in core.main Fixer pass.",
+                os.path.basename(input_filepath), os.path.basename(output_filepath), target_lang
+            )
+
+        self.logger.info("Subtitle-based translation completed for %s", os.path.basename(input_filepath))
+        return True
+
+    # ---------- Core calls ----------
+
+    def _translate_batch_json(
+        self,
+        *,
+        src_items: List[str],
+        target_lang: str,
+        termbase: Dict[str, Dict[str, str]],
+        batch_ids: List[int],
+    ) -> List[Dict[str, Any]]:
+        """
+        Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
+        One item per input, same order and ids.
+        """
+        termbase_block = build_termbase_block(termbase, target_lang)
+        mapped_target_lang = target_lang
+
+        system_prompt = (
+            "You are a professional subtitle translator. "
+            "Return valid JSON ONLY, never prose."
         )
-        self.logger.info(
-            f"SRTTranslator initialized with termbase for {len(self.termbase)} languages"
+
+        # The translation rules here preserve the core behavior you've tuned:
+        user_prompt = f"""Translate each item to {mapped_target_lang}. Keep 1:1 count and order.
+
+TERMINOLOGY:
+Use these business term mappings when present (source → target). If "(none)", ignore:
+{termbase_block}
+
+DNT PLACEHOLDERS:
+- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.
+- Do not invent or drop placeholders.
+- Never invent __DNT_TERM_n__ placeholders. Only preserve those already present in the input.
+
+STRUCTURE:
+- Return JSON ONLY as: {{"items":[{{"id":<int>,"tgt":"..."}}, ...]}}
+- The "items" array MUST have exactly {len(src_items)} objects.
+- Use the provided ids 1:1 with the inputs below. Do not merge or split.
+- Do not include SRT timestamps in the output. Only JSON.
+
+STYLE:
+- Natural, fluent translation.
+- Numbers: keep digits; localize formatting where normal. No rounding.
+- No added/removed content.
+
+INPUT ITEMS:
+{self._render_items_for_prompt(batch_ids, src_items)}
+"""
+        # Use JSON mode if available; otherwise rely on instruction.
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            # Some clients support JSON mode; if your SDK doesn't, remove this line.
+            response_format={"type": "json_object"},  # harmless if unsupported
         )
+        content = (resp.choices[0].message.content or "").strip()
+
+        try:
+            data = json.loads(content)
+            items = data.get("items", [])
+            # Normalize ids to int; ensure shape
+            norm = []
+            for obj in items:
+                oid = obj.get("id")
+                if isinstance(oid, str) and oid.isdigit():
+                    oid = int(oid)
+                norm.append({"id": oid, "tgt": obj.get("tgt", "")})
+            return norm
+        except Exception:
+            # If the model ignored JSON mode, attempt a quick reformat pass.
+            self.logger.warning("Model did not return JSON; attempting shape reformat.")
+            items = self._reformat_items_to_shape(
+                raw_src=src_items,
+                raw_ids=batch_ids,
+                raw_tgt_text=content,
+                expected_count=len(src_items),
+            )
+            return items
+
+    def _reformat_items_to_shape(
+        self,
+        *,
+        raw_src: List[str],
+        raw_ids: List[int],
+        raw_tgt_text: str,
+        expected_count: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Shape-only pass: do not change wording, only produce the required
+        JSON with exactly expected_count items and the given ids.
+        """
+        sys = "You are a text formatter. Do not translate; only reformat."
+        prompt = f"""Reformat the given translations to valid JSON ONLY.
+
+RULES:
+- Keep wording EXACTLY the same as provided; do not translate or edit text.
+- Return JSON ONLY as: {{"items":[{{"id":<int>,"tgt":"..."}}, ...]}}
+- MUST have exactly {expected_count} items.
+- Use ids in this order: {raw_ids}.
+- Do not merge or split content across items; assign the nearest content to each id.
+
+SOURCE ITEMS (id → source):
+{self._render_items_for_prompt(raw_ids, raw_src)}
+
+TRANSLATED TEXT (to reformat, do NOT translate):
+{raw_tgt_text}
+"""
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "system", "content": sys},
+                      {"role": "user", "content": prompt}],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        content = (resp.choices[0].message.content or "").strip()
+        data = json.loads(content)
+        items = data.get("items", [])
+        if len(items) != expected_count:
+            raise RuntimeError(f"Reformat still mismatched: expected {expected_count}, got {len(items)}")
+        norm = []
+        for oid, obj in zip(raw_ids, items):
+            # force ids to expected order
+            norm.append({"id": oid, "tgt": obj.get("tgt", "")})
+        return norm
+
+    def _reformat_fix_placeholders(
+        self,
+        *,
+        src_items: List[str],
+        tgt_items: List[str],
+        ids: List[int],
+        allowed_placeholders: List[str],
+    ) -> Optional[List[str]]:
+        """
+        Ask model to remove invented placeholders and restore any missing ones
+        that appear in the corresponding source item.
+        """
+        sys = "You are a strict placeholder fixer. Do not translate; only adjust placeholders."
+        prompt = f"""Fix placeholders ONLY. Do not change wording except to:
+- Remove any placeholders NOT in this allowed list: {allowed_placeholders}
+- If a source item contains a placeholder, the same placeholder MUST appear in that target item.
+- Keep the same number of items, same ids, same order.
+- Return JSON ONLY: {{"items":[{{"id":<int>,"tgt":"..."}}, ...]}}
+
+SOURCE ITEMS:
+{self._render_items_for_prompt(ids, src_items)}
+
+TARGET ITEMS (TO FIX):
+{self._render_items_for_prompt(ids, tgt_items)}
+"""
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "system", "content": sys},
+                      {"role": "user", "content": prompt}],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        content = (resp.choices[0].message.content or "").strip()
+        try:
+            data = json.loads(content)
+            items = data.get("items", [])
+            if len(items) != len(ids):
+                return None
+            return [obj.get("tgt", "") for obj in items]
+        except Exception:
+            return None
+
+    # ---------- Helpers ----------
+
+    def _get_cps_caps(self, lang_code: str) -> Tuple[int, int]:
+        try:
+            caps = self.language_config.get_cps_caps(lang_code)
+            # Expecting (soft, hard). If your method returns a dict, adapt here.
+            if isinstance(caps, (list, tuple)) and len(caps) == 2:
+                return int(caps[0]), int(caps[1])
+            if isinstance(caps, dict):
+                return int(caps.get("cps_soft", 16)), int(caps.get("cps_hard", 18))
+        except Exception:
+            pass
+        return (16, 18)  # sensible defaults
 
     @staticmethod
-    def debug_log_config(
-        cfg, logger=None, *, full_termbase=False, max_langs=12, max_terms_per_lang=8
-    ):
+    def _render_items_for_prompt(ids: List[int], texts: List[str]) -> str:
+        rows = []
+        for i, t in zip(ids, texts):
+            # One line per item; escape braces lightly for JSON-mode friendliness
+            clean = t.replace("\n", " ").strip()
+            rows.append(f"{i}) {clean}")
+        return "\n".join(rows)
+
+    @staticmethod
+    def debug_log_config(cfg, logger=None, *, full_termbase=False, max_langs=12, max_terms_per_lang=8):
         """
         Emit a redacted, human-friendly config snapshot at DEBUG level.
         - full_termbase=False prints a per-language summary with samples.
@@ -229,976 +593,3 @@ class SRTTranslator:
             lines.append("Termbase: (none)")
 
         log.debug("\n".join(lines))
-
-    def get_translation_prompt(self, target_lang):
-        """Get the translation prompt for single subtitle translation (fallback only)"""
-        # For single subtitle translation, we need to create a dummy batch with one subtitle
-        # This is only used as fallback when batch translation fails
-        dummy_batch = [type("Subtitle", (), {"content": ""})()]
-        termbase_block = self._format_termbase_block(target_lang, dummy_batch)
-        mapped_target_lang = target_lang
-        return self._get_builtin_prompt(mapped_target_lang, termbase_block)
-
-    def _format_termbase_block(self, target_lang, batch_content):
-        """Format termbase terms for injection into prompt"""
-        return self._format_termbase_block_smart(target_lang, batch_content)
-
-    def _format_termbase_block_smart(self, target_lang, batch_content):
-        """Filter termbase to only include terms present in current batch"""
-        # Get filtered termbase with DNT precedence enforced
-        filtered_termbase = self.term_handler.get_filtered_termbase()
-        
-        # Get relevant terms for this batch
-        batch_text = " ".join([sub.content for sub in batch_content])
-        relevant_terms = self.term_handler.relevant_termbase(batch_text)
-        
-        if not relevant_terms:
-            return "No specific termbase terms for this content."
-
-        return "\n".join(
-            [f'- "{en}" → "{trans}"' for en, trans in relevant_terms.items()]
-        )
-
-    def _get_builtin_prompt(self, target_lang, termbase_block):
-        """Built-in fallback prompt with termbase injection"""
-        return f"""You are a professional translator. Translate the following text to {target_lang}.
-
-BUSINESS TERMINOLOGY: When you see these specific business terms, use these translations:
-{termbase_block}
-
-PLACEHOLDER RULES:
-1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written - DO NOT translate them back to the original terms
-2. Do NOT create any new placeholders
-3. Do NOT replace normal words with placeholders
-4. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your translation exactly as __DNT_TERM_0__
-
-TRANSLATION APPROACH:
-- Translate ALL text naturally and completely
-- Use the business terminology above when those specific terms appear
-- For all other words, use standard translation practices
-- Preserve all formatting and punctuation
-- Do not skip or omit any content unless it is genuinely untranslatable
-- Numbers: keep digits; localize formatting; no rounding.
-
-ERROR HANDLING:
-Only refuse translation if the text is genuinely untranslatable (corrupted, inappropriate content, etc.).
-If you cannot translate, respond EXACTLY: "I cannot translate because [specific reason]"
-
-Examples:
-- "Hello __DNT_TERM_0__ world" → "你好 __DNT_TERM_0__ 世界"
-- "The operating plan shows results" → "运营计划显示结果" (using termbase)
-- "They met at the time" → "他们当时见面了" (normal translation)
-
-Translate completely and naturally."""
-
-    def get_batch_translation_prompt(self, target_lang, batch_content):
-        termbase_block = self._format_termbase_block(target_lang, batch_content)
-        mapped_target_lang = target_lang
-
-        return f"""You are a professional translator. Translate the following SRT subtitles to {mapped_target_lang}.
-
-BUSINESS TERMINOLOGY:
-When you see these specific business terms, use these translations:
-{termbase_block}
-
-SRT STRUCTURE RULES:
-1. Preserve subtitle numbering and timestamps exactly as shown.
-2. Return one translated subtitle for each original — do not merge, split, or skip subtitles.
-3. Keep the structure and order of subtitles exactly as provided.
-
-TRANSLATION RULES:
-1. Translate all subtitle text completely and naturally.
-2. Use the business terminology provided above when terms appear.
-3. For all other content, use standard professional translation practices.
-4. Do not add or remove any content, punctuation, or formatting unless necessary to complete the translation.
-5. Numbers: keep digits; localize formatting; no rounding.
-
-PLACEHOLDER RULES:
-1. If you see __DNT_TERM_X__ placeholders, keep them EXACTLY as written — do not translate or modify them.
-2. Do not invent new placeholders.
-3. CRITICAL: Placeholders like __DNT_TERM_0__ must appear in your output exactly as __DNT_TERM_0__.
-
-ERROR HANDLING:
-Only refuse to translate if content is truly untranslatable. If so, return: "I cannot translate because [specific reason]"
-
-Return a complete, valid SRT block with the same subtitle count, structure, and timestamps as the input.
-"""
-
-    def translate_subtitle(
-        self, text, target_lang, filename, subtitle_number=None, summary=None
-    ):
-        """Translate a single subtitle text"""
-        # Use unified language config (no mapping needed for standard ISO codes)
-        mapped_target_lang = target_lang
-
-        try:
-            time.sleep(0.5)
-            processed_text, term_map = self.term_handler.replace_dnt_terms(text)
-
-            system_prompt = self.get_translation_prompt(target_lang)
-
-            max_retries = 2
-            retries = 0
-            final_text = ""
-            while retries <= max_retries:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": processed_text},
-                    ],
-                    temperature=0.1,  # Lower temperature for more consistent behavior
-                )
-                translated_text = response.choices[0].message.content
-                if translated_text is None:
-                    raise ValueError("OpenAI response content is None")
-                translated_text = translated_text.strip()
-                final_text = self.term_handler.restore_dnt_terms(
-                    translated_text,
-                    term_map,
-                    filename,
-                    subtitle_number=subtitle_number,
-                    target_lang=target_lang,
-                )
-                if not contains_bad_response(final_text):
-                    break
-                logging.warning(
-                    f"Translation refused at index {subtitle_number} in file {filename}. "
-                    f"Retrying (attempt {retries + 1}/{max_retries + 1}). "
-                    f"Reason: '{extract_translation_failure_reason(final_text)}'"
-                )
-                retries += 1
-            if contains_bad_response(final_text):
-                failure_reason = extract_translation_failure_reason(final_text)
-                # Log the prompt and model response for debugging
-                logging.info(
-                    f"\n--- SINGLE TRANSLATION ERROR PROMPT for {filename} (subtitle {subtitle_number}) ---\nSYSTEM PROMPT:\n{system_prompt}\nUSER MESSAGE (processed_text):\n{processed_text}\n--- MODEL RESPONSE ---\n{final_text}\n--- END ERROR LOG ---\n"
-                )
-                logging.error(
-                    f"""
-{"=" * 80}
-SINGLE TRANSLATION FAILURE - INSTRUCTOR ACTION NEEDED
-{"=" * 80}
-SUMMARY: OpenAI refused to translate single subtitle after {max_retries + 1} attempts
-
-COPY THIS ENTIRE SECTION TO AN AI CHAT FOR HELP:
-----------------------------------------
-File: {filename}
-Subtitle Number: {subtitle_number}
-Target Language: {target_lang}
-
-ORIGINAL TEXT:
-\"{text}\"
-
-AI REFUSAL MESSAGE:
-\"{final_text}\"
-
-EXTRACTED REASON:
-\"{failure_reason}\"
-
-QUESTION FOR AI CHAT:
-\"I'm translating educational content about business operations. The AI translator
-refused to translate the above subtitle. The original text is educational content
-about Amazon's business practices. Why might the AI refuse this translation and
-how can I modify the text to make it translatable while preserving the educational
-value? Please suggest an alternative wording that would be acceptable.\"
-
-TECHNICAL DETAILS:
-- Translation attempts: {max_retries + 1}
-- Model: {self.model_name}
-- Processed text sent to AI: \"{processed_text}\"
-- Full AI response: \"{final_text}\"
-----------------------------------------
-
-RESULT: Subtitle left untranslated to mark failure.
-{"=" * 80}
-"""
-                )
-                if summary is not None and isinstance(summary, dict):
-                    summary["bad_translations"] = summary.get("bad_translations", 0) + 1
-                return final_text  # Keep the AI refusal message in the SRT output
-
-            # Check for phantom placeholders (AI hallucinations) and remove them
-            phantom_placeholders = re.findall(r"__DNT_TERM_\d+__", final_text)
-            for phantom in phantom_placeholders:
-                if phantom not in term_map:
-                    logging.warning(
-                        f"""
-==================================================
-PHANTOM PLACEHOLDER DETECTED:
-File: {filename}
-Subtitle Number: {subtitle_number}
-Language: {target_lang}
-Phantom Placeholder: {phantom}
-Original Text: {text}
-Translated Text: {final_text}
-Status: AI Hallucination - Remove this placeholder
-==================================================
-"""
-                    )
-                    # Remove hallucinated placeholder from output
-                    final_text = final_text.replace(phantom, "")
-            # Tidy whitespace after removals
-            final_text = re.sub(r"\s{2,}", " ", final_text).strip()
-
-            # Check for untranslated content after DNT restoration
-            if is_untranslated_after_dnt(text, final_text, self.dnt_terms):
-                self.logger.warning(
-                    f"Untranslated content detected in {filename} subtitle {subtitle_number}. "
-                    f"Retrying with micro-context..."
-                )
-                
-                # Try to retry with micro-context using batch translator
-                try:
-                    retry_text = self._retry_with_micro_context(
-                        text, target_lang, filename, subtitle_number, summary
-                    )
-                    if retry_text and not is_untranslated_after_dnt(text, retry_text, self.dnt_terms):
-                        self.logger.info(f"Micro-context retry successful for subtitle {subtitle_number}")
-                        final_text = retry_text
-                    else:
-                        self.logger.warning(f"Micro-context retry failed for subtitle {subtitle_number}")
-                except Exception as e:
-                    self.logger.error(f"Error during micro-context retry: {e}")
-
-            placeholder_issues = self._check_placeholder_issues(
-                text, final_text, term_map, target_lang, filename, subtitle_number
-            )
-
-            if placeholder_issues:
-                for issue in placeholder_issues:
-                    log_placeholder_issue(issue["type"], issue)
-
-            # ADDED: Warn if a non-empty source subtitle becomes empty after translation
-            if text.strip() and not final_text.strip():
-                logging.warning(
-                    f"Subtitle at index {subtitle_number} in file {filename} became empty after translation. "
-                    f"Original: '{text}'"
-                )
-
-            return final_text
-        except Exception as e:
-            logging.error(
-                f"Translation error for file '{filename}', subtitle {subtitle_number}, text '{text}': {e}"
-            )
-            return text
-
-    def _check_placeholder_issues(
-        self,
-        original_text,
-        translated_text,
-        term_map,
-        target_lang,
-        filename,
-        subtitle_number=None,
-    ):
-        """
-        Check for issues with placeholders in translated text.
-
-        This method validates that DNT (Do Not Translate) terms were properly preserved
-        during translation by checking for two types of issues:
-        1. Missing placeholders - DNT terms that were completely removed
-        2. Position mismatches - DNT terms that moved to different contexts
-
-        Args:
-            original_text: The source text before translation
-            translated_text: The translated text to check
-            term_map: Dictionary mapping placeholders to original terms
-            target_lang: Target language code
-            filename: Source filename for logging
-            subtitle_number: Subtitle number for logging
-
-        Returns:
-            List of issue dictionaries with details about placeholder problems
-        """
-        issues = []
-
-        # Check each DNT term that was replaced with a placeholder
-        for placeholder, original_term in term_map.items():
-            # Issue 1: Missing placeholder - DNT term was completely removed
-            if placeholder not in translated_text:
-                issues.append(
-                    {
-                        "type": "missing_placeholder",
-                        "fixable": True,  # Can be fixed by re-adding the placeholder
-                        "reason_description": "The placeholder is missing in the translated text.",
-                        "filename": filename,
-                        "subtitle_number": subtitle_number,
-                        "language": target_lang,
-                        "placeholder": placeholder,
-                        "original_term": original_term,
-                        "original_text": original_text,
-                        "translated_text": translated_text,
-                    }
-                )
-                # Auto-fix: Add placeholder back to the beginning
-                translated_text = f"{placeholder} {translated_text}"
-            else:
-                # Issue 2: Position mismatch - DNT term moved to different context
-                # Get the surrounding context (words before/after) for both original and translated
-                original_context = self.term_handler.get_context(
-                    original_text, original_term
-                )
-                translated_context = self.term_handler.get_context(
-                    translated_text, placeholder
-                )
-
-                # Check if contexts are similar (same surrounding words)
-                if (
-                    original_context
-                    and translated_context
-                    and not self.term_handler.check_context_similarity(
-                        original_context, translated_context
-                    )
-                ):
-                    issues.append(
-                        {
-                            "type": "position_mismatch",
-                            "fixable": False,  # Requires human review due to sentence structure changes
-                            "reason_description": (
-                                "The placeholder position in the translated text does not match its "
-                                "original context, likely due to sentence structure changes."
-                            ),
-                            "filename": filename,
-                            "subtitle_number": subtitle_number,
-                            "language": target_lang,
-                            "placeholder": placeholder,
-                            "original_term": original_term,
-                            "original_context": original_context,
-                            "translated_context": translated_context,
-                        }
-                    )
-
-        return issues
-
-    def batch_translate_file(self, input_filepath, output_filepath, target_lang):
-        """
-        Translate an entire SRT file using sentence-aware batching for efficiency and context preservation.
-
-        This method processes SRT files in sentence-aware chunks rather than individual subtitles
-        to maintain context between related subtitles and improve translation quality.
-
-        Args:
-            input_filepath: Path to source SRT file
-            output_filepath: Path for translated SRT file
-            target_lang: Target language code
-
-        Raises:
-            RuntimeError: If another translation batch is already in progress
-        """
-        # Single-batch enforcement check
-        if self._batch_in_progress:
-            raise RuntimeError(
-                "Translation already in progress. Only one batch can run at a time. "
-                "Wait for the current translation to complete before starting another."
-            )
-
-        filename = os.path.basename(input_filepath)
-
-        # Acquire lock and set batch state
-        with self._translation_lock:
-            self._batch_in_progress = True
-            try:
-                # Parse the SRT file into subtitle objects
-                subtitles = self.parser.parse_file(input_filepath)
-
-                if not subtitles:
-                    logging.warning(
-                        f"No subtitles found in {input_filepath}. Skipping translation."
-                    )
-                    return
-
-                # Sort and reindex subtitles to ensure proper order
-                subtitles = list(srt.sort_and_reindex(subtitles))
-
-                # Process subtitles in sentence-aware batches for better context and efficiency
-                translated_subtitles = []
-                total = len(subtitles)
-
-                # Create sentence-aware batches for better context and efficiency
-                logging.info(
-                    f"Using sentence-aware batching for {filename} to {target_lang}"
-                )
-                subtitle_batches = self._create_batches(
-                    subtitles,
-                    soft_limit=self.batch_size,
-                    hard_limit=8,
-                    target_lang=target_lang,
-                )
-
-                logging.info(
-                    f"Starting batch translation of {filename} to {target_lang} with {len(subtitle_batches)} batches"
-                )
-
-                # Process each batch of subtitles
-                for batch_index, batch in enumerate(subtitle_batches):
-                    batch_srt = srt.compose(batch)
-
-                    self.logger.info(
-                        f"Translating batch {batch_index + 1}/{len(subtitle_batches)} (subtitles {batch[0].index}-{batch[-1].index})"
-                    )
-
-                    # Translate the entire batch as one unit
-                    translated_batch_srt, prompt = self.translate_srt_block(
-                        batch_srt, target_lang, filename, batch[0].index, batch
-                    )
-
-                    # Error handling: Check if batch translation failed completely
-                    if contains_bad_response(translated_batch_srt):
-                        self.logger.warning(
-                            f"Batch translation failed for batch starting at index {batch[0].index}. Reason: {extract_translation_failure_reason(translated_batch_srt)}"
-                        )
-                        self.logger.info(
-                            f"\n--- BATCH TRANSLATION ERROR PROMPT for {filename} (batch starting at subtitle {batch[0].index}) ---\n{prompt}\n--- MODEL RESPONSE ---\n{translated_batch_srt}\n--- END ERROR LOG ---\n"
-                        )
-
-                        # Fallback strategy: Translate each subtitle individually
-                        self.logger.info(
-                            f"Falling back to single subtitle translation for batch {batch_index + 1}"
-                        )
-                        for sub in batch:
-                            sub.content = self.translate_subtitle(
-                                sub.content, target_lang, filename, sub.index
-                            )
-                            translated_subtitles.append(sub)
-                        continue
-
-                    # Clean up the translated SRT output
-                    translated_batch_srt = clean_srt_output(translated_batch_srt)
-
-                    # Quality check: Detect phantom placeholders (AI hallucinations)
-                    # These are placeholders that appear in translation but weren't in the original
-                    phantom_placeholders = re.findall(
-                        r"__DNT_TERM_\d+__", translated_batch_srt
-                    )
-                    batch_term_map = getattr(self, "_last_batch_term_map", {})
-                    for phantom in phantom_placeholders:
-                        if phantom not in batch_term_map:
-                            self.logger.warning(
-                                f"""
-==================================================
-PHANTOM PLACEHOLDER DETECTED IN BATCH:
-File: {filename}
-Batch: {batch_index + 1} (subtitles {batch[0].index}-{batch[-1].index})
-Language: {target_lang}
-Phantom Placeholder: {phantom}
-Status: AI Hallucination in batch translation - Remove this placeholder
-==================================================
-"""
-                            )
-                            # Remove hallucinated placeholder from batch output before parsing
-                            translated_batch_srt = translated_batch_srt.replace(
-                                phantom, ""
-                            )
-                    # Tidy whitespace after removals (basic)
-                    translated_batch_srt = re.sub(
-                        r"[ \t]{2,}", " ", translated_batch_srt
-                    )
-                    try:
-                        translated_batch = list(srt.parse(translated_batch_srt))
-
-                        # ALWAYS use redistribution for consistent boundary clamping
-                        redistributed_batch = self._redistribute_subtitles(
-                            batch, translated_batch, filename, batch[0].index
-                        )
-                        
-                        # Log subtitle count differences and adjustments made
-                        original_count = len(batch)
-                        translated_count = len(translated_batch)
-                        redistributed_count = len(redistributed_batch)
-                        
-                        if translated_count != original_count:
-                            self.logger.info(
-                                f"SUBTITLE COUNT ADJUSTMENT in {filename} batch {batch_index + 1}: "
-                                f"sent {original_count} → returned {translated_count} → redistributed {redistributed_count}"
-                            )
-                            if translated_count < original_count:
-                                self.logger.info(
-                                    f"  → Fewer subtitles returned: spread {translated_count} across {original_count} slots "
-                                    f"with even timing distribution"
-                                )
-                            elif translated_count > original_count:
-                                self.logger.info(
-                                    f"  → More subtitles returned: merged {translated_count} into {original_count} slots "
-                                    f"keeping original timing"
-                                )
-                        
-                        translated_subtitles.extend(redistributed_batch)
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to parse translated SRT batch at index {batch[0].index}: {e}"
-                        )
-                        # Log the prompt and model response for debugging
-                        self.logger.info(
-                            f"\n--- BATCH PARSING EXCEPTION for {filename} "
-                            f"(batch starting at subtitle {batch[0].index}) ---\n"
-                            f"EXCEPTION: {e}\nPROMPT:\n{prompt}\n"
-                            f"--- MODEL RESPONSE ---\n{translated_batch_srt}\n"
-                            f"--- END ERROR LOG ---\n"
-                        )
-                        for sub in batch:
-                            sub.content = self.translate_subtitle(
-                                sub.content, target_lang, filename, sub.index
-                            )
-                            translated_subtitles.append(sub)
-
-                # Filter out empty subtitles and reindex for clean output
-                final_subtitles = []
-                for subtitle in translated_subtitles:
-                    if subtitle.content.strip():  # Only keep subtitles with content
-                        final_subtitles.append(subtitle)
-
-                # Reindex the final subtitles to ensure sequential numbering
-                final_subtitles = list(srt.sort_and_reindex(final_subtitles))
-
-                # Log final subtitle count summary
-                original_total = sum(len(batch) for batch in subtitle_batches)
-                self.logger.info(
-                    f"FINAL SUBTITLE SUMMARY for {filename}: "
-                    f"original {original_total} → final {len(final_subtitles)} subtitles "
-                    f"(filtered from {len(translated_subtitles)} total)"
-                )
-
-                # Log timing boundaries for verification
-                if final_subtitles:
-                    self.logger.info(
-                        f"Final timing boundaries: {final_subtitles[0].start} --> {final_subtitles[-1].end}"
-                    )
-
-                self.parser.write_file(output_filepath, final_subtitles)
-                self.logger.info(f"Translated SRT saved to: {output_filepath}")
-                return output_filepath
-            finally:
-                # Always reset batch state when translation completes
-                self._batch_in_progress = False
-
-    def translate_srt_block(
-        self, srt_block, target_lang, filename, batch_start_index, batch_content
-    ):
-        """Translate a block of SRT subtitles as a batch."""
-        # Process DNT terms for the entire SRT block
-        processed_srt_block, term_map = self.term_handler.replace_dnt_terms(srt_block)
-
-        # Store term_map for phantom detection (hacky but works)
-        self._last_batch_term_map = term_map
-
-        prompt = self.get_batch_translation_prompt(target_lang, batch_content)
-        full_prompt = f"{prompt}\n\n{processed_srt_block}"
-
-        time.sleep(0.5)  # Respect rate limits
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "user", "content": full_prompt},
-            ],
-            temperature=0.1,
-        )
-
-        translated_srt = response.choices[0].message.content
-        if translated_srt is None:
-            raise ValueError("OpenAI response content is None")
-        translated_srt = translated_srt.strip()
-
-        # Restore DNT terms in the translated SRT block
-        restored_srt = self.term_handler.restore_dnt_terms(
-            translated_srt,
-            term_map,
-            filename,
-            subtitle_number=f"batch_{batch_start_index}",
-            target_lang=target_lang,
-        )
-
-        return restored_srt, full_prompt
-
-    def _create_batches(
-        self,
-        subtitles: List[srt.Subtitle],
-        soft_limit: int,
-        hard_limit: int,
-        target_lang: str,
-    ) -> List[List[srt.Subtitle]]:
-        """
-        Create sentence-aware batches that respect sentence boundaries while staying within size limits.
-
-        This method groups subtitles into batches that end at natural sentence boundaries
-        when possible, improving translation context and quality.
-
-        Args:
-            subtitles: List of subtitle objects to batch
-            soft_limit: Target batch size (preferred)
-            hard_limit: Maximum batch size (absolute limit)
-            target_lang: Target language code for language-specific rules
-
-        Returns:
-            List of subtitle batches
-        """
-        if not subtitles:
-            return []
-
-        batches = []
-        current_batch = []
-
-        # Get language-specific sentence boundary rules
-        language_config = get_language_config()
-        lang_rules = language_config.get_language_rules(target_lang)
-        sentence_endings = tuple(lang_rules["sentence_endings"])
-        break_markers = lang_rules["break_markers"]
-
-        for subtitle in subtitles:
-            current_batch.append(subtitle)
-
-            # Check if we've hit the hard limit
-            if len(current_batch) >= hard_limit:
-                batches.append(current_batch)
-                current_batch = []
-                continue
-
-            # Check if we've hit the soft limit and can break at a sentence boundary
-            if len(current_batch) >= soft_limit:
-                # Look for sentence endings in the current subtitle's content
-                content = subtitle.content.strip()
-                if any(content.endswith(ending) for ending in sentence_endings):
-                    batches.append(current_batch)
-                    current_batch = []
-
-        # Add any remaining subtitles
-        if current_batch:
-            batches.append(current_batch)
-
-        return batches
-
-    def _retry_with_micro_context(
-        self, text: str, target_lang: str, filename: str, subtitle_number: int, summary: dict = None
-    ) -> str:
-        """
-        Retry translation with micro-context (prev, current, next) using batch translator.
-        This is a quality improvement that doesn't affect timing.
-        """
-        try:
-            # Create a minimal batch with just the current subtitle
-            # This gives the model some context without changing the batch structure
-            current_subtitle = srt.Subtitle(
-                index=subtitle_number,
-                start=srt.Subtitle.parse_time("00:00:00,000"),
-                end=srt.Subtitle.parse_time("00:00:05,000"),
-                content=text
-            )
-            
-            # Create a minimal batch
-            mini_batch = [current_subtitle]
-            
-            # Get relevant termbase for this text
-            relevant_tb = self.term_handler.relevant_termbase(text)
-            
-            # Create a simple batch prompt for retry
-            retry_prompt = f"""Translate this subtitle to {target_lang}. 
-            Keep the same timing and format. Only translate the text content.
-            
-            {text}"""
-            
-            # Use the batch translation approach for consistency
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "user", "content": retry_prompt},
-                ],
-                temperature=0.1,
-            )
-            
-            retry_text = response.choices[0].message.content
-            if retry_text is None:
-                return None
-                
-            retry_text = retry_text.strip()
-            
-            # Process DNT terms for the retry
-            processed_text, term_map = self.term_handler.replace_dnt_terms(text)
-            retry_text = self.term_handler.restore_dnt_terms(
-                retry_text, term_map, filename, subtitle_number, target_lang
-            )
-            
-            return retry_text
-            
-        except Exception as e:
-            self.logger.error(f"Error in micro-context retry: {e}")
-            return None
-
-    def _redistribute_subtitles(
-        self, original_batch, translated_batch, filename, batch_start_index
-    ):
-        """Redistribute translated content across original timing slots, clamped to batch boundaries, no blanks."""
-        original_count = len(original_batch)
-        translated_count = len(translated_batch)
-
-        batch_start_time = original_batch[0].start
-        batch_end_time = original_batch[-1].end
-        redistributed = []
-
-        # Edge case: no translations returned
-        if translated_count == 0:
-            logging.info(
-                f"No translations returned for batch {batch_start_index} of {filename}, emitting nothing."
-            )
-            return redistributed
-
-        # Case 1: counts match → keep AI timing/content, then clamp batch edges
-        if translated_count == original_count:
-            for orig, trans in zip(original_batch, translated_batch):
-                redistributed.append(
-                    srt.Subtitle(
-                        index=orig.index,
-                        start=trans.start,
-                        end=trans.end,
-                        content=trans.content.strip(),
-                    )
-                )
-            # clamp edges
-            redistributed[0].start = batch_start_time
-            redistributed[-1].end = batch_end_time
-            logging.info(
-                f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}"
-            )
-            logging.info(
-                f"REDISTRIBUTION DETAILS for {filename}: 1:1 mapping with clamped edges"
-            )
-            return redistributed
-
-        # Case 2: fewer translations than original → spread evenly across whole batch, no blanks
-        if translated_count < original_count:
-            total = batch_end_time - batch_start_time
-            slot = total / translated_count
-
-            for i in range(translated_count):
-                t_start = batch_start_time + i * slot
-                t_end = batch_start_time + (i + 1) * slot
-                redistributed.append(
-                    srt.Subtitle(
-                        index=original_batch[i].index,  # preserve first N indices
-                        start=t_start,
-                        end=t_end,
-                        content=translated_batch[i].content.strip(),
-                    )
-                )
-
-            # clamp edges (defensive)
-            redistributed[0].start = batch_start_time
-            redistributed[-1].end = batch_end_time
-
-            logging.info(
-                f"Redistributed {translated_count} translations across {original_count} original slots "
-                f"(emitted {translated_count}; no blanks) in batch {batch_start_index} of {filename}."
-            )
-            logging.info(
-                f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}"
-            )
-            logging.debug(
-                f"REDISTRIBUTION DETAILS for {filename}: even time slices = {[str(sub.end - sub.start) for sub in redistributed]}"
-            )
-            return redistributed
-
-        # Case 3: more translations than original → merge into original slots, keep original slot timing
-        translations_per_slot = translated_count / original_count
-        ti = 0
-        for i in range(original_count):
-            take = int(translations_per_slot) + (
-                1 if i < (translated_count % original_count) else 0
-            )
-            chunk = []
-            for _ in range(take):
-                if ti < translated_count:
-                    chunk.append(translated_batch[ti].content.strip())
-                    ti += 1
-            # keep original timing for slot i
-            redistributed.append(
-                srt.Subtitle(
-                    index=original_batch[i].index,
-                    start=original_batch[i].start,
-                    end=original_batch[i].end,
-                    content=(
-                        "\n".join(c for c in chunk if c)
-                    ),  # newline separator reads better
-                )
-            )
-
-        # clamp edges (defensive)
-        redistributed[0].start = batch_start_time
-        redistributed[-1].end = batch_end_time
-        logging.info(
-            f"Merged {translated_count} translations into {original_count} original slots (kept original timing) "
-            f"in batch {batch_start_index} of {filename}."
-        )
-        logging.info(
-            f"BATCH BOUNDARY ENFORCED for {filename}: {batch_start_time} → {batch_end_time}"
-        )
-        logging.debug(
-            f"REDISTRIBUTION DETAILS for {filename}: content lengths = {[len(s.content) for s in redistributed]}"
-        )
-        return redistributed
-
-    def translate_with_utterances(self, input_filepath, output_filepath, target_lang):
-        """
-        **NEW: Utterance-based translation system**
-        
-        Deterministic path:
-          - parse source
-          - segment utterances
-          - translate utterances in batches (5–8 items)
-          - reflow each utterance back into the original subtitle windows
-          - write target SRT using source times
-          - error policy gates
-        """
-        filename = os.path.basename(input_filepath)
-        
-        try:
-            # 1) Parse source (uses existing parser)
-            src_subs = self._translation_utils.parse_source_to_local_subtitles(
-                self.parser, input_filepath
-            )
-            if not src_subs:
-                raise RuntimeError("No subtitles parsed from source.")
-            
-            # 2) Segment utterances (language unknown at parse time; we rely on punctuation/time and target_lang for caps)
-            utts = self._utterance_segmenter.segment_utterances(src_subs, target_lang)
-            
-            self.logger.info(f"Segmented {len(src_subs)} subtitles into {len(utts)} utterances for {filename}")
-            
-            # 3) Translate utterances in batches of ~5–8 (list-in/list-out)
-            # Use existing translation methods as the translate function
-            def translate_utterance_batch(texts, lang):
-                """Wrapper to use existing batch translation logic."""
-                # Create dummy subtitle objects for the existing batch translator
-                dummy_subs = []
-                for i, text in enumerate(texts):
-                    dummy_sub = type('DummySubtitle', (), {
-                        'index': i + 1,
-                        'start': type('Time', (), {'total_seconds': lambda: 1.0})(),
-                        'end': type('Time', (), {'total_seconds': lambda: 2.0})(),
-                        'content': text
-                    })()
-                    dummy_subs.append(dummy_sub)
-                
-                # Use existing batch translation
-                batch_srt, _ = self.translate_srt_block(
-                    "\n".join(texts), target_lang, filename, 1, dummy_subs
-                )
-                
-                # Parse the result back into individual texts
-                try:
-                    parsed = list(srt.parse(batch_srt))
-                    return [sub.content.strip() for sub in parsed]
-                except Exception as e:
-                    self.logger.warning(f"Failed to parse batch result, falling back to individual: {e}")
-                    # Fallback to individual translation
-                    return [self.translate_subtitle(text, lang, filename, i + 1) for i, text in enumerate(texts)]
-            
-            translations = self._utterance_translator.translate_with_concurrency(
-                utts, target_lang, translate_utterance_batch, batch_size=8
-            )
-            
-            # 4) Reflow per utterance back to original subtitles
-            tgt_subs = [None] * len(src_subs)  # type: ignore
-            utterance_failures = []
-            
-            for u, ttext in zip(utts, translations):
-                try:
-                    chunks = self._reflow_engine.reflow_to_subtitles(u, ttext, target_lang)
-                    
-                    # fill the same subtitle windows; preserve times verbatim
-                    if len(chunks) != (u.sub_end - u.sub_start + 1):
-                        raise RuntimeError(
-                            f"Internal reflow error: chunk count {len(chunks)} != subtitles in utterance {(u.sub_end - u.sub_start + 1)}"
-                        )
-                    
-                    for off, sub in enumerate(u.subtitles):
-                        txt = chunks[off]
-                        if not txt.strip():
-                            if self._error_policy == ErrorPolicy.STRICT:
-                                raise RuntimeError(f"Empty text after reflow at subtitle index {sub.index} (STRICT mode).")
-                            else:
-                                # BOUNDED/DEV mode: visible pass-through to keep structure
-                                self.logger.warning(f"{self._error_policy.value}: pass-through at subtitle {sub.index}")
-                                txt = sub.text
-                        
-                        tgt_subs[sub.index - 1] = Subtitle(
-                            index=sub.index, 
-                            start_ms=sub.start_ms, 
-                            end_ms=sub.end_ms, 
-                            text=txt.strip()
-                        )
-                        
-                except Exception as e:
-                    utterance_failures.append((u, str(e)))
-                    if self._error_policy == ErrorPolicy.STRICT:
-                        raise RuntimeError(f"Utterance reflow failed: {e}")
-                    elif self._error_policy == ErrorPolicy.BOUNDED:
-                        # Check if we've exceeded bounded limits
-                        if len(utterance_failures) > self._translation_config.bounded_max_exceptions:
-                            raise RuntimeError(f"Exceeded bounded exception limit: {len(utterance_failures)} failures")
-                        # Pass through source text for this utterance
-                        for sub in u.subtitles:
-                            tgt_subs[sub.index - 1] = Subtitle(
-                                index=sub.index, 
-                                start_ms=sub.start_ms, 
-                                end_ms=sub.end_ms, 
-                                text=sub.text
-                            )
-                    else:  # DEV mode
-                        self.logger.warning(f"DEV: pass-through at utterance {u.sub_start+1}-{u.sub_end+1}: {e}")
-                        for sub in u.subtitles:
-                            tgt_subs[sub.index - 1] = Subtitle(
-                                index=sub.index, 
-                                start_ms=sub.start_ms, 
-                                end_ms=sub.end_ms, 
-                                text=sub.text
-                            )
-            
-            # 5) Error policy gates: parity & exact timing (structure)
-            if any(s is None for s in tgt_subs):
-                missing = [i+1 for i, s in enumerate(tgt_subs) if s is None]
-                raise RuntimeError(f"Missing subtitles in target after reflow: {missing[:8]}{'...' if len(missing)>8 else ''}")
-            
-            if len(tgt_subs) != len(src_subs):
-                raise RuntimeError(f"Parity failure: src={len(src_subs)} vs tgt={len(tgt_subs)}")
-            
-            # (Exact time equality is guaranteed because we copied start/end)
-            
-            # 6) Write target using existing writer
-            self._translation_utils.write_local_subtitles_to_srt(
-                self.parser, tgt_subs, output_filepath
-            )
-            
-            self.logger.info(f"Utterance-based translation completed for {filename}")
-            return output_filepath
-            
-        except Exception as e:
-            self.logger.error(f"Utterance-based translation failed for {filename}: {e}")
-            raise
-
-    def translate_file(self, input_filepath, output_filepath, target_lang):
-        """Translate an entire SRT file using batching."""
-        return self.batch_translate_file(input_filepath, output_filepath, target_lang)
-    
-    def translate_file_utterance_mode(self, input_filepath, output_filepath, target_lang):
-        """Translate using the new utterance-based system."""
-        return self.translate_with_utterances(input_filepath, output_filepath, target_lang)
-    
-    def get_translation_mode_info(self):
-        """Get information about available translation modes."""
-        return {
-            "current_mode": "utterance_based" if hasattr(self, '_utterance_segmenter') else "legacy_batch",
-            "error_policy": self._error_policy.value if hasattr(self, '_error_policy') else "N/A",
-            "max_concurrency": self._max_concurrency if hasattr(self, '_max_concurrency') else 1,
-            "languages_path": getattr(self._language_config, 'languages_path', 'N/A') if hasattr(self, '_language_config') else 'N/A'
-        }
-
-
-def clean_srt_output(text):
-    """Remove Markdown code fences (``` or ```srt) from model output if present."""
-    text = text.strip()
-    if text.startswith("```srt"):
-        text = text[len("```srt") :].strip()
-    if text.startswith("```"):
-        text = text[len("```") :].strip()
-    if text.endswith("```"):
-        text = text[:-3].strip()
-    return text

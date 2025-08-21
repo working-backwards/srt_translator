@@ -67,20 +67,33 @@ def translate_srt_files(
     logger.info(f"Batch folder: {batch_dir}")
     logger.info(f"Log file: {log_file}")
     logger.info(f"Translating with batch size: {translation_config.batch_size}")
+    logger.info("Using subtitle-based translation system")
 
     # Apply numeric filtering to DNT terms before creating translator
     filtered_dnt_terms = translation_config.dnt_terms
     dnt_filtered_out = []
     if translation_config.dnt_terms:
-        # Import the filtering function from ai_config
-        from srt_translator.gui.ai_config import AIConfigGenerator
-        temp_config = AIConfigGenerator("dummy_key")  # Temporary instance for filtering
-        filtered_dnt_terms, dnt_filtered_out = temp_config.filter_dnt_terms_with_metadata(translation_config.dnt_terms)
+        # Import the filtering function from core terminology utils
+        from srt_translator.core.terminology_utils import filter_dnt_terms_with_metadata
+        filtered_dnt_terms, dnt_filtered_out = filter_dnt_terms_with_metadata(translation_config.dnt_terms)
         
         if len(filtered_dnt_terms) != len(translation_config.dnt_terms):
             logger.info(f"DNT terms filtered: {len(translation_config.dnt_terms)} → {len(filtered_dnt_terms)} (numeric items removed)")
 
-    # Create translator with filtered DNT terms
+    # Load language configuration for the core engine
+    try:
+        import json
+        from srt_translator.core.config.language_config import LanguageConfig
+        languages_path = "config/languages.json"
+        with open(languages_path, "r", encoding="utf-8") as f:
+            lang_data = json.load(f)
+        language_config = LanguageConfig(lang_data)
+        logger.info(f"Loaded language configuration with {len(language_config.get_all_languages())} languages")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load language configuration: {e}")
+        raise RuntimeError(f"Language configuration load failed: {e}")
+
+    # Create translator with filtered DNT terms and language configuration
     translator = SRTTranslator(
         dnt_terms=filtered_dnt_terms,
         termbase=translation_config.termbase,
@@ -90,6 +103,8 @@ def translate_srt_files(
         model_name=translation_config.model_name,
         batch_size=translation_config.batch_size,
         logger=logger,  # Pass the configured logger
+        error_policy=translation_config.error_policy,  # Pass error policy
+        language_config=language_config,  # Pass language configuration
     )
 
     # Capture filtering results for enhanced output
@@ -181,11 +196,13 @@ def translate_srt_files(
             logger.info(f"translated by {current_operation} / {total_operations} - {filename} → {lang_name}")
 
             try:
+                logger.info(f"Using subtitle-based translation system for {filename} → {lang_name}")
                 result = translator.translate_file(
                     input_filepath=input_filepath,
                     output_filepath=output_filepath,
                     target_lang=lang_code,
                 )
+                
                 if result is None:
                     summary["skipped"] += 1
                 else:

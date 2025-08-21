@@ -10,6 +10,7 @@ tests/
 ├── conftest.py                 # Pytest configuration and fixtures
 ├── test_ai_config_basic.py     # Basic AI configuration tests
 ├── test_ai_config_integration.py # Integration tests for AI config system
+
 └── gui/                        # GUI component tests
     ├── __init__.py
     ├── test_termbase_editor.py
@@ -28,6 +29,8 @@ pytest tests/ -v
 python -m pytest tests/ -v
 ```
 
+
+
 ### GUI Tests Only
 ```bash
 pytest tests/gui/ -v
@@ -41,6 +44,8 @@ pytest tests/ -v
 # GUI tests only
 pytest tests/gui/ -v
 
+
+
 # Specific test file
 pytest tests/test_ai_config_integration.py -v
 ```
@@ -50,6 +55,8 @@ pytest tests/test_ai_config_integration.py -v
 ### Unit Tests
 - **`test_ai_config_basic.py`**: Basic functionality tests for AI configuration
 - **`test_ai_config_integration.py`**: Integration tests for the complete AI config system
+
+
 
 ### GUI Tests
 - **`test_termbase_editor.py`**: Tests the termbase editor widget

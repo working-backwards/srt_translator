@@ -1,26 +1,27 @@
 """
-SRT Translator Core Module
+Core translation engine for SRT files.
 
-This module provides the core translation functionality for SRT subtitle files.
+This module provides the main translation functionality, including:
+- SRT parsing and writing
+- AI model integration
+- Term handling (DNT terms and termbase)
+- Translation utilities
 """
 
-from .translator import SRTTranslator
-from .models import Subtitle, Utterance, ErrorPolicy, TranslationConfig
-from .utterance_segmenter import UtteranceSegmenter
-from .utterance_translator import UtteranceTranslator
-from .reflow_engine import ReflowEngine
-from .language_config import LanguageConfig
-from .utils import TranslationUtils
+from srt_translator.core.translator.models import InternalSubtitle, ErrorPolicy, TranslationConfig
+from srt_translator.core.translator.translator import SRTTranslator
+from srt_translator.core.translator.srt_parser import SRTParser
+from srt_translator.core.translator.term_handler import TermHandler
+from srt_translator.core.translator.subtitle_formatter import SubtitleFormatter
+from srt_translator.core.translator.utils import TranslationUtils
 
 __all__ = [
-    "SRTTranslator",
-    "Subtitle",
-    "Utterance", 
-    "ErrorPolicy",
+    "InternalSubtitle",
+    "ErrorPolicy", 
     "TranslationConfig",
-    "UtteranceSegmenter", 
-    "UtteranceTranslator",
-    "ReflowEngine",
-    "LanguageConfig",
+    "SRTTranslator",
+    "SRTParser",
+    "TermHandler",
+    "SubtitleFormatter",
     "TranslationUtils",
 ]

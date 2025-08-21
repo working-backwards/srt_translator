@@ -14,6 +14,8 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 > Are you a developer? Start here:
 - **Dev Installation** → [Installation](INSTALLATION.md)
 - **Contribute** → [Coding Standards](CODING_STANDARDS.md)
+- **Architecture** → [Dependency Injection Refactor](DEPENDENCY_INJECTION_REFACTOR.md)
+- **Technical Flow** → [Technical Flow Example](TECHNICAL_FLOW_EXAMPLE.md)
 - **Security** → [Security Quick Reference](SECURITY_QUICK_REFERENCE.md)
 
 ---
@@ -25,8 +27,8 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 - **Open source** (MIT license)
 - **AI-powered translation** using OpenAI models
 - **Term preservation** with Do Not Translate (DNT) terms
-- **Custom terminology** with termbase support
-- **Utterance-based processing** for multiple files and languages
+- **Custom terminology** with AI-generated termbase and script validation
+- **Subtitle-based processing** for multiple files and languages
 - **Professional output** with timing preservation
 
 ## Quick Start
@@ -38,6 +40,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 
 **📖 Need detailed instructions?** → [GUI User Manual](GUI_USER_MANUAL.md)
 **🧠 Want to understand translation?** → [Translation Concepts](GUI_USER_MANUAL.md#understanding-translation-advanced-concepts)
+**🔤 Learn about terminology?** → [Terminology System](TERMINOLOGY_SYSTEM.md)
 
 ## Features
 
@@ -45,7 +48,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 - **Simple GUI** - No technical knowledge required
 - **File Processing** - Handle multiple files at once
 - **Language Support** - 100+ languages available
-- **Term Preservation** - Keep names, brands, and acronyms intact
+- **Term Preservation** - Keep names, brands, and acronyms intact with intelligent filtering
 - **Quality Output** - Professional subtitle files ready for use
 
 ### For Developers
@@ -54,6 +57,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 - **Extensible Design** - Easy to add new features and integrations
 - **Comprehensive Testing** - Robust test suite with high coverage
 - **Modern Tooling** - Uses latest Python packaging standards
+- **Technical Documentation** - Real-world examples of system behavior
 
 ## Installation Options
 

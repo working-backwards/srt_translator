@@ -1,20 +1,33 @@
 """
-Utility functions and adapters for the refactored translation system.
+Translation utilities for SRT file processing.
 """
 
 import logging
+import os
+import srt
 from typing import List, Any
-from .models import Subtitle
+
+from srt_translator.core.translator.models import InternalSubtitle
 
 
 class TranslationUtils:
-    """Utility functions for subtitle parsing, writing, and validation."""
+    """
+    Utility functions for subtitle parsing, writing, and validation.
+    
+    Provides adapters between our InternalSubtitle format and the srt library's
+    Subtitle format for file I/O operations.
+    """
     
     def __init__(self, logger: logging.Logger = None):
         self.logger = logger or logging.getLogger(__name__)
     
-    def parse_source_to_local_subtitles(self, parser, input_filepath: str) -> List[Subtitle]:
-        """Adapter over existing parser → produce local Subtitle list with ms times."""
+    def parse_source_to_local_subtitles(self, parser, input_filepath: str) -> List[InternalSubtitle]:
+        """
+        Adapter over existing parser → produce local InternalSubtitle list with ms times.
+        
+        Converts srt library Subtitle objects to our InternalSubtitle format
+        for internal processing.
+        """
         subs = []
         try:
             parsed = parser.parse_file(input_filepath)
@@ -27,7 +40,7 @@ class TranslationUtils:
                 # Get text content (handle different attribute names)
                 text = getattr(s, 'content', None) or getattr(s, 'text', '')
                 
-                subs.append(Subtitle(
+                subs.append(InternalSubtitle(
                     index=s.index,
                     start_ms=start_ms,
                     end_ms=end_ms,
@@ -39,47 +52,44 @@ class TranslationUtils:
         
         return subs
     
-    def write_local_subtitles_to_srt(self, parser, subs: List[Subtitle], output_filepath: str):
-        """Adapter back to existing writer; uses source times; only text changes."""
+    def write_local_subtitles_to_srt(self, subs: List[InternalSubtitle], output_filepath: str, target_lang: str = None):
+        """
+        Write InternalSubtitle objects to SRT file format.
+        
+        Converts our InternalSubtitle objects to srt library Subtitle
+        format for file writing.
+        """
         try:
             # Map back into existing subtitle object format
             out_objs = []
             for s in subs:
-                subtitle_obj = self._build_subtitle_like(parser, s)
+                subtitle_obj = self._build_subtitle_like(s)
                 out_objs.append(subtitle_obj)
             
-            parser.write_file(output_filepath, out_objs)
+            # Write using srt library
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                f.write(srt.compose(out_objs))
             
         except Exception as e:
             self.logger.error(f"Failed to write output file {output_filepath}: {e}")
             raise
     
-    def _build_subtitle_like(self, parser, subtitle: Subtitle) -> Any:
-        """Build whatever the writer expects."""
+    def _build_subtitle_like(self, subtitle: InternalSubtitle) -> Any:
+        """
+        Build srt.Subtitle objects for the writer.
+        
+        Creates srt library Subtitle objects from our InternalSubtitle format
+        for output writing, maintaining compatibility with the existing SRT writer.
+        """
         try:
-            # Try to use existing build method if available
-            if hasattr(parser, 'build_subtitle'):
-                return parser.build_subtitle(
-                    index=subtitle.index,
-                    start_ms=subtitle.start_ms,
-                    end_ms=subtitle.end_ms,
-                    content=subtitle.text
-                )
+            # Use the actual srt.Subtitle class for compatibility
+            from srt import Subtitle
             
-            # Fallback: create a simple object with required attributes
-            class SimpleSubtitle:
-                def __init__(self, index, start, end, content):
-                    self.index = index
-                    self.start = start
-                    self.end = end
-                    self.content = content
+            # Convert ms back to time objects
+            start_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.start_ms/1000:06.3f}")
+            end_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.end_ms/1000:06.3f}")
             
-            # Convert ms back to time objects if needed
-            from srt import Subtitle as SRTSubtitle
-            start_time = SRTSubtitle.parse_time(f"00:00:{subtitle.start_ms/1000:06.3f}")
-            end_time = SRTSubtitle.parse_time(f"00:00:{subtitle.end_ms/1000:06.3f}")
-            
-            return SimpleSubtitle(
+            return Subtitle(
                 index=subtitle.index,
                 start=start_time,
                 end=end_time,
@@ -90,9 +100,14 @@ class TranslationUtils:
             self.logger.error(f"Failed to build subtitle object: {e}")
             raise
     
-    def validate_subtitle_structure(self, src_subs: List[Subtitle], 
-                                  tgt_subs: List[Subtitle]) -> List[str]:
-        """Validate subtitle structure integrity."""
+    def validate_subtitle_structure(self, src_subs: List[InternalSubtitle], 
+                                  tgt_subs: List[InternalSubtitle]) -> List[str]:
+        """
+        Validate subtitle structure integrity.
+        
+        Ensures that the target subtitle list maintains the same structure
+        as the source, including count, indices, and timing.
+        """
         errors = []
         
         # Check parity

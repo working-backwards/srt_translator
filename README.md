@@ -39,15 +39,46 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 - **Multi-language Translation**: Translate to multiple languages at once
 - **Preserve Important Terms**: Keep names, brands, and technical terms untranslated
-- **Maintains Timing**: Subtitle timing and formatting stay intact with deterministic utterance-based reflow
+- **Maintains Timing**: Subtitle timing and formatting stay intact with deterministic subtitle-based formatting
 - **Automatic Error Fixing**: Intelligently fixes common translation issues
 - **Professional Results**: High-quality translations suitable for public content
-- **Smart Batching**: Utterance-aware processing for better context and translation quality
+- **Smart Batching**: Subtitle-aware processing for better context and translation quality
+- **Translation Quality Improvements**: Progressive shrinking and no-orphans protection eliminate quality cliffs
 - **Centralized Configuration**: Single source of truth for all translation settings
 - **Thread-Safe GUI**: Improved reliability for concurrent operations
 - **Quality Hardening**: Automatic filtering of numeric DNT terms and DNT precedence enforcement
+- **Script-Aware Termbase**: AI-generated translations validated against proper script requirements
+- **Hard-Preserve DNT**: Intelligent DNT filtering that keeps only truly important terms (acronyms, tech tokens)
 - **Enhanced Output**: Complete transparency into what was provided vs. what was used during translation
-- **Utterance-Based Translation**: New sentence-level processing system that eliminates timing drift while improving translation quality
+- **Subtitle-Based Translation**: New subtitle-level processing system that eliminates timing drift while improving translation quality
+
+---
+
+## Translation Quality Improvements
+
+The latest version includes significant improvements to translation quality that eliminate the "quality cliff" issue:
+
+### Progressive Shrinking
+When batch translation fails (e.g., 5 inputs → 4 outputs), the system now uses intelligent batch size reduction instead of immediately falling back to individual translation:
+
+- **Preserves context**: Phrases like "me llamo Colin Bryar" stay together
+- **Maintains quality**: Batch translation advantages preserved as long as possible
+- **Graceful degradation**: Smooth quality reduction instead of immediate cliff
+
+### No-Orphans Protection
+Language-aware subtitle optimization prevents orphaned function words at subtitle boundaries:
+
+- **Spanish**: "Me llamo | Colin" instead of "Me | llamo Colin"
+- **English**: "I am going | to the store" instead of "I am | going to the store"
+- **Japanese**: "私 | は行きました" instead of "私は | 行きました"
+
+### Language Support
+Works across all supported language families with configurable rules:
+- **Latin scripts**: English, Spanish, French, German, etc.
+- **CJK scripts**: Chinese, Japanese, Korean
+- **Other families**: Cyrillic, RTL, Indic languages
+
+See [TRANSLATION_QUALITY_GUIDE.md](docs/TRANSLATION_QUALITY_GUIDE.md) for detailed configuration options.
 
 ---
 
@@ -394,13 +425,9 @@ A: Yes, only subtitle text is sent to OpenAI. Your video files stay local.
 
 ### Architecture Overview
 
-The SRT Translator now uses a **clean architecture** with centralized configuration management and an **utterance-based translation system**:
+The SRT Translator now uses a **clean architecture** with centralized configuration management and a **subtitle-based translation system**:
 
-- **`TranslationConfig`**: Immutable configuration object containing all translation settings
-- **`ConfigResolver`**: Centralized logic for resolving configuration from different sources
-- **`SettingsManager`**: Single source of truth for GUI state management
-- **Environment Variables**: Used only for CLI mode, eliminated from GUI runtime
-- **Utterance-Based Processing**: Sentence-level translation with deterministic reflow to preserve timing
+- **Subtitle-Based Processing**: Subtitle-level translation with deterministic formatting to preserve timing
 
 ### Required Parameters
 

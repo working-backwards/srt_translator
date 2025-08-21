@@ -118,17 +118,17 @@ The AI suggests a Termbase for each language based on your content. The lists do
 Subtitles have timecodes, line-length constraints, and reading-speed limits. That creates unique challenges:
 
 - **Lip-sync vs. readability:** We preserve your original timing, but translated text may need more or fewer characters. We prioritize readability and matching the speaker's intent over perfect lip movement.
-- **Segment structure changes:** The app now uses utterance-based processing that groups subtitles by sentence boundaries, then reflows translated text back into the original timing windows to eliminate drift.
+- **Segment structure changes:** The app now uses subtitle-based processing that translates each subtitle individually while maintaining perfect timing alignment.
 - **Punctuation and sentence boundaries:** Languages break sentences differently; we normalize punctuation for readability.
 
-**In practice:** The app makes a best effort to keep your cues aligned with speaker turns and major pauses, while allowing small changes so the translation reads naturally.
+**In practice:** The app makes a best effort to keep your subtitles aligned with speaker turns and major pauses, while allowing small changes so the translation reads naturally.
 
 ### How SRT Translator Works
 
 1. **Ingest your SRT** — already speaker-synced
 2. **Prepare terminology** — AI suggests DNT and Termbase candidates; you review/edit
-3. **Utterance-based processing** — We now group subtitles into utterances based on sentence boundaries and timing, then translate each utterance as a unit. This provides better context for accurate translation while maintaining perfect timing alignment.
-   - **GUI users:** Utterance processing is automatic and optimized
+3. **Subtitle-based processing** — We now translate each subtitle individually while maintaining perfect timing alignment. This provides better context for accurate translation while maintaining exact timing.
+   - **GUI users:** Subtitle processing is automatic and optimized
    - **CLI (expert) users:** Can configure error policies and concurrency settings
 4. **Translate with instructions** — The AI receives your DNT list, Termbase, and subtitle-specific constraints
 5. **Reassemble & retime** — We map translated text back to subtitles, allowing minimal merge/split, then snap results to your original timecodes
@@ -138,13 +138,15 @@ Subtitles have timecodes, line-length constraints, and reading-speed limits. Tha
    - Flag cases for manual intervention where DNT placement can't be resolved automatically
    - Perform other internal cleanup steps to preserve subtitle integrity
 
-### Utterance Processing: Context vs. Timing
+### Subtitle Processing: Context vs. Timing
 
-Utterance-based processing balances context for better translation against perfect timing preservation.
+**The Challenge:** Subtitle translation requires balancing two competing needs:
 
-**How it works:** We group subtitles into natural utterances based on sentence boundaries, punctuation, and timing gaps. Each utterance is translated as a unit, then the translated text is reflowed back into the original subtitle windows to maintain exact timing.
+Subtitle-based processing balances context for better translation against perfect timing preservation.
 
-**Benefits:** Better translation quality through sentence-level context, while eliminating timing drift that was common with the old batch-based approach.
+**How it works:** We translate each subtitle individually while maintaining exact timing. Each subtitle keeps its original start and end time, ensuring perfect synchronization with your video.
+
+**Benefits:** Better translation quality through sentence-level context, while maintaining perfect timing alignment with the new subtitle-based approach.
 
 **GUI users don't need to worry about this** — it's automatic and optimized. Advanced CLI users can configure error policies and concurrency settings.
 
@@ -160,7 +162,7 @@ Utterance-based processing balances context for better translation against perfe
 - **DNT integrity:** All DNT terms are preserved exactly and in the right place
 - **Termbase consistency:** Terms match approved translations for each language
 - **Readability:** Lines are concise and easy to read at intended display speed
-- **Timing:** No overlaps, speaker changes align with cue changes
+- **Timing:** No overlaps, speaker changes align with subtitle changes
 - **Locale formatting:** Numbers, dates, and other formats match target language norms
 - **Tone/register:** Consistent with your audience
 
@@ -230,7 +232,7 @@ Please confirm your API key in the API Configuration section. Make sure your int
 
 ### The timing looks unusual in a few places.
 
-The application now uses utterance-based processing that preserves exact timing. Each subtitle maintains its original start and end time, while the translated text is intelligently distributed across the available space. This approach eliminates timing drift completely while keeping subtitles readable and properly synchronized.
+The application now uses subtitle-based processing that preserves exact timing. Each subtitle maintains its original start and end time, while the translated text is intelligently formatted within the original timing window. This approach eliminates timing drift completely while keeping subtitles readable and properly synchronized.
 
 ### Some terms should have stayed in English.
 
@@ -304,7 +306,7 @@ The output directory contains:
 ### Translation Speed
 - Process fewer target languages at once for faster results
 - Smaller SRT files translate more quickly than very long ones
-- The application automatically optimizes utterance processing for your content
+- The application automatically optimizes subtitle processing for your content
 
 ### Quality vs. Speed
 - The default model provides a good balance of quality and speed
@@ -327,14 +329,14 @@ The application now organizes all output files in one convenient location:
 
 ### Improved Error Handling
 - Clear error messages when translations cannot proceed
-- Automatic fallback to individual subtitle translation if utterance translation fails
+- Automatic fallback to individual subtitle translation if batch translation fails
 - Detailed logging of all operations and decisions
 - Phantom placeholder detection to prevent AI hallucinations
 
 ### Performance Optimizations
 - Single-file processing ensures consistent performance
 - Rate limiting to respect API constraints
-- Efficient utterance processing with sentence-aware boundaries
+- Efficient subtitle processing with individual subtitle translation
 - Memory-conscious file handling for large subtitle files
 
 ---

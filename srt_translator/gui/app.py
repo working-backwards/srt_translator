@@ -9,7 +9,7 @@ import sys
 
 # Set up logging - ALWAYS include this
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Get logger for this module

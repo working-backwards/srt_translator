@@ -4,88 +4,29 @@ Language configuration for the SRT Translator.
 """
 
 import logging
-from typing import Any, Dict, Optional, cast
-
-from srt_translator.core.config.languages_data import LANGUAGES_JSON
+import unicodedata
+from typing import Any, Dict, List
 
 
 class LanguageConfig:
-    """Unified language configuration manager for CLI"""
-
-    def __init__(self):
+    """Immutable view over a preloaded languages mapping.
+    Core code MUST receive this via DI; it never reads files itself."""
+    
+    def __init__(self, data: Dict[str, Any]):
+        if not isinstance(data, dict) or "languages" not in data:
+            raise ValueError("LanguageConfig requires a preloaded mapping with a 'languages' key.")
+        if not data["languages"]:
+            raise ValueError("LanguageConfig requires non-empty languages mapping.")
+        self._config: Dict[str, Any] = data
         self.logger = logging.getLogger(__name__)
-        self._config: Optional[Dict[str, Any]] = None
 
-    def load_config(self) -> dict:
-        """Load language configuration from JSON file using resource loader"""
-        if self._config is not None:
-            return self._config
-
-        try:
-            # Use the resource loader which handles both package resources and repo paths
-            config = LANGUAGES_JSON
-            languages = config.get("languages", {})
-            if isinstance(languages, dict):
-                self.logger.info(f"Loaded language config with {len(languages)} languages")
-            else:
-                self.logger.info("Loaded language config with unknown number of languages")
-            self._config = config
-            return config
-        except Exception as e:
-            self.logger.error(f"Error loading language config: {e}")
-            fallback = self.get_fallback_config()
-            self._config = fallback
-            return fallback
-
-    @property
-    def config(self) -> dict:
-        """Get configuration, loading if necessary"""
-        return self.load_config()
-
-    def get_fallback_config(self) -> dict:
-        """Get fallback configuration if JSON file is unavailable"""
-        self.logger.warning("Using fallback language configuration")
-        return {
-            "version": "1.0",
-            "default_popular_limit": 12,
-            "default_popular_languages": [
-                "es",
-                "fr",
-                "de",
-                "it",
-                "pt-BR",
-                "zh-Hans",
-                "ja",
-                "ko",
-                "ar",
-                "hi",
-                "id",
-                "vi",
-            ],
-            "languages": {
-                "es": {"name": "Spanish", "popular": True},
-                "fr": {"name": "French", "popular": True},
-                "de": {"name": "German", "popular": True},
-                "it": {"name": "Italian", "popular": True},
-                "pt-BR": {"name": "Portuguese (Brazil)", "popular": True},
-                "zh-Hans": {"name": "Chinese (Simplified)", "popular": True},
-                "ja": {"name": "Japanese", "popular": True},
-                "ko": {"name": "Korean", "popular": True},
-                "ar": {"name": "Arabic", "popular": True},
-                "hi": {"name": "Hindi", "popular": True},
-                "id": {"name": "Indonesian", "popular": True},
-                "vi": {"name": "Vietnamese", "popular": True},
-            },
-        }
-
-    def get_all_languages(self) -> dict[str, dict[str, Any]]:
+    def get_all_languages(self) -> Dict[str, Any]:
         """Get all available languages"""
-        languages = cast(dict[str, dict[str, Any]], self.config.get("languages", {}))
-        return languages
+        return self._config.get("languages", {})
 
     def get_popular_languages(self) -> list[str]:
-        """Get current popular languages (defaults for now, user preferences in future)"""
-        return cast(list[str], self.config.get("default_popular_languages", []))
+        """Get current popular languages"""
+        return self._config.get("default_popular_languages", [])
 
     def get_language_name(self, code: str) -> str:
         """Get display name for language code"""
@@ -120,13 +61,11 @@ class LanguageConfig:
 
     def get_config_version(self) -> str:
         """Get the configuration version"""
-        version = self.config.get("version")
-        return version if version is not None else "1.0"
+        return self._config.get("version", "1.0")
 
     def get_popular_limit(self) -> int:
         """Get the default popular languages limit"""
-        limit = self.config.get("default_popular_limit")
-        return limit if limit is not None else 12
+        return self._config.get("default_popular_limit", 12)
 
     def get_target_languages_dict(self) -> dict[str, str]:
         """Get target languages in the format expected by CLI (name: code)"""
@@ -140,59 +79,230 @@ class LanguageConfig:
                 result[code] = code
         return result
 
-    def get_language_rules(self, lang_code: str) -> dict[str, list[str]]:
-        """Get language-specific sentence boundary rules"""
-        DEFAULT_SENTENCE_ENDINGS: list[str] = [".", "!", "?", "...", ":", ";"]
-        DEFAULT_BREAK_MARKERS: list[str] = []
-
+    def get_language_rules(self, code: str) -> Dict[str, Any]:
+        """Get language-specific rules for sentence endings and break markers"""
         languages = self.get_all_languages()
-        lang_info = languages.get(lang_code, {})
-
-        sentence_endings = lang_info.get("sentence_endings")
-        if not isinstance(sentence_endings, list):
-            sentence_endings = DEFAULT_SENTENCE_ENDINGS
-
-        break_markers = lang_info.get("break_markers")
-        if not isinstance(break_markers, list):
-            break_markers = DEFAULT_BREAK_MARKERS
-
+        lang_info = languages.get(code, {})
         return {
-            "sentence_endings": sentence_endings,
-            "break_markers": break_markers,
+            "sentence_endings": lang_info.get("sentence_endings", []),
+            "break_markers": lang_info.get("break_markers", []),
         }
 
-    def normalize_to_code(self, name_or_code: str) -> Optional[str]:
-        """Convert language name or code to normalized language code"""
-        if not name_or_code:
-            return None
-
-        # First check if it's already a valid language code
-        if self.validate_language_code(name_or_code):
-            return name_or_code
-
-        # If not, try to find it by name
+    def get_cps_caps(self, code: str) -> Dict[str, int]:
+        """Get CPS (characters per second) limits for a language"""
         languages = self.get_all_languages()
-        for code, lang_info in languages.items():
-            # code is now str, not Any
-            name = lang_info.get("name")
-            if name and name.lower() == name_or_code.lower():
-                return code
+        meta = languages.get(code, {})
+        return {
+            "cps_soft": int(meta.get("cps_soft", 15)),
+            "cps_hard": int(meta.get("cps_hard", 20)),
+        }
 
-        # If still not found, try partial matches
-        for code, lang_info in languages.items():
-            lang_name = lang_info.get("name")
-            if lang_name:
-                if (
-                    name_or_code.lower() in lang_name.lower()
-                    or lang_name.lower() in name_or_code.lower()
-                ):
-                    return code
+    def get_family_defaults(self, family: str) -> dict:
+        """Get family-level defaults for language configuration"""
+        return (self._config.get("family_defaults") or {}).get(family, {})
 
-        # If no match found, return None
-        return None
+    def no_orphan_end(self, code: str) -> list[str]:
+        """
+        Get list of tokens that should not end a subtitle for a language.
+        Falls back to family defaults if language-specific config is missing.
+        """
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        family = lang_info.get("family", "")
+        
+        # Try language-specific config first, then family defaults
+        lang_config = lang_info.get("no_orphan_end", [])
+        if lang_config:
+            return lang_config
+            
+        family_defaults = self.get_family_defaults(family)
+        return family_defaults.get("no_orphan_end", [])
 
+    def no_orphan_chars_end(self, code: str) -> list[str]:
+        """
+        Get list of characters that should not end a subtitle for CJK languages.
+        Falls back to family defaults if language-specific config is missing.
+        """
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        family = lang_info.get("family", "")
+        
+        # Try language-specific config first, then family defaults
+        lang_config = lang_info.get("no_orphan_chars_end", [])
+        if lang_config:
+            return lang_config
+            
+        family_defaults = self.get_family_defaults(family)
+        return family_defaults.get("no_orphan_chars_end", [])
 
-# Create instance only when needed, not at import time
-def get_language_config() -> LanguageConfig:
-    """Get language configuration instance (lazy initialization)"""
-    return LanguageConfig()
+    def protected_bigrams(self, code: str) -> list[str]:
+        """
+        Get list of two-word sequences that should stay together if possible.
+        Falls back to family defaults if language-specific config is missing.
+        """
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        family = lang_info.get("family", "")
+        
+        # Try language-specific config first, then family defaults
+        lang_config = lang_info.get("protected_bigrams", [])
+        if lang_config:
+            return lang_config
+            
+        family_defaults = self.get_family_defaults(family)
+        return family_defaults.get("protected_bigrams", [])
+
+    def family(self, code: str) -> str:
+        """Get the language family for a given language code"""
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        return lang_info.get("family", "")
+
+    def get_sentence_endings(self, code: str) -> List[str]:
+        """Get sentence ending punctuation for a language"""
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        return lang_info.get("sentence_endings", [".", "!", "?"])
+
+    # ---------- Script helpers (unchanged design; now fed by JSON) ----------
+    _UNICODE_BLOCKS = {
+        "CJK":       [("\u4E00","\u9FFF")],
+        "Hiragana":  [("\u3040","\u309F")],
+        "Katakana":  [("\u30A0","\u30FF")],
+        "Hangul":    [("\uAC00","\uD7A3")],
+        "Arabic":    [("\u0600","\u06FF")],
+        "Hebrew":    [("\u0590","\u05FF")],
+        "Cyrillic":  [("\u0400","\u04FF")],
+        "Greek":     [("\u0370","\u03FF")],
+        "Devanagari":[("\u0900","\u097F")],
+        "Bengali":   [("\u0980","\u09FF")],
+        "Gurmukhi":  [("\u0A00","\u0A7F")],
+        "Gujarati":  [("\u0A80","\u0AFF")],
+        "Oriya":     [("\u0B00","\u0B7F")],
+        "Tamil":     [("\u0B80","\u0BFF")],
+        "Telugu":    [("\u0C00","\u0C7F")],
+        "Kannada":   [("\u0C80","\u0CFF")],
+        "Malayalam": [("\u0D00","\u0D7F")],
+        "Sinhala":   [("\u0D80","\u0DFF")],
+        "Thai":      [("\u0E00","\u0E7F")],
+        "Lao":       [("\u0E80","\u0EFF")],
+        "Khmer":     [("\u1780","\u17FF")],
+        "Georgian":  [("\u10A0","\u10FF")]
+    }
+
+    def get_script_spec(self, code: str) -> dict:
+        """Get script specification for a language"""
+        languages = self.get_all_languages()
+        meta = languages.get(code, {})
+        spec = {}
+        
+        if "script_blocks" in meta:
+            spec["script_blocks"] = meta["script_blocks"]
+        if "script" in meta:
+            spec["script"] = meta["script"]
+            
+        if not spec:
+            # Fall back to family-based defaults
+            fam = (meta.get("family") or "").lower()
+            blocks = self._FAMILY_TO_DEFAULT_BLOCK.get(fam, [])
+            if blocks:
+                spec["script_blocks"] = blocks
+                
+        return spec
+
+    def text_matches_script(self, text: str, spec: dict) -> bool:
+        """Check if text contains characters that match the required script"""
+        if not spec:
+            return True
+            
+        blocks = spec.get("script_blocks")
+        if not blocks:
+            # Map script names to blocks
+            mapping = {
+                "cjk": ["CJK"], 
+                "japanese": ["Hiragana","Katakana","CJK"], 
+                "hangul": ["Hangul"],
+                "arabic": ["Arabic"], 
+                "hebrew": ["Hebrew"],
+                "cyrillic": ["Cyrillic"], 
+                "greek": ["Greek"],
+                "devanagari": ["Devanagari"], 
+                "bengali": ["Bengali"], 
+                "gurmukhi": ["Gurmukhi"],
+                "gujarati": ["Gujarati"], 
+                "odia": ["Oriya"], 
+                "tamil": ["Tamil"], 
+                "telugu": ["Telugu"],
+                "kannada": ["Kannada"], 
+                "malayalam": ["Malayalam"], 
+                "sinhala": ["Sinhala"],
+                "thai": ["Thai"], 
+                "lao": ["Lao"], 
+                "khmer": ["Khmer"], 
+                "georgian": ["Georgian"],
+                "latin": []
+            }
+            blocks = mapping.get((spec.get("script") or "").lower(), [])
+            
+        if not blocks:
+            return True  # Latin or unknown: don't enforce
+            
+        # Check if text contains at least one character in any required block
+        for ch in text or "":
+            for b in blocks:
+                for lo, hi in self._UNICODE_BLOCKS.get(b, []):
+                    if lo <= ch <= hi:
+                        return True
+                        
+        return False
+
+    _FAMILY_TO_DEFAULT_BLOCK = {
+        "cjk": ["CJK"],
+        "rtl": ["Arabic"],
+        "cyrillic": ["Cyrillic"],
+        "greek": ["Greek"],
+        "armenian": [],
+        "georgian": ["Georgian"],
+        "indic": [],
+        "latin": [],
+        "no_space": [],
+    }
+    
+    def get_family_defaults(self, family: str) -> dict:
+        cfg = self._config
+        return (cfg.get("family_defaults") or {}).get(family, {})
+    
+    def family(self, code: str) -> str:
+        return (self.get_all_languages().get(code, {}) or {}).get("family", "")
+    
+    def no_orphan_end(self, code: str) -> list[str]:
+        lang = self.get_all_languages().get(code, {})
+        fam = self.get_family_defaults(lang.get("family", ""))
+        return lang.get("no_orphan_end") or fam.get("no_orphan_end") or []
+    
+    def no_orphan_chars_end(self, code: str) -> list[str]:
+        lang = self.get_all_languages().get(code, {})
+        fam = self.get_family_defaults(lang.get("family", ""))
+        return lang.get("no_orphan_chars_end") or fam.get("no_orphan_chars_end") or []
+    
+    def protected_bigrams(self, code: str) -> list[str]:
+        lang = self.get_all_languages().get(code, {})
+        fam = self.get_family_defaults(lang.get("family", ""))
+        return lang.get("protected_bigrams") or fam.get("protected_bigrams") or []
+    
+    # --- Reflow policy (language-aware with safe defaults) -------------------
+    _OVERSHOOT_DEFAULT = 0.10        # Rule of thumb: prefer small overshoot before trimming
+    _MICRO_SPILL_CHARS_DEFAULT = 30  # At most ~1–2 short words
+    _MICRO_SPILL_GAP_MS_DEFAULT = 250
+    
+    def reflow_overshoot_pct(self, code: str) -> float:
+        rules = self.get_all_languages().get(code, {}) or {}
+        return float((rules.get("reflow") or {}).get("overshoot_pct", self._OVERSHOOT_DEFAULT))
+    
+    def reflow_micro_spill_chars(self, code: str) -> int:
+        rules = self.get_all_languages().get(code, {}) or {}
+        return int((rules.get("reflow") or {}).get("micro_spill_chars", self._MICRO_SPILL_CHARS_DEFAULT))
+    
+    def reflow_micro_spill_gap_ms(self, code: str) -> int:
+        rules = self.get_all_languages().get(code, {}) or {}
+        return int((rules.get("reflow") or {}).get("micro_spill_gap_ms", self._MICRO_SPILL_GAP_MS_DEFAULT))

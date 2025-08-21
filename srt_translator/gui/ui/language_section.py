@@ -25,12 +25,12 @@ from srt_translator.core.config.language_config import LanguageConfig
 class LanguageSection(QGroupBox):
     """Language selection section with popular languages and search"""
 
-    def __init__(self, settings_manager):
+    def __init__(self, settings_manager, language_config):
         super().__init__("Target Languages")
         self.settings_manager = settings_manager
+        self.language_config = language_config
         self.setObjectName("languageSection")
         self.target_languages = {}
-        self.language_config = LanguageConfig()
 
         self.setup_ui()
         self.populate_language_list()

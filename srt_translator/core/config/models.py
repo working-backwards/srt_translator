@@ -26,6 +26,7 @@ class TranslationConfig:
     aggressiveness: float  # Aggressiveness of automatic placeholder fixes
     log_mode: LogMode
     mode: Literal["CLI", "GUI"]
+    error_policy: Literal["STRICT", "BOUNDED", "DEV"] = "BOUNDED"  # Error handling policy for translation system (BOUNDED for testing)
 
     @classmethod
     def from_raw(
@@ -97,6 +98,12 @@ class TranslationConfig:
             errors.append(str(e))
             aggressiveness = 0.75
 
+        # Parse error policy
+        error_policy = raw.get("error_policy", "STRICT")
+        if error_policy not in ["STRICT", "BOUNDED", "DEV"]:
+            warnings.append(f"Invalid error_policy '{error_policy}', using 'STRICT'")
+            error_policy = "STRICT"
+
         try:
             log_mode = LogMode(raw.get("log_mode", "Standard"))
         except ValueError:
@@ -130,4 +137,5 @@ class TranslationConfig:
             aggressiveness=aggressiveness,
             log_mode=log_mode,
             mode=mode,
+            error_policy=error_policy,
         )

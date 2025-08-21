@@ -51,9 +51,25 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.logger.info("SRT Translator GUI started")
 
+        # Load language configuration once
+        try:
+            import json
+            from srt_translator.core.config.language_config import LanguageConfig
+            languages_path = "config/languages.json"
+            with open(languages_path, "r", encoding="utf-8") as f:
+                lang_data = json.load(f)
+            self.language_config = LanguageConfig(lang_data)
+            self.logger.info(f"Loaded language configuration with {len(self.language_config.get_all_languages())} languages")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.logger.error(f"Failed to load language configuration: {e}")
+            QMessageBox.critical(self, "Configuration Error", 
+                               f"Failed to load language configuration: {e}\n\nPlease ensure config/languages.json exists and is valid.")
+            raise RuntimeError(f"Language configuration load failed: {e}")
+        
         # Initialize components
-        self.settings_manager = SettingsManager()
-        self.config_manager = GUIConfigManager(self.settings_manager)
+        self.settings_manager = SettingsManager(self.language_config)
+        self.config_manager = GUIConfigManager(self.settings_manager, self.language_config)
+        
         self.ai_config_generator = None
         self.ai_config_thread = None
         self.ai_config_worker = None
@@ -115,7 +131,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create modular sections
         self.api_section = APISection(self.settings_manager)
         self.file_section = FileSection(self.settings_manager)
-        self.language_section = LanguageSection(self.settings_manager)
+        self.language_section = LanguageSection(self.settings_manager, self.language_config)
         self.ai_config_section = AIConfigSection()
         self.translation_section = TranslationSection()
 
@@ -357,7 +373,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
-            self.ai_config_generator = AIConfigGenerator(api_key)
+            self.ai_config_generator = AIConfigGenerator(api_key, self.language_config)
 
         # Show progress and disable button
         self.ai_config_section.show_progress(True)
@@ -367,6 +383,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         class AIConfigWorker(QObject):
             finished = Signal(tuple)  # (dnt_terms, termbase)
             error = Signal(str)
+            progress = Signal(str)  # Add progress signal for GUI updates
 
             def __init__(self, ai_generator, files, languages):
                 super().__init__()
@@ -374,37 +391,84 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.files = files
                 self.languages = languages
                 self.logger = logging.getLogger(__name__)
+                
+                # Set up logging bridge to capture AI config logs
+                self._setup_logging_bridge()
 
             def run(self):
                 try:
+                    self.progress.emit("AI Config Worker: Starting content extraction")
                     self.logger.info("AI Config Worker: Starting content extraction")
+                    
                     # Extract content from SRT files
                     content = self.ai_generator.extract_subtitle_content(self.files)
-                    self.logger.info(
-                        f"AI Config Worker: Extracted {len(content)} characters of content"
-                    )
+                    progress_msg = f"AI Config Worker: Extracted {len(content)} characters of content"
+                    self.progress.emit(progress_msg)
+                    self.logger.info(progress_msg)
 
+                    self.progress.emit("AI Config Worker: Generating DNT terms")
                     self.logger.info("AI Config Worker: Generating DNT terms")
+                    
                     # Generate DNT terms
                     dnt_terms = self.ai_generator.generate_dnt_terms(content)
-                    self.logger.info(
-                        f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
-                    )
+                    progress_msg = f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
+                    self.progress.emit(progress_msg)
+                    self.logger.info(progress_msg)
 
+                    self.progress.emit("AI Config Worker: Generating termbase")
                     self.logger.info("AI Config Worker: Generating termbase")
+                    
                     # Generate termbase
                     termbase = self.ai_generator.generate_termbase(
                         content, self.languages
                     )
-                    self.logger.info(
-                        f"AI Config Worker: Generated termbase for {len(termbase)} languages"
-                    )
+                    progress_msg = f"AI Config Worker: Generated termbase for {len(termbase)} languages"
+                    self.progress.emit(progress_msg)
+                    self.logger.info(progress_msg)
 
                     self.finished.emit((dnt_terms, termbase))
 
                 except Exception as e:
-                    self.logger.error(f"AI Config Worker: Error during generation: {e}")
+                    error_msg = f"AI Config Worker: Error during generation: {e}"
+                    self.progress.emit(error_msg)
+                    self.logger.error(error_msg)
                     self.error.emit(str(e))
+                    
+            def _setup_logging_bridge(self):
+                """Set up logging bridge to capture AI config logs and send to GUI"""
+                try:
+                    # Create a custom handler that emits progress signals
+                    class ProgressLogHandler(logging.Handler):
+                        def __init__(self, worker):
+                            super().__init__()
+                            self.worker = worker
+                        
+                        def emit(self, record):
+                            try:
+                                msg = self.format(record)
+                                self.worker.progress.emit(msg)
+                            except Exception:
+                                pass
+                    
+                    # Set up the handler for AI config logs
+                    progress_handler = ProgressLogHandler(self)
+                    progress_handler.setLevel(logging.INFO)
+                    
+                    # Format the logs nicely
+                    formatter = logging.Formatter('%(message)s')
+                    progress_handler.setFormatter(formatter)
+                    
+                    # Add handler to AI config logger
+                    ai_logger = logging.getLogger('srt_translator.gui.ai_config')
+                    ai_logger.addHandler(progress_handler)
+                    ai_logger.setLevel(logging.INFO)
+                    
+                    # Also capture our own worker logs
+                    self.logger.addHandler(progress_handler)
+                    
+                except Exception as e:
+                    # Fallback if logging bridge fails
+                    self.logger.warning(f"Failed to set up logging bridge: {e}")
 
         # Create and start worker thread
         self.ai_config_thread = QThread()
@@ -414,6 +478,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_worker.moveToThread(self.ai_config_thread)
 
         self.ai_config_thread.started.connect(self.ai_config_worker.run)
+        self.ai_config_worker.progress.connect(self.ai_config_section.update_progress)
         self.ai_config_worker.finished.connect(self.ai_config_generation_finished)
         self.ai_config_worker.error.connect(self.ai_config_generation_error)
         self.ai_config_worker.finished.connect(self.ai_config_thread.quit)

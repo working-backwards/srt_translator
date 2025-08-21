@@ -30,7 +30,8 @@ def setup_logging(log_file_override: str) -> str:
     # Create a dedicated logger for translation operations
     # This avoids conflicts with existing root logger configurations
     translation_logger = logging.getLogger("srt_translator")
-    translation_logger.setLevel(logging.INFO)
+    # Don't override the logging level - respect what was already set
+    # translation_logger.setLevel(logging.INFO)  # Commented out to respect GUI logging level
 
     # Remove any existing handlers to avoid duplicates
     for handler in translation_logger.handlers[:]:

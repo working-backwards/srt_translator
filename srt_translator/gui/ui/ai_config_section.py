@@ -115,6 +115,12 @@ class AIConfigSection(QGroupBox):
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        
+        # Progress text label (initially hidden)
+        self.progress_label = QLabel("")
+        self.progress_label.setVisible(False)
+        self.progress_label.setWordWrap(True)
+        self.progress_label.setStyleSheet("color: #6B7280; font-size: 12px;")
 
         # DNT (Do Not Translate) display
         dnt_label = QLabel("🚫 Do Not Translate (DNT) - Terms that stay in original language:")
@@ -145,6 +151,7 @@ class AIConfigSection(QGroupBox):
         content_layout.addWidget(self.generate_btn)
         content_layout.addLayout(self.action_buttons)
         content_layout.addWidget(self.progress_bar)
+        content_layout.addWidget(self.progress_label)
         content_layout.addWidget(dnt_label)
         content_layout.addWidget(self.dnt_display)
         content_layout.addWidget(termbase_label)
@@ -212,7 +219,13 @@ class AIConfigSection(QGroupBox):
     def show_progress(self, show: bool):
         """Show or hide the progress bar"""
         self.progress_bar.setVisible(show)
+        self.progress_label.setVisible(show)
         self.generate_btn.setEnabled(not show)
+
+    def update_progress(self, message: str):
+        """Update the progress text with a message"""
+        self.progress_label.setText(message)
+        self.progress_label.setVisible(True)
 
     def update_dnt_display(self, terms: list):
         """Update the DNT display with a list of terms"""

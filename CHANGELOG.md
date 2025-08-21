@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Relevant Termbase Injection**: Only injects termbase entries present in current batch text
 - **Enhanced Output Format**: Complete transparency into what was provided vs. what was used during translation
 - **Processing Summaries**: Detailed logs showing filtering results and quality improvements applied
+- **Translation Quality Improvements**: Major enhancement to address "quality cliff" issues
+  - **Progressive Shrinking**: Intelligent batch size reduction that preserves translation context and quality
+  - **No-Orphans Protection**: Language-aware subtitle reflow that prevents orphaned function words
+  - **Language-Specific Configuration**: Support for customizing orphan prevention rules per language
+  - **Family Defaults**: Sensible defaults for unconfigured languages with safe fallbacks
 
 ### Changed
 - Replaced print() statements with proper logging in CLI
@@ -35,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced TermHandler**: Added tolerant matching for Latin terms (space/hyphen variations, possessives)
 - **Improved AI Config**: Added numeric filtering functions and enhanced DNT processing
 - **Enhanced Translator**: Added untranslated content detection with micro-context retry mechanism
+- **Batch Translation Logic**: Replaced immediate fallback to individual translation with progressive shrinking
+- **Reflow Engine**: Enhanced with language-aware orphan rebalancing for better subtitle quality
+- **Language Configuration**: Extended `languages.json` with orphan prevention rules and family defaults
 
 ### Fixed
 - SRT writer edge case for empty output directories
@@ -43,6 +51,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DNT Term Filtering**: Fixed issue where numeric DNT terms were blocking proper localization
 - **Termbase Collisions**: Resolved conflicts between DNT terms and termbase entries
 - **Output Transparency**: Fixed lack of visibility into what filtering was applied during translation
+
+### Technical Details
+- Progressive shrinking tries smaller sub-batches (e.g., 5→3+2) before falling back to individual translation
+- No-orphans protection works across all language families (Latin, CJK, Cyrillic, RTL, Indic)
+- Configuration-driven approach allows easy tuning without code changes
+- Safe implementation with comprehensive error handling and logging
+
+### Impact
+- **Quality**: Eliminates quality cliff when batch translation fails
+- **Context**: Preserves natural language flow and context in subtitles
+- **Languages**: Improves subtitle quality across all supported languages
+- **Performance**: Minimal overhead with significant quality benefits
 
 ## [1.0.0] - 2025-01-27
 

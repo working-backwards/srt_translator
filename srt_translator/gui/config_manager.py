@@ -21,9 +21,10 @@ class GUIConfigManager:
     3. Built-in defaults (last resort)
     """
 
-    def __init__(self, settings_manager: SettingsManager):
+    def __init__(self, settings_manager: SettingsManager, language_config: LanguageConfig):
         """Initialize the GUI config manager"""
         self.settings_manager = settings_manager
+        self.language_config = language_config
         self.logger = logging.getLogger(__name__)
 
         # Built-in defaults
@@ -101,8 +102,7 @@ class GUIConfigManager:
 
         # Try language name to code mapping
         try:
-            config = LanguageConfig()
-            all_languages = config.get_all_languages()
+            all_languages = self.language_config.get_all_languages()
 
             for code, lang_info in all_languages.items():
                 if lang_info.get("name") == target_language:

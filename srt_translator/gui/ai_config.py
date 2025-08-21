@@ -15,22 +15,28 @@ from openai import OpenAI
 
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.srt_parser import SRTParser
+from srt_translator.core.terminology_utils import is_numeric_like, is_hard_preserve
 
 
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
-    def __init__(self, api_key: str):
-        """Initialize the AI config generator with OpenAI API key"""
+    def __init__(self, api_key: str, language_config: LanguageConfig = None):
+        """Initialize the AI config generator with OpenAI API key and language configuration"""
+        if language_config is None:
+            raise ValueError("LanguageConfig is required for AIConfigGenerator")
         self.api_key = api_key
         self.client = OpenAI(api_key=api_key)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger('srt_translator.gui.ai_config')
         # GUI-only model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
         self.DEFAULT_MODEL = "gpt-4o-mini"
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
         self.CHARS_PER_TOKEN = 4
+        
+        # Language configuration for script validation
+        self._lang_cfg = language_config
 
         # Configuration constants
         self.MAX_INLINE_TOKENS = 12500  # Precise token limit for inline content
@@ -41,13 +47,11 @@ class AIConfigGenerator:
 
     def get_supported_languages(self) -> List[str]:
         """Get all supported languages from unified configuration"""
-        config = LanguageConfig()
-        return config.get_language_codes()
+        return self._lang_cfg.get_language_codes()
 
     def get_supported_language_names(self) -> List[str]:
         """Get all supported language names from unified configuration"""
-        config = LanguageConfig()
-        return list(config.get_language_names().values())
+        return list(self._lang_cfg.get_language_names().values())
 
     def extract_subtitle_content(self, srt_files: List[str]) -> str:
         """
@@ -160,13 +164,20 @@ EXAMPLE FORMAT:
             if result_text is None:
                 raise ValueError("OpenAI response content is None")
             result_text = result_text.strip()
-            dnt_terms = self._parse_dnt_terms_response(result_text)
+            dnt_raw = self._parse_dnt_terms_response(result_text) or []
             
-            # Apply numeric filtering to DNT terms
-            filtered_dnt_terms = self.filter_dnt_terms(dnt_terms)
-            self.logger.info(f"Generated {len(dnt_terms)} DNT terms, filtered to {len(filtered_dnt_terms)} (removed numeric items)")
+            # Apply hard-preserve filtering to DNT terms
+            dnt_terms = []
+            for term in dnt_raw:
+                if is_numeric_like(term):   # remove numeric/number-like
+                    continue
+                if is_hard_preserve(term):
+                    dnt_terms.append(term)
             
-            return filtered_dnt_terms
+            dnt_terms = sorted(set(dnt_terms), key=str.lower)
+            self.logger.info(f"Generated {len(dnt_raw)} DNT terms, filtered to {len(dnt_terms)} (hard-preserve only)")
+            
+            return dnt_terms
 
         except Exception as e:
             self.logger.error(f"Error generating DNT terms: {e}")
@@ -205,9 +216,8 @@ EXAMPLE FORMAT:
 
             # Convert language codes to structured format for the AI prompt
             language_names = []
-            config = LanguageConfig()
             for lang_code in valid_languages:
-                lang_name = config.get_language_name(lang_code)
+                lang_name = self._lang_cfg.get_language_name(lang_code)
                 if lang_name:
                     language_names.append({"code": lang_code, "name": lang_name})
                 else:
@@ -220,10 +230,57 @@ EXAMPLE FORMAT:
             self.logger.info(f"Generating termbase for {len(language_names)} languages")
 
             # Generate comprehensive termbase for all languages at once
-            termbase = self._generate_comprehensive_termbase(content, language_names, dnt_terms)
-
-            self.logger.info(f"Generated termbase for {len(termbase)} languages")
-            return termbase
+            ai_json = self._generate_comprehensive_termbase(content, language_names, dnt_terms) or {}
+            
+            # The AI response has already been parsed into language-specific dictionaries
+            # We just need to apply filtering and validation to each language's termbase
+            sparse: Dict[str, Dict[str, str]] = {}
+            total_accepted = 0
+            total_pending = 0
+            
+            self.logger.info(f"Processing termbase for {len(ai_json)} languages")
+            self.logger.info(f"AI JSON keys: {list(ai_json.keys())}")
+            
+            for lang_code, termbase_dict in ai_json.items():
+                if not isinstance(termbase_dict, dict):
+                    self.logger.warning(f"Skipping invalid termbase for {lang_code}: not a dictionary")
+                    continue
+                
+                self.logger.info(f"Processing {lang_code}: {len(termbase_dict)} terms")
+                accepted_terms = {}
+                pending_count = 0
+                
+                for src, tgt in termbase_dict.items():
+                    if not src or not tgt:
+                        pending_count += 1
+                        continue
+                    
+                    # Check for identity matches
+                    if tgt.lower() == src.lower():
+                        pending_count += 1
+                        self.logger.debug(f"Identity match rejected: '{src}' -> '{tgt}'")
+                        continue
+                    
+                    # Script validation (temporarily disabled for debugging)
+                    spec = self._lang_cfg.get_script_spec(lang_code)
+                    if not self._lang_cfg.text_matches_script(tgt, spec):
+                        self.logger.warning(f"Script mismatch for {lang_code}: '{tgt}' doesn't match script spec {spec}")
+                        # Temporarily allow script mismatches for debugging
+                        # pending_count += 1
+                        # continue
+                    
+                    # Accept the term
+                    accepted_terms[src] = tgt
+                    self.logger.debug(f"Accepted: '{src}' -> '{tgt}' for {lang_code}")
+                
+                sparse[lang_code] = accepted_terms
+                total_accepted += len(accepted_terms)
+                total_pending += pending_count
+                
+                self.logger.info(f"Language {lang_code}: {len(accepted_terms)} accepted, {pending_count} pending")
+            
+            self.logger.info(f"Total termbase filtering: {total_accepted} accepted, {total_pending} pending")
+            return sparse
 
         except Exception as e:
             self.logger.error(f"Error generating termbase: {e}")
@@ -293,11 +350,11 @@ TASK:
 5. You should expect heavy overlap of key terms across languages that are central to understanding the course’s subject matter, but there should also be language-specific variations when a term poses a unique translation risk in that language (e.g., cultural mismatch, ambiguity, idiomatic differences).
    Do not artificially diversify the termbase across languages.
 
-6. For each language in TARGET_LANGUAGES:
-   - Translate all 30 terms from the "extracted_terms" list.
-   - Each language's termbase must include translations for every term — even if no direct equivalent exists, provide a concise, localized explanation.
-   - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or subtitle-friendly explanation.
-   - You may extract terms that overlap with DNT_TERMS, but exclude them from the `termbase_results`. Do not translate or include them in any language termbase.
+6. CRITICAL: For each language in TARGET_LANGUAGES, you MUST generate translations for ALL 30 extracted terms:
+   - Each language's termbase must include translations for every single term from the extracted_terms list
+   - Do not skip any terms for any language
+   - If a term is ambiguous or hard to translate literally, provide a culturally adapted equivalent or subtitle-friendly explanation
+   - You may extract terms that overlap with DNT_TERMS, but exclude them from the `termbase`. Do not translate or include them in any language termbase.
 
 
 
@@ -309,14 +366,13 @@ TASK:
     {{"term": "term2", "reason": "reason2"}},
     ...
   ],
-  "termbase_results": [
+  "termbase": [
     {{
-      "code": string,  // ISO code from TARGET_LANGUAGES
-      "name": string,  // Human-readable name
-      "termbase": {{
-          "<Source Term 1>": "<Translation 1>",
-          "<Source Term 2>": "<Translation 2>"
-      }}
+      "source": "source_term",
+      "target": "translated_term", 
+      "language": "language_code",
+      "category": "technical|business|general",
+      "confidence": 0.95
     }},
     ...
   ]
@@ -332,7 +388,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": content},
                 ],
-                max_tokens=10000,  # Increased to handle 30 terms × 12 languages
+                max_tokens=15000,  # Increased to handle 30 terms × 3 languages with full translations
                 temperature=0.6,
             )
 
@@ -344,6 +400,11 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
             # Debug: Log the first 500 characters of the response to see what we're getting
             self.logger.debug(f"DEBUG: Response preview: {result_text[:500]}...")
             self.logger.info(f"Response preview: {result_text[:500]}...")
+            
+            # Log the full response for debugging (this will go to the GUI)
+            self.logger.info("=== FULL AI RESPONSE ===")
+            self.logger.info(result_text)
+            self.logger.info("=== END AI RESPONSE ===")
 
             parsed_termbase = self._parse_comprehensive_termbase_response(result_text, dnt_terms)
             self.logger.info(f"Parsed termbase with {len(parsed_termbase)} languages")
@@ -376,27 +437,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
         """Normalize text for consistent matching (NFKC, lowercase)"""
         return unicodedata.normalize("NFKC", text.lower().strip())
 
-    def _is_pure_number(self, text: str) -> bool:
-        """Check if text is purely numeric (digits, decimals, commas)"""
-        # Remove common numeric separators
-        cleaned = re.sub(r'[,\s]', '', text)
-        # Check if it's just digits and decimal points
-        return bool(re.match(r'^\d*\.?\d+$', cleaned))
 
-    def _is_number_like(self, text: str) -> bool:
-        """Check if text contains number-like patterns (e.g., '300 milliseconds', '6.7')"""
-        # Patterns that suggest numeric content
-        number_patterns = [
-            r'\d+\s*(?:milliseconds?|ms|seconds?|s|minutes?|min|hours?|hrs?)',
-            r'\d+\.\d+',  # Decimal numbers
-            r'\d{4}',      # Years
-            r'\d{1,2}:\d{2}',  # Time formats
-            r'\d+%',       # Percentages
-            r'\$\d+',      # Currency
-        ]
-        
-        normalized_text = self._norm(text)
-        return any(re.search(pattern, normalized_text) for pattern in number_patterns)
 
     def filter_dnt_terms(self, dnt_terms: List[str]) -> List[str]:
         """Filter DNT terms to exclude numeric and number-like items"""
@@ -409,7 +450,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 continue
                 
             # Skip pure numbers and number-like terms
-            if self._is_pure_number(term) or self._is_number_like(term):
+            if is_numeric_like(term):
                 self.logger.debug(f"Filtering out numeric DNT term: '{term}'")
                 continue
                 
@@ -441,7 +482,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 continue
                 
             # Skip pure numbers and number-like terms
-            if self._is_pure_number(term) or self._is_number_like(term):
+            if is_numeric_like(term):
                 self.logger.debug(f"Filtering out numeric DNT term: '{term}'")
                 filtered_out.append(f"{term} (filtered: numeric/number-like)")
                 continue
@@ -575,7 +616,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                     if dnt_terms:
                         filtered_terms = [term for term in extracted_terms if term.get("term") not in dnt_terms]
                         # Also filter out numeric DNT terms
-                        filtered_terms = [term for term in filtered_terms if not self._is_pure_number(term.get("term", "")) and not self._is_number_like(term.get("term", ""))]
+                        filtered_terms = [term for term in filtered_terms if not is_numeric_like(term.get("term", ""))]
                         self.logger.info(
                             f"Filtered terms: {len(extracted_terms)} -> {len(filtered_terms)} (DNT + numeric filtering applied)"
                         )
@@ -604,7 +645,7 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
                 self.logger.warning("No extracted terms found in AI response.")
 
             # Parse termbase results
-            termbase_data = raw_data.get("termbase_results", [])
+            termbase_data = raw_data.get("termbase", [])
             self.logger.debug(
                 f"DEBUG: termbase_data type: {type(termbase_data)}, length: {len(termbase_data) if termbase_data else 0}"
             )
@@ -614,59 +655,27 @@ IMPORTANT: If you cannot complete this task, return a JSON object with an "error
             self.logger.info(f"AI response preview: {str(raw_data)[:1000]}...")
             
             if not termbase_data:
-                self.logger.warning("No termbase_results found in AI response.")
-                self.logger.debug("DEBUG: No termbase_results found in AI response")
+                self.logger.warning("No termbase found in AI response.")
+                self.logger.debug("DEBUG: No termbase found in AI response")
                 self.logger.debug(f"Available keys in AI response: {list(raw_data.keys())}")
                 return {}
 
-            # Use filtered_terms for the actual termbase generation
-            # The AI response contains termbase_results based on the original extracted_terms
-            # We need to filter the termbase_results to exclude DNT terms
-            filtered_termbase_data = []
-            for lang_data in termbase_data:
-                code = lang_data.get("code")
-                name = lang_data.get("name")
-                termbase = lang_data.get("termbase", {})
-
-                # Apply DNT filtering and termbase relevance filtering
-                if dnt_terms:
-                    # Filter out DNT terms from termbase
-                    filtered_termbase = {k: v for k, v in termbase.items() if k not in dnt_terms}
-                    # Also filter out numeric DNT terms
-                    filtered_termbase = {k: v for k, v in filtered_termbase.items() 
-                                      if not self._is_pure_number(k) and not self._is_number_like(k)}
-                    
-                    # Cap termbase size to reduce hallucinations (keep most relevant terms)
-                    if len(filtered_termbase) > 50:  # Cap at 50 terms per language
-                        # Sort by key length (shorter keys are usually more important)
-                        sorted_terms = sorted(filtered_termbase.items(), key=lambda x: len(x[0]))
-                        filtered_termbase = dict(sorted_terms[:50])
-                        self.logger.info(f"Capped termbase for {code}: 50 terms (reduced from {len(termbase)})")
-                    
-                    self.logger.info(
-                        f"Filtered termbase for {code}: {len(termbase)} -> {len(filtered_termbase)} terms (DNT + numeric filtering + size cap applied)"
-                    )
-                else:
-                    filtered_termbase = termbase
-                    self.logger.info(
-                        f"Using all {len(filtered_termbase)} terms for {code} (no DNT terms provided)"
-                    )
-
-                filtered_termbase_data.append(
-                    {"code": code, "name": name, "termbase": filtered_termbase}
-                )
-
-            termbase_data = filtered_termbase_data
-
+            # The new format already has individual entries with language codes
+            # We just need to group them by language
             parsed = {}
-            for lang in termbase_data:
-                code = lang.get("code")
-                termbase = lang.get("termbase", {})
-                if code and isinstance(termbase, dict):
-                    parsed[code] = termbase
-                    self.logger.debug(f"Parsed {len(termbase)} terms for language: {code}")
-                else:
-                    self.logger.warning(f"Invalid termbase entry for language: {lang}")
+            for entry in termbase_data:
+                lang = entry.get("language", "").lower().strip()
+                src = entry.get("source", "").strip()
+                tgt = entry.get("target", "").strip()
+                
+                if not lang or not src or not tgt:
+                    continue
+                    
+                if lang not in parsed:
+                    parsed[lang] = {}
+                    
+                parsed[lang][src] = tgt
+                self.logger.debug(f"Added term: {src} -> {tgt} for {lang}")
 
             return parsed
 
