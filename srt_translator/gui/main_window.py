@@ -397,36 +397,20 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             def run(self):
                 try:
-                    self.progress.emit("AI Config Worker: Starting content extraction")
-                    self.logger.info("AI Config Worker: Starting content extraction")
+                    self.progress.emit("AI Config Worker: Starting batch-level AI config generation")
+                    self.logger.info("AI Config Worker: Starting batch-level AI config generation")
                     
-                    # Extract content from SRT files
-                    content = self.ai_generator.extract_subtitle_content(self.files)
-                    progress_msg = f"AI Config Worker: Extracted {len(content)} characters of content"
-                    self.progress.emit(progress_msg)
-                    self.logger.info(progress_msg)
-
-                    self.progress.emit("AI Config Worker: Generating DNT terms")
-                    self.logger.info("AI Config Worker: Generating DNT terms")
-                    
-                    # Generate DNT terms
-                    dnt_terms = self.ai_generator.generate_dnt_terms(content)
-                    progress_msg = f"AI Config Worker: Generated {len(dnt_terms)} DNT terms"
-                    self.progress.emit(progress_msg)
-                    self.logger.info(progress_msg)
-
-                    self.progress.emit("AI Config Worker: Generating termbase")
-                    self.logger.info("AI Config Worker: Generating termbase")
-                    
-                    # Generate termbase
-                    termbase = self.ai_generator.generate_termbase(
-                        content, self.languages
+                    # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
+                    batch_config = self.ai_generator.generate_batch_ai_config(
+                        source_file_paths=self.files,
+                        target_lang_codes=self.languages
                     )
-                    progress_msg = f"AI Config Worker: Generated termbase for {len(termbase)} languages"
+                    
+                    progress_msg = f"AI Config Worker: Generated {len(batch_config.dnt_terms)} DNT terms and termbase for {len(batch_config.termbase)} languages (batch-level)"
                     self.progress.emit(progress_msg)
                     self.logger.info(progress_msg)
 
-                    self.finished.emit((dnt_terms, termbase))
+                    self.finished.emit((batch_config.dnt_terms, batch_config.termbase))
 
                 except Exception as e:
                     error_msg = f"AI Config Worker: Error during generation: {e}"

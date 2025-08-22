@@ -69,6 +69,22 @@ def translate_srt_files(
     logger.info(f"Translating with batch size: {translation_config.batch_size}")
     logger.info("Using subtitle-based translation system")
 
+    # Write batch-level AI config into the batch folder for traceability
+    if translation_config.dnt_terms or translation_config.termbase:
+        ai_cfg_path = os.path.join(batch_dir, "ai_config.json")
+        try:
+            with open(ai_cfg_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "dnt_terms": translation_config.dnt_terms or [],
+                    "termbase": translation_config.termbase or {},
+                    "generated_at": ts_str,
+                    "source_files": len(file_paths),
+                    "target_languages": list(translation_config.target_languages.values())
+                }, f, ensure_ascii=False, indent=2)
+            logger.info(f"Wrote batch-level AI config: {os.path.basename(ai_cfg_path)}")
+        except Exception as e:
+            logger.warning(f"Failed to write AI config manifest: {e}")
+
     # Apply numeric filtering to DNT terms before creating translator
     filtered_dnt_terms = translation_config.dnt_terms
     dnt_filtered_out = []
