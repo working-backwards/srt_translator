@@ -14,13 +14,13 @@ from srt_translator.core.translator.subtitle_formatter import format_subtitle_te
 from srt_translator.core.translator.term_handler import TermHandler
 
 
-
 # OpenAI client
 from openai import OpenAI
 
 # ---------------------------
 # Fallback functions (if imports fail)
 # ---------------------------
+
 
 def _safe_format_subtitle_text(
     text: str,
@@ -56,39 +56,41 @@ def _safe_format_subtitle_text(
         return clean[:mid].rstrip() + "\n" + clean[mid:].lstrip()
 
 
-
 # ---------------------------
 # Data models
 # ---------------------------
+
 
 @dataclass
 class Subtitle:
     idx: int
     start: str  # "HH:MM:SS,mmm"
-    end: str    # "HH:MM:SS,mmm"
+    end: str  # "HH:MM:SS,mmm"
     text: str
+
 
 @dataclass
 class TranslationConfiguration:
-    target_languages: Dict[str, str]                  # {"Spanish":"es", ...}
+    target_languages: Dict[str, str]  # {"Spanish":"es", ...}
     dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]               # {"es": {"term": "term"}, "zh-hans": {...}}
+    termbase: Dict[str, Dict[str, str]]  # {"es": {"term": "term"}, "zh-hans": {...}}
     batch_size: int
     aggressiveness: float
     api_key: str
     model_name: str = "gpt-4o-mini"
-    error_policy: str = "STRICT"                      # "STRICT" | "BOUNDED" | "DEV"
-    mode: str = "GUI"                                 # "GUI" | "CLI"
+    error_policy: str = "STRICT"  # "STRICT" | "BOUNDED" | "DEV"
+    mode: str = "GUI"  # "GUI" | "CLI"
+
 
 # ---------------------------
 # Utilities
 # ---------------------------
 
 SRT_BLOCK_RE = re.compile(
-    r"^\s*(\d+)\s*\n"                                 # index
+    r"^\s*(\d+)\s*\n"  # index
     r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*"
     r"(\d{2}:\d{2}:\d{2},\d{3})\s*\n"
-    r"(.*?)(?=\n{2,}|\Z)",                            # text
+    r"(.*?)(?=\n{2,}|\Z)",  # text
     re.DOTALL | re.MULTILINE,
 )
 
@@ -96,12 +98,17 @@ TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
 
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__")
 
+
 def _parse_time_to_seconds(ts: str) -> float:
     m = TIME_RE.match(ts)
     if not m:
         return 0.0
-    h = int(m.group("h")); m_ = int(m.group("m")); s = int(m.group("s")); ms = int(m.group("ms"))
+    h = int(m.group("h"))
+    m_ = int(m.group("m"))
+    s = int(m.group("s"))
+    ms = int(m.group("ms"))
     return h * 3600 + m_ * 60 + s + ms / 1000.0
+
 
 def parse_srt(text: str) -> List[Subtitle]:
     subs: List[Subtitle] = []
@@ -113,6 +120,7 @@ def parse_srt(text: str) -> List[Subtitle]:
         subs.append(Subtitle(idx=idx, start=start, end=end, text=body))
     return subs
 
+
 def render_srt(subs: Sequence[Subtitle]) -> str:
     parts: List[str] = []
     for i, sub in enumerate(subs, start=1):
@@ -122,8 +130,10 @@ def render_srt(subs: Sequence[Subtitle]) -> str:
         parts.append("")  # blank line
     return "\n".join(parts).rstrip() + "\n"
 
+
 def chunk(seq: Sequence[Any], n: int) -> List[List[Any]]:
-    return [list(seq[i:i+n]) for i in range(0, len(seq), n)]
+    return [list(seq[i : i + n]) for i in range(0, len(seq), n)]
+
 
 def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) -> str:
     lang = lang_code.lower()
@@ -136,9 +146,11 @@ def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) ->
     lines = [f"- {src} → {tgt}" for src, tgt in pairs.items()]
     return "\n".join(lines)
 
+
 # DNT placeholder validation helpers
 def _extract_ph_ids(text: str, ph_regex: re.Pattern) -> Set[str]:
     return set(ph_regex.findall(text or ""))
+
 
 def validate_placeholders_pair(
     src_items: List[str],
@@ -151,27 +163,34 @@ def validate_placeholders_pair(
         src_ids = _extract_ph_ids(src, ph_regex)
         tgt_ids = _extract_ph_ids(tgt, ph_regex)
         invented = {pid for pid in tgt_ids if pid not in allowed_ids}
-        missing  = {pid for pid in src_ids if pid not in tgt_ids}
+        missing = {pid for pid in src_ids if pid not in tgt_ids}
         if invented or missing:
             issues[i] = {"invented": invented, "missing": missing}
     return issues
 
-def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.Pattern) -> str:
+
+def strip_invented_placeholders(
+    text: str, invented_ids: Set[str], ph_regex: re.Pattern
+) -> str:
     if not invented_ids:
         return text
+
     def _sub(m):
         pid = m.group(1)
         return "" if pid in invented_ids else m.group(0)
+
     return ph_regex.sub(_sub, text or "")
+
 
 # ---------------------------
 # SRTTranslator
 # ---------------------------
 
+
 class SRTTranslator:
     # Expert configuration - modify these values as needed
     HARD_BATCH_LIMIT = 8  # Maximum subtitles per batch (safety cap)
-    
+
     def __init__(
         self,
         *,
@@ -187,21 +206,23 @@ class SRTTranslator:
     ) -> None:
         if logger is None:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
-        
+
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
         self.model_name = model_name
         self.batch_size = max(1, int(batch_size))
         self.error_policy = error_policy.upper()
-        
+
         # Make a namespaced child for clarity in logs
-        self.logger = logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
+        self.logger = (
+            logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
+        )
         self.logger = self.logger.getChild("core.translator")
         # If caller gave an adapter, re-wrap child with the same extra
         if isinstance(logger, logging.LoggerAdapter):
             self.logger = logging.LoggerAdapter(self.logger, logger.extra)
-            
+
         self.language_config = language_config or LanguageConfig()
 
         # Initialize TermHandler for DNT and termbase management
@@ -213,11 +234,13 @@ class SRTTranslator:
         )
 
         if OpenAI is None:
-            raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
+            raise RuntimeError(
+                "OpenAI client not available; install/openai and configure API key."
+            )
 
         self.client = OpenAI(api_key=api_key)
 
-    # --- Sentence-aware batching (no utterances) ----------------------------
+    # --- Sentence-aware batching ----------------------------
     def _create_batches(
         self,
         subtitles: List[Subtitle],
@@ -279,13 +302,20 @@ class SRTTranslator:
         target_lang: str,
     ) -> None:
         # Per-call context (add file/lang without reconfiguring handlers)
-        file_logger = logging.LoggerAdapter(self.logger, {
-            "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
-            "file": os.path.basename(input_filepath),
-            "lang": target_lang,
-        })
-        
-        file_logger.info("Using subtitle-based translation system for %s → %s", os.path.basename(input_filepath), target_lang)
+        file_logger = logging.LoggerAdapter(
+            self.logger,
+            {
+                "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
+                "file": os.path.basename(input_filepath),
+                "lang": target_lang,
+            },
+        )
+
+        file_logger.info(
+            "Using subtitle-based translation system for %s → %s",
+            os.path.basename(input_filepath),
+            target_lang,
+        )
 
         # 1) Load and parse SRT
         with open(input_filepath, "r", encoding="utf-8") as f:
@@ -294,7 +324,11 @@ class SRTTranslator:
         if not src_subs:
             raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
 
-        self.logger.info("Processing %d subtitles for %s", len(src_subs), os.path.basename(input_filepath))
+        self.logger.info(
+            "Processing %d subtitles for %s",
+            len(src_subs),
+            os.path.basename(input_filepath),
+        )
 
         # 2) Sentence-aware batching (each subtitle stays its own item)
         batches = self._create_batches(
@@ -303,13 +337,17 @@ class SRTTranslator:
             hard_limit=self.HARD_BATCH_LIMIT,
             target_lang=target_lang,
         )
-        
+
         file_logger.info(
             "Using sentence-aware batching for %s → %s "
             "(%d subtitles → %d batches; "
             "soft=%d, hard=%d)",
-            os.path.basename(input_filepath), target_lang, len(src_subs), len(batches), 
-            self.batch_size, self.HARD_BATCH_LIMIT
+            os.path.basename(input_filepath),
+            target_lang,
+            len(src_subs),
+            len(batches),
+            self.batch_size,
+            self.HARD_BATCH_LIMIT,
         )
         all_tgt_subs: List[Subtitle] = []
 
@@ -317,10 +355,14 @@ class SRTTranslator:
         cps_soft, cps_hard = self._get_cps_caps(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
-            file_logger.info("Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches))
+            file_logger.info(
+                "Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches)
+            )
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
-            src_items = [self.term_handler.apply_dnt_placeholders(s.text) for s in batch]
+            src_items = [
+                self.term_handler.apply_dnt_placeholders(s.text) for s in batch
+            ]
 
             # Call JSON batch
             items = self._translate_batch_json(
@@ -332,52 +374,90 @@ class SRTTranslator:
 
             # Validate count
             if len(items) != len(batch):
-                file_logger.warning("JSON batch count mismatch: expected %d, got %d", len(batch), len(items))
+                file_logger.warning(
+                    "JSON batch count mismatch: expected %d, got %d",
+                    len(batch),
+                    len(items),
+                )
                 # Reformat pass (shape-only)
                 items = self._reformat_items_to_shape(
                     raw_src=src_items,
                     raw_ids=[s.idx for s in batch],
-                    raw_tgt_text="\n".join([it.get("tgt", "") for it in items]) if isinstance(items, list) else str(items),
+                    raw_tgt_text=(
+                        "\n".join([it.get("tgt", "") for it in items])
+                        if isinstance(items, list)
+                        else str(items)
+                    ),
                     expected_count=len(batch),
                 )
 
             # Extract and validate placeholder usage
             tgt_texts = [it.get("tgt", "") for it in items]
-            allowed_ph_ids = {m.group(1) for ph in self.term_handler.placeholder_map.keys() for m in [self.term_handler.placeholder_regex.search(ph)] if m}
-            ph_issues = validate_placeholders_pair(src_items, tgt_texts, allowed_ph_ids, self.term_handler.placeholder_regex)
+            allowed_ph_ids = {
+                m.group(1)
+                for ph in self.term_handler.placeholder_map.keys()
+                for m in [self.term_handler.placeholder_regex.search(ph)]
+                if m
+            }
+            ph_issues = validate_placeholders_pair(
+                src_items,
+                tgt_texts,
+                allowed_ph_ids,
+                self.term_handler.placeholder_regex,
+            )
 
             if ph_issues:
                 for idx, kinds in ph_issues.items():
                     inv = ",".join(sorted(kinds["invented"])) or "-"
                     mis = ",".join(sorted(kinds["missing"])) or "-"
-                    file_logger.warning("Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]", bi, idx, inv, mis)
+                    file_logger.warning(
+                        "Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]",
+                        bi,
+                        idx,
+                        inv,
+                        mis,
+                    )
 
                 if self.error_policy == "STRICT":
                     fixed = self._reformat_fix_placeholders(
                         src_items=src_items,
                         tgt_items=tgt_texts,
                         ids=[s.idx for s in batch],
-                        allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
+                        allowed_placeholders=sorted(
+                            self.term_handler.placeholder_map.keys()
+                        ),
                     )
                     if fixed is None:
-                        raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
+                        raise RuntimeError(
+                            "Reformat failed: phantom/missing placeholders unresolved."
+                        )
                     tgt_texts = fixed
                 elif self.error_policy in ("BOUNDED", "DEV"):
                     # Remove invented; warn about missing but do not invent content.
                     for i, kinds in ph_issues.items():
                         if kinds["invented"]:
-                            tgt_texts[i] = strip_invented_placeholders(tgt_texts[i], kinds["invented"], self.term_handler.placeholder_regex)
+                            tgt_texts[i] = strip_invented_placeholders(
+                                tgt_texts[i],
+                                kinds["invented"],
+                                self.term_handler.placeholder_regex,
+                            )
 
             # Restore DNT placeholders to originals
-            tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
+            tgt_texts = [
+                self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts
+            ]
 
             # Empty guard (STRICT/BOUNDED behavior)
-            for i, (src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
+            for i, (src_raw, tgt_raw) in enumerate(
+                zip([s.text for s in batch], tgt_texts)
+            ):
                 if not tgt_raw.strip():
                     msg = f"Empty translation for subtitle idx={batch[i].idx}"
                     if self.error_policy == "STRICT":
                         raise RuntimeError(msg)
-                    file_logger.warning("%s; falling back to source text (BOUNDED/DEV).", msg)
+                    file_logger.warning(
+                        "%s; falling back to source text (BOUNDED/DEV).", msg
+                    )
                     tgt_texts[i] = src_raw
 
             # Format per subtitle (CPS; line breaks)
@@ -388,12 +468,14 @@ class SRTTranslator:
                     lang_code=target_lang.lower(),
                     text=tgt,
                     start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
-                    end_ms=int(end_s * 1000),      # Convert seconds to milliseconds
+                    end_ms=int(end_s * 1000),  # Convert seconds to milliseconds
                     cps_soft=cps_soft,
                     cps_hard=cps_hard,
                     overshoot_pct=0.10,
                 )
-                all_tgt_subs.append(Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted))
+                all_tgt_subs.append(
+                    Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
+                )
 
         # 3) Render and write
         out_text = render_srt(all_tgt_subs)
@@ -404,10 +486,15 @@ class SRTTranslator:
         if file_logger:
             file_logger.debug(
                 "Translated %s → %s (lang=%s). Placeholder restoration will run in core.main Fixer pass.",
-                os.path.basename(input_filepath), os.path.basename(output_filepath), target_lang
+                os.path.basename(input_filepath),
+                os.path.basename(output_filepath),
+                target_lang,
             )
 
-        file_logger.info("Subtitle-based translation completed for %s", os.path.basename(input_filepath))
+        file_logger.info(
+            "Subtitle-based translation completed for %s",
+            os.path.basename(input_filepath),
+        )
         return True
 
     # ---------- Core calls ----------
@@ -523,8 +610,10 @@ TRANSLATED TEXT (to reformat, do NOT translate):
 """
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "system", "content": sys},
-                      {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.0,
             response_format={"type": "json_object"},
         )
@@ -532,7 +621,9 @@ TRANSLATED TEXT (to reformat, do NOT translate):
         data = json.loads(content)
         items = data.get("items", [])
         if len(items) != expected_count:
-            raise RuntimeError(f"Reformat still mismatched: expected {expected_count}, got {len(items)}")
+            raise RuntimeError(
+                f"Reformat still mismatched: expected {expected_count}, got {len(items)}"
+            )
         norm = []
         for oid, obj in zip(raw_ids, items):
             # force ids to expected order
@@ -566,8 +657,10 @@ TARGET ITEMS (TO FIX):
 """
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "system", "content": sys},
-                      {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.0,
             response_format={"type": "json_object"},
         )
@@ -605,14 +698,23 @@ TARGET ITEMS (TO FIX):
         return "\n".join(rows)
 
     @staticmethod
-    def debug_log_config(cfg, logger: logging.Logger, *, full_termbase=False, max_langs=12, max_terms_per_lang=8):
+    def debug_log_config(
+        cfg,
+        logger: logging.Logger,
+        *,
+        full_termbase=False,
+        max_langs=12,
+        max_terms_per_lang=8,
+    ):
         """
         Emit a redacted, human-friendly config snapshot at DEBUG level.
         - full_termbase=False prints a per-language summary with samples.
         - Set full_termbase=True to pretty-print the entire termbase.
         """
         if logger is None:
-            raise ValueError("Logger is required for debug_log_config; no fallback allowed.")
+            raise ValueError(
+                "Logger is required for debug_log_config; no fallback allowed."
+            )
         log = logger
         if not log.isEnabledFor(logging.DEBUG):
             return
