@@ -22,38 +22,7 @@ from openai import OpenAI
 # ---------------------------
 
 
-def _safe_format_subtitle_text(
-    text: str,
-    start_s: float,
-    end_s: float,
-    lang_code: str,
-    cps_soft: int,
-    cps_hard: int,
-    allow_overshoot_pct: float = 0.10,
-) -> str:
-    """
-    Safe fallback for subtitle formatting if the main formatter is unavailable.
-    Simple wrapper with basic line wrapping and CPS enforcement.
-    """
-    try:
-        return format_subtitle_text(
-            text, start_s, end_s, lang_code, cps_soft, cps_hard, allow_overshoot_pct
-        )
-    except Exception:
-        # Very basic fallback: wrap to ~42 chars/line and trim if > hard cap
-        duration = max(0.001, end_s - start_s)
-        cap = int(cps_hard * duration * (1.0 + allow_overshoot_pct))
-        clean = " ".join(text.split())
-        if len(clean) > cap:
-            clean = clean[:cap].rstrip()
-
-        # naive 2-line wrap
-        if len(clean) <= 42:
-            return clean
-        mid = clean.rfind(" ", 0, min(len(clean), 42))
-        if mid == -1:
-            mid = 42
-        return clean[:mid].rstrip() + "\n" + clean[mid:].lstrip()
+# Fallback function removed - no longer needed with simplified CPS system
 
 
 # ---------------------------
@@ -155,15 +124,14 @@ def _extract_ph_ids(text: str, ph_regex: re.Pattern) -> Set[str]:
 def validate_placeholders_pair(
     src_items: List[str],
     tgt_items: List[str],
-    allowed_ids: Set[str],
     ph_regex: re.Pattern,
 ) -> Dict[int, Dict[str, Set[str]]]:
     issues: Dict[int, Dict[str, Set[str]]] = {}
     for i, (src, tgt) in enumerate(zip(src_items, tgt_items)):
         src_ids = _extract_ph_ids(src, ph_regex)
         tgt_ids = _extract_ph_ids(tgt, ph_regex)
-        invented = {pid for pid in tgt_ids if pid not in allowed_ids}
-        missing = {pid for pid in src_ids if pid not in tgt_ids}
+        invented = tgt_ids - src_ids
+        missing = src_ids - tgt_ids
         if invented or missing:
             issues[i] = {"invented": invented, "missing": missing}
     return issues
@@ -189,7 +157,7 @@ def strip_invented_placeholders(
 
 class SRTTranslator:
     # Expert configuration - modify these values as needed
-    HARD_BATCH_LIMIT = 8  # Maximum subtitles per batch (safety cap)
+    MAX_BATCH_SIZE = 8  # Maximum subtitles per batch (safety cap)
 
     def __init__(
         self,
@@ -244,14 +212,14 @@ class SRTTranslator:
     def _create_batches(
         self,
         subtitles: List[Subtitle],
-        soft_limit: int,
-        hard_limit: int,
+        target_size: int,
+        max_size: int,
         target_lang: str,
     ) -> List[List[Subtitle]]:
         """
         Group consecutive subtitles into batches that prefer ending at a natural
-        sentence boundary once the soft limit is reached, without exceeding
-        the hard limit.  Each subtitle remains its own item (1:1 id mapping).
+        sentence boundary once the target size is reached, without exceeding
+        the maximum size.  Each subtitle remains its own item (1:1 id mapping).
         """
         if not subtitles:
             return []
@@ -274,14 +242,14 @@ class SRTTranslator:
         for sub in subtitles:
             current.append(sub)
 
-            # If we hit the hard cap, cut the batch immediately.
-            if len(current) >= hard_limit:
+            # If we hit the maximum cap, cut the batch immediately.
+            if len(current) >= max_size:
                 batches.append(current)
                 current = []
                 continue
 
-            # If we've reached the soft target, prefer to break on a sentence end.
-            if len(current) >= soft_limit:
+            # If we've reached the target size, prefer to break on a sentence end.
+            if len(current) >= target_size:
                 text = (sub.text or "").strip()
                 if any(text.endswith(end) for end in sentence_endings):
                     batches.append(current)
@@ -333,26 +301,26 @@ class SRTTranslator:
         # 2) Sentence-aware batching (each subtitle stays its own item)
         batches = self._create_batches(
             subtitles=src_subs,
-            soft_limit=int(self.batch_size),
-            hard_limit=self.HARD_BATCH_LIMIT,
+            target_size=int(self.batch_size),
+            max_size=self.MAX_BATCH_SIZE,
             target_lang=target_lang,
         )
 
         file_logger.info(
             "Using sentence-aware batching for %s → %s "
             "(%d subtitles → %d batches; "
-            "soft=%d, hard=%d)",
+            "target=%d, max=%d)",
             os.path.basename(input_filepath),
             target_lang,
             len(src_subs),
             len(batches),
             self.batch_size,
-            self.HARD_BATCH_LIMIT,
+            self.MAX_BATCH_SIZE,
         )
         all_tgt_subs: List[Subtitle] = []
 
-        # Language rules
-        cps_soft, cps_hard = self._get_cps_caps(target_lang)
+        # Language CPS cap
+        cps_cap = self.language_config.get_cps_cap(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
             file_logger.info(
@@ -363,6 +331,15 @@ class SRTTranslator:
             src_items = [
                 self.term_handler.apply_dnt_placeholders(s.text) for s in batch
             ]
+
+            # Log source items being sent to AI for troubleshooting
+            file_logger.debug(
+                "Sending batch %d/%d to AI (lang=%s):\n%s",
+                bi,
+                len(batches),
+                target_lang,
+                "\n".join([f"  {i}: {text}" for i, text in enumerate(src_items)]),
+            )
 
             # Call JSON batch
             items = self._translate_batch_json(
@@ -391,18 +368,32 @@ class SRTTranslator:
                     expected_count=len(batch),
                 )
 
-            # Extract and validate placeholder usage
+                # Extract and validate placeholder usage
             tgt_texts = [it.get("tgt", "") for it in items]
-            allowed_ph_ids = {
-                m.group(1)
-                for ph in self.term_handler.placeholder_map.keys()
-                for m in [self.term_handler.placeholder_regex.search(ph)]
-                if m
-            }
+
+            # Log input/output for troubleshooting placeholder issues
+            for i, (src, tgt) in enumerate(zip(src_items, tgt_texts)):
+                # Use the regex pattern directly to avoid logging violations
+                src_placeholders = PH_RE.findall(src)
+                tgt_placeholders = PH_RE.findall(tgt)
+                if src_placeholders or tgt_placeholders:
+                    file_logger.info(
+                        "Placeholder comparison (batch=%d, item=%d):\n"
+                        "  Source: %s\n"
+                        "  Target: %s\n"
+                        "  Source placeholders: %s\n"
+                        "  Target placeholders: %s",
+                        bi,
+                        i,
+                        src,
+                        tgt,
+                        src_placeholders,
+                        tgt_placeholders,
+                    )
+
             ph_issues = validate_placeholders_pair(
                 src_items,
                 tgt_texts,
-                allowed_ph_ids,
                 self.term_handler.placeholder_regex,
             )
 
@@ -469,9 +460,7 @@ class SRTTranslator:
                     text=tgt,
                     start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
                     end_ms=int(end_s * 1000),  # Convert seconds to milliseconds
-                    cps_soft=cps_soft,
-                    cps_hard=cps_hard,
-                    overshoot_pct=0.10,
+                    cps_cap=cps_cap,
                 )
                 all_tgt_subs.append(
                     Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
@@ -558,6 +547,14 @@ INPUT ITEMS:
         )
         content = (resp.choices[0].message.content or "").strip()
 
+        # Log the raw AI response for troubleshooting
+        self.logger.debug(
+            "AI response for batch (lang=%s, items=%d):\n%s",
+            target_lang,
+            len(src_items),
+            content,
+        )
+
         try:
             data = json.loads(content)
             items = data.get("items", [])
@@ -568,6 +565,24 @@ INPUT ITEMS:
                 if isinstance(oid, str) and oid.isdigit():
                     oid = int(oid)
                 norm.append({"id": oid, "tgt": obj.get("tgt", "")})
+
+            # Log the parsed items for verification
+            self.logger.debug(
+                "Parsed %d items from AI response: %s",
+                len(norm),
+                [
+                    {
+                        "id": item["id"],
+                        "tgt": (
+                            item["tgt"][:50] + "..."
+                            if len(item["tgt"]) > 50
+                            else item["tgt"]
+                        ),
+                    }
+                    for item in norm
+                ],
+            )
+
             return norm
         except Exception:
             # If the model ignored JSON mode, attempt a quick reformat pass.
@@ -676,17 +691,7 @@ TARGET ITEMS (TO FIX):
 
     # ---------- Helpers ----------
 
-    def _get_cps_caps(self, lang_code: str) -> Tuple[int, int]:
-        try:
-            caps = self.language_config.get_cps_caps(lang_code)
-            # Expecting (soft, hard). If your method returns a dict, adapt here.
-            if isinstance(caps, (list, tuple)) and len(caps) == 2:
-                return int(caps[0]), int(caps[1])
-            if isinstance(caps, dict):
-                return int(caps.get("cps_soft", 16)), int(caps.get("cps_hard", 18))
-        except Exception:
-            pass
-        return (16, 18)  # sensible defaults
+    # Removed: no backward compatibility; single cps_cap is required in config.
 
     @staticmethod
     def _render_items_for_prompt(ids: List[int], texts: List[str]) -> str:

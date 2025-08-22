@@ -11,10 +11,12 @@ from typing import Any, Dict, List
 class LanguageConfig:
     """Immutable view over a preloaded languages mapping.
     Core code MUST receive this via DI; it never reads files itself."""
-    
+
     def __init__(self, data: Dict[str, Any]):
         if not isinstance(data, dict) or "languages" not in data:
-            raise ValueError("LanguageConfig requires a preloaded mapping with a 'languages' key.")
+            raise ValueError(
+                "LanguageConfig requires a preloaded mapping with a 'languages' key."
+            )
         if not data["languages"]:
             raise ValueError("LanguageConfig requires non-empty languages mapping.")
         self._config: Dict[str, Any] = data
@@ -88,69 +90,20 @@ class LanguageConfig:
             "break_markers": lang_info.get("break_markers", []),
         }
 
-    def get_cps_caps(self, code: str) -> Dict[str, int]:
-        """Get CPS (characters per second) limits for a language"""
-        languages = self.get_all_languages()
-        meta = languages.get(code, {})
-        return {
-            "cps_soft": int(meta.get("cps_soft", 15)),
-            "cps_hard": int(meta.get("cps_hard", 20)),
-        }
+    def get_cps_cap(self, code: str) -> int:
+        """Return the single CPS cap for a language (required)."""
+        meta = self.get_all_languages().get(code, {}) or {}
+        cap = meta.get("cps_cap")
+        if cap is None:
+            # Default fallback for robustness
+            return 20
+        return int(cap)
 
     def get_family_defaults(self, family: str) -> dict:
         """Get family-level defaults for language configuration"""
         return (self._config.get("family_defaults") or {}).get(family, {})
 
-    def no_orphan_end(self, code: str) -> list[str]:
-        """
-        Get list of tokens that should not end a subtitle for a language.
-        Falls back to family defaults if language-specific config is missing.
-        """
-        languages = self.get_all_languages()
-        lang_info = languages.get(code, {})
-        family = lang_info.get("family", "")
-        
-        # Try language-specific config first, then family defaults
-        lang_config = lang_info.get("no_orphan_end", [])
-        if lang_config:
-            return lang_config
-            
-        family_defaults = self.get_family_defaults(family)
-        return family_defaults.get("no_orphan_end", [])
-
-    def no_orphan_chars_end(self, code: str) -> list[str]:
-        """
-        Get list of characters that should not end a subtitle for CJK languages.
-        Falls back to family defaults if language-specific config is missing.
-        """
-        languages = self.get_all_languages()
-        lang_info = languages.get(code, {})
-        family = lang_info.get("family", "")
-        
-        # Try language-specific config first, then family defaults
-        lang_config = lang_info.get("no_orphan_chars_end", [])
-        if lang_config:
-            return lang_config
-            
-        family_defaults = self.get_family_defaults(family)
-        return family_defaults.get("no_orphan_chars_end", [])
-
-    def protected_bigrams(self, code: str) -> list[str]:
-        """
-        Get list of two-word sequences that should stay together if possible.
-        Falls back to family defaults if language-specific config is missing.
-        """
-        languages = self.get_all_languages()
-        lang_info = languages.get(code, {})
-        family = lang_info.get("family", "")
-        
-        # Try language-specific config first, then family defaults
-        lang_config = lang_info.get("protected_bigrams", [])
-        if lang_config:
-            return lang_config
-            
-        family_defaults = self.get_family_defaults(family)
-        return family_defaults.get("protected_bigrams", [])
+    # Orphan/protected lists are removed (no reflow/wrapping policy).
 
     def family(self, code: str) -> str:
         """Get the language family for a given language code"""
@@ -166,28 +119,28 @@ class LanguageConfig:
 
     # ---------- Script helpers (unchanged design; now fed by JSON) ----------
     _UNICODE_BLOCKS = {
-        "CJK":       [("\u4E00","\u9FFF")],
-        "Hiragana":  [("\u3040","\u309F")],
-        "Katakana":  [("\u30A0","\u30FF")],
-        "Hangul":    [("\uAC00","\uD7A3")],
-        "Arabic":    [("\u0600","\u06FF")],
-        "Hebrew":    [("\u0590","\u05FF")],
-        "Cyrillic":  [("\u0400","\u04FF")],
-        "Greek":     [("\u0370","\u03FF")],
-        "Devanagari":[("\u0900","\u097F")],
-        "Bengali":   [("\u0980","\u09FF")],
-        "Gurmukhi":  [("\u0A00","\u0A7F")],
-        "Gujarati":  [("\u0A80","\u0AFF")],
-        "Oriya":     [("\u0B00","\u0B7F")],
-        "Tamil":     [("\u0B80","\u0BFF")],
-        "Telugu":    [("\u0C00","\u0C7F")],
-        "Kannada":   [("\u0C80","\u0CFF")],
-        "Malayalam": [("\u0D00","\u0D7F")],
-        "Sinhala":   [("\u0D80","\u0DFF")],
-        "Thai":      [("\u0E00","\u0E7F")],
-        "Lao":       [("\u0E80","\u0EFF")],
-        "Khmer":     [("\u1780","\u17FF")],
-        "Georgian":  [("\u10A0","\u10FF")]
+        "CJK": [("\u4E00", "\u9FFF")],
+        "Hiragana": [("\u3040", "\u309F")],
+        "Katakana": [("\u30A0", "\u30FF")],
+        "Hangul": [("\uAC00", "\uD7A3")],
+        "Arabic": [("\u0600", "\u06FF")],
+        "Hebrew": [("\u0590", "\u05FF")],
+        "Cyrillic": [("\u0400", "\u04FF")],
+        "Greek": [("\u0370", "\u03FF")],
+        "Devanagari": [("\u0900", "\u097F")],
+        "Bengali": [("\u0980", "\u09FF")],
+        "Gurmukhi": [("\u0A00", "\u0A7F")],
+        "Gujarati": [("\u0A80", "\u0AFF")],
+        "Oriya": [("\u0B00", "\u0B7F")],
+        "Tamil": [("\u0B80", "\u0BFF")],
+        "Telugu": [("\u0C00", "\u0C7F")],
+        "Kannada": [("\u0C80", "\u0CFF")],
+        "Malayalam": [("\u0D00", "\u0D7F")],
+        "Sinhala": [("\u0D80", "\u0DFF")],
+        "Thai": [("\u0E00", "\u0E7F")],
+        "Lao": [("\u0E80", "\u0EFF")],
+        "Khmer": [("\u1780", "\u17FF")],
+        "Georgian": [("\u10A0", "\u10FF")],
     }
 
     def get_script_spec(self, code: str) -> dict:
@@ -195,65 +148,65 @@ class LanguageConfig:
         languages = self.get_all_languages()
         meta = languages.get(code, {})
         spec = {}
-        
+
         if "script_blocks" in meta:
             spec["script_blocks"] = meta["script_blocks"]
         if "script" in meta:
             spec["script"] = meta["script"]
-            
+
         if not spec:
             # Fall back to family-based defaults
             fam = (meta.get("family") or "").lower()
             blocks = self._FAMILY_TO_DEFAULT_BLOCK.get(fam, [])
             if blocks:
                 spec["script_blocks"] = blocks
-                
+
         return spec
 
     def text_matches_script(self, text: str, spec: dict) -> bool:
         """Check if text contains characters that match the required script"""
         if not spec:
             return True
-            
+
         blocks = spec.get("script_blocks")
         if not blocks:
             # Map script names to blocks
             mapping = {
-                "cjk": ["CJK"], 
-                "japanese": ["Hiragana","Katakana","CJK"], 
+                "cjk": ["CJK"],
+                "japanese": ["Hiragana", "Katakana", "CJK"],
                 "hangul": ["Hangul"],
-                "arabic": ["Arabic"], 
+                "arabic": ["Arabic"],
                 "hebrew": ["Hebrew"],
-                "cyrillic": ["Cyrillic"], 
+                "cyrillic": ["Cyrillic"],
                 "greek": ["Greek"],
-                "devanagari": ["Devanagari"], 
-                "bengali": ["Bengali"], 
+                "devanagari": ["Devanagari"],
+                "bengali": ["Bengali"],
                 "gurmukhi": ["Gurmukhi"],
-                "gujarati": ["Gujarati"], 
-                "odia": ["Oriya"], 
-                "tamil": ["Tamil"], 
+                "gujarati": ["Gujarati"],
+                "odia": ["Oriya"],
+                "tamil": ["Tamil"],
                 "telugu": ["Telugu"],
-                "kannada": ["Kannada"], 
-                "malayalam": ["Malayalam"], 
+                "kannada": ["Kannada"],
+                "malayalam": ["Malayalam"],
                 "sinhala": ["Sinhala"],
-                "thai": ["Thai"], 
-                "lao": ["Lao"], 
-                "khmer": ["Khmer"], 
+                "thai": ["Thai"],
+                "lao": ["Lao"],
+                "khmer": ["Khmer"],
                 "georgian": ["Georgian"],
-                "latin": []
+                "latin": [],
             }
             blocks = mapping.get((spec.get("script") or "").lower(), [])
-            
+
         if not blocks:
             return True  # Latin or unknown: don't enforce
-            
+
         # Check if text contains at least one character in any required block
         for ch in text or "":
             for b in blocks:
                 for lo, hi in self._UNICODE_BLOCKS.get(b, []):
                     if lo <= ch <= hi:
                         return True
-                        
+
         return False
 
     _FAMILY_TO_DEFAULT_BLOCK = {
@@ -267,42 +220,27 @@ class LanguageConfig:
         "latin": [],
         "no_space": [],
     }
-    
+
     def get_family_defaults(self, family: str) -> dict:
         cfg = self._config
         return (cfg.get("family_defaults") or {}).get(family, {})
-    
+
     def family(self, code: str) -> str:
         return (self.get_all_languages().get(code, {}) or {}).get("family", "")
-    
+
     def no_orphan_end(self, code: str) -> list[str]:
         lang = self.get_all_languages().get(code, {})
         fam = self.get_family_defaults(lang.get("family", ""))
         return lang.get("no_orphan_end") or fam.get("no_orphan_end") or []
-    
+
     def no_orphan_chars_end(self, code: str) -> list[str]:
         lang = self.get_all_languages().get(code, {})
         fam = self.get_family_defaults(lang.get("family", ""))
         return lang.get("no_orphan_chars_end") or fam.get("no_orphan_chars_end") or []
-    
+
     def protected_bigrams(self, code: str) -> list[str]:
         lang = self.get_all_languages().get(code, {})
         fam = self.get_family_defaults(lang.get("family", ""))
         return lang.get("protected_bigrams") or fam.get("protected_bigrams") or []
-    
-    # --- Reflow policy (language-aware with safe defaults) -------------------
-    _OVERSHOOT_DEFAULT = 0.10        # Rule of thumb: prefer small overshoot before trimming
-    _MICRO_SPILL_CHARS_DEFAULT = 30  # At most ~1–2 short words
-    _MICRO_SPILL_GAP_MS_DEFAULT = 250
-    
-    def reflow_overshoot_pct(self, code: str) -> float:
-        rules = self.get_all_languages().get(code, {}) or {}
-        return float((rules.get("reflow") or {}).get("overshoot_pct", self._OVERSHOOT_DEFAULT))
-    
-    def reflow_micro_spill_chars(self, code: str) -> int:
-        rules = self.get_all_languages().get(code, {}) or {}
-        return int((rules.get("reflow") or {}).get("micro_spill_chars", self._MICRO_SPILL_CHARS_DEFAULT))
-    
-    def reflow_micro_spill_gap_ms(self, code: str) -> int:
-        rules = self.get_all_languages().get(code, {}) or {}
-        return int((rules.get("reflow") or {}).get("micro_spill_gap_ms", self._MICRO_SPILL_GAP_MS_DEFAULT))
+
+    # Reflow policy removed.

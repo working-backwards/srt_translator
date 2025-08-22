@@ -98,7 +98,6 @@ def translate_srt_files(
 
     # Load language configuration for the core engine
     try:
-        import json
         from srt_translator.core.config.language_config import LanguageConfig
         languages_path = "config/languages.json"
         with open(languages_path, "r", encoding="utf-8") as f:

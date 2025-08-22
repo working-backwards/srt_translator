@@ -20,9 +20,8 @@
       "name": "Albanian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ar": {
       "name": "Arabic",
@@ -34,17 +33,15 @@
         "."
       ],
       "family": "rtl",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "arabic"
+      "script": "arabic",
+      "cps_cap": 18
     },
     "hy": {
       "name": "Armenian",
       "popular": false,
       "family": "armenian",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "armenian"
+      "script": "armenian",
+      "cps_cap": 20
     },
     "az": {
       "name": "Azerbaijani",
@@ -56,49 +53,43 @@
         "beləliklə"
       ],
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "eu": {
       "name": "Basque",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "be": {
       "name": "Belarusian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "bn": {
       "name": "Bengali",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "bengali"
+      "script": "bengali",
+      "cps_cap": 18
     },
     "bg": {
       "name": "Bulgarian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "ca": {
       "name": "Catalan",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "zh-Hans": {
       "name": "Chinese (Simplified)",
@@ -110,56 +101,49 @@
         "……"
       ],
       "family": "cjk",
-      "cps_soft": 12,
-      "cps_hard": 15,
-      "script": "cjk",
-      "script_blocks": [
-        "CJK"
-      ],
-      "no_orphan_chars_end": ["的", "了", "着", "吗", "呢", "吧", "啊", "呀", "哦", "嗯"]
-    },
-    "zh-Hant": {
-      "name": "Chinese (Traditional)",
-      "popular": false,
-      "family": "cjk",
-      "cps_soft": 12,
-      "cps_hard": 15,
+      "cps_cap": 15,
       "script": "cjk",
       "script_blocks": [
         "CJK"
       ]
     },
+    "zh-Hant": {
+      "name": "Chinese (Traditional)",
+      "popular": false,
+      "family": "cjk",
+      "script": "cjk",
+      "script_blocks": [
+        "CJK"
+      ],
+      "cps_cap": 15
+    },
     "hr": {
       "name": "Croatian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "cs": {
       "name": "Czech",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "da": {
       "name": "Danish",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "nl": {
       "name": "Dutch",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "en": {
       "name": "English",
@@ -177,155 +161,134 @@
         "since"
       ],
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin",
-      "no_orphan_end": ["and", "or", "but", "to", "of", "the", "a", "an", "that", "in", "on", "at", "by", "for", "with"],
-      "protected_bigrams": ["my name", "i am", "i'm going", "i will", "i can", "i have"]
+      "cps_cap": 20,
+      "script": "latin"
     },
     "et": {
       "name": "Estonian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "fa": {
       "name": "Persian",
       "popular": false,
       "family": "rtl",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "arabic"
+      "script": "arabic",
+      "cps_cap": 18
     },
     "fi": {
       "name": "Finnish",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "fr": {
       "name": "French",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
+      "cps_cap": 22,
       "script": "latin"
     },
     "gl": {
       "name": "Galician",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ka": {
       "name": "Georgian",
       "popular": false,
       "family": "georgian",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "georgian"
+      "script": "georgian",
+      "cps_cap": 20
     },
     "de": {
       "name": "German",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
+      "cps_cap": 22,
       "script": "latin"
     },
     "el": {
       "name": "Greek",
       "popular": false,
       "family": "greek",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "greek"
+      "script": "greek",
+      "cps_cap": 20
     },
     "gu": {
       "name": "Gujarati",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "gujarati"
+      "script": "gujarati",
+      "cps_cap": 18
     },
     "ha": {
       "name": "Hausa",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "he": {
       "name": "Hebrew",
       "popular": false,
       "family": "rtl",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "hebrew"
+      "script": "hebrew",
+      "cps_cap": 18
     },
     "hi": {
       "name": "Hindi",
       "popular": true,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "devanagari"
+      "script": "devanagari",
+      "cps_cap": 18
     },
     "hu": {
       "name": "Hungarian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "is": {
       "name": "Icelandic",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ig": {
       "name": "Igbo",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "id": {
       "name": "Indonesian",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ga": {
       "name": "Irish",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "it": {
       "name": "Italian",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ja": {
       "name": "Japanese",
@@ -337,39 +300,51 @@
         "…"
       ],
       "family": "cjk",
-      "cps_soft": 12,
-      "cps_hard": 15,
       "script": "japanese",
       "script_blocks": [
         "Hiragana",
         "Katakana",
         "CJK"
       ],
-      "no_orphan_chars_end": ["の", "は", "が", "を", "に", "で", "と", "も", "か", "ね", "よ", "な", "や", "や", "わ"]
+      "no_orphan_chars_end": [
+        "の",
+        "は",
+        "が",
+        "を",
+        "に",
+        "で",
+        "と",
+        "も",
+        "か",
+        "ね",
+        "よ",
+        "な",
+        "や",
+        "や",
+        "わ"
+      ],
+      "cps_cap": 15
     },
     "kn": {
       "name": "Kannada",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "kannada"
+      "script": "kannada",
+      "cps_cap": 18
     },
     "kk": {
       "name": "Kazakh",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "km": {
       "name": "Khmer",
       "popular": false,
       "family": "no_space",
-      "cps_soft": 12,
-      "cps_hard": 16,
-      "script": "khmer"
+      "script": "khmer",
+      "cps_cap": 16
     },
     "ko": {
       "name": "Korean",
@@ -381,249 +356,228 @@
         "입니다."
       ],
       "family": "cjk",
-      "cps_soft": 12,
-      "cps_hard": 15,
       "script": "hangul",
-      "no_orphan_chars_end": ["은", "는", "이", "가", "을", "를", "에", "에서", "로", "으로", "와", "과", "도", "만", "도"]
+      "no_orphan_chars_end": [
+        "은",
+        "는",
+        "이",
+        "가",
+        "을",
+        "를",
+        "에",
+        "에서",
+        "로",
+        "으로",
+        "와",
+        "과",
+        "도",
+        "만",
+        "도"
+      ],
+      "cps_cap": 15
     },
     "ky": {
       "name": "Kyrgyz",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "lo": {
       "name": "Lao",
       "popular": false,
       "family": "no_space",
-      "cps_soft": 12,
-      "cps_hard": 16,
-      "script": "lao"
+      "script": "lao",
+      "cps_cap": 16
     },
     "lv": {
       "name": "Latvian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "lt": {
       "name": "Lithuanian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "mk": {
       "name": "Macedonian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "ml": {
       "name": "Malayalam",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "malayalam"
+      "script": "malayalam",
+      "cps_cap": 18
     },
     "ms": {
       "name": "Malay (Malaysia)",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "mt": {
       "name": "Maltese",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "mr": {
       "name": "Marathi",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "devanagari"
+      "script": "devanagari",
+      "cps_cap": 18
     },
     "mn": {
       "name": "Mongolian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "ne": {
       "name": "Nepali",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "no": {
       "name": "Norwegian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "pl": {
       "name": "Polish",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "pt-BR": {
       "name": "Portuguese (Brazil)",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "pt-PT": {
       "name": "Portuguese (Portugal)",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ro": {
       "name": "Romanian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ru": {
       "name": "Russian",
       "popular": true,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "si": {
       "name": "Sinhala",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "sinhala"
+      "script": "sinhala",
+      "cps_cap": 18
     },
     "sk": {
       "name": "Slovak",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "sl": {
       "name": "Slovenian",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "so": {
       "name": "Somali",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "es": {
       "name": "Spanish",
       "popular": true,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 22,
-      "script": "latin",
-      "no_orphan_end": ["me", "mi", "de", "que", "y", "o", "a", "la", "el", "los", "las", "del", "al"],
-      "protected_bigrams": ["me llamo", "mi nombre", "soy de"],
-      "reflow": {
-        "overshoot_pct": 0.10,
-        "micro_spill_chars": 30,
-        "micro_spill_gap_ms": 250
-      }
+      "cps_cap": 22,
+      "script": "latin"
     },
     "sr": {
       "name": "Serbian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "sw": {
       "name": "Swahili",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "sv": {
       "name": "Swedish",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "ta": {
       "name": "Tamil",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "tamil"
+      "script": "tamil",
+      "cps_cap": 18
     },
     "te": {
       "name": "Telugu",
       "popular": false,
       "family": "indic",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "telugu"
+      "script": "telugu",
+      "cps_cap": 18
     },
     "th": {
       "name": "Thai",
       "popular": false,
       "family": "no_space",
-      "cps_soft": 12,
-      "cps_hard": 16,
-      "script": "thai"
+      "script": "thai",
+      "cps_cap": 16
     },
     "tl": {
       "name": "Filipino",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "tr": {
       "name": "Turkish",
@@ -635,41 +589,36 @@
         "fakat"
       ],
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "tk": {
       "name": "Turkmen",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "uk": {
       "name": "Ukrainian",
       "popular": false,
       "family": "cyrillic",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "cyrillic"
+      "script": "cyrillic",
+      "cps_cap": 20
     },
     "ur": {
       "name": "Urdu",
       "popular": false,
       "family": "rtl",
-      "cps_soft": 14,
-      "cps_hard": 18,
-      "script": "arabic"
+      "script": "arabic",
+      "cps_cap": 18
     },
     "uz": {
       "name": "Uzbek",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "vi": {
       "name": "Vietnamese",
@@ -681,62 +630,43 @@
         "tuy nhiên"
       ],
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "cy": {
       "name": "Welsh",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "xh": {
       "name": "Xhosa",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "yo": {
       "name": "Yoruba",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     },
     "zu": {
       "name": "Zulu",
       "popular": false,
       "family": "latin",
-      "cps_soft": 15,
-      "cps_hard": 20,
-      "script": "latin"
+      "script": "latin",
+      "cps_cap": 20
     }
   },
   "family_defaults": {
-    "latin": {
-      "no_orphan_end": ["and", "or", "but", "to", "of", "the", "a", "an", "that", "in", "on", "at", "by", "for", "with"],
-      "protected_bigrams": []
-    },
-    "cyrillic": {
-      "no_orphan_end": ["и", "в", "с", "на", "по", "за", "о", "у", "к", "от", "до", "из", "под", "над"],
-      "protected_bigrams": []
-    },
-    "cjk": {
-      "no_orphan_chars_end": ["的", "了", "着", "吗", "呢", "吧", "は", "が", "を", "に", "で", "と", "も", "か", "ね", "よ", "な", "은", "는", "이", "가", "을", "를", "에", "에서", "로", "으로", "와", "과", "도", "만"]
-    },
-    "rtl": {
-      "no_orphan_end": ["و", "في", "من", "إلى", "على", "عن", "في", "من", "إلى", "على", "عن"],
-      "protected_bigrams": []
-    },
-    "indic": {
-      "no_orphan_end": ["और", "या", "लेकिन", "में", "पर", "से", "को", "का", "की", "के"],
-      "protected_bigrams": []
-    }
+    "latin": {},
+    "cyrillic": {},
+    "cjk": {},
+    "rtl": {},
+    "indic": {}
   }
 }
