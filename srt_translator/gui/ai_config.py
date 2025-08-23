@@ -10,7 +10,7 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from openai import OpenAI
 
@@ -22,6 +22,7 @@ from srt_translator.core.terminology_utils import is_numeric_like, is_hard_prese
 _CHARS_PER_TOKEN = 4  # rough heuristic: ~4 chars per token
 _TOKEN_CAP = 12_500
 _CHAR_CAP = _TOKEN_CAP * _CHARS_PER_TOKEN  # ~50k chars
+
 
 @dataclass
 class BatchAIConfig:
@@ -38,14 +39,14 @@ class AIConfigGenerator:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
         self.api_key = api_key
         self.client = OpenAI(api_key=api_key)
-        self.logger = logging.getLogger('srt_translator.gui.ai_config')
+        self.logger = logging.getLogger("srt_translator.gui.ai_config")
         # GUI-only model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
         self.DEFAULT_MODEL = "gpt-4o-mini"
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
         self.CHARS_PER_TOKEN = 4
-        
+
         # Language configuration for script validation
         self._lang_cfg = language_config
 
@@ -54,7 +55,9 @@ class AIConfigGenerator:
         self.MAX_CONTENT_TOKENS = (
             100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
         )
-        self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
+        self.MAX_CONTENT_LENGTH = (
+            400000  # Character limit as fallback (roughly 100K tokens)
+        )
 
     def get_supported_languages(self) -> List[str]:
         """Get all supported languages from unified configuration"""
@@ -176,18 +179,20 @@ EXAMPLE FORMAT:
                 raise ValueError("OpenAI response content is None")
             result_text = result_text.strip()
             dnt_raw = self._parse_dnt_terms_response(result_text) or []
-            
+
             # Apply hard-preserve filtering to DNT terms
             dnt_terms = []
             for term in dnt_raw:
-                if is_numeric_like(term):   # remove numeric/number-like
+                if is_numeric_like(term):  # remove numeric/number-like
                     continue
                 if is_hard_preserve(term):
                     dnt_terms.append(term)
-            
+
             dnt_terms = sorted(set(dnt_terms), key=str.lower)
-            self.logger.info(f"Generated {len(dnt_raw)} DNT terms, filtered to {len(dnt_terms)} (hard-preserve only)")
-            
+            self.logger.info(
+                f"Generated {len(dnt_raw)} DNT terms, filtered to {len(dnt_terms)} (hard-preserve only)"
+            )
+
             return dnt_terms
 
         except Exception as e:
@@ -201,214 +206,366 @@ EXAMPLE FORMAT:
         dnt_terms: List[str] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
-        Generate termbase for all target languages using a simple two-stage pipeline:
-        1. Extract risk terms once (canonical English list) - inline
-        2. Translate per language for reliability
-        
-        Args:
-            content: Clean text content from SRT files
-            target_languages: List of target languages for translation
-            dnt_terms: List of terms that should not be included in the termbase
-            
-        Returns:
-            Dictionary with language keys and term-translation pairs
+        Generate a termbase per target language using a per‑language TWO‑PASS approach:
+          Pass 1: ~20 topic‑critical & likely‑risky source‑language terms
+          Pass 2: ~10 confusable / hard‑to‑translate source‑language terms
+        Then translate those to the target language. DNT takes precedence; any term
+        present in DNT is excluded from selection and filtered out if it slips through.
+
+        If a language's TB fails, it is skipped. TB is optional by design.
         """
         try:
-            # Get all supported languages from unified config
             supported_languages = self.get_supported_languages()
             self.logger.info(f"Supported languages count: {len(supported_languages)}")
 
-            valid_languages = [lang for lang in target_languages if lang in supported_languages]
+            valid_languages = [
+                lang for lang in target_languages if lang in supported_languages
+            ]
             self.logger.info(f"Valid languages from input: {valid_languages}")
-
             if not valid_languages:
                 self.logger.warning("No valid target languages provided")
                 self.logger.warning(f"Input languages: {target_languages}")
-                self.logger.warning(f"Supported languages sample: {supported_languages[:10]}")
+                self.logger.warning(
+                    f"Supported languages sample: {supported_languages[:10]}"
+                )
                 return {}
 
-            # Stage 1: Extract canonical English risk terms once (inline)
-            self.logger.info("Stage 1: Extracting canonical English risk terms")
-            
-            # Filter out DNT terms (case-insensitive)
             dnt_set = {term.lower().strip() for term in (dnt_terms or [])}
-            
-            prompt = f"""
-You are analyzing educational video transcript content to identify terms that are likely to be mistranslated.
+            termbase: Dict[str, Dict[str, str]] = {}
 
-TASK: Extract 20-25 English terms or phrases that pose translation risks.
-
-INCLUDE terms that:
-• Are central to understanding the course's subject matter (frameworks, methods, strategic concepts)
-• Could be misunderstood due to ambiguity, abstraction, or cultural specificity
-• Have figurative or idiomatic meanings that might be translated too literally
-• Are technical or business terms that may not have direct equivalents
-• Would benefit from standardized, subtitle-friendly translations
-
-EXCLUDE:
-• Terms that are obvious, literal, or easily translatable
-• Purely stylistic idioms with little instructional value
-• Terms already in the DNT list (these will be filtered out)
-
-CONTEXT: This is for subtitle translation. Focus on terms where mistranslation could reduce learner understanding.
-
-DNT_TERMS (already excluded): {list(dnt_set)}
-
-TRANSCRIPT:
-{content}
-
-OUTPUT: Return ONLY a JSON array of objects with "term" and "reason" fields.
-EXAMPLE: [{{"term": "operating cadence", "reason": "Figurative term that could be translated too literally"}}]
-
-Return valid JSON only. No explanations or markdown.
-"""
-
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-                temperature=0.3,
-                response_format={"type": "json_object"},
+            self.logger.info(
+                "Per‑language TWO‑PASS extraction + translation (source‑language agnostic)"
             )
-
-            result_text = response.choices[0].message.content.strip()
-            if not result_text:
-                raise ValueError("Empty response from AI")
-
-            # Parse the response
-            try:
-                data = json.loads(result_text)
-                terms = data.get("terms", [])
-                
-                # Validate structure
-                if not isinstance(terms, list):
-                    raise ValueError("Response is not a list")
-                
-                # Filter out any DNT terms that might have slipped through
-                filtered_terms = []
-                for item in terms:
-                    if not isinstance(item, dict):
-                        continue
-                    term = item.get("term", "").strip()
-                    reason = item.get("reason", "").strip()
-                    
-                    if term and reason and term.lower() not in dnt_set:
-                        filtered_terms.append({"term": term, "reason": reason})
-                
-                self.logger.info(f"Extracted {len(filtered_terms)} risk terms (filtered from {len(terms)} total)")
-                
-                if not filtered_terms:
-                    self.logger.warning("No risk terms extracted, skipping termbase generation")
-                    return {}
-                
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to parse AI response as JSON: {e}")
-                self.logger.debug(f"Raw response: {result_text}")
-                raise
-
-            # Stage 2: Generate termbase per language for reliability
-            self.logger.info("Stage 2: Generating termbase per language")
-            termbase = {}
-            
             for lang_code in valid_languages:
-                try:
-                    lang_name = self._lang_cfg.get_language_name(lang_code)
-                    if not lang_name:
-                        self.logger.warning(f"Could not get language name for {lang_code}, skipping")
-                        continue
-                    
-                    self.logger.info(f"Generating termbase for {lang_code} ({lang_name})")
-                    lang_termbase = self.generate_single_language_termbase(
-                        filtered_terms, lang_code, lang_name
+                lang_name = self._lang_cfg.get_language_name(lang_code)
+                if not lang_name:
+                    self.logger.warning(
+                        f"Could not get language name for {lang_code}, skipping"
                     )
-                    
-                    if lang_termbase:
-                        termbase[lang_code] = lang_termbase
-                        self.logger.info(f"Successfully generated termbase for {lang_code}: {len(lang_termbase)} terms")
-                    else:
-                        self.logger.warning(f"Empty termbase for {lang_code}")
-                        
+                    continue
+                try:
+                    tb_dict, extracted_terms = self.generate_language_termbase_two_pass(
+                        content=content,
+                        lang_code=lang_code,
+                        lang_name=lang_name,
+                        dnt_terms=list(dnt_set),
+                    )
+                    if not tb_dict:
+                        self.logger.warning(f"Empty termbase for {lang_code}; skipping")
+                        continue
+                    # DNT wins: aggressively drop any collisions that slipped in.
+                    cleaned = self._drop_dnt_from_termbase(tb_dict, dnt_set)
+                    if cleaned:
+                        termbase[lang_code] = cleaned
+                        self.logger.info(
+                            f"TB[{lang_code}] {len(cleaned)} terms (after DNT filtering)"
+                        )
                 except Exception as e:
-                    self.logger.error(f"Failed to generate termbase for {lang_code}: {e}")
-                    # Continue with other languages instead of failing the whole batch
+                    self.logger.error(
+                        f"Failed to generate termbase for {lang_code}: {e}"
+                    )
                     continue
 
-            self.logger.info(f"Generated termbase for {len(termbase)} languages (batch-level)")
+            self.logger.info(
+                f"Generated termbase for {len(termbase)} languages (per‑language two‑pass)"
+            )
             return termbase
-
         except Exception as e:
             self.logger.error(f"Error generating termbase: {e}")
             raise
 
+    def generate_language_termbase_two_pass(
+        self,
+        content: str,
+        lang_code: str,
+        lang_name: str,
+        dnt_terms: List[str] | None = None,
+        max_terms: int = 30,
+    ) -> Tuple[Dict[str, str], List[Dict[str, str]]]:
+        """
+        Per‑language two‑pass extraction (source‑language agnostic) + translation in ONE call.
+        Returns (termbase_dict, extracted_terms_list). extracted_terms are [{'term','reason'}, ...].
+        DNT list is used to exclude/skip terms; any collisions are filtered after parsing as well.
+        """
+        dnt_set = {t.lower().strip() for t in (dnt_terms or [])}
+        prompt = f"""
+You are an expert in terminology extraction and localization for educational subtitles.
+
+INPUTS
+- Transcript TEXT (original language unknown; infer from TEXT)
+- Target language: "{lang_name}" (code: {lang_code})
+- DNT_TERMS: JSON array below (do-not-translate surface forms to exclude entirely)
+
+GOAL
+For translation into {lang_name}, select the source-language terms most likely to cause confusion/mistranslation, then provide a concise, subtitle‑friendly termbase in {lang_name}.
+
+FIRST, detect the transcript's source language and use its surface forms for all extracted terms. Do not convert them to the source-language.
+
+1. Carefully analyze the transcript in the provided text.
+
+2. PASS 1: Extract the 20 source-language terms or phrases most likely to cause confusion or mistranslation in subtitle translation. These should meet one or more of the following criteria:
+
+   INCLUDE if they:
+   - Are central to understanding the course's subject matter (e.g., key frameworks, structured methods, strategic terms)
+   - Could be misunderstood or mistranslated due to ambiguity, abstraction, cultural specificity, or figurative language
+   - Are important for learners to grasp — even if they appear only once
+   - Would benefit from a standardized, subtitle-friendly translation to avoid confusion
+
+   AVOID if they:
+   - Are obvious, literal, or easily translatable without risk of confusion
+   - Are purely stylistic idioms or colorful language with little instructional value
+   - Are listed in DNT_TERMS (do not extract any terms that appear in the DNT_TERMS list)
+
+3. PASS 2: Identify 10 additional source-language words or phrases from the transcript that are likely to be:
+   - mistranslated,
+   - interpreted too literally,
+   - or misunderstood without context.
+
+   These may include single words, figurative language, verbs or idioms with a special usage, or phrases that learners might take the wrong way in another culture or language.
+   Pay special attention to single words that could be confused with similar words (e.g., "thrash" vs "trash").
+   Only include these 10 if their mistranslation could cause confusion or reduce learner understanding.
+   Do not include merely colorful or stylistic phrases.
+
+   ➤ You must generate exactly 30 total terms: 20 from Pass 1 + 10 from Pass 2.
+
+4. Return both:
+   - The extracted list of 30 terms, with a brief reason for each
+   - A termbase mapping each source term to its {lang_name} translation
+
+OUTPUT (JSON only; no markdown, no commentary):
+{{
+  "extracted_terms": [
+    {{"term": "<SRC term 1>", "reason": "<Why risky when translating into {lang_name}>"}}
+  ],
+  "termbase": {{
+    "<SRC term 1>": "<{lang_name} term 1>"
+  }}
+}}
+
+IMPORTANT: In the "reason" field, be specific about why the term is risky:
+- For Pass 1: "key business concept", "technical framework", "strategic term", etc.
+- For Pass 2: "confusable with similar words", "hard to translate", "ambiguous meaning", "literal vs figurative", etc.
+
+TRANSLATION RULES
+- Provide 1–4 word, natural, subtitle‑friendly {lang_name} equivalents.
+- If no exact equivalent, use the most natural localized term (not a long definition).
+- Preserve proper names; do not translate trademarks.
+- Do NOT include any DNT terms (they were excluded from selection).
+
+SIZES
+- extracted_terms: 30 total (20 Pass 1 + 10 Pass 2)
+
+DNT_TERMS (JSON array):
+{json.dumps(sorted(list(dnt_set)), ensure_ascii=False)}
+
+TEXT (Transcript):
+{content}
+""".strip()
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.DEFAULT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=5000,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+            )
+            raw = (response.choices[0].message.content or "").strip()
+            data = json.loads(raw)
+            extracted = data.get("extracted_terms", []) or []
+            tb = data.get("termbase", {}) or {}
+
+            # Basic validation + DNT filtering with pass analysis
+            cleaned_terms: List[Dict[str, str]] = []
+            dnt_filtered_terms = []
+            pass1_terms = []
+            pass2_terms = []
+
+            for it in extracted:
+                if not isinstance(it, dict):
+                    continue
+                term = (it.get("term") or "").strip()
+                reason = (it.get("reason") or "").strip()
+                if not term or not reason:
+                    continue
+
+                # Check if term is in DNT list
+                if term.lower() in dnt_set:
+                    dnt_filtered_terms.append(term)
+                    continue
+
+                # Categorize by pass based on reason content
+                reason_lower = reason.lower()
+                # Debug: log a few reasons to see what the AI is actually writing
+                if len(cleaned_terms) < 3:
+                    self.logger.debug(f"Sample reason for '{term}': '{reason}'")
+
+                if any(
+                    keyword in reason_lower
+                    for keyword in [
+                        "confusable",
+                        "near-homophone",
+                        "orthography",
+                        "mistranslate",
+                        "over-literal",
+                        "confused",
+                        "similar",
+                        "hard to translate",
+                        "difficult",
+                        "ambiguous",
+                        "literal",
+                        "misunderstood",
+                    ]
+                ):
+                    pass2_terms.append({"term": term, "reason": reason})
+                else:
+                    pass1_terms.append({"term": term, "reason": reason})
+
+                cleaned_terms.append({"term": term, "reason": reason})
+                if len(cleaned_terms) >= max_terms:
+                    break
+
+            # Filter DNT collisions from TB keys
+            tb_dict = {}
+            if isinstance(tb, dict):
+                for k, v in tb.items():
+                    if not k or not v:
+                        continue
+                    if k.strip().lower() in dnt_set:
+                        continue
+                    tb_dict[k.strip()] = str(v).strip()
+
+            # Log detailed breakdown
+            self.logger.info(
+                f"Termbase breakdown for {lang_code}: "
+                f"Pass 1 (topic-critical): {len(pass1_terms)}, "
+                f"Pass 2 (confusable): {len(pass2_terms)}, "
+                f"DNT filtered: {len(dnt_filtered_terms)}, "
+                f"Total extracted: {len(cleaned_terms)}, "
+                f"Final TB entries: {len(tb_dict)}"
+            )
+
+            # Log each term with its reason for detailed analysis
+            if pass1_terms:
+                self.logger.info(f"Pass 1 terms for {lang_code}:")
+                for term_info in pass1_terms:
+                    self.logger.info(
+                        f"  Pass 1: '{term_info['term']}' - {term_info['reason']}"
+                    )
+
+            if pass2_terms:
+                self.logger.info(f"Pass 2 terms for {lang_code}:")
+                for term_info in pass2_terms:
+                    self.logger.info(
+                        f"  Pass 2: '{term_info['term']}' - {term_info['reason']}"
+                    )
+
+            if dnt_filtered_terms:
+                self.logger.info(
+                    f"DNT filtered terms for {lang_code}: {dnt_filtered_terms[:5]}{'...' if len(dnt_filtered_terms) > 5 else ''}"
+                )
+
+            # Add size validation
+            if len(cleaned_terms) < 5:  # Minimum reasonable size
+                self.logger.warning(
+                    f"Very small termbase for {lang_code}: {len(cleaned_terms)} terms"
+                )
+
+            return tb_dict, cleaned_terms
+
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse AI response for {lang_code}: {e}")
+            self.logger.debug(f"Raw response: {raw}")
+            return {}, []  # Return empty results instead of raising
+        except Exception as e:
+            self.logger.error(f"Error generating termbase for {lang_code}: {e}")
+            return {}, []
+
+    def _drop_dnt_from_termbase(
+        self, tb: Dict[str, str], dnt_set: set[str]
+    ) -> Dict[str, str]:
+        """Remove any entries whose source key collides with DNT (DNT > TB)."""
+        if not tb:
+            return {}
+        out = {}
+        for k, v in tb.items():
+            if k and k.strip().lower() not in dnt_set and v:
+                out[k.strip()] = v.strip()
+        return out
+
     def _clean_subtitle_text(self, text: str) -> str:
         """Clean subtitle text by removing timestamps and formatting"""
         # Remove timestamp patterns like [00:00:00] or (00:00:00)
-        text = re.sub(r'\[?\d{1,2}:\d{2}:\d{2}\]?', '', text)
+        text = re.sub(r"\[?\d{1,2}:\d{2}:\d{2}\]?", "", text)
         # Remove HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
+        text = re.sub(r"<[^>]+>", "", text)
         # Remove extra whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"\s+", " ", text).strip()
         return text
 
     def _norm(self, text: str) -> str:
         """Normalize text for consistent matching (NFKC, lowercase)"""
         return unicodedata.normalize("NFKC", text.lower().strip())
 
-
-
     def filter_dnt_terms(self, dnt_terms: List[str]) -> List[str]:
         """Filter DNT terms to exclude numeric and number-like items"""
         if not dnt_terms:
             return []
-        
+
         filtered_terms = []
         for term in dnt_terms:
             if not term or not term.strip():
                 continue
-                
+
             # Skip pure numbers and number-like terms
             if is_numeric_like(term):
                 self.logger.debug(f"Filtering out numeric DNT term: '{term}'")
                 continue
-                
+
             filtered_terms.append(term)
-        
+
         if len(filtered_terms) != len(dnt_terms):
-            self.logger.info(f"Filtered DNT terms: {len(dnt_terms)} -> {len(filtered_terms)} (removed numeric items)")
-        
+            self.logger.info(
+                f"Filtered DNT terms: {len(dnt_terms)} -> {len(filtered_terms)} (removed numeric items)"
+            )
+
         return filtered_terms
 
-    def filter_dnt_terms_with_metadata(self, dnt_terms: List[str]) -> tuple[List[str], List[str]]:
+    def filter_dnt_terms_with_metadata(
+        self, dnt_terms: List[str]
+    ) -> tuple[List[str], List[str]]:
         """
         Filter DNT terms and return both filtered terms and metadata about what was filtered out.
-        
+
         Args:
             dnt_terms: List of DNT terms to filter
-            
+
         Returns:
             Tuple of (filtered_terms, filtered_out_terms)
         """
         if not dnt_terms:
             return [], []
-        
+
         filtered_terms = []
         filtered_out = []
-        
+
         for term in dnt_terms:
             if not term or not term.strip():
                 continue
-                
+
             # Skip pure numbers and number-like terms
             if is_numeric_like(term):
                 self.logger.debug(f"Filtering out numeric DNT term: '{term}'")
                 filtered_out.append(f"{term} (filtered: numeric/number-like)")
                 continue
-                
+
             filtered_terms.append(term)
-        
+
         if len(filtered_terms) != len(dnt_terms):
-            self.logger.info(f"Filtered DNT terms: {len(dnt_terms)} -> {len(filtered_terms)} (removed numeric items)")
-        
+            self.logger.info(
+                f"Filtered DNT terms: {len(dnt_terms)} -> {len(filtered_terms)} (removed numeric items)"
+            )
+
         return filtered_terms, filtered_out
 
     def _truncate_text_intelligently(self, text: str, target_length: int) -> str:
@@ -481,7 +638,11 @@ Return valid JSON only. No explanations or markdown.
 
             # Ensure it's a dict and all values are strings
             if isinstance(termbase, dict):
-                return {str(k).strip(): str(v).strip() for k, v in termbase.items() if k and v}
+                return {
+                    str(k).strip(): str(v).strip()
+                    for k, v in termbase.items()
+                    if k and v
+                }
             else:
                 self.logger.warning("AI response is not a dictionary format")
                 return {}
@@ -499,23 +660,23 @@ Return valid JSON only. No explanations or markdown.
     ) -> Dict[str, str]:
         """
         Generate termbase for a single target language.
-        
+
         Args:
             terms: List of {"term": str, "reason": str} from extract_risk_terms
             lang_code: ISO language code (e.g., "es", "zh-Hans")
             lang_name: Human-readable language name (e.g., "Spanish", "Chinese (Simplified)")
-            
+
         Returns:
             Dictionary mapping English terms to target language translations
         """
         try:
             # Convert terms to simple list for the prompt
             term_list = [item["term"] for item in terms]
-            
-            prompt = f"""
-You translate an English term list into {lang_name} for subtitle use.
 
-Return JSON only: {{"<EN term>": "<{lang_name} term>", ...}}
+            prompt = f"""
+You translate a source-language term list into {lang_name} for subtitle use.
+
+Return JSON only: {{"<SRC term>": "<{lang_name} term>", ...}}
 
 Rules:
 - 1-4 words per entry; concise and subtitle-friendly
@@ -524,7 +685,7 @@ Rules:
 - Do NOT include any DNT term (they're already excluded from the input)
 - Do NOT add terms, do NOT skip terms
 
-INPUT TERMS (JSON array of strings):
+INPUT TERMS (JSON array of strings; these are source-language surface forms):
 {json.dumps(term_list, ensure_ascii=False)}
 
 Return valid JSON only. No explanations or markdown.
@@ -545,11 +706,11 @@ Return valid JSON only. No explanations or markdown.
             # Parse the response
             try:
                 translations = json.loads(result_text)
-                
+
                 # Validate that all input terms are present
                 missing_terms = []
                 result = {}
-                
+
                 for term in term_list:
                     if term in translations:
                         target = translations[term].strip()
@@ -558,17 +719,25 @@ Return valid JSON only. No explanations or markdown.
                         else:
                             # Empty translation - use English key and warn
                             result[term] = term
-                            self.logger.warning(f"Empty translation for '{term}' in {lang_code}, using English key")
+                            self.logger.warning(
+                                f"Empty translation for '{term}' in {lang_code}, using English key"
+                            )
                     else:
                         missing_terms.append(term)
                         # Missing term - use English key and warn
                         result[term] = term
-                        self.logger.warning(f"Missing translation for '{term}' in {lang_code}, using English key")
+                        self.logger.warning(
+                            f"Missing translation for '{term}' in {lang_code}, using English key"
+                        )
 
                 if missing_terms:
-                    self.logger.warning(f"Missing {len(missing_terms)} terms in {lang_code}: {missing_terms}")
+                    self.logger.warning(
+                        f"Missing {len(missing_terms)} terms in {lang_code}: {missing_terms}"
+                    )
 
-                self.logger.info(f"Generated termbase for {lang_code}: {len(result)} terms")
+                self.logger.info(
+                    f"Generated termbase for {lang_code}: {len(result)} terms"
+                )
                 return result
 
             except json.JSONDecodeError as e:
@@ -593,13 +762,19 @@ Return valid JSON only. No explanations or markdown.
         except Exception as e:
             error_msg = str(e).lower()
             if "invalid" in error_msg or "authentication" in error_msg:
-                self.logger.error("Invalid API key - please check your key at platform.openai.com")
-            elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
+                self.logger.error(
+                    "Invalid API key - please check your key at platform.openai.com"
+                )
+            elif (
+                "quota" in error_msg or "billing" in error_msg or "credits" in error_msg
+            ):
                 self.logger.error(
                     "Insufficient API credits - please add credits to your OpenAI account"
                 )
             elif "rate" in error_msg:
-                self.logger.error("Rate limit exceeded - please wait a moment and try again")
+                self.logger.error(
+                    "Rate limit exceeded - please wait a moment and try again"
+                )
             elif "network" in error_msg or "connection" in error_msg:
                 self.logger.error(
                     "Network connection issue - please check your internet connection"
@@ -652,7 +827,9 @@ Return valid JSON only. No explanations or markdown.
                 "message": "Please check your internet connection",
                 "suggestion": "Check your internet connection and try again",
             }
-        elif "content" in error_msg and ("too small" in error_msg or "insufficient" in error_msg):
+        elif "content" in error_msg and (
+            "too small" in error_msg or "insufficient" in error_msg
+        ):
             return {
                 "type": "insufficient_content",
                 "title": "Insufficient Content for Analysis",
@@ -713,7 +890,9 @@ Return valid JSON only. No explanations or markdown.
 
         transcript_sample = "\n".join(sampler)
         approx_tokens = len(transcript_sample) // _CHARS_PER_TOKEN
-        self.logger.info(f"Transcript sampled for AI config: ~{approx_tokens} tokens (~{len(transcript_sample)} chars)")
+        self.logger.info(
+            f"Transcript sampled for AI config: ~{approx_tokens} tokens (~{len(transcript_sample)} chars)"
+        )
 
         # 2) Generate a SINGLE DNT list for the whole run
         dnt_terms = self.generate_dnt_terms(transcript_sample)
@@ -725,7 +904,9 @@ Return valid JSON only. No explanations or markdown.
             target_lang_codes,
             dnt_terms=dnt_terms,
         )
-        self.logger.info(f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)")
+        self.logger.info(
+            f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)"
+        )
 
         return BatchAIConfig(dnt_terms=dnt_terms, termbase=termbase_by_lang)
 
@@ -733,7 +914,9 @@ Return valid JSON only. No explanations or markdown.
     def _strip_srt_markup(raw: str) -> str:
         """Remove index/timestamps and keep visible text as a fallback sampler."""
         # kill timestamps 00:00:00,000 --> 00:00:00,000
-        raw = re.sub(r"\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}", "", raw)
+        raw = re.sub(
+            r"\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}", "", raw
+        )
         # kill pure index lines
         raw = re.sub(r"(?m)^\s*\d+\s*$", "", raw)
         return raw

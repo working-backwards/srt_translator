@@ -51,6 +51,7 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 - **Hard-Preserve DNT**: Intelligent DNT filtering that keeps only truly important terms (acronyms, tech tokens)
 - **Enhanced Output**: Complete transparency into what was provided vs. what was used during translation
 - **Subtitle-Based Translation**: New subtitle-level processing system that eliminates timing drift while improving translation quality
+- **Language-Specific Termbases**: AI generates optimal termbases for each target language, improving translation quality
 
 ---
 
@@ -79,6 +80,12 @@ Works across all supported language families with configurable rules:
 - **Other families**: Cyrillic, RTL, Indic languages
 
 See [TRANSLATION_QUALITY_GUIDE.md](docs/TRANSLATION_QUALITY_GUIDE.md) for detailed configuration options.
+
+### Source Language Assumptions
+
+The app **does not require you to specify the original language**; the AI infers it from the transcript text. However, to keep terminology extraction reliable and evaluation artifacts consistent, **all original `.srt` files you select for a single run should be in the SAME language**. Mixing different source languages in one batch is not supported and may degrade results.
+
+**DNT precedence:** If a term appears in both DNT and the termbase, **DNT wins**. DNT items are excluded from the termbase at generation time. See the evaluation guide for coverage goals and collision policy.
 
 ---
 
