@@ -8,6 +8,8 @@ import json
 import logging
 import os
 import re
+import random
+import time
 import unicodedata
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
@@ -206,6 +208,7 @@ EXAMPLE FORMAT:
         content: str,
         target_languages: List[str],
         dnt_terms: List[str] = None,
+        source_language: Optional[Dict[str, object]] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
         Generate a termbase per target language using a per‑language TWO‑PASS approach:
@@ -235,6 +238,29 @@ EXAMPLE FORMAT:
             dnt_set = {term.lower().strip() for term in (dnt_terms or [])}
             termbase: Dict[str, Dict[str, str]] = {}
 
+            # --- soft alignment anchor (first successful TB) ---
+            anchor_count: Optional[int] = None
+            # derive a simple size floor from transcript size (tokens ≈ chars/4)
+            approx_tokens = max(1, len(content) // self.CHARS_PER_TOKEN)
+            if approx_tokens <= 400:
+                size_floor = 6
+            elif approx_tokens <= 2000:
+                size_floor = 10
+            else:
+                size_floor = 14
+
+            # default soft band BEFORE we have an anchor (content-scaled)
+            # this helps the first few languages aim for a healthy size
+            def _default_soft_band(tokens: int) -> Tuple[int, int]:
+                if tokens <= 600:
+                    return (8, 12)
+                if tokens <= 2000:
+                    return (16, 24)
+                # long content
+                return (20, 30)
+
+            default_lo, default_hi = _default_soft_band(approx_tokens)
+
             self.logger.info(
                 "Per‑language TWO‑PASS extraction + translation (source‑language agnostic)"
             )
@@ -246,11 +272,41 @@ EXAMPLE FORMAT:
                     )
                     continue
                 try:
+                    # compute soft band (clamped to defaults)
+                    if anchor_count:
+                        tol = max(2, round(anchor_count * 0.15))
+                        soft_lo = max(
+                            default_lo, min(default_hi, max(8, anchor_count - tol))
+                        )
+                        soft_hi = max(
+                            soft_lo, min(default_hi, min(40, anchor_count + tol))
+                        )
+                    else:
+                        soft_lo, soft_hi = default_lo, default_hi
+                    if anchor_count is None:
+                        self.logger.info(
+                            f"[{lang_code}] default_soft_range={soft_lo}-{soft_hi} (no anchor yet)"
+                        )
+                    else:
+                        self.logger.info(
+                            f"[{lang_code}] soft_range={soft_lo}-{soft_hi} (anchor={anchor_count})"
+                        )
+
+                    # small jitter AFTER anchor to reduce order effects
+                    if anchor_count is not None:
+                        import random
+                        import time
+
+                        time.sleep(random.uniform(0.4, 1.1))
+
                     tb_dict, extracted_terms = self.generate_language_termbase_two_pass(
                         content=content,
                         lang_code=lang_code,
                         lang_name=lang_name,
                         dnt_terms=list(dnt_set),
+                        soft_lo=soft_lo,
+                        soft_hi=soft_hi,
+                        source_language=source_language,
                     )
                     if not tb_dict:
                         self.logger.warning(f"Empty termbase for {lang_code}; skipping")
@@ -259,9 +315,24 @@ EXAMPLE FORMAT:
                     cleaned = self._drop_dnt_from_termbase(tb_dict, dnt_set)
                     if cleaned:
                         termbase[lang_code] = cleaned
+                        size = len(cleaned)
                         self.logger.info(
-                            f"TB[{lang_code}] {len(cleaned)} terms (after DNT filtering)"
+                            f"TB[{lang_code}] {size} terms (after DNT filtering)"
                         )
+
+                        # anchor may rise later, but never drop below default_soft_lo
+                        extracted_n = max(1, len(extracted_terms))
+                        coverage = size / extracted_n
+                        if size >= max(size_floor, 8) and coverage >= 0.6:
+                            candidate = max(size, default_lo)
+                            if anchor_count is None:
+                                anchor_count = candidate
+                            else:
+                                anchor_count = max(anchor_count, candidate)
+                            self.logger.info(
+                                f"Anchored soft term count at {anchor_count} "
+                                f"(size_floor={size_floor}, coverage={coverage:.2f})"
+                            )
                 except Exception as e:
                     self.logger.error(
                         f"Failed to generate termbase for {lang_code}: {e}"
@@ -283,6 +354,9 @@ EXAMPLE FORMAT:
         lang_name: str,
         dnt_terms: List[str] | None = None,
         max_terms: int = 30,
+        soft_lo: Optional[int] = None,
+        soft_hi: Optional[int] = None,
+        source_language: Optional[Dict[str, object]] = None,
     ) -> Tuple[Dict[str, str], List[Dict[str, str]]]:
         """
         Per‑language two‑pass extraction (source‑language agnostic) + translation in ONE call.
@@ -290,25 +364,57 @@ EXAMPLE FORMAT:
         DNT list is used to exclude/skip terms; any collisions are filtered after parsing as well.
         """
         dnt_set = {t.lower().strip() for t in (dnt_terms or [])}
+
+        # source-language hint (if GUI already detected it)
+        src_hint = ""
+        if source_language:
+            src_code = (
+                source_language.get("normalized_code")
+                or source_language.get("detected_code")
+                or ""
+            ).strip()
+            src_name = (source_language.get("normalized_name") or "").strip()
+            if src_code:
+                pretty = f"{src_code}" + (f" · {src_name}" if src_name else "")
+                src_hint = f"Source language: {pretty}. Use surface forms from this language for all extracted terms; do not convert them to another language."
+
+        # soft alignment + concrete pass targets (optional)
+        soft_block = ""
+        pass1_goal = pass2_goal = None
+        if soft_lo and soft_hi and soft_lo < soft_hi:
+            target_total = int(round((soft_lo + soft_hi) / 2))
+            pass1_goal = max(8, int(round(target_total * 0.7)))
+            pass2_goal = max(4, max(target_total - pass1_goal, 0))
+            soft_block = f"""
+TERM COUNT ALIGNMENT (soft):
+Aim to return a TOTAL of {soft_lo}–{soft_hi} items **in the "extracted_terms" array** for this language.
+- If you do **not** set "exhausted": true, you **must** return at least {soft_lo} and at most {soft_hi}.
+- Do **not** pad with low-value items just to hit the range; ensure each item is legitimate and useful.
+- Each item must include a non-empty "term" and "reason".
+- If the transcript genuinely lacks further legitimate candidates (not model fatigue), return fewer and set "exhausted": true and an "exhaustion_reason".
+""".strip()
+
         prompt = f"""
-You are an expert in terminology extraction and localization for educational subtitles.
+You are building a bilingual termbase for target language: {lang_name} ({lang_code}).
+The transcript's source language has already been detected elsewhere. Do NOT detect it here.
 
-INPUTS
-- Transcript TEXT (original language unknown; infer from TEXT)
-- Target language: "{lang_name}" (code: {lang_code})
-- DNT_TERMS: JSON array below (do-not-translate surface forms to exclude entirely)
+REQUIREMENT: Return a total of {soft_lo}–{soft_hi} terms across Pass 1 + Pass 2, unless the content is genuinely exhausted.
+If you cannot legitimately reach {soft_lo}, set "exhausted": true and provide "exhaustion_reason".
+Otherwise, "exhausted": false.
 
-GOAL
-For translation into {lang_name}, select the source-language terms most likely to cause confusion/mistranslation, then provide a concise, subtitle‑friendly termbase in {lang_name}.
+Pass 1: topic-critical terms; Pass 2: confusable or easy-to-mistranslate items.
 
-FIRST, detect the transcript's source language and use its surface forms for all extracted terms. Do not convert them to the source-language.
+Hard-exclude any terms present in DNT. Use culturally appropriate, subtitle-friendly translations.
+
+{soft_block if soft_block else ""}
 
 1. Carefully analyze the transcript in the provided text.
 
-2. PASS 1: Extract the 20 source-language terms or phrases most likely to cause confusion or mistranslation in subtitle translation. These should meet one or more of the following criteria:
+2. PASS 1: Extract the topic-critical source-language terms most likely to cause confusion or mistranslation{f" (aim ≈{pass1_goal})" if pass1_goal else ""}. These should meet one or more of the following criteria:
 
    INCLUDE if they:
-   - Are central to understanding the course's subject matter (e.g., key frameworks, structured methods, strategic terms)
+   - **Appear in the transcript** (surface forms from the source language)
+   - Are **multi-word, domain-specific noun phrases** and proper names
    - Could be misunderstood or mistranslated due to ambiguity, abstraction, cultural specificity, or figurative language
    - Are important for learners to grasp — even if they appear only once
    - Would benefit from a standardized, subtitle-friendly translation to avoid confusion
@@ -317,30 +423,43 @@ FIRST, detect the transcript's source language and use its surface forms for all
    - Are obvious, literal, or easily translatable without risk of confusion
    - Are purely stylistic idioms or colorful language with little instructional value
    - Are listed in DNT_TERMS (do not extract any terms that appear in the DNT_TERMS list)
+   - Are **generic single-word terms** unless they appear in ≥3 distinct subtitle lines
+   - Are inferred companies, brands, roles, or frameworks that aren't in the transcript
 
-3. PASS 2: Identify 10 additional source-language words or phrases from the transcript that are likely to be:
+3. PASS 2: Identify additional source-language words or phrases{f" (aim ≈{pass2_goal})" if pass2_goal else ""} that are likely to be:
    - mistranslated,
    - interpreted too literally,
    - or misunderstood without context.
 
    These may include single words, figurative language, verbs or idioms with a special usage, or phrases that learners might take the wrong way in another culture or language.
    Pay special attention to single words that could be confused with similar words (e.g., "thrash" vs "trash").
-   Only include these 10 if their mistranslation could cause confusion or reduce learner understanding.
+   Only include these if their mistranslation could cause confusion or reduce learner understanding.
    Do not include merely colorful or stylistic phrases.
 
-   ➤ You must generate exactly 30 total terms: 20 from Pass 1 + 10 from Pass 2.
+   **IMPORTANT**: Limit generic single-word terms (e.g., metrics, feedback, engagement, innovation, framework, alignment, goals) to at most **2 total** across both passes, **unless** the single word appears in ≥3 distinct subtitle lines. If a generic single has a longer, more specific variant also present (e.g., 'agile product development' vs 'agile'), **choose the longer phrase** and drop the generic.
 
-4. Return both:
-   - The extracted list of 30 terms, with a brief reason for each
-   - A termbase mapping each source term to its {lang_name} translation
+   ➤ Generate a coherent list. If you cannot find enough legitimate candidates, return fewer and set "exhausted": true and "exhaustion_reason". **Do not pad** with broad synonyms.
+
+Return JSON with:
+- "pass1_terms": [{{"term": "...","reason":"..."}}]
+- "pass2_terms": [{{"term": "...","reason":"..."}}]
+- "termbase": {{"<source-term>": "<translated-term>", ...}}
+- "exhausted": boolean
+- "exhaustion_reason": string|null
 
 OUTPUT (JSON only; no markdown, no commentary):
 {{
-  "extracted_terms": [
+  "exhausted": false,
+  "exhaustion_reason": null,
+  "pass1_terms": [
     {{"term": "<SRC term 1>", "reason": "<Why risky when translating into {lang_name}>"}}
   ],
+  "pass2_terms": [
+    {{"term": "<SRC term 2>", "reason": "<Why risky when translating into {lang_name}>"}}
+  ],
   "termbase": {{
-    "<SRC term 1>": "<{lang_name} term 1>"
+    "<SRC term 1>": "<{lang_name} term 1>",
+    "<SRC term 2>": "<{lang_name} term 2>"
   }}
 }}
 
@@ -353,9 +472,6 @@ TRANSLATION RULES
 - If no exact equivalent, use the most natural localized term (not a long definition).
 - Preserve proper names; do not translate trademarks.
 - Do NOT include any DNT terms (they were excluded from selection).
-
-SIZES
-- extracted_terms: 30 total (20 Pass 1 + 10 Pass 2)
 
 DNT_TERMS (JSON array):
 {json.dumps(sorted(list(dnt_set)), ensure_ascii=False)}
@@ -374,8 +490,71 @@ TEXT (Transcript):
             )
             raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
-            extracted = data.get("extracted_terms", []) or []
+            exhausted = bool(data.get("exhausted") or False)
+            exhaustion_reason = data.get("exhaustion_reason")
+            pass1_terms = data.get("pass1_terms", []) or []
+            pass2_terms = data.get("pass2_terms", []) or []
+            extracted = pass1_terms + pass2_terms
             tb = data.get("termbase", {}) or {}
+
+            # Domain-agnostic post-filtering constants and functions
+            GENERIC_SINGLETONS = {
+                "metrics",
+                "feedback",
+                "engagement",
+                "innovation",
+                "framework",
+                "alignment",
+                "goals",
+                "control",
+                "execution",
+                "insights",
+                "initiative",
+                "agile",
+            }
+
+            def appears_in_transcript(term: str, transcript: str) -> bool:
+                # simple case/space/hyphen tolerant check
+                canon = term.lower().replace("-", " ").strip()
+                text = transcript.lower().replace("-", " ")
+                return f" {canon} " in f" {text} "
+
+            def count_distinct_lines(term: str, lines: list[str]) -> int:
+                t = term.lower()
+                return sum(1 for ln in lines if t in ln.lower())
+
+            def dedupe_substrings(terms: list[str]) -> list[str]:
+                terms_sorted = sorted(terms, key=lambda t: (-len(t), t.lower()))
+                keep: list[str] = []
+                for t in terms_sorted:
+                    if not any(
+                        t.lower() in k.lower() and t.lower() != k.lower() for k in keep
+                    ):
+                        keep.append(t)
+                return keep
+
+            def prune_generics(
+                terms: list[str], transcript: str, lines: list[str]
+            ) -> list[str]:
+                # 1) drop terms not in transcript at all
+                in_text = [t for t in terms if appears_in_transcript(t, transcript)]
+                # 2) substring collapse (prefer longer phrases)
+                collapsed = dedupe_substrings(in_text)
+                # 3) cap generic singletons to 2 unless frequent (≥3 distinct lines)
+                singles, others = [], []
+                for t in collapsed:
+                    if " " not in t and t.lower() in GENERIC_SINGLETONS:
+                        singles.append(t)
+                    else:
+                        others.append(t)
+                singles_keep = [
+                    t for t in singles if count_distinct_lines(t, lines) >= 3
+                ]
+                singles_budget = max(0, 2 - len(singles_keep))
+                singles_fill = [t for t in singles if t not in singles_keep][
+                    :singles_budget
+                ]
+                return others + singles_keep + singles_fill
 
             # Basic validation + DNT filtering with pass analysis
             cleaned_terms: List[Dict[str, str]] = []
@@ -383,6 +562,8 @@ TEXT (Transcript):
             pass1_terms = []
             pass2_terms = []
 
+            # Require non-empty reason and dedupe by case-insensitive key
+            seen_terms = set()
             for it in extracted:
                 if not isinstance(it, dict):
                     continue
@@ -395,6 +576,11 @@ TEXT (Transcript):
                 if term.lower() in dnt_set:
                     dnt_filtered_terms.append(term)
                     continue
+
+                kl = term.lower()
+                if kl in seen_terms:
+                    continue
+                seen_terms.add(kl)
 
                 # Categorize by pass based on reason content
                 reason_lower = reason.lower()
@@ -424,8 +610,68 @@ TEXT (Transcript):
                     pass1_terms.append({"term": term, "reason": reason})
 
                 cleaned_terms.append({"term": term, "reason": reason})
-                if len(cleaned_terms) >= max_terms:
+                # keep a sane upper bound but prefer the prompt band
+                effective_max = (
+                    min(max_terms, soft_hi) if (soft_hi and soft_hi > 0) else max_terms
+                )
+                if len(cleaned_terms) >= effective_max:
                     break
+
+            def do_top_up(needed: int) -> int:
+                # oversample to survive DNT/dedupe; clip later
+                ask_low = needed + max(2, needed // 2)  # e.g., need 3 -> ask 4 or 5
+                ask_high = ask_low + 2
+                addl = self._top_up_extracted_terms(
+                    content=content,
+                    lang_code=lang_code,
+                    lang_name=lang_name,
+                    existing_terms=[t["term"] for t in cleaned_terms],
+                    needed=ask_low,
+                    needed_hi=ask_high,
+                    dnt_terms=list(dnt_set),
+                )
+                added = 0
+                for it in addl:
+                    term = (it.get("term") or "").strip()
+                    reason = (it.get("reason") or "").strip()
+                    if not term or not reason:
+                        continue
+                    kl = term.lower()
+                    if kl in seen_terms or kl in dnt_set:
+                        continue
+                    cleaned_terms.append({"term": term, "reason": reason})
+                    seen_terms.add(kl)
+                    added += 1
+                    if soft_hi and len(cleaned_terms) >= soft_hi:
+                        break
+                return added
+
+            if (soft_lo and len(cleaned_terms) < soft_lo) and not exhausted:
+                missing = soft_lo - len(cleaned_terms)
+                self.logger.info(
+                    f"[{lang_code}] {len(cleaned_terms)} < soft_lo({soft_lo}); requesting +{missing} top-up terms."
+                )
+                added = do_top_up(missing)
+                if (soft_lo and len(cleaned_terms) < soft_lo) and added > 0:
+                    # still short, try one more time for the remainder
+                    do_top_up(soft_lo - len(cleaned_terms))
+
+            # Apply domain-agnostic post-filtering
+            transcript_lines = content.split("\n")
+            term_texts = [t["term"] for t in cleaned_terms]
+            filtered_terms = prune_generics(term_texts, content, transcript_lines)
+
+            # Rebuild cleaned_terms with filtered results
+            filtered_cleaned_terms = []
+            for term_text in filtered_terms:
+                # Find the original term dict with this text
+                for term_dict in cleaned_terms:
+                    if term_dict["term"] == term_text:
+                        filtered_cleaned_terms.append(term_dict)
+                        break
+
+            # Update cleaned_terms with filtered results
+            cleaned_terms = filtered_cleaned_terms
 
             # Filter DNT collisions from TB keys
             tb_dict = {}
@@ -437,6 +683,29 @@ TEXT (Transcript):
                         continue
                     tb_dict[k.strip()] = str(v).strip()
 
+            # --- ensure translations exist for ALL cleaned terms ---
+            src_terms = [t["term"] for t in cleaned_terms]
+            missing_src = [s for s in src_terms if not tb_dict.get(s)]
+            if missing_src:
+                merged = {}
+                CHUNK = 25
+                for i in range(0, len(missing_src), CHUNK):
+                    chunk = missing_src[i : i + CHUNK]
+                    fill_map = (
+                        self.generate_single_language_termbase(
+                            terms=[{"term": s, "reason": ""} for s in chunk],
+                            lang_code=lang_code,
+                            lang_name=lang_name,
+                        )
+                        or {}
+                    )
+                    merged.update(fill_map)
+                for s in missing_src:
+                    tb_dict[s] = merged.get(s) or s
+                self.logger.info(
+                    f"[{lang_code}] post-fill added {len(missing_src)} translations; TB now {len(tb_dict)}"
+                )
+
             # Log detailed breakdown
             self.logger.info(
                 f"Termbase breakdown for {lang_code}: "
@@ -445,6 +714,9 @@ TEXT (Transcript):
                 f"DNT filtered: {len(dnt_filtered_terms)}, "
                 f"Total extracted: {len(cleaned_terms)}, "
                 f"Final TB entries: {len(tb_dict)}"
+            )
+            self.logger.info(
+                f"[{lang_code}] exhausted={exhausted} reason={exhaustion_reason}"
             )
 
             # Log each term with its reason for detailed analysis
@@ -669,7 +941,7 @@ TEXT (Transcript):
             lang_name: Human-readable language name (e.g., "Spanish", "Chinese (Simplified)")
 
         Returns:
-            Dictionary mapping English terms to target language translations
+            Dictionary mapping source-language terms to target language translations
         """
         try:
             # Convert terms to simple list for the prompt
@@ -719,17 +991,17 @@ Return valid JSON only. No explanations or markdown.
                         if target:
                             result[term] = target
                         else:
-                            # Empty translation - use English key and warn
+                            # Empty translation - use source term and warn
                             result[term] = term
                             self.logger.warning(
-                                f"Empty translation for '{term}' in {lang_code}, using English key"
+                                f"Empty translation for '{term}' in {lang_code}, using source term"
                             )
                     else:
                         missing_terms.append(term)
-                        # Missing term - use English key and warn
+                        # Missing term - use source term and warn
                         result[term] = term
                         self.logger.warning(
-                            f"Missing translation for '{term}' in {lang_code}, using English key"
+                            f"Missing translation for '{term}' in {lang_code}, using source term"
                         )
 
                 if missing_terms:
@@ -917,6 +1189,7 @@ Return valid JSON only. No explanations or markdown.
             transcript_sample,
             target_lang_codes,
             dnt_terms=dnt_terms,
+            source_language=source_lang,
         )
         self.logger.info(
             f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)"
@@ -936,3 +1209,75 @@ Return valid JSON only. No explanations or markdown.
         # kill pure index lines
         raw = re.sub(r"(?m)^\s*\d+\s*$", "", raw)
         return raw
+
+    def _maybe_sleep_jitter(self, low: float = 0.5, high: float = 2.0) -> None:
+        """Add a small random sleep to reduce AI fatigue."""
+        sleep_time = random.uniform(low, high)
+        self.logger.debug(
+            f"Sleeping for {sleep_time:.2f} seconds to reduce AI fatigue."
+        )
+        time.sleep(sleep_time)
+
+    def _top_up_extracted_terms(
+        self,
+        content: str,
+        lang_code: str,
+        lang_name: str,
+        existing_terms: List[str],
+        needed: int,
+        needed_hi: int = None,
+        dnt_terms: List[str] | None = None,
+    ) -> List[Dict[str, str]]:
+        """
+        One-shot request for EXACTLY `needed` NEW terms (not in existing_terms, not in DNT).
+        Returns a list of {"term","reason"} (may be fewer than requested if genuinely exhausted).
+        """
+        dnt_set = {t.lower().strip() for t in (dnt_terms or [])}
+        needed_hi = needed_hi or needed
+        prompt = f"""
+You are assisting with a small top-up of terminology extraction for translation into {lang_name}.
+
+REQUIREMENT: Return AT LEAST {needed} NEW, UNIQUE terms not in existing_terms (after DNT filtering).
+If you can, return {needed} to {needed_hi} to allow for dedupe, but never include duplicates.
+
+Provide NEW source-language terms that:
+- are legitimate per the same selection rules,
+- are NOT in EXISTING_TERMS and NOT in DNT_TERMS,
+- include a concise "reason".
+
+Output only:
+{{"pass1_terms":[{{"term":"<SRC term>","reason":"<short reason>"}}]}}
+
+EXISTING_TERMS (JSON): {json.dumps(sorted(existing_terms), ensure_ascii=False)}
+DNT_TERMS (JSON): {json.dumps(sorted(list(dnt_set)), ensure_ascii=False)}
+TEXT:
+{content}
+""".strip()
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.DEFAULT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=1400,
+                response_format={"type": "json_object"},
+            )
+            raw = (resp.choices[0].message.content or "").strip()
+            data = json.loads(raw)
+            out = []
+            for it in data.get("pass1_terms") or []:
+                term = (it.get("term") or "").strip()
+                reason = (it.get("reason") or "").strip()
+                if not term or not reason:
+                    continue
+                tl = term.lower()
+                if tl in dnt_set:
+                    continue
+                if tl in {t.lower() for t in existing_terms}:
+                    continue
+                out.append({"term": term, "reason": reason})
+                if len(out) >= needed:
+                    break
+            return out
+        except Exception as e:
+            self.logger.warning(f"[{lang_code}] top-up failed: {e}")
+            return []
