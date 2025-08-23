@@ -2,6 +2,7 @@
   "version": "1.2",
   "default_popular_limit": 12,
   "default_popular_languages": [
+    "en-US",
     "es",
     "fr",
     "de",
@@ -147,6 +148,44 @@
     },
     "en": {
       "name": "English",
+      "popular": false,
+      "break_markers": [
+        "and",
+        "but",
+        "or",
+        "so",
+        "because",
+        "however",
+        "therefore",
+        "although",
+        "while",
+        "since"
+      ],
+      "family": "latin",
+      "cps_cap": 20,
+      "script": "latin"
+    },
+    "en-US": {
+      "name": "English (US)",
+      "popular": true,
+      "break_markers": [
+        "and",
+        "but",
+        "or",
+        "so",
+        "because",
+        "however",
+        "therefore",
+        "although",
+        "while",
+        "since"
+      ],
+      "family": "latin",
+      "cps_cap": 20,
+      "script": "latin"
+    },
+    "en-GB": {
+      "name": "English (UK)",
       "popular": false,
       "break_markers": [
         "and",
