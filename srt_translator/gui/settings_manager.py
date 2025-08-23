@@ -74,12 +74,14 @@ class SettingsManager:
             # If current state is empty, try to load AI configuration
             if not self._state.dnt_terms and not self._state.termbase:
                 try:
-                    ai_dnt_terms, ai_termbase = self.load_ai_config()
+                    ai_dnt_terms, ai_termbase, _ = self.load_ai_config()
                     if ai_dnt_terms or ai_termbase:
                         self.logger.info("Loading AI configuration into current state")
                         new_state = self._state.copy()
                         new_state.dnt_terms = ai_dnt_terms.copy()
-                        new_state.termbase = {k: v.copy() for k, v in ai_termbase.items()}
+                        new_state.termbase = {
+                            k: v.copy() for k, v in ai_termbase.items()
+                        }
                         self._state = new_state
                 except Exception as e:
                     self.logger.warning(f"Failed to load AI configuration: {e}")
@@ -188,11 +190,17 @@ class SettingsManager:
         with self._lock:
             self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
 
-    def save_ai_config(self, dnt_terms: List[str], termbase: Dict[str, Dict[str, str]]) -> None:
+    def save_ai_config(
+        self,
+        dnt_terms: List[str],
+        termbase: Dict[str, Dict[str, str]],
+        source_language: Optional[Dict[str, object]] = None,
+    ) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
+        self.settings.setValue("ai_source_language", source_language or {})
         self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
 
         # Also update current state
@@ -208,11 +216,12 @@ class SettingsManager:
 
     def load_ai_config(
         self,
-    ) -> Tuple[List[str], Dict[str, Dict[str, str]]]:
+    ) -> Tuple[List[str], Dict[str, Dict[str, str]], Optional[Dict[str, object]]]:
         """Load AI-generated configuration"""
         dnt_terms = self.settings.value("ai_dnt_terms", [])
         termbase = self.settings.value("ai_termbase", {})
-        return dnt_terms, termbase
+        source_language = self.settings.value("ai_source_language", {})
+        return dnt_terms, termbase, source_language
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
         """Check if AI configuration is recent"""
@@ -229,13 +238,14 @@ class SettingsManager:
 
     def has_ai_config(self) -> bool:
         """Check if AI configuration exists"""
-        dnt_terms, termbase = self.load_ai_config()
+        dnt_terms, termbase, _ = self.load_ai_config()
         return bool(dnt_terms or termbase)
 
     def clear_ai_config(self) -> None:
         """Clear AI configuration"""
         self.settings.remove("ai_dnt_terms")
         self.settings.remove("ai_termbase")
+        self.settings.remove("ai_source_language")
         self.settings.remove("ai_config_timestamp")
         self.settings.remove("ai_config_file_hash")
 
@@ -324,9 +334,13 @@ class SettingsManager:
         # fill the remaining slots with default popular languages
         if len(user_preferences) < popular_limit:
             # Get default languages that aren't already in user preferences
-            remaining_defaults = [code for code in default_popular if code not in user_preferences]
+            remaining_defaults = [
+                code for code in default_popular if code not in user_preferences
+            ]
             # Fill up to the limit
-            additional_languages = remaining_defaults[: popular_limit - len(user_preferences)]
+            additional_languages = remaining_defaults[
+                : popular_limit - len(user_preferences)
+            ]
             return user_preferences + additional_languages
 
         # If user has enough preferences, use them (up to the limit)

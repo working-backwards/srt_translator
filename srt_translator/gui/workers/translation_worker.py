@@ -159,8 +159,10 @@ class TranslationWorker(QObject):
 
             # Build configuration from GUI settings manager
             if self.settings_manager:
-                # Load DNT terms and termbase from settings manager BEFORE creating config
-                dnt_terms, termbase = self.settings_manager.load_ai_config()
+                # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
+                dnt_terms, termbase, source_language = (
+                    self.settings_manager.load_ai_config()
+                )
 
                 # Build config from settings manager with actual data
                 api_cfg = TranslationConfiguration(
@@ -175,6 +177,7 @@ class TranslationWorker(QObject):
                     log_mode="Standard",
                     api_key=self.api_key,
                     mode="GUI",
+                    source_language=source_language,
                 )
                 self.logger.info(
                     f"Using configuration from settings manager: "

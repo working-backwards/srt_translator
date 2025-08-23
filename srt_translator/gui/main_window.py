@@ -55,21 +55,29 @@ class SRTTranslatorMainWindow(QMainWindow):
         try:
             import json
             from srt_translator.core.config.language_config import LanguageConfig
+
             languages_path = "config/languages.json"
             with open(languages_path, "r", encoding="utf-8") as f:
                 lang_data = json.load(f)
             self.language_config = LanguageConfig(lang_data)
-            self.logger.info(f"Loaded language configuration with {len(self.language_config.get_all_languages())} languages")
+            self.logger.info(
+                f"Loaded language configuration with {len(self.language_config.get_all_languages())} languages"
+            )
         except (FileNotFoundError, json.JSONDecodeError) as e:
             self.logger.error(f"Failed to load language configuration: {e}")
-            QMessageBox.critical(self, "Configuration Error", 
-                               f"Failed to load language configuration: {e}\n\nPlease ensure config/languages.json exists and is valid.")
+            QMessageBox.critical(
+                self,
+                "Configuration Error",
+                f"Failed to load language configuration: {e}\n\nPlease ensure config/languages.json exists and is valid.",
+            )
             raise RuntimeError(f"Language configuration load failed: {e}")
-        
+
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)
-        self.config_manager = GUIConfigManager(self.settings_manager, self.language_config)
-        
+        self.config_manager = GUIConfigManager(
+            self.settings_manager, self.language_config
+        )
+
         self.ai_config_generator = None
         self.ai_config_thread = None
         self.ai_config_worker = None
@@ -131,7 +139,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create modular sections
         self.api_section = APISection(self.settings_manager)
         self.file_section = FileSection(self.settings_manager)
-        self.language_section = LanguageSection(self.settings_manager, self.language_config)
+        self.language_section = LanguageSection(
+            self.settings_manager, self.language_config
+        )
         self.ai_config_section = AIConfigSection()
         self.translation_section = TranslationSection()
 
@@ -218,7 +228,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.language_section.load_saved_languages()
 
         # Load and display existing Translation Settings if available
-        dnt_terms, termbase = self.settings_manager.load_ai_config()
+        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if dnt_terms or termbase:
             self.ai_config_section.update_dnt_display(dnt_terms)
             self.ai_config_section.update_termbase_display(termbase)
@@ -300,7 +310,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.set_generate_button_enabled(len(selected_files) > 0)
 
         # Check if we have existing Translation Settings and enable action buttons
-        dnt_terms, termbase = self.settings_manager.load_ai_config()
+        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         has_translation_settings = bool(dnt_terms or termbase)
         self.ai_config_section.set_action_buttons_enabled(has_translation_settings)
 
@@ -381,7 +391,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Start AI configuration generation in a separate thread
 
         class AIConfigWorker(QObject):
-            finished = Signal(tuple)  # (dnt_terms, termbase)
+            finished = Signal(tuple)  # (dnt_terms, termbase, source_language)
             error = Signal(str)
             progress = Signal(str)  # Add progress signal for GUI updates
 
@@ -391,33 +401,42 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self.files = files
                 self.languages = languages
                 self.logger = logging.getLogger(__name__)
-                
+
                 # Set up logging bridge to capture AI config logs
                 self._setup_logging_bridge()
 
             def run(self):
                 try:
-                    self.progress.emit("AI Config Worker: Starting batch-level AI config generation")
-                    self.logger.info("AI Config Worker: Starting batch-level AI config generation")
-                    
+                    self.progress.emit(
+                        "AI Config Worker: Starting batch-level AI config generation"
+                    )
+                    self.logger.info(
+                        "AI Config Worker: Starting batch-level AI config generation"
+                    )
+
                     # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
                     batch_config = self.ai_generator.generate_batch_ai_config(
-                        source_file_paths=self.files,
-                        target_lang_codes=self.languages
+                        source_file_paths=self.files, target_lang_codes=self.languages
                     )
-                    
+
                     progress_msg = f"AI Config Worker: Generated {len(batch_config.dnt_terms)} DNT terms and termbase for {len(batch_config.termbase)} languages (batch-level)"
                     self.progress.emit(progress_msg)
                     self.logger.info(progress_msg)
 
-                    self.finished.emit((batch_config.dnt_terms, batch_config.termbase))
+                    self.finished.emit(
+                        (
+                            batch_config.dnt_terms,
+                            batch_config.termbase,
+                            batch_config.source_language,
+                        )
+                    )
 
                 except Exception as e:
                     error_msg = f"AI Config Worker: Error during generation: {e}"
                     self.progress.emit(error_msg)
                     self.logger.error(error_msg)
                     self.error.emit(str(e))
-                    
+
             def _setup_logging_bridge(self):
                 """Set up logging bridge to capture AI config logs and send to GUI"""
                 try:
@@ -426,30 +445,30 @@ class SRTTranslatorMainWindow(QMainWindow):
                         def __init__(self, worker):
                             super().__init__()
                             self.worker = worker
-                        
+
                         def emit(self, record):
                             try:
                                 msg = self.format(record)
                                 self.worker.progress.emit(msg)
                             except Exception:
                                 pass
-                    
+
                     # Set up the handler for AI config logs
                     progress_handler = ProgressLogHandler(self)
                     progress_handler.setLevel(logging.INFO)
-                    
+
                     # Format the logs nicely
-                    formatter = logging.Formatter('%(message)s')
+                    formatter = logging.Formatter("%(message)s")
                     progress_handler.setFormatter(formatter)
-                    
+
                     # Add handler to AI config logger
-                    ai_logger = logging.getLogger('srt_translator.gui.ai_config')
+                    ai_logger = logging.getLogger("srt_translator.gui.ai_config")
                     ai_logger.addHandler(progress_handler)
                     ai_logger.setLevel(logging.INFO)
-                    
+
                     # Also capture our own worker logs
                     self.logger.addHandler(progress_handler)
-                    
+
                 except Exception as e:
                     # Fallback if logging bridge fails
                     self.logger.warning(f"Failed to set up logging bridge: {e}")
@@ -476,7 +495,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def ai_config_generation_finished(self, result):
         """Handle AI configuration generation completion"""
-        dnt_terms, termbase = result
+        dnt_terms, termbase, source_language = result
 
         self.logger.info(
             f"AI configuration generation completed: {len(dnt_terms)} DNT terms, "
@@ -487,7 +506,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.show_progress(False)
 
         # Save AI configuration
-        self.settings_manager.save_ai_config(dnt_terms, termbase)
+        self.settings_manager.save_ai_config(dnt_terms, termbase, source_language)
         self.logger.info("AI configuration saved to settings")
 
         # Update displays
@@ -545,7 +564,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def edit_translation_settings(self):
         """Open the Translation Settings editor dialog."""
         # Get current Translation Settings
-        dnt_terms, termbase = self.settings_manager.load_ai_config()
+        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
 
         if not dnt_terms and not termbase:
             QMessageBox.warning(
@@ -567,8 +586,13 @@ class SRTTranslatorMainWindow(QMainWindow):
             modified_terms, modified_termbase = dialog.get_modified_config()
 
             if dialog.has_changes():
-                # Save the modified configuration
-                self.settings_manager.save_ai_config(modified_terms, modified_termbase)
+                # Save the modified configuration (preserve existing source language)
+                dnt_terms, termbase, source_language = (
+                    self.settings_manager.load_ai_config()
+                )
+                self.settings_manager.save_ai_config(
+                    modified_terms, modified_termbase, source_language
+                )
 
                 # Update displays
                 self.ai_config_section.update_dnt_display(modified_terms)
@@ -596,7 +620,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def view_translation_settings_details(self):
         """View detailed Translation Settings"""
         # Get current configuration
-        dnt_terms, termbase = self.settings_manager.load_ai_config()
+        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
 
         if not dnt_terms and not termbase:
             QMessageBox.warning(
@@ -686,7 +710,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         estimated_cost = (estimated_tokens / 1000) * 0.002
 
         # Add AI configuration cost if not already generated
-        dnt_terms, termbase = self.settings_manager.load_ai_config()
+        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if not dnt_terms and not termbase:
             estimated_cost += 0.10  # AI configuration cost
 

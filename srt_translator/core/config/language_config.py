@@ -99,6 +99,38 @@ class LanguageConfig:
             return 20
         return int(cap)
 
+    @classmethod
+    def normalize_language_code(cls, code: str) -> str:
+        """Normalize language code to standard form."""
+        if not code:
+            return code
+
+        # Normalize case
+        normalized = code.strip().lower()
+
+        # Handle common language code variations
+        if normalized == "zh":
+            return "zh-Hans"  # Default to Simplified Chinese
+        elif normalized == "pt":
+            return "pt-BR"  # Default to Brazilian Portuguese
+        elif normalized == "en":
+            return "en-US"  # Default to US English
+        elif normalized in ["zh-hans", "zh-cn"]:
+            return "zh-Hans"
+        elif normalized in ["zh-hant", "zh-tw", "zh-hk"]:
+            return "zh-Hant"
+        elif normalized in ["pt-br", "pt-brazil"]:
+            return "pt-BR"
+        elif normalized in ["pt-pt", "pt-portugal"]:
+            return "pt-PT"
+        elif normalized in ["en-us", "en-america"]:
+            return "en-US"
+        elif normalized in ["en-gb", "en-uk", "en-britain"]:
+            return "en-GB"
+
+        # Return as-is for other codes
+        return code
+
     def get_family_defaults(self, family: str) -> dict:
         """Get family-level defaults for language configuration"""
         return (self._config.get("family_defaults") or {}).get(family, {})

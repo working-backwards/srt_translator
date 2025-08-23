@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 from srt_translator.core.config.models import TranslationConfig
-from srt_translator.core.main import translate_srt_files  # (file_paths, config)
 
 
 @dataclass(frozen=True)
@@ -22,25 +21,11 @@ class TranslationConfiguration:
     log_mode: str = "Standard"
     api_key: Optional[str] = None
     mode: str = "GUI"  # or "CLI"
+    # NEW: pass-through from GUI/CLI detection (Batch-level, optional)
+    source_language: Optional[Dict[str, object]] = None
 
-
-class Translator:
-    """One-batch-per-instance translator façade."""
-
-    def __init__(self, config: TranslationConfiguration):
-        self._config = config
-        self._ran = False
-        self._log = logging.getLogger("srt_translator")
-
-    def run(self) -> Dict[str, Any]:
-        if self._ran:
-            raise RuntimeError(
-                "Translator.run() is single-use; create a new instance for another batch"
-            )
-        self._ran = True
-        if not self._config.files:
-            raise ValueError("TranslationConfiguration.files is required in v1")
-
+    def _build_core_config(self) -> TranslationConfig:
+        """Build the core TranslationConfig from this facade configuration."""
         raw: Dict[str, Any] = {
             "api_key": self._config.api_key,
             "output_directory": str(self._config.output_dir),
@@ -51,10 +36,56 @@ class Translator:
             "batch_size": self._config.batch_size,
             "aggressiveness": self._config.aggressiveness,
             "log_mode": self._config.log_mode,
+            # NEW: forward to core model
+            "source_language": self._config.source_language,
         }
         core_cfg = TranslationConfig.from_raw(
             raw,
             mode=(self._config.mode if self._config.mode in ("GUI", "CLI") else "GUI"),
         )
-        files = [str(p) for p in self._config.files]
-        return translate_srt_files(file_paths=files, config=core_cfg)
+        return core_cfg
+
+    def run(self) -> Dict[str, Any]:
+        """Run the translation with the current configuration and return summary."""
+        core_cfg = self._build_core_config()
+        from srt_translator.core.main import translate_srt_files
+
+        if not self.files:
+            raise ValueError("No files specified for translation")
+
+        return translate_srt_files(
+            file_paths=[str(f) for f in self.files],
+            config=core_cfg,
+        )
+
+    @property
+    def _config(self) -> "TranslationConfiguration":
+        return self
+
+
+class Translator:
+    """Facade class for running translations from GUI/CLI."""
+
+    def __init__(self, config: TranslationConfiguration):
+        self.config = config
+
+    def run(self) -> Dict[str, Any]:
+        """Run the translation and return results."""
+        try:
+            # Run the translation and get summary
+            summary = self.config.run()
+
+            # Return results in format expected by GUI
+            return {
+                "status": "success",
+                "message": "Translation completed successfully",
+                "completed": summary["successes"],
+                "failed": summary["errors"],
+                "total_files": summary["total_files"],
+                "output_directory": str(
+                    self.config.output_dir
+                ),  # Include actual output directory
+            }
+        except Exception as e:
+            logging.error(f"Translation failed: {e}")
+            raise

@@ -10,13 +10,14 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from openai import OpenAI
 
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.srt_parser import SRTParser
 from srt_translator.core.terminology_utils import is_numeric_like, is_hard_preserve
+from srt_translator.core.services.language_detection import detect_source_language
 
 # Batch-level AI config constants
 _CHARS_PER_TOKEN = 4  # rough heuristic: ~4 chars per token
@@ -28,6 +29,7 @@ _CHAR_CAP = _TOKEN_CAP * _CHARS_PER_TOKEN  # ~50k chars
 class BatchAIConfig:
     dnt_terms: List[str]
     termbase: Dict[str, Dict[str, str]]  # lang -> {source_term: mapped_translation}
+    source_language: Optional[Dict[str, object]] = None
 
 
 class AIConfigGenerator:
@@ -894,11 +896,23 @@ Return valid JSON only. No explanations or markdown.
             f"Transcript sampled for AI config: ~{approx_tokens} tokens (~{len(transcript_sample)} chars)"
         )
 
-        # 2) Generate a SINGLE DNT list for the whole run
+        # 2) Detect source language
+        source_lang = detect_source_language(
+            transcript_sample,
+            chat=self.client,
+            model=self.DEFAULT_MODEL,
+            language_config=self._lang_cfg,
+        )
+        self.logger.info(
+            "Detected source language: "
+            f"{source_lang.get('normalized_code') or source_lang.get('detected_code')}"
+        )
+
+        # 3) Generate a SINGLE DNT list for the whole run
         dnt_terms = self.generate_dnt_terms(transcript_sample)
         self.logger.info(f"Generated {len(dnt_terms)} DNT terms (batch-level)")
 
-        # 3) Generate termbase using the new two-stage pipeline
+        # 4) Generate termbase using the new two-stage pipeline
         termbase_by_lang = self.generate_termbase(
             transcript_sample,
             target_lang_codes,
@@ -908,7 +922,9 @@ Return valid JSON only. No explanations or markdown.
             f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)"
         )
 
-        return BatchAIConfig(dnt_terms=dnt_terms, termbase=termbase_by_lang)
+        return BatchAIConfig(
+            dnt_terms=dnt_terms, termbase=termbase_by_lang, source_language=source_lang
+        )
 
     @staticmethod
     def _strip_srt_markup(raw: str) -> str:
