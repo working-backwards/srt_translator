@@ -4,7 +4,7 @@ DNT Terms Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import List
+from typing import Dict, List
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 
 
 class DNTTermsEditor(QWidget):
-    """Widget for editing DNT terms that should remain in English."""
+    """Widget for editing DNT terms that should remain in the original source language."""
 
     # Signal emitted when terms are modified
     terms_changed = Signal(list)
@@ -33,9 +33,24 @@ class DNTTermsEditor(QWidget):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.terms_list = []
+        self.source_language_name: str = "Original"  # Will be updated dynamically
 
         self.setup_ui()
         self.connect_signals()
+
+    def set_source_language(self, source_language_info: Dict[str, object]):
+        """Set the source language information for display purposes."""
+        if source_language_info and "name" in source_language_info:
+            self.source_language_name = str(source_language_info["name"])
+        else:
+            self.source_language_name = "Original"
+        self._update_title_label()
+
+    def _update_title_label(self):
+        """Update the title label with current source language."""
+        self.title_label.setText(
+            f"DNT terms (will remain in {self.source_language_name.lower()} language)"
+        )
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -45,12 +60,12 @@ class DNTTermsEditor(QWidget):
 
         # Header
         header_layout = QHBoxLayout()
-        title_label = QLabel("DNT terms (will remain in original language)")
+        self.title_label = QLabel("DNT terms (will remain in original language)")
         title_font = QFont()
         title_font.setBold(True)
         title_font.setPointSize(10)
-        title_label.setFont(title_font)
-        header_layout.addWidget(title_label)
+        self.title_label.setFont(title_font)
+        header_layout.addWidget(self.title_label)
         header_layout.addStretch()
 
         # Terms count label
@@ -65,7 +80,9 @@ class DNTTermsEditor(QWidget):
         self.terms_list_widget.setMinimumHeight(150)
         self.terms_list_widget.setMaximumHeight(200)
         self.terms_list_widget.setAlternatingRowColors(True)
-        self.terms_list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.terms_list_widget.setSelectionMode(
+            QListWidget.SelectionMode.SingleSelection
+        )
         layout.addWidget(self.terms_list_widget)
 
         # Buttons frame
@@ -213,7 +230,9 @@ class DNTTermsEditor(QWidget):
 
         for term in sorted(self.terms_list):
             item = QListWidgetItem(term)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            item.setFlags(
+                item.flags() | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+            )
             self.terms_list_widget.addItem(item)
 
         self.update_count_label()
@@ -241,7 +260,7 @@ class DNTTermsEditor(QWidget):
         term, ok = QInputDialog.getText(
             self,
             "Add DNT Term",
-            "Enter a term that should remain in English:",
+            f"Enter a term that should remain in {self.source_language_name.lower()} language:",
             text="",
         )
 
@@ -273,7 +292,9 @@ class DNTTermsEditor(QWidget):
             return
 
         old_term = selected_items[0].text()
-        new_term, ok = QInputDialog.getText(self, "Edit DNT Term", "Edit the term:", text=old_term)
+        new_term, ok = QInputDialog.getText(
+            self, "Edit DNT Term", "Edit the term:", text=old_term
+        )
 
         if ok and new_term.strip():
             new_term = new_term.strip()

@@ -640,8 +640,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         if termbase:
             for language, terms in termbase.items():
                 termbase_text += f"{language}:\n"
-                for english_term, translation in terms.items():
-                    termbase_text += f"  • {english_term} → {translation}\n"
+                for source_term, translation in terms.items():
+                    termbase_text += f"  • {source_term} → {translation}\n"
                 termbase_text += "\n"
         else:
             termbase_text = "No termbase entries"

@@ -29,8 +29,8 @@ from PySide6.QtWidgets import (
 class TermbaseEditor(QWidget):
     """Widget for editing termbase entries across multiple languages.
 
-    The termbase contains language-specific translations of English terms.
-    Each language has its own set of translations for the same English terms.
+    The termbase contains language-specific translations of source language terms.
+    Each language has its own set of translations for the same source language terms.
     """
 
     termbase_changed = Signal(dict)  # Emitted when termbase is modified
@@ -38,11 +38,22 @@ class TermbaseEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.termbase: Dict[str, Dict[str, str]] = {}  # {language: {english_term: translation}}
+        self.termbase: Dict[str, Dict[str, str]] = (
+            {}
+        )  # {language: {source_term: translation}}
         self.languages: List[str] = []
+        self.source_language_name: str = "Source"  # Will be updated dynamically
         self._updating_table = False  # Flag to prevent signal loops
         self.setup_ui()
         self.connect_signals()
+
+    def set_source_language(self, source_language_info: Dict[str, object]):
+        """Set the source language information for display purposes."""
+        if source_language_info and "name" in source_language_info:
+            self.source_language_name = str(source_language_info["name"])
+        else:
+            self.source_language_name = "Source"
+        self.refresh_table()
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -128,34 +139,48 @@ class TermbaseEditor(QWidget):
             self._updating_table = False
             return
 
-        # Get all unique English terms across all languages
+            # Get all unique source terms across all languages (deduplicated)
         all_terms: set[str] = set()
         for language_termbase in self.termbase.values():
             all_terms.update(language_termbase.keys())
+
+        # Ensure case-insensitive deduplication and proper sorting
+        unique_terms = set()
+        for term in all_terms:
+            # Check if we already have a case-insensitive version
+            term_lower = term.lower()
+            if not any(existing.lower() == term_lower for existing in unique_terms):
+                unique_terms.add(term)
+
+        all_terms = unique_terms
 
         if not all_terms:
             self._updating_table = False
             return
 
-        # Set up table
-        self.table.setColumnCount(len(self.languages) + 1)  # +1 for English terms
-        headers = ["English Term"] + self.languages
+        # Set up table - terms in column 0, languages in columns 1-N
+        self.table.setColumnCount(
+            len(self.languages) + 1
+        )  # +1 for source language terms
+        headers = [f"{self.source_language_name} Term"] + self.languages
         self.table.setHorizontalHeaderLabels(headers)
 
-        # Add rows
-        sorted_terms = sorted(all_terms)
+        # Add rows - one row per unique source term (deduplicated and alphabetically sorted)
+        sorted_terms = sorted(
+            all_terms, key=str.lower
+        )  # Case-insensitive alphabetical sorting
         self.table.setRowCount(len(sorted_terms))
 
-        for row, english_term in enumerate(sorted_terms):
-            # English term (read-only)
-            english_item = QTableWidgetItem(english_term)
-            english_item.setFlags(english_item.flags() & ~Qt.ItemIsEditable)  # type: ignore[attr-defined]
-            english_item.setBackground(QColor(240, 240, 240))
-            self.table.setItem(row, 0, english_item)
+        for row, source_term in enumerate(sorted_terms):
+            # Source term (read-only) in column 0
+            source_item = QTableWidgetItem(source_term)
+            source_item.setFlags(source_item.flags() & ~Qt.ItemIsEditable)  # type: ignore[attr-defined]
+            source_item.setBackground(QColor(240, 240, 240))
+            self.table.setItem(row, 0, source_item)
 
-            # Translations for each language
+            # Translations for each language in columns 1-N
             for col, language in enumerate(self.languages, 1):
-                translation = self.termbase.get(language, {}).get(english_term, "")
+                translation = self.termbase.get(language, {}).get(source_term, "")
                 item = QTableWidgetItem(translation)
                 self.table.setItem(row, col, item)
 
@@ -171,7 +196,9 @@ class TermbaseEditor(QWidget):
             total_terms += len(language_termbase)
 
         language_count = len(self.languages)
-        self.count_label.setText(f"{total_terms} translations across {language_count} languages")
+        self.count_label.setText(
+            f"{total_terms} translations across {language_count} languages"
+        )
 
     def update_button_states(self):
         """Update button enabled states based on selection."""
@@ -186,9 +213,9 @@ class TermbaseEditor(QWidget):
         """Add a new term to the termbase."""
         dialog = AddTermDialog(self.languages, self)
         if dialog.exec():
-            english_term, translations = dialog.get_data()
-            if english_term:
-                self._add_term_to_termbase(english_term, translations)
+            source_term, translations = dialog.get_data()
+            if source_term:
+                self._add_term_to_termbase(source_term, translations)
                 self.refresh_table()
                 self.update_count_label()
                 self.update_button_states()
@@ -200,13 +227,13 @@ class TermbaseEditor(QWidget):
         if not selected_items:
             return
 
-        # Get the English term from the first column
+        # Get the source term from the first column
         row = selected_items[0].row()
-        english_term_item = self.table.item(row, 0)
-        if not english_term_item:
+        source_term_item = self.table.item(row, 0)
+        if not source_term_item:
             return
 
-        english_term = english_term_item.text()
+        source_term = source_term_item.text()
 
         # Collect current translations
         current_translations = {}
@@ -215,10 +242,10 @@ class TermbaseEditor(QWidget):
             if item:
                 current_translations[language] = item.text()
 
-        dialog = EditTermDialog(english_term, current_translations, self.languages, self)
+        dialog = EditTermDialog(source_term, current_translations, self.languages, self)
         if dialog.exec():
             new_translations = dialog.get_translations()
-            self._update_term_translations(english_term, new_translations)
+            self._update_term_translations(source_term, new_translations)
             self.refresh_table()
             self.update_count_label()
             self.termbase_changed.emit(self.termbase)
@@ -230,28 +257,30 @@ class TermbaseEditor(QWidget):
             return
 
         row = selected_items[0].row()
-        english_term_item = self.table.item(row, 0)
-        if not english_term_item:
+        source_term_item = self.table.item(row, 0)
+        if not source_term_item:
             return
 
-        english_term = english_term_item.text()
+        source_term = source_term_item.text()
 
         # Count how many languages have this term
         term_count = sum(
-            1 for lang_termbase in self.termbase.values() if english_term in lang_termbase
+            1
+            for lang_termbase in self.termbase.values()
+            if source_term in lang_termbase
         )
 
         reply = QMessageBox.question(
             self,
             "Remove Term",
-            f"Remove '{english_term}' from {term_count} language(s)?\n\n"
+            f"Remove '{source_term}' from {term_count} language(s)?\n\n"
             "This action cannot be undone.",
             QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
             QMessageBox.No,  # type: ignore[attr-defined]
         )
 
         if reply == QMessageBox.Yes:  # type: ignore[attr-defined]
-            self._remove_term_from_termbase(english_term)
+            self._remove_term_from_termbase(source_term)
             self.refresh_table()
             self.update_count_label()
             self.update_button_states()
@@ -259,7 +288,9 @@ class TermbaseEditor(QWidget):
 
     def clear_all_terms(self):
         """Clear all terms from the termbase."""
-        total_terms = sum(len(lang_termbase) for lang_termbase in self.termbase.values())
+        total_terms = sum(
+            len(lang_termbase) for lang_termbase in self.termbase.values()
+        )
 
         reply = QMessageBox.question(
             self,
@@ -284,16 +315,18 @@ class TermbaseEditor(QWidget):
         if self._updating_table:
             return
 
-        if item.column() == 0:  # English term column is read-only
+        if item.column() == 0:  # Source term column is read-only
             return
 
         row = item.row()
-        english_term_item = self.table.item(row, 0)
-        if not english_term_item:
+        source_term_item = self.table.item(row, 0)
+        if not source_term_item:
             return
 
-        english_term = english_term_item.text()
-        language = self.languages[item.column() - 1]  # -1 because column 0 is English
+        source_term = source_term_item.text()
+        language = self.languages[
+            item.column() - 1
+        ]  # -1 because column 0 is source term
         translation = item.text()
 
         # Update the termbase
@@ -301,37 +334,37 @@ class TermbaseEditor(QWidget):
             self.termbase[language] = {}
 
         if translation.strip():
-            self.termbase[language][english_term] = translation.strip()
-        elif english_term in self.termbase[language]:
-            del self.termbase[language][english_term]
+            self.termbase[language][source_term] = translation.strip()
+        elif source_term in self.termbase[language]:
+            del self.termbase[language][source_term]
 
         self.update_count_label()
         self.termbase_changed.emit(self.termbase)
 
-    def _add_term_to_termbase(self, english_term: str, translations: dict):
+    def _add_term_to_termbase(self, source_term: str, translations: dict):
         """Add a new term to the termbase."""
         for language, translation in translations.items():
             if language not in self.termbase:
                 self.termbase[language] = {}
             if translation.strip():
-                self.termbase[language][english_term] = translation.strip()
+                self.termbase[language][source_term] = translation.strip()
 
-    def _update_term_translations(self, english_term: str, translations: dict):
+    def _update_term_translations(self, source_term: str, translations: dict):
         """Update translations for an existing term."""
         for language, translation in translations.items():
             if language not in self.termbase:
                 self.termbase[language] = {}
 
             if translation.strip():
-                self.termbase[language][english_term] = translation.strip()
-            elif english_term in self.termbase[language]:
-                del self.termbase[language][english_term]
+                self.termbase[language][source_term] = translation.strip()
+            elif source_term in self.termbase[language]:
+                del self.termbase[language][source_term]
 
-    def _remove_term_from_termbase(self, english_term: str):
+    def _remove_term_from_termbase(self, source_term: str):
         """Remove a term from all languages in the termbase."""
         for language_termbase in self.termbase.values():
-            if english_term in language_termbase:
-                del language_termbase[english_term]
+            if source_term in language_termbase:
+                del language_termbase[source_term]
 
     def is_modified(self, original_termbase: dict) -> bool:
         """Check if the termbase has been modified from the original."""
@@ -339,12 +372,12 @@ class TermbaseEditor(QWidget):
 
 
 class AddTermDialog(QDialog):
-    """Dialog for adding a new English term and its translations to the termbase."""
+    """Dialog for adding a new source language term and its translations to the termbase."""
 
     def __init__(self, languages: list, parent=None):
         super().__init__(parent)
         self.languages = languages
-        self.english_term = ""
+        self.source_term = ""
         self.translations: Dict[str, QLineEdit] = {}
         self.setup_ui()
         self.connect_signals()
@@ -357,14 +390,14 @@ class AddTermDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # English term input
-        english_layout = QHBoxLayout()
-        english_label = QLabel("English Term:")
-        self.english_input = QLineEdit()
-        self.english_input.setPlaceholderText("Enter the English term...")
-        english_layout.addWidget(english_label)
-        english_layout.addWidget(self.english_input)
-        layout.addLayout(english_layout)
+        # Source term input
+        source_layout = QHBoxLayout()
+        source_label = QLabel("Source Term:")
+        self.source_input = QLineEdit()
+        self.source_input.setPlaceholderText("Enter the source language term...")
+        source_layout.addWidget(source_label)
+        source_layout.addWidget(self.source_input)
+        layout.addLayout(source_layout)
 
         # Translations section
         translations_label = QLabel("Translations:")
@@ -379,7 +412,9 @@ class AddTermDialog(QDialog):
         for i, language in enumerate(self.languages):
             label = QLabel(f"{language}:")
             self.translations[language] = QLineEdit()
-            self.translations[language].setPlaceholderText(f"Enter {language} translation...")
+            self.translations[language].setPlaceholderText(
+                f"Enter {language} translation..."
+            )
             self.translations_layout.addWidget(label, i, 0)
             self.translations_layout.addWidget(self.translations[language], i, 1)
 
@@ -397,38 +432,41 @@ class AddTermDialog(QDialog):
         """Connect dialog signals."""
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        self.english_input.textChanged.connect(self.validate_input)
+        self.source_input.textChanged.connect(self.validate_input)
 
     def validate_input(self):
         """Validate the input and enable/disable OK button."""
-        english_term = self.english_input.text().strip()
-        has_translations = any(self.translations[lang].text().strip() for lang in self.languages)
+        source_term = self.source_input.text().strip()
+        has_translations = any(
+            self.translations[lang].text().strip() for lang in self.languages
+        )
 
         self.button_box.button(QDialogButtonBox.Ok).setEnabled(  # type: ignore[attr-defined]
-            bool(english_term) and has_translations
+            bool(source_term) and has_translations
         )
 
     def get_data(self) -> Tuple[str, dict]:
         """Get the entered data."""
-        english_term = self.english_input.text().strip()
+        source_term = self.source_input.text().strip()
         translations = {
-            language: self.translations[language].text().strip() for language in self.languages
+            language: self.translations[language].text().strip()
+            for language in self.languages
         }
-        return english_term, translations
+        return source_term, translations
 
 
 class EditTermDialog(QDialog):
-    """Dialog for editing an existing English term's translations across all languages."""
+    """Dialog for editing an existing source language term's translations across all languages."""
 
     def __init__(
         self,
-        english_term: str,
+        source_term: str,
         current_translations: dict,
         languages: list,
         parent=None,
     ):
         super().__init__(parent)
-        self.english_term = english_term
+        self.source_term = source_term
         self.languages = languages
         self.translations: Dict[str, QLineEdit] = {}
         self.setup_ui()
@@ -437,21 +475,21 @@ class EditTermDialog(QDialog):
 
     def setup_ui(self):
         """Set up the dialog interface."""
-        self.setWindowTitle(f"Edit Term: {self.english_term}")
+        self.setWindowTitle(f"Edit Term: {self.source_term}")
         self.setModal(True)
         self.resize(500, 300)
 
         layout = QVBoxLayout(self)
 
-        # English term display (read-only)
-        english_layout = QHBoxLayout()
-        english_label = QLabel("English Term:")
-        english_term_label = QLabel(self.english_term)
-        english_term_label.setObjectName("readOnlyText")
-        english_layout.addWidget(english_label)
-        english_layout.addWidget(english_term_label)
-        english_layout.addStretch()
-        layout.addLayout(english_layout)
+        # Source term display (read-only)
+        source_layout = QHBoxLayout()
+        source_label = QLabel("Source Term:")
+        source_term_label = QLabel(self.source_term)
+        source_term_label.setObjectName("readOnlyText")
+        source_layout.addWidget(source_label)
+        source_layout.addWidget(source_term_label)
+        source_layout.addStretch()
+        layout.addLayout(source_layout)
 
         # Translations section
         translations_label = QLabel("Translations:")
@@ -466,7 +504,9 @@ class EditTermDialog(QDialog):
         for i, language in enumerate(self.languages):
             label = QLabel(f"{language}:")
             self.translations[language] = QLineEdit()
-            self.translations[language].setPlaceholderText(f"Enter {language} translation...")
+            self.translations[language].setPlaceholderText(
+                f"Enter {language} translation..."
+            )
             self.translations_layout.addWidget(label, i, 0)
             self.translations_layout.addWidget(self.translations[language], i, 1)
 
@@ -493,4 +533,7 @@ class EditTermDialog(QDialog):
 
     def get_translations(self) -> dict:
         """Get the current translations."""
-        return {language: self.translations[language].text().strip() for language in self.languages}
+        return {
+            language: self.translations[language].text().strip()
+            for language in self.languages
+        }
