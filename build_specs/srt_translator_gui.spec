@@ -5,7 +5,7 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path.cwd()
-ENTRY = str(ROOT / "srt_translator" / "gui" / "main_window.py")
+ENTRY = str(ROOT / "srt_translator" / "gui" / "app.py")
 
 # Bundle data if present (adjust/remove if you don't use it)
 DATAS = []
