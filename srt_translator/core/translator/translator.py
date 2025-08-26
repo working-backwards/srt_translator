@@ -341,34 +341,16 @@ class SRTTranslator:
                 "\n".join([f"  {i}: {text}" for i, text in enumerate(src_items)]),
             )
 
-            # Call JSON batch
-            items = self._translate_batch_json(
+            # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
+            items = self._translate_with_simple_shape_lock(
                 src_items=src_items,
                 target_lang=target_lang,
                 termbase=self.termbase,
                 batch_ids=[s.idx for s in batch],
+                logger=file_logger,
             )
 
-            # Validate count
-            if len(items) != len(batch):
-                file_logger.warning(
-                    "JSON batch count mismatch: expected %d, got %d",
-                    len(batch),
-                    len(items),
-                )
-                # Reformat pass (shape-only)
-                items = self._reformat_items_to_shape(
-                    raw_src=src_items,
-                    raw_ids=[s.idx for s in batch],
-                    raw_tgt_text=(
-                        "\n".join([it.get("tgt", "") for it in items])
-                        if isinstance(items, list)
-                        else str(items)
-                    ),
-                    expected_count=len(batch),
-                )
-
-                # Extract and validate placeholder usage
+            # Extract and validate placeholder usage
             tgt_texts = [it.get("tgt", "") for it in items]
 
             # Log input/output for troubleshooting placeholder issues
@@ -395,6 +377,16 @@ class SRTTranslator:
                 src_items,
                 tgt_texts,
                 self.term_handler.placeholder_regex,
+            )
+
+            # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
+            # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
+            tgt_texts = self._repair_adjacent_placeholder_drift(
+                src_items=src_items,
+                tgt_items=tgt_texts,
+                ph_issues=ph_issues,
+                batch_ids=[s.idx for s in batch],
+                logger=file_logger,
             )
 
             if ph_issues:
@@ -424,7 +416,7 @@ class SRTTranslator:
                         )
                     tgt_texts = fixed
                 elif self.error_policy in ("BOUNDED", "DEV"):
-                    # Remove invented; warn about missing but do not invent content.
+                    # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
                     for i, kinds in ph_issues.items():
                         if kinds["invented"]:
                             tgt_texts[i] = strip_invented_placeholders(
@@ -438,18 +430,54 @@ class SRTTranslator:
                 self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts
             ]
 
-            # Empty guard (STRICT/BOUNDED behavior)
+            # Empty guard — single pair-retry for mid-stream empty; no source fallback
             for i, (src_raw, tgt_raw) in enumerate(
                 zip([s.text for s in batch], tgt_texts)
             ):
-                if not tgt_raw.strip():
-                    msg = f"Empty translation for subtitle idx={batch[i].idx}"
+                if tgt_raw.strip():
+                    continue
+                sid = batch[i].idx
+                filled = False
+                # Try exactly one pair retry with the next cue when available
+                if i + 1 < len(batch):
+                    try:
+                        file_logger.info(
+                            "Empty target at idx=%s; attempting pair retry with next cue.",
+                            sid,
+                        )
+                        pair_src = [
+                            self.term_handler.apply_dnt_placeholders(batch[i].text),
+                            self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
+                        ]
+                        pair_ids = [batch[i].idx, batch[i + 1].idx]
+                        pair_items = self._translate_batch_json(
+                            src_items=pair_src,
+                            target_lang=target_lang,
+                            termbase=self.termbase,
+                            batch_ids=pair_ids,
+                        )
+                        if isinstance(pair_items, list) and len(pair_items) >= 1:
+                            candidate = pair_items[0].get("tgt", "")
+                            if candidate and candidate.strip():
+                                tgt_texts[i] = (
+                                    self.term_handler.restore_dnt_placeholders(
+                                        candidate
+                                    )
+                                )
+                                file_logger.info(
+                                    "Pair retry filled idx=%s successfully.", sid
+                                )
+                                filled = True
+                    except Exception as ex:
+                        file_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
+                if not filled:
                     if self.error_policy == "STRICT":
-                        raise RuntimeError(msg)
-                    file_logger.warning(
-                        "%s; falling back to source text (BOUNDED/DEV).", msg
+                        raise RuntimeError(f"Empty translation for subtitle idx={sid}")
+                    # Leave empty in BOUNDED/DEV; evaluator will flag as Missing translation
+                    file_logger.error(
+                        "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                        sid,
                     )
-                    tgt_texts[i] = src_raw
 
             # Format per subtitle (CPS; line breaks)
             for s, tgt in zip(batch, tgt_texts):
@@ -585,65 +613,13 @@ INPUT ITEMS:
 
             return norm
         except Exception:
-            # If the model ignored JSON mode, attempt a quick reformat pass.
-            self.logger.warning("Model did not return JSON; attempting shape reformat.")
-            items = self._reformat_items_to_shape(
-                raw_src=src_items,
-                raw_ids=batch_ids,
-                raw_tgt_text=content,
-                expected_count=len(src_items),
+            # If the model ignored JSON mode, we cannot recover - fail fast
+            self.logger.error(
+                "Model did not return JSON; cannot recover without shape lock."
             )
-            return items
-
-    def _reformat_items_to_shape(
-        self,
-        *,
-        raw_src: List[str],
-        raw_ids: List[int],
-        raw_tgt_text: str,
-        expected_count: int,
-    ) -> List[Dict[str, Any]]:
-        """
-        Shape-only pass: do not change wording, only produce the required
-        JSON with exactly expected_count items and the given ids.
-        """
-        sys = "You are a text formatter. Do not translate; only reformat."
-        prompt = f"""Reformat the given translations to valid JSON ONLY.
-
-RULES:
-- Keep wording EXACTLY the same as provided; do not translate or edit text.
-- Return JSON ONLY as: {{"items":[{{"id":<int>,"tgt":"..."}}, ...]}}
-- MUST have exactly {expected_count} items.
-- Use ids in this order: {raw_ids}.
-- Do not merge or split content across items; assign the nearest content to each id.
-
-SOURCE ITEMS (id → source):
-{self._render_items_for_prompt(raw_ids, raw_src)}
-
-TRANSLATED TEXT (to reformat, do NOT translate):
-{raw_tgt_text}
-"""
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "system", "content": sys},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-            response_format={"type": "json_object"},
-        )
-        content = (resp.choices[0].message.content or "").strip()
-        data = json.loads(content)
-        items = data.get("items", [])
-        if len(items) != expected_count:
             raise RuntimeError(
-                f"Reformat still mismatched: expected {expected_count}, got {len(items)}"
+                "Translation failed: model did not return valid JSON format"
             )
-        norm = []
-        for oid, obj in zip(raw_ids, items):
-            # force ids to expected order
-            norm.append({"id": oid, "tgt": obj.get("tgt", "")})
-        return norm
 
     def _reformat_fix_placeholders(
         self,
@@ -788,3 +764,161 @@ TARGET ITEMS (TO FIX):
             lines.append("Termbase: (none)")
 
         log.debug("\n".join(lines))
+
+    # ---------- Adjacent placeholder drift repair ----------
+    def _repair_adjacent_placeholder_drift(
+        self,
+        *,
+        src_items: List[str],
+        tgt_items: List[str],
+        ph_issues: Dict[int, Dict[str, Set[str]]],
+        batch_ids: List[int],
+        logger: logging.Logger,
+    ) -> List[str]:
+        """
+        If item i 'invented' a placeholder that item i+1 'missed', and i+1 is empty,
+        the model likely under-ran and merged content forward. Split item i at the
+        first occurrence of that placeholder token and move the tail to item i+1.
+        This preserves cue parity and original timings. Runs BEFORE placeholder restore.
+        """
+        if not tgt_items or not ph_issues:
+            return tgt_items
+
+        out = list(tgt_items)
+        n = len(out)
+
+        for i in range(n - 1):
+            issues_i = ph_issues.get(i)
+            issues_next = ph_issues.get(i + 1)
+            if not issues_i or not issues_next:
+                continue
+
+            invented_here = issues_i.get("invented", set())
+            missing_next = issues_next.get("missing", set())
+            if not invented_here or not missing_next:
+                continue
+
+            leaked = sorted(invented_here.intersection(missing_next))
+            if not leaked:
+                continue
+
+            # Only repair when the next slot is effectively empty.
+            if out[i + 1].strip():
+                continue
+
+            pid = leaked[0]
+            token = f"__DNT_TERM_{pid}__"
+            text_i = out[i]
+            pos = text_i.find(token)
+            if pos < 0:
+                # Cannot locate token; skip to avoid heuristic, non-deterministic splits.
+                logger.debug(
+                    "adjacent-repair: token %s not found in item %d (id=%s); skipping",
+                    token,
+                    i,
+                    batch_ids[i] if i < len(batch_ids) else "?",
+                )
+                continue
+
+            head = text_i[:pos].rstrip()
+            tail = text_i[pos:].lstrip()
+            if not tail:
+                continue
+
+            out[i] = head
+            out[i + 1] = tail
+
+            logger.info(
+                "adjacent-repair: moved tail starting with %s from id=%s to id=%s",
+                token,
+                batch_ids[i] if i < len(batch_ids) else "?",
+                batch_ids[i + 1] if (i + 1) < len(batch_ids) else "?",
+            )
+
+        return out
+
+    # ---------- Simple shape lock: split batch into halves and retry once ----------
+    def _translate_with_simple_shape_lock(
+        self,
+        *,
+        src_items: List[str],
+        target_lang: str,
+        termbase: Optional[Dict[str, Any]],
+        batch_ids: List[int],
+        logger: logging.Logger,
+    ) -> List[Dict[str, Any]]:
+        """
+        Simple, reliable recovery:
+        1) Try the batch once.
+        2) If count mismatches, split into two halves and translate each half once.
+        3) If a half of size 1 still mismatches, raise (fail fast with a clear message).
+        """
+        items = self._translate_batch_json(
+            src_items=src_items,
+            target_lang=target_lang,
+            termbase=termbase,
+            batch_ids=batch_ids,
+        )
+        if len(items) == len(src_items):
+            return items
+
+        logger.warning(
+            "JSON batch count mismatch: expected %d, got %d — reducing batch size and retrying once.",
+            len(src_items),
+            len(items),
+        )
+
+        n = len(src_items)
+        if n == 1:
+            # We cannot split further; fail fast.
+            raise RuntimeError(
+                "Shape lock failed at size=1: expected 1 item, got %d" % len(items)
+            )
+
+        mid = n // 2
+        left_src, right_src = src_items[:mid], src_items[mid:]
+        left_ids, right_ids = batch_ids[:mid], batch_ids[mid:]
+
+        left_items = self._translate_batch_json(
+            src_items=left_src,
+            target_lang=target_lang,
+            termbase=termbase,
+            batch_ids=left_ids,
+        )
+        right_items = self._translate_batch_json(
+            src_items=right_src,
+            target_lang=target_lang,
+            termbase=termbase,
+            batch_ids=right_ids,
+        )
+
+        if len(left_items) != len(left_src):
+            if len(left_src) == 1:
+                raise RuntimeError(
+                    "Shape lock failed in left sub-batch (size=1): expected 1 item, got %d"
+                    % len(left_items)
+                )
+            else:
+                raise RuntimeError(
+                    "Shape lock failed in left sub-batch: expected %d, got %d"
+                    % (len(left_src), len(left_items))
+                )
+
+        if len(right_items) != len(right_src):
+            if len(right_src) == 1:
+                raise RuntimeError(
+                    "Shape lock failed in right sub-batch (size=1): expected 1 item, got %d"
+                    % len(right_items)
+                )
+            else:
+                raise RuntimeError(
+                    "Shape lock failed in right sub-batch: expected %d, got %d"
+                    % (len(right_src), len(right_items))
+                )
+
+        logger.info(
+            "Shape mismatch resolved by splitting into halves (%d + %d).",
+            len(left_src),
+            len(right_src),
+        )
+        return left_items + right_items

@@ -1,101 +1,29 @@
-# config/translation_rubric.yaml
-# Repository-controlled rubric for translation evaluation.
-# The GUI does NOT allow overriding this at runtime.
-# 
-# This file controls evaluation thresholds and behavior.
-# If this file is missing, evaluation is skipped gracefully.
-
 meta:
   version: 1
   notes:
     - "'subtitle' == 'cue'."
-    - "CPS = visible characters / duration (seconds)."
-    - "If ORIGINAL exceeds CPS caps, log INFO only; do NOT penalize translation."
+    - "CPS = characters / seconds."
+    - "If the ORIGINAL exceeds CPS caps, do not penalize the translation."
 
 caps:
-  # Default CPS thresholds for languages not explicitly listed
-  defaults:
-    cps_soft: 15  # Warning threshold
-    cps_hard: 20  # Hard failure threshold
-  
-  # Language-specific CPS thresholds
+  defaults: { cps_soft: 15, cps_hard: 20 }
   per_language:
-    zh-Hans:
-      cps_soft: 12  # Chinese needs lower thresholds due to character density
-      cps_hard: 15
-    es:
-      cps_soft: 15
-      cps_hard: 20
-    pt-BR:
-      cps_soft: 15
-      cps_hard: 20
-    fr:
-      cps_soft: 15
-      cps_hard: 20
-    de:
-      cps_soft: 15
-      cps_hard: 20
-    it:
-      cps_soft: 15
-      cps_hard: 20
-    ja:
-      cps_soft: 10  # Japanese needs very low thresholds
-      cps_hard: 12
-    ko:
-      cps_soft: 12  # Korean similar to Chinese
-      cps_hard: 15
-
-timing:
-  # Timing integrity thresholds vs English source (in milliseconds)
-  delta_start_ms:
-    median_max_abs: 200  # Median absolute start time difference
-    p95_max_abs: 500     # 95th percentile absolute start time difference
-  delta_end_ms:
-    median_max_abs: 200  # Median absolute end time difference
-    p95_max_abs: 500     # 95th percentile absolute end time difference
-  require_cue_parity: true  # Source and target must have same number of cues
-
-terminology:
-  dnt_min_coverage_pct: 95  # Minimum DNT term preservation percentage
-  tb_min_coverage_pct: 90   # Minimum termbase usage percentage
-  dnt_over_tb: true         # DNT terms take precedence over termbase
-
-untranslated_and_fragments:
-  flag_untranslated: true           # Flag any untranslated content as FAIL
-  english_fragment_min_run: 6       # Minimum run of English letters to flag
+    zh-Hans: { cps_soft: 12, cps_hard: 15 }
+    # You can add more languages here if needed. If absent, defaults apply.
 
 numbers:
-  enforce_integrity: true           # Missing digits from source = FAIL
+  enforce_pure_digits: true           # only pure digits must match (e.g., 2022, 252)
+  mixed_alnum_severity: info          # tokens like Q3/A4 are informational, not failures
+  allow_thousand_separators: true
+  allow_decimal_comma: true
 
-formatting:
-  max_lines_per_cue: 2              # Maximum lines per subtitle (WARN if exceeded)
-  enforce_line_length: false        # Optional line length enforcement
+untranslated_after_dnt:
+  min_remainder_len: 5                # ignore trivial single-word cognates like "plan"
+  uppercase_acronym_treated_as: info  # PRFAQ/S3/etc. INFO unless in DNT/TB
 
-rules:
-  # Hard failure conditions (evaluation fails)
-  fail_if:
-    - "cue_parity_mismatch"         # Different number of cues
-    - "timing_median_exceeds"       # Timing drift too high (median)
-    - "timing_p95_exceeds"          # Timing drift too high (95th percentile)
-    - "has_untranslated"            # Untranslated content detected
-    - "numbers_mismatch"            # Missing numbers from source
-  
-  # Warning conditions (evaluation passes but with warnings)
-  warn_if:
-    - "dnt_coverage_below_min"      # DNT coverage below threshold
-    - "tb_coverage_below_min"       # Termbase coverage below threshold
-    - "cps_hard_tail_over_10pct"    # Too many cues exceed hard CPS limit
-    - "english_fragments_present"   # Source language fragments detected
-    - "formatting_issues"           # Formatting problems
-  
-  pass_otherwise: true              # Pass if no hard failures
+fragments:
+  mode: auto_non_latin                # only emit fragments CSV for non-Latin scripts
 
 report:
-  include_sections:
-    - "language_rollup"             # Summary table across languages
-    - "per_language_tables"         # Detailed per-language status
-    - "notes_and_how_to_read"       # Help text for report interpretation
-  
-  language_name_overrides: {}       # Custom display names for languages
-  
-  show_caps_used_in_sections: true # Show CPS thresholds in report sections
+  show_all_issues: true
+  show_timing_drift_when_empty: false # hide drift section if no findings

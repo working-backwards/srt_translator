@@ -53,7 +53,7 @@ class TestEvaluationRunner:
         import inspect
 
         sig = inspect.signature(run_batch_evaluation)
-        expected_params = ["batch_root", "logger"]
+        expected_params = ["batch_root", "logger", "language_config"]
 
         for param in expected_params:
             assert param in sig.parameters

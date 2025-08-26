@@ -7,9 +7,9 @@ import argparse
 import logging
 import sys
 
-# Set up logging - ALWAYS include this
+# Set up logging based on debug flag (will be updated in main())
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Get logger for this module

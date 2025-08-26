@@ -158,7 +158,7 @@ Examples:
             if latest_batch and latest_batch.exists():
                 logger.info("Running evaluation", extra={"batch": latest_batch.name})
                 rollup = run_batch_evaluation(
-                    batch_root=latest_batch, logger=eval_logger
+                    batch_root=latest_batch, logger=eval_logger, language_config=api_cfg
                 )
 
                 if rollup:

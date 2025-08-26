@@ -56,35 +56,45 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 
 ---
 
-## Evaluation (Automatic)
+## Evaluation
 
-After each translation batch, an evaluation runs automatically **iff** `config/translation_rubric.yaml` exists. The GUI/CLI never override this path at runtime.
+After each translation, the evaluator runs automatically and writes artifacts to your batch folder.
 
-### How the evaluator discovers config and what it writes
+### Where config is discovered
 
-1) **Config discovery**
-   - Evaluator looks for `config/translation_rubric.yaml` under the project root.
-   - If missing: evaluation is **skipped** and a single INFO log is emitted.
+- **Rubric:** `config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
+- **DNT / Termbase:** the **client writes** these to the **batch root**:
+  - `dnt_summary.json` — list(s) of "Do Not Translate" tokens/phrases (may include all languages).
+  - `termbase_summary.json` — termbase entries, optionally per language.
 
-2) **Inputs & pairing**
-   - Originals are placed by the translator under `translation-batch-<ts>/originals/<src_code>/...` (GUI/CLI controlled).
-   - Pairing is **strict by filename stem**: `originals/<src_code>/*.srt` ↔ `<lang>/*.srt`.
-   - `manifest.json` (if present) is treated as a **processing summary**, not as evaluator input.
+> The evaluator **does not** fall back to `ai_config.json`. If you want DNT/TB coverage, ensure those two JSON files are written to the batch root.
 
-3) **Outputs**
-   - Batch root:
-     - `eval_report.md` — roll-up summary linking to per-language artifacts.
-   - Per language under `artifacts/<lang>/`:
-     - `timing_<lang>_<batch>.csv`
-     - `cps_<lang>_<batch>.csv`
-     - `dnt_coverage_<lang>_<batch>.csv`
-     - `tb_coverage_<lang>_<batch>.csv`
-     - `untranslated_<lang>_<batch>.csv`
-     - `number_mismatch_<lang>_<batch>.csv`
-     - `source_fragments_<lang>_<batch>.csv`  (post-DNT, ≥6-letter runs of source language)
-     - `eval_summary_<lang>_<batch>.md`
+### What the evaluator writes
 
-**Policy note:** If the **original source** exceeds CPS caps, we log at **INFO** and do **not** penalize the translation. CPS grading concerns the target's readability.
+At the batch root:
+
+- `eval_report.md` — creator-friendly, consolidated punch list (shows **all** issues).
+- `artifacts/<lang>/…` — per-language CSVs and summaries (numbers, DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
+  - DNT/TB snapshots are copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for self-contained audits.
+  - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
+
+### Reporting behavior
+
+- **Numbers Integrity:** enforces **pure digits** only (e.g., `2022`, `252`). Mixed alphanumerics like `Q3` are informational.
+- **Untranslated after DNT:** ignores trivial single-word cognates; upper-case acronyms are **INFO** unless covered by DNT/TB.
+- **Missing translation:** empty cues are listed explicitly.
+- **Timing drift:** omitted unless there are findings.
+
+### Language labels
+
+The report uses the **language config abstraction** (`srt_translator.core.config.language_config`) to resolve friendly names. The source language label comes from `manifest.json` (`original_language.name`/`code`) when available.
+
+Edit SRTs in any text editor. Keep the **cue number** and **timings** unchanged; only modify the subtitle text.
+
+### Global fragments policy
+
+- Rubric key: `fragments.mode` (`auto_non_latin` | `always` | `never`), with `min_ascii_run`.
+- Default is `auto_non_latin`: generate the source-fragments CSV only when the **target text** is predominantly non-Latin script.
 
 ---
 
