@@ -22,6 +22,10 @@ from srt_translator.api import TranslationConfiguration
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
 
+# Evaluation imports (config-gated)
+from srt_translator.eval.runner import run_batch_evaluation
+from srt_translator.eval.report import write_batch_report
+
 
 class TranslationWorker(QObject):
     """Worker object for running translations in background thread"""
@@ -261,6 +265,75 @@ class TranslationWorker(QObject):
             self.translation_results = results
 
             # (Fixer runs in core automatically; nothing to do here)
+
+            # Post-translation evaluation (config-gated)
+            try:
+                eval_logger = self.logger.getChild("eval")
+
+                # Prefer an explicit batch root if your translation returns it
+                batch_root = results.get(
+                    "batch_directory"
+                )  # <— add this in your pipeline if possible
+                if batch_root:
+                    latest_batch = Path(batch_root)
+                else:
+                    # Fallback: derive from the known output_directory
+                    out_dir = results.get("output_directory")
+                    if not out_dir:
+                        self.logger.warning("No output directory found for evaluation")
+                        latest_batch = None
+                    else:
+                        parent = Path(out_dir)
+                        candidates = [
+                            d
+                            for d in parent.iterdir()
+                            if d.is_dir() and d.name.startswith("translation-batch-")
+                        ]
+                        # Choose by modification time to avoid lexicographic surprises
+                        latest_batch = (
+                            max(candidates, key=lambda d: d.stat().st_mtime)
+                            if candidates
+                            else None
+                        )
+
+                if latest_batch and latest_batch.exists():
+                    self.logger.info(
+                        "Running evaluation", extra={"batch": latest_batch.name}
+                    )
+                    rollup = run_batch_evaluation(
+                        batch_root=latest_batch, logger=eval_logger
+                    )
+
+                    if rollup:
+                        write_batch_report(
+                            batch_root=latest_batch,
+                            rollup=rollup,
+                            logger=eval_logger,
+                        )
+                        self.logger.info("Evaluation completed successfully")
+                        # Update progress for GUI
+                        self._throttled_emit(
+                            self.progress_updated,
+                            f"Evaluation completed successfully for batch: {latest_batch.name}",
+                        )
+                    else:
+                        self.logger.info("Evaluation skipped (no rubric found)")
+                        self._throttled_emit(
+                            self.progress_updated,
+                            "Evaluation skipped (no rubric found)",
+                        )
+                else:
+                    self.logger.warning("No batch directory found for evaluation")
+
+            except Exception as e:
+                self.logger.error(
+                    "Evaluation failed", extra={"error": str(e)}, exc_info=True
+                )
+                # Don't fail the translation - evaluation is optional
+                self._throttled_emit(
+                    self.progress_updated,
+                    f"Evaluation failed: {e} (translation completed successfully)",
+                )
 
             # Emit completion via signal (thread-safe)
             self.translation_completed.emit(results)

@@ -200,131 +200,27 @@ def translate_srt_files(
     artifacts_dir = os.path.join(batch_dir, "artifacts")
     os.makedirs(artifacts_dir, exist_ok=True)
 
-    # Write per-language artifacts and manifests
-    for lang_name, lang_code in config.target_languages.items():
-        if not lang_code:
-            continue
+    # Create originals directory and copy source files for evaluation
+    originals_dir = os.path.join(batch_dir, "originals")
+    os.makedirs(originals_dir, exist_ok=True)
 
+    # Copy source files to originals directory for evaluation pairing
+    for file_path in file_paths:
         try:
-            # Create language-specific artifacts directory
-            lang_artifacts_dir = os.path.join(artifacts_dir, lang_code)
-            os.makedirs(lang_artifacts_dir, exist_ok=True)
+            import shutil
 
-            # Generate summaries and manifests
-            from srt_translator.core.utils.run_summaries import (
-                create_dnt_summary,
-                create_termbase_summary,
-                create_manifest_summary,
-                write_run_artifacts,
-                get_filtering_rules,
-                create_batch_manifest,
-            )
-
-            # Create summaries
-            dnt_meta = create_dnt_summary(
-                user_terms=config.dnt_terms or [],
-                filtered_terms=config.dnt_terms or [],
-                filtered_out=[],
-                lang_code=lang_code,
-                filtering_rules=get_filtering_rules(),
-            )
-            tb_meta = create_termbase_summary(
-                user_termbase=config.termbase or {},
-                filtered_termbase=config.termbase.get(lang_code, {}) or {},
-                collisions_removed={},
-                lang_code=lang_code,
-                filtering_rules=get_filtering_rules(),
-            )
-
-            # Create processing summary
-            processing_summary = {
-                "batch_size": config.batch_size,
-                "aggressiveness": config.aggressiveness,
-                "model": config.model_name,
-                "filtering_rules": get_filtering_rules(),
-            }
-
-            # Create summary for this language
-            summary = {
-                "total_files": len(file_paths),
-                "unique_languages": 1,
-                "total_operations": 1,
-                "successes": 1,  # Each language translation is a separate operation
-                "skipped": 0,
-                "errors": 0,
-                "error_details": [],
-            }
-
-            # Create manifest for this language
-            lang_manifest = create_manifest_summary(
-                version=__version__,
-                timestamp=ts_str,
-                mode=config.mode,
-                source_files=[os.path.basename(f) for f in file_paths],
-                target_languages=[lang_code],
-                summary=summary,
-                processing_summary=processing_summary,
-                dnt_meta=dnt_meta,
-                tb_meta=tb_meta,
-                source_language=source_lang,
-            )
-
-            # Write artifacts for this language
-            write_run_artifacts(
-                artifacts_dir,
-                lang_code,
-                dnt_meta,
-                tb_meta,
-                lang_manifest,
-            )
-
-            logger.info(
-                f"Language artifacts written for {lang_code}: artifacts/{lang_code}/"
-            )
-
+            source_filename = os.path.basename(file_path)
+            dest_path = os.path.join(originals_dir, source_filename)
+            shutil.copy2(file_path, dest_path)
+            logger.info(f"Copied source file to originals: {source_filename}")
         except Exception as e:
-            logger.error(f"Failed to write artifacts for {lang_code}: {e}")
-            continue
+            logger.warning(f"Failed to copy source file {file_path}: {e}")
 
-    # Create batch-level summary and processing summary
-    batch_summary = {
-        "total_files": len(file_paths),
-        "unique_languages": len(config.target_languages),
-        "total_operations": total_operations,
-        "successes": successful_translations,
-        "skipped": 0,
-        "errors": total_operations - successful_translations,
-        "error_details": [],
-    }
+    # Per-language artifacts are now handled by the evaluation system
+    # The core translation focuses only on translation, not artifact creation
 
-    # Import get_filtering_rules for batch summary
-    from srt_translator.core.utils.run_summaries import get_filtering_rules
-
-    batch_processing_summary = {
-        "batch_size": config.batch_size,
-        "aggressiveness": config.aggressiveness,
-        "model": config.model_name,
-        "filtering_rules": get_filtering_rules(),
-    }
-
-    # Write batch-root manifest (top-level)
-    try:
-        batch_manifest = create_batch_manifest(
-            version=__version__,
-            timestamp=ts_str,
-            mode=config.mode,
-            source_files=[os.path.basename(f) for f in file_paths],
-            target_languages=list(config.target_languages.values()),
-            summary=batch_summary,
-            processing_summary=batch_processing_summary,
-            source_language=source_lang,
-        )
-        batch_manifest_path = os.path.join(batch_dir, "manifest.json")
-        with open(batch_manifest_path, "w", encoding="utf-8") as f:
-            json.dump(batch_manifest, f, ensure_ascii=False, indent=2)
-        logger.info("Wrote batch-root manifest.json")
-    except Exception as e:
-        logger.warning(f"Failed to write batch-root manifest: {e}")
+    # Batch-level artifacts are now handled by the evaluation system
+    # The core translation focuses only on translation, not artifact creation
 
     # Print summary
     logger.info(" === Translation Summary ===")
@@ -379,13 +275,14 @@ def translate_srt_files(
 
     logger.info("Automatic SRT fixes completed.")
 
-    # Return summary of translation results
-    return SummaryDict(
-        total_files=len(file_paths),
-        unique_languages=len(config.target_languages),
-        total_operations=total_operations,
-        successes=successful_translations,
-        skipped=0,
-        errors=total_operations - successful_translations,
-        error_details=[],
-    )
+    # Return summary of translation results with batch directory
+    return {
+        "total_files": len(file_paths),
+        "unique_languages": len(config.target_languages),
+        "total_operations": total_operations,
+        "successes": successful_translations,
+        "skipped": 0,
+        "errors": total_operations - successful_translations,
+        "error_details": [],
+        "batch_directory": batch_dir,  # Include batch directory for evaluation
+    }

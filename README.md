@@ -52,6 +52,39 @@ See **INSTALLATION.md** for building per‑platform and packaging details.
 - **Enhanced Output**: Complete transparency into what was provided vs. what was used during translation
 - **Subtitle-Based Translation**: New subtitle-level processing system that eliminates timing drift while improving translation quality
 - **Language-Specific Termbases**: AI generates optimal termbases for each target language, improving translation quality
+- **Automatic Evaluation**: Quality assessment with configurable thresholds and comprehensive reporting
+
+---
+
+## Evaluation (Automatic)
+
+After each translation batch, an evaluation runs automatically **iff** `config/translation_rubric.yaml` exists. The GUI/CLI never override this path at runtime.
+
+### How the evaluator discovers config and what it writes
+
+1) **Config discovery**
+   - Evaluator looks for `config/translation_rubric.yaml` under the project root.
+   - If missing: evaluation is **skipped** and a single INFO log is emitted.
+
+2) **Inputs & pairing**
+   - Originals are placed by the translator under `translation-batch-<ts>/originals/<src_code>/...` (GUI/CLI controlled).
+   - Pairing is **strict by filename stem**: `originals/<src_code>/*.srt` ↔ `<lang>/*.srt`.
+   - `manifest.json` (if present) is treated as a **processing summary**, not as evaluator input.
+
+3) **Outputs**
+   - Batch root:
+     - `eval_report.md` — roll-up summary linking to per-language artifacts.
+   - Per language under `artifacts/<lang>/`:
+     - `timing_<lang>_<batch>.csv`
+     - `cps_<lang>_<batch>.csv`
+     - `dnt_coverage_<lang>_<batch>.csv`
+     - `tb_coverage_<lang>_<batch>.csv`
+     - `untranslated_<lang>_<batch>.csv`
+     - `number_mismatch_<lang>_<batch>.csv`
+     - `source_fragments_<lang>_<batch>.csv`  (post-DNT, ≥6-letter runs of source language)
+     - `eval_summary_<lang>_<batch>.md`
+
+**Policy note:** If the **original source** exceeds CPS caps, we log at **INFO** and do **not** penalize the translation. CPS grading concerns the target's readability.
 
 ---
 

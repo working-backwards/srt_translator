@@ -11,6 +11,10 @@ import os
 import sys
 from pathlib import Path
 
+# Evaluation imports (config-gated)
+from srt_translator.eval.runner import run_batch_evaluation
+from srt_translator.eval.report import write_batch_report
+
 
 def setup_logging(debug: bool = False) -> None:
     """Set up logging configuration for CLI."""
@@ -36,7 +40,9 @@ Examples:
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument("--version", action="store_true", help="Show version information")
+    parser.add_argument(
+        "--version", action="store_true", help="Show version information"
+    )
     args = parser.parse_args(argv)
 
     # Handle version flag first
@@ -105,14 +111,71 @@ Examples:
         if not os.path.exists(input_dir):
             logger.error(f"INPUT_DIRECTORY not found: {input_dir}")
             return 1
-        files = [Path(input_dir) / f for f in sorted(os.listdir(input_dir)) if f.endswith(".srt")]
+        files = [
+            Path(input_dir) / f
+            for f in sorted(os.listdir(input_dir))
+            if f.endswith(".srt")
+        ]
         if not files:
             logger.info(f"No .srt files found in {input_dir}")
             return 0
         logger.info(f"Found {len(files)} .srt files to translate")
         cfg_with_files = api_cfg.__class__(**{**api_cfg.__dict__, "files": files})
-        Translator(cfg_with_files).run()
+        # Run translation and get results including batch directory
+        results = Translator(cfg_with_files).run()
         logger.info("Translation completed successfully")
+
+        # Post-translation evaluation (config-gated)
+        try:
+            eval_logger = logger.getChild("eval")
+
+            # Prefer an explicit batch root if your translation returns it
+            batch_root = results.get(
+                "batch_directory"
+            )  # <— add this in your pipeline if possible
+            if batch_root:
+                latest_batch = Path(batch_root)
+            else:
+                # Fallback: derive from the known output_directory
+                out_dir = results.get("output_directory")
+                if not out_dir:
+                    logger.warning("No output directory found for evaluation")
+                    latest_batch = None
+                else:
+                    parent = Path(out_dir)
+                    candidates = [
+                        d
+                        for d in parent.iterdir()
+                        if d.is_dir() and d.name.startswith("translation-batch-")
+                    ]
+                    # Choose by modification time to avoid lexicographic surprises
+                    latest_batch = (
+                        max(candidates, key=lambda d: d.stat().st_mtime)
+                        if candidates
+                        else None
+                    )
+
+            if latest_batch and latest_batch.exists():
+                logger.info("Running evaluation", extra={"batch": latest_batch.name})
+                rollup = run_batch_evaluation(
+                    batch_root=latest_batch, logger=eval_logger
+                )
+
+                if rollup:
+                    write_batch_report(
+                        batch_root=latest_batch,
+                        rollup=rollup,
+                        logger=eval_logger,
+                    )
+                    logger.info("Evaluation completed successfully")
+                else:
+                    logger.info("Evaluation skipped (no rubric found)")
+            else:
+                logger.warning("No batch directory found for evaluation")
+
+        except Exception as e:
+            logger.error("Evaluation failed", extra={"error": str(e)}, exc_info=True)
+            # Don't fail the translation - evaluation is optional
 
     except ImportError as e:
         logger.error(f"Import error: {e}")
