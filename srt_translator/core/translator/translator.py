@@ -194,6 +194,7 @@ class SRTTranslator:
             logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
         )
         self.logger = self.logger.getChild("core.translator")
+
         # If caller gave an adapter, re-wrap child with the same extra
         if isinstance(logger, logging.LoggerAdapter):
             self.logger = logging.LoggerAdapter(self.logger, logger.extra)
@@ -361,13 +362,23 @@ class SRTTranslator:
             )
 
             # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
-            items = self._translate_with_simple_shape_lock(
-                src_items=src_items,
-                target_lang=target_lang,
-                termbase=self.termbase,
-                batch_ids=[s.idx for s in batch],
-                logger=file_logger,
-            )
+            try:
+                items = self._translate_with_simple_shape_lock(
+                    src_items=src_items,
+                    target_lang=target_lang,
+                    termbase=self.termbase,
+                    batch_ids=[s.idx for s in batch],
+                    logger=file_logger,
+                )
+            except Exception as ex:
+                # Log the payload that was sent to the translator when failure occurs
+                self.logger.info(
+                    "Main batch translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                    target_lang,
+                    len(src_items),
+                    target_lang,
+                )
+                raise  # Re-raise the exception to maintain the original behavior
 
             # Extract and validate placeholder usage
             tgt_texts = [it.get("tgt", "") for it in items]
@@ -488,6 +499,13 @@ class SRTTranslator:
                                 )
                                 filled = True
                     except Exception as ex:
+                        # Log the payload that was sent to the translator when failure occurs
+                        self.logger.info(
+                            "Pair retry failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                            target_lang,
+                            len(pair_src),
+                            target_lang,
+                        )
                         file_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
                 if not filled:
                     if self.error_policy == "STRICT":
@@ -581,6 +599,13 @@ class SRTTranslator:
                             deferred_tail_retry["cue_index"],
                         )
                 except Exception as ex:
+                    # Log the payload that was sent to the translator when failure occurs
+                    self.logger.info(
+                        "Cross-batch pair retry failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                        target_lang,
+                        len(pair_src),
+                        target_lang,
+                    )
                     file_logger.warning(
                         "Pair retry failed for idx=%s: %s",
                         deferred_tail_retry["cue_index"],
@@ -664,13 +689,17 @@ STYLE:
 INPUT ITEMS:
 {self._render_items_for_prompt(batch_ids, src_items)}
 """
+
+        # Prepare the messages payload for logging
+        messages_payload = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
         # Use JSON mode if available; otherwise rely on instruction.
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages_payload,
             temperature=0.1,
             # Some clients support JSON mode; if your SDK doesn't, remove this line.
             response_format={"type": "json_object"},  # harmless if unsupported
@@ -715,6 +744,19 @@ INPUT ITEMS:
 
             return norm
         except Exception:
+            # Log the payload sent to translator and the response received when failure occurs
+            self.logger.info(
+                "Translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: %s\nUser: %s",
+                target_lang,
+                len(src_items),
+                system_prompt,
+                user_prompt,
+            )
+            self.logger.info(
+                "Translation failure - Raw response received from translator:\n%s",
+                content,
+            )
+
             # If the model ignored JSON mode, we cannot recover - fail fast
             self.logger.error(
                 "Model did not return JSON; cannot recover without shape lock."
@@ -748,12 +790,16 @@ SOURCE ITEMS:
 TARGET ITEMS (TO FIX):
 {self._render_items_for_prompt(ids, tgt_items)}
 """
+
+        # Prepare the messages payload for logging
+        messages_payload = [
+            {"role": "system", "content": sys},
+            {"role": "user", "content": prompt},
+        ]
+
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": sys},
-                {"role": "user", "content": prompt},
-            ],
+            messages=messages_payload,
             temperature=0.0,
             response_format={"type": "json_object"},
         )
@@ -765,6 +811,16 @@ TARGET ITEMS (TO FIX):
                 return None
             return [obj.get("tgt", "") for obj in items]
         except Exception:
+            # Log the payload sent to translator and the response received when failure occurs
+            self.logger.info(
+                "Placeholder fix failure - Payload sent to translator:\nSystem: %s\nUser: %s",
+                sys,
+                prompt,
+            )
+            self.logger.info(
+                "Placeholder fix failure - Raw response received from translator:\n%s",
+                content,
+            )
             return None
 
     # ---------- Helpers ----------
@@ -955,12 +1011,23 @@ TARGET ITEMS (TO FIX):
         2) If count mismatches, split into two halves and translate each half once.
         3) If a half of size 1 still mismatches, raise (fail fast with a clear message).
         """
-        items = self._translate_batch_json(
-            src_items=src_items,
-            target_lang=target_lang,
-            termbase=termbase,
-            batch_ids=batch_ids,
-        )
+        try:
+            items = self._translate_batch_json(
+                src_items=src_items,
+                target_lang=target_lang,
+                termbase=termbase,
+                batch_ids=batch_ids,
+            )
+        except Exception as ex:
+            # Log the payload that was sent to the translator when failure occurs
+            self.logger.info(
+                "Shape lock initial batch failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                target_lang,
+                len(src_items),
+                target_lang,
+            )
+            raise  # Re-raise the exception to maintain the original behavior
+
         if len(items) == len(src_items):
             return items
 
@@ -981,18 +1048,39 @@ TARGET ITEMS (TO FIX):
         left_src, right_src = src_items[:mid], src_items[mid:]
         left_ids, right_ids = batch_ids[:mid], batch_ids[mid:]
 
-        left_items = self._translate_batch_json(
-            src_items=left_src,
-            target_lang=target_lang,
-            termbase=termbase,
-            batch_ids=left_ids,
-        )
-        right_items = self._translate_batch_json(
-            src_items=right_src,
-            target_lang=target_lang,
-            termbase=termbase,
-            batch_ids=right_ids,
-        )
+        try:
+            left_items = self._translate_batch_json(
+                src_items=left_src,
+                target_lang=target_lang,
+                termbase=termbase,
+                batch_ids=left_ids,
+            )
+        except Exception as ex:
+            # Log the payload that was sent to the translator when failure occurs
+            self.logger.info(
+                "Shape lock left half failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                target_lang,
+                len(left_src),
+                target_lang,
+            )
+            raise  # Re-raise the exception to maintain the original behavior
+
+        try:
+            right_items = self._translate_batch_json(
+                src_items=right_src,
+                target_lang=target_lang,
+                termbase=termbase,
+                batch_ids=right_ids,
+            )
+        except Exception as ex:
+            # Log the payload that was sent to the translator when failure occurs
+            self.logger.info(
+                "Shape lock right half failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                target_lang,
+                len(right_src),
+                target_lang,
+            )
+            raise  # Re-raise the exception to maintain the original behavior
 
         if len(left_items) != len(left_src):
             if len(left_src) == 1:

@@ -145,7 +145,7 @@ def translate_srt_files(
                 == "CLI",  # GUI: no fallback; CLI: allow
                 model_name=config.model_name,
                 batch_size=config.batch_size,
-                logger=logger.getChild("core.translator"),
+                logger=logger,
                 error_policy=config.error_policy,  # Pass error policy
                 language_config=language_config,  # Pass language configuration
             )

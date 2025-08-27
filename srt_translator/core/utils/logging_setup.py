@@ -11,7 +11,7 @@ from srt_translator.core.config.models import LogMode
 
 def configure_logging(log_mode: LogMode) -> None:
     """Configure logging based on the specified mode."""
-    level = logging.DEBUG if log_mode == LogMode.Verbose else logging.INFO
+    level = logging.DEBUG if log_mode == LogMode.VERBOSE else logging.INFO
 
     logging.basicConfig(
         level=level,
@@ -20,6 +20,15 @@ def configure_logging(log_mode: LogMode) -> None:
             logging.StreamHandler(),
         ],
     )
+    
+    # Filter out noisy third-party library debug messages
+    if log_mode == LogMode.VERBOSE:
+        # Set httpcore to WARNING level to reduce noise from HTTP client internals
+        logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        # Also filter other potentially noisy HTTP libraries
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("openai._base_client").setLevel(logging.WARNING)
 
 
 def setup_logging(log_file_override: str) -> str:
