@@ -184,9 +184,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
                 )
 
     # Header/intro now that we know total_items
-    intro = []
-    # Ensure we only add this once (some earlier flows appended twice).
-    intro.append(f"*Detected source language:* **{src_label}**")
+    intro = [f"*Detected source language:* **{src_label}**"]
     if total_items == 0:
         intro.append(
             "Everything looks great. Your translated files are **ready for use**."

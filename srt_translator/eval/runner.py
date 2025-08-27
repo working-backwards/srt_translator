@@ -463,11 +463,9 @@ def run_batch_evaluation(
                         "cps_hard": cps_hard_cap,
                     },
                     "issues": {
-                        "numbers": num_issues[:50],  # keep MD manageable
-                        "untranslated_after_dnt": un_issues[:50],
-                        "missing_translation": missing_issues[
-                            :50
-                        ],  # computed in memory
+                        "numbers": num_issues,  # keep MD manageable
+                        "untranslated_after_dnt": un_issues,
+                        "missing_translation": missing_issues,  # computed in memory
                         "timing_fail": timing_fail,
                     },
                     "artifacts_dir": f"artifacts/{lang}",

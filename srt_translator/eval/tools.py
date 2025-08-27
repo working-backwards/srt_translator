@@ -99,12 +99,9 @@ def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
 
 
 # --- Numbers integrity helpers ------------------------------------------------
-# We enforce: every "pure digit" token in the source (not touching letters)
-# must appear in the target (subset rule). Extra digits in target are OK.
-# This avoids flagging "Q3" (quarter label) and similar alpha+digit tokens.
-# If subset fails, we attempt a CJK magnitude check for money figures
-# (e.g., "$12 million" ≡ "1200万", "$200 million" ≡ "2亿").
-
+# Enforce *pure digit* subset: every token of digits in the source must
+# appear in the target (ignore alpha+digit like 'Q3'). If subset fails,
+# accept CJK money magnitudes equivalent to English magnitudes.
 PURE_DIGIT = re.compile(r"(?<![A-Za-z])\d+(?![A-Za-z])")
 HAS_CJK_WAN = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*万")
 HAS_CJK_YI = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*亿")
@@ -114,15 +111,10 @@ HAS_ENG_MAG = re.compile(
 
 
 def _pure_digit_tokens(s: str) -> List[str]:
-    """Return list of pure digit tokens (no adjacent letters)."""
     return PURE_DIGIT.findall(s or "")
 
 
 def _to_number_english_magnitude(text: str) -> Optional[float]:
-    """
-    Parse the first 'X thousand/million/billion' style magnitude.
-    Returns None if not present.
-    """
     if not text:
         return None
     m = HAS_ENG_MAG.search(text)
@@ -145,10 +137,6 @@ def _to_number_english_magnitude(text: str) -> Optional[float]:
 
 
 def _to_number_cjk_magnitude(text: str) -> Optional[float]:
-    """
-    Parse the first CJK magnitude using 万 (1e4) or 亿 (1e8).
-    Returns None if not present.
-    """
     if not text:
         return None
     m_yi = HAS_CJK_YI.search(text)
@@ -162,31 +150,73 @@ def _to_number_cjk_magnitude(text: str) -> Optional[float]:
 
 def numbers_ok(src: str, tgt: str) -> bool:
     """
-    Numbers integrity (primary rule):
-    - Treat only "pure digits" as required (exclude letter-adjacent like 'Q3').
-    - Every pure-digit token in src must appear in tgt (subset).
-    - Extra digits in tgt are allowed (e.g., month/day digits in Chinese dates).
-    Fallback:
-    - If subset fails, accept CJK money magnitudes equivalent to English
-      magnitudes (万/亿 vs thousand/million/billion) when they represent
-      the same value (within tiny relative tolerance).
+    Numbers integrity:
+    - Only pure digits are required (ignore alpha+digit like 'Q3').
+    - Subset rule: every pure digit token in src must appear in tgt.
+    - Extra digits in tgt are allowed.
+    - Fallback: accept English magnitude == CJK 万/亿 when values match (±2%).
     """
     src_digits = _pure_digit_tokens(src)
     tgt_digits = _pure_digit_tokens(tgt)
-    # Fast path: subset check (each src token appears as a substring token in tgt)
+    if not src_digits:
+        return True
     if all(any(sd in td for td in tgt_digits) for sd in src_digits):
         return True
-    # Fallback: money magnitude equivalence (handles 12 million ≡ 1200万; 200 million ≡ 2亿)
     val_src = _to_number_english_magnitude(src)
     val_tgt = _to_number_cjk_magnitude(tgt)
     if val_src is not None and val_tgt is not None:
-        # Compare within a tight tolerance. Exact match for clean integers will pass.
         if val_src == 0 and val_tgt == 0:
             return True
         if val_src != 0:
             rel = abs(val_src - val_tgt) / abs(val_src)
-            return rel <= 0.02  # 2% tolerance
+            return rel <= 0.02
     return False
+
+
+# ---------------------------------------------------------------------------
+# Back-compat symbol shims for current call sites in evaluate_pair().
+# These are *local adapters*, not a long-term API. They keep the code readable
+# and map the old names to the new single-source-of-truth logic above.
+# ---------------------------------------------------------------------------
+
+
+def extract_pure_digits(text: str) -> List[str]:
+    """Adapter: old helper name -> new implementation."""
+    return _pure_digit_tokens(text or "")
+
+
+def numbers_integrity_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
+    return (
+        ("pass", "")
+        if numbers_ok(src, tgt)
+        else ("fail", "Pure digit mismatch (missing/changed numerals).")
+    )
+
+
+def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
+    """
+    Rubric-aware untranslated check.
+    Returns one of: ('fail'|'info'|'pass', note).
+    - Ignore trivial one-word cognates shorter than rubric.min_remainder_len (default 5).
+    - Treat ALL-CAPS acronyms as INFO by default (unless rubric overrides).
+    """
+    s = (src or "").strip()
+    t = (tgt or "").strip()
+    if not s:
+        return "pass", ""
+    if s == t:
+        toks = s.split()
+        if len(toks) == 1:
+            tok = toks[0]
+            ua_cfg = rubric.get("untranslated_after_dnt", {}) or {}
+            min_len = int(ua_cfg.get("min_remainder_len", 5))
+            if len(tok) < min_len:
+                return "pass", ""
+            if tok.isupper():
+                sev = str(ua_cfg.get("uppercase_acronym_treated_as", "info")).lower()
+                return sev, "Uppercase acronym carried through."
+        return "fail", "Identical to original after DNT removal."
+    return "pass", ""
 
 
 def _occurrences(cues: List[Cue], term: str) -> List[int]:
@@ -549,17 +579,15 @@ def evaluate_pair(
     # --- Numbers integrity (pure digits only) ---
     number_mismatch_rows: List[List[Any]] = []
     for cue_idx in range(cue_count):
-        mismatch, note = numbers_integrity_check(
-            source_cues[cue_idx].text, target_cues[cue_idx].text, rubric
-        )
-        if mismatch:
-            nums = ",".join(extract_pure_digits(source_cues[cue_idx].text))
+        # Numbers integrity (boolean check; subset + CJK magnitude equivalence)
+        if not numbers_ok(source_cues[cue_idx].text, target_cues[cue_idx].text):
             number_mismatch_rows.append(
                 [
                     cue_idx + 1,
                     source_cues[cue_idx].index,
-                    nums,
+                    source_cues[cue_idx].text.replace("\n", " / "),
                     target_cues[cue_idx].text.replace("\n", " / "),
+                    "Pure digit mismatch (missing/changed numerals).",
                 ]
             )
     with (out_dir / f"number_mismatch_{lang}_{batch}.csv").open(
