@@ -998,19 +998,18 @@ TARGET ITEMS (TO FIX):
     # ---------- Simple shape lock: split batch into halves and retry once ----------
     def _translate_with_simple_shape_lock(
         self,
-        *,
-        src_items: List[str],
+        src_items: List[SubtitleItem],
         target_lang: str,
-        termbase: Optional[Dict[str, Any]],
+        termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
         logger: logging.Logger,
-    ) -> List[Dict[str, Any]]:
-        """
-        Simple, reliable recovery:
-        1) Try the batch once.
-        2) If count mismatches, split into two halves and translate each half once.
-        3) If a half of size 1 still mismatches, raise (fail fast with a clear message).
-        """
+        depth: int = 0,
+    ) -> List[str]:
+        """Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once."""
+        if depth > 3:  # Prevent infinite recursion
+            raise RuntimeError("Maximum recursion depth exceeded in shape lock")
+
+        # Initial attempt: translate the full batch
         try:
             items = self._translate_batch_json(
                 src_items=src_items,
@@ -1019,35 +1018,34 @@ TARGET ITEMS (TO FIX):
                 batch_ids=batch_ids,
             )
         except Exception as ex:
-            # Log the payload that was sent to the translator when failure occurs
-            self.logger.info(
-                "Shape lock initial batch failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                target_lang,
+            # Decode/format failure: treat like a count mismatch and force the split path.
+            self.logger.warning(
+                "Initial batch failed to parse/validate JSON (items=%d). "
+                "Will split and retry once. error=%s",
                 len(src_items),
-                target_lang,
+                ex,
             )
-            raise  # Re-raise the exception to maintain the original behavior
+            items = []
 
+        # If we got the right count, we're done
         if len(items) == len(src_items):
             return items
 
-        logger.warning(
-            "JSON batch count mismatch: expected %d, got %d — reducing batch size and retrying once.",
+        # Shape mismatch: split into halves and retry
+        logger.info(
+            "JSON batch count mismatch: expected %d, got %d — reducing batch size...",
             len(src_items),
             len(items),
         )
 
-        n = len(src_items)
-        if n == 1:
-            # We cannot split further; fail fast.
-            raise RuntimeError(
-                "Shape lock failed at size=1: expected 1 item, got %d" % len(items)
-            )
+        # Split the source items into halves
+        mid = len(src_items) // 2
+        left_src = src_items[:mid]
+        right_src = src_items[mid:]
+        left_ids = batch_ids[:mid]
+        right_ids = batch_ids[mid:]
 
-        mid = n // 2
-        left_src, right_src = src_items[:mid], src_items[mid:]
-        left_ids, right_ids = batch_ids[:mid], batch_ids[mid:]
-
+        # Try left half
         try:
             left_items = self._translate_batch_json(
                 src_items=left_src,
@@ -1056,15 +1054,35 @@ TARGET ITEMS (TO FIX):
                 batch_ids=left_ids,
             )
         except Exception as ex:
-            # Log the payload that was sent to the translator when failure occurs
-            self.logger.info(
-                "Shape lock left half failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                target_lang,
-                len(left_src),
-                target_lang,
-            )
-            raise  # Re-raise the exception to maintain the original behavior
+            if len(left_src) == 1:
+                # One-item micro-retry: a second ask often succeeds after truncation.
+                try:
+                    left_items = self._translate_batch_json(
+                        src_items=left_src,
+                        target_lang=target_lang,
+                        termbase=termbase,
+                        batch_ids=left_ids,
+                    )
+                except Exception:
+                    raise RuntimeError(
+                        "Shape lock failed in left sub-batch (size=1): JSON decode/format error"
+                    )
+            else:
+                # Recursively shape-lock this half.
+                self.logger.info(
+                    "Recursively splitting left half (size=%d) due to JSON failure",
+                    len(left_src),
+                )
+                left_items = self._translate_with_simple_shape_lock(
+                    src_items=left_src,
+                    target_lang=target_lang,
+                    termbase=termbase,
+                    batch_ids=left_ids,
+                    logger=logger,
+                    depth=depth + 1,
+                )
 
+        # Try right half
         try:
             right_items = self._translate_batch_json(
                 src_items=right_src,
@@ -1073,42 +1091,38 @@ TARGET ITEMS (TO FIX):
                 batch_ids=right_ids,
             )
         except Exception as ex:
-            # Log the payload that was sent to the translator when failure occurs
-            self.logger.info(
-                "Shape lock right half failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                target_lang,
-                len(right_src),
-                target_lang,
-            )
-            raise  # Re-raise the exception to maintain the original behavior
-
-        if len(left_items) != len(left_src):
-            if len(left_src) == 1:
-                raise RuntimeError(
-                    "Shape lock failed in left sub-batch (size=1): expected 1 item, got %d"
-                    % len(left_items)
-                )
-            else:
-                raise RuntimeError(
-                    "Shape lock failed in left sub-batch: expected %d, got %d"
-                    % (len(left_src), len(left_items))
-                )
-
-        if len(right_items) != len(right_src):
             if len(right_src) == 1:
-                raise RuntimeError(
-                    "Shape lock failed in right sub-batch (size=1): expected 1 item, got %d"
-                    % len(right_items)
-                )
+                try:
+                    right_items = self._translate_batch_json(
+                        src_items=right_src,
+                        target_lang=target_lang,
+                        termbase=termbase,
+                        batch_ids=right_ids,
+                    )
+                except Exception:
+                    raise RuntimeError(
+                        "Shape lock failed in right sub-batch (size=1): JSON decode/format error"
+                    )
             else:
-                raise RuntimeError(
-                    "Shape lock failed in right sub-batch: expected %d, got %d"
-                    % (len(right_src), len(right_items))
+                # Recursively shape-lock this half.
+                self.logger.info(
+                    "Recursively splitting right half (size=%d) due to JSON failure",
+                    len(right_src),
+                )
+                right_items = self._translate_with_simple_shape_lock(
+                    src_items=right_src,
+                    target_lang=target_lang,
+                    termbase=termbase,
+                    batch_ids=right_ids,
+                    logger=logger,
+                    depth=depth + 1,
                 )
 
+        # Combine the results
+        combined = left_items + right_items
         logger.info(
             "Shape mismatch resolved by splitting into halves (%d + %d).",
-            len(left_src),
-            len(right_src),
+            len(left_items),
+            len(right_items),
         )
-        return left_items + right_items
+        return combined
