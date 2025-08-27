@@ -108,7 +108,6 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Render header
     out.append("# Evaluation Report\n")
-    out.append(f"*Detected source language:* **{src_label}**\n\n")
 
     # Punch list per language/file (only sections that have issues)
     for lang, entry in langs.items():
@@ -186,16 +185,17 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Header/intro now that we know total_items
     intro = []
-    intro.append(f"*Detected source language:* **{src_label}**\n")
+    # Ensure we only add this once (some earlier flows appended twice).
+    intro.append(f"*Detected source language:* **{src_label}**")
     if total_items == 0:
         intro.append(
-            "Everything looks great. Your translated files are **ready for use**.\n"
+            "Everything looks great. Your translated files are **ready for use**."
         )
     else:
         intro.append(
-            f"Some files need attention. Below is a consolidated punch list of **{total_items}** issue(s). For each cue, we show the original and the translation with a suggested fix.\n"
+            f"Some files need attention. Below is a consolidated punch list of **{total_items}** issue(s). For each cue, we show the original and the translation with a suggested fix."
         )
-    out.insert(1, "\n".join(intro) + "\n")
+    out.insert(1, "\n\n".join(intro) + "\n")
 
     # Roll-up table
     out.append("\n---\n")

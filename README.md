@@ -132,6 +132,15 @@ The app **does not require you to specify the original language**; the AI infers
 
 ---
 
+## Resilience to model under-runs
+
+The translator preserves 1:1 cue parity and original timings by design. When a model returns an empty line for a cue:
+1) A one-shot **pair retry** is attempted with the next cue. If the empty cue is the last in a batch, a **cross-batch pair retry** is performed using the first cue of the next batch.
+2) If retry fails (BOUNDED/DEV), the cue remains **empty** (we do not paste source text). The evaluator will clearly flag it as **Missing translation**.
+3) The SRT writer **always emits** a cue block (even if text is empty), avoiding "missing cue" shifts downstream.
+
+---
+
 ## Installation
 
 ### Console Scripts (Recommended)

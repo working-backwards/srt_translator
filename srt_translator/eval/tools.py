@@ -98,9 +98,95 @@ def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
     return (a != "") and (a == b)
 
 
+# --- Numbers integrity helpers ------------------------------------------------
+# We enforce: every "pure digit" token in the source (not touching letters)
+# must appear in the target (subset rule). Extra digits in target are OK.
+# This avoids flagging "Q3" (quarter label) and similar alpha+digit tokens.
+# If subset fails, we attempt a CJK magnitude check for money figures
+# (e.g., "$12 million" ≡ "1200万", "$200 million" ≡ "2亿").
+
+PURE_DIGIT = re.compile(r"(?<![A-Za-z])\d+(?![A-Za-z])")
+HAS_CJK_WAN = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*万")
+HAS_CJK_YI = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*亿")
+HAS_ENG_MAG = re.compile(
+    r"(?P<num>\d+(?:,\d{3})*(?:\.\d+)?)\s*(?P<mag>thousand|million|billion)", re.I
+)
+
+
+def _pure_digit_tokens(s: str) -> List[str]:
+    """Return list of pure digit tokens (no adjacent letters)."""
+    return PURE_DIGIT.findall(s or "")
+
+
+def _to_number_english_magnitude(text: str) -> Optional[float]:
+    """
+    Parse the first 'X thousand/million/billion' style magnitude.
+    Returns None if not present.
+    """
+    if not text:
+        return None
+    m = HAS_ENG_MAG.search(text)
+    if not m:
+        return None
+    raw = m.group("num").replace(",", "")
+    try:
+        base = float(raw)
+    except ValueError:
+        return None
+    mag = m.group("mag").lower()
+    scale = 1.0
+    if mag == "thousand":
+        scale = 1_000
+    elif mag == "million":
+        scale = 1_000_000
+    elif mag == "billion":
+        scale = 1_000_000_000
+    return base * scale
+
+
+def _to_number_cjk_magnitude(text: str) -> Optional[float]:
+    """
+    Parse the first CJK magnitude using 万 (1e4) or 亿 (1e8).
+    Returns None if not present.
+    """
+    if not text:
+        return None
+    m_yi = HAS_CJK_YI.search(text)
+    if m_yi:
+        return float(m_yi.group("num")) * 100_000_000
+    m_wan = HAS_CJK_WAN.search(text)
+    if m_wan:
+        return float(m_wan.group("num")) * 10_000
+    return None
+
+
 def numbers_ok(src: str, tgt: str) -> bool:
-    nums = re.findall(r"\d+", src or "")
-    return all(re.search(re.escape(n), tgt or "") for n in nums)
+    """
+    Numbers integrity (primary rule):
+    - Treat only "pure digits" as required (exclude letter-adjacent like 'Q3').
+    - Every pure-digit token in src must appear in tgt (subset).
+    - Extra digits in tgt are allowed (e.g., month/day digits in Chinese dates).
+    Fallback:
+    - If subset fails, accept CJK money magnitudes equivalent to English
+      magnitudes (万/亿 vs thousand/million/billion) when they represent
+      the same value (within tiny relative tolerance).
+    """
+    src_digits = _pure_digit_tokens(src)
+    tgt_digits = _pure_digit_tokens(tgt)
+    # Fast path: subset check (each src token appears as a substring token in tgt)
+    if all(any(sd in td for td in tgt_digits) for sd in src_digits):
+        return True
+    # Fallback: money magnitude equivalence (handles 12 million ≡ 1200万; 200 million ≡ 2亿)
+    val_src = _to_number_english_magnitude(src)
+    val_tgt = _to_number_cjk_magnitude(tgt)
+    if val_src is not None and val_tgt is not None:
+        # Compare within a tight tolerance. Exact match for clean integers will pass.
+        if val_src == 0 and val_tgt == 0:
+            return True
+        if val_src != 0:
+            rel = abs(val_src - val_tgt) / abs(val_src)
+            return rel <= 0.02  # 2% tolerance
+    return False
 
 
 def _occurrences(cues: List[Cue], term: str) -> List[int]:
@@ -552,61 +638,6 @@ def generate_eval(
         cps_soft_hard=cps,
         rubric=rubric,
     )
-
-
-# ---------- New evaluation helpers for PR polish ----------
-
-PURE_DIGIT = re.compile(
-    r"(?<![A-Za-z])\d+(?![A-Za-z])"
-)  # digits not adjacent to letters
-UPPER_ACRO = re.compile(r"^[A-Z0-9]{2,8}\.?$")
-
-
-def extract_pure_digits(s: str) -> List[str]:
-    return PURE_DIGIT.findall(s or "")
-
-
-def is_upper_acronym(token: str) -> bool:
-    return bool(UPPER_ACRO.match((token or "").strip()))
-
-
-def numbers_integrity_check(src: str, tgt: str, rubric: Dict) -> Tuple[bool, str]:
-    """Pure digits must match as a multiset; mixed alphanumerics (Q3/A4) are not failures."""
-    s = extract_pure_digits(src)
-    t = extract_pure_digits(tgt)
-    if sorted(s) != sorted(t):
-        return True, "Pure digit mismatch (missing/changed numerals)."
-    return False, ""
-
-
-def untranslated_after_dnt_check(
-    src_after_dnt: str, tgt: str, rubric: Dict
-) -> Tuple[str, str]:
-    """
-    Returns one of: ('fail'|'info'|'pass', note).
-    - Ignore trivial one-word cognates below min length.
-    - ALL-CAPS acronyms are INFO unless they're in DNT/TB.
-    """
-    s = (src_after_dnt or "").strip()
-    t = (tgt or "").strip()
-    if not s:
-        return "pass", ""
-    if s == t:
-        toks = s.split()
-        if len(toks) == 1:
-            tok = toks[0]
-            min_len = int(
-                rubric.get("untranslated_after_dnt", {}).get("min_remainder_len", 5)
-            )
-            if len(tok) < min_len:
-                return "pass", ""
-            if is_upper_acronym(tok):
-                sev = rubric.get("untranslated_after_dnt", {}).get(
-                    "uppercase_acronym_treated_as", "info"
-                )
-                return sev, "Uppercase acronym carried through."
-        return "fail", "Identical to original after DNT removal."
-    return "pass", ""
 
 
 def should_emit_fragments(lang_code: str, rubric: dict, rows: int) -> bool:

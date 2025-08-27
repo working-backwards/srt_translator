@@ -91,11 +91,18 @@ def parse_srt(text: str) -> List[Subtitle]:
 
 
 def render_srt(subs: Sequence[Subtitle]) -> str:
+    """
+    Render target SRT using original timings.
+    IMPORTANT: We ALWAYS emit a block—even if the translated text is empty.
+    This preserves 1:1 cue parity and timings, allowing the evaluator to
+    surface true 'Missing translation' instead of silently shifting indices.
+    """
     parts: List[str] = []
     for i, sub in enumerate(subs, start=1):
+        translated = (sub.text or "").strip()
         parts.append(str(i))
         parts.append(f"{sub.start} --> {sub.end}")
-        parts.append(sub.text.strip())
+        parts.append(translated if translated else "")
         parts.append("")  # blank line
     return "\n".join(parts).rstrip() + "\n"
 
@@ -319,6 +326,18 @@ class SRTTranslator:
         )
         all_tgt_subs: List[Subtitle] = []
 
+        # === Cross-batch pair-retry state ===================================
+        # If the *last* cue of a batch returns empty, we cannot repair it inside
+        # the same batch (no "next" cue available). We defer a one-shot pair-retry
+        # to the start of the next loop iteration, when the head of the next batch
+        # is available. We then patch the fixed text back into all_translated_texts.
+        #
+        # We keep at most one deferred retry at a time; it is resolved immediately
+        # on the next batch. This preserves both invariants:
+        #   - 1:1 cue parity with source
+        #   - original timings unchanged
+        deferred_tail_retry: Optional[Dict[str, Any]] = None
+
         # Language CPS cap
         cps_cap = self.language_config.get_cps_cap(target_lang)
 
@@ -479,7 +498,33 @@ class SRTTranslator:
                         sid,
                     )
 
-            # Format per subtitle (CPS; line breaks)
+            # Before we append, compute where the last item will land in the global list.
+            # We need this to patch it later if we defer a cross-batch pair-retry.
+            base_out_pos = len(all_tgt_subs)
+            last_out_pos = base_out_pos + len(tgt_texts) - 1
+
+            # If the last item is still empty, defer a cross-batch retry.
+            # We only *record* the slot here; the actual retry happens after
+            # the next batch is translated (so we can pair with its first cue).
+            if tgt_texts and not tgt_texts[-1].strip():
+                last_cue = batch[-1]
+                if self.error_policy == "STRICT":
+                    raise RuntimeError(
+                        f"Empty translation for subtitle idx={last_cue.idx}"
+                    )
+                deferred_tail_retry = {
+                    "cue_index": last_cue.idx,
+                    "out_index": last_out_pos,
+                    "source_text_with_placeholders": self.term_handler.apply_dnt_placeholders(
+                        last_cue.text
+                    ),
+                }
+                file_logger.info(
+                    "Deferred cross-batch pair retry for end-of-batch empty at idx=%s.",
+                    last_cue.idx,
+                )
+
+            # Format per subtitle (CPS; line breaks) and append to global list
             for s, tgt in zip(batch, tgt_texts):
                 start_s = _parse_time_to_seconds(s.start)
                 end_s = _parse_time_to_seconds(s.end)
@@ -493,6 +538,63 @@ class SRTTranslator:
                 all_tgt_subs.append(
                     Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
                 )
+
+            # Fulfill any deferred cross-batch pair-retry *now* that we have the next batch's head.
+            if deferred_tail_retry is not None and batch:
+                try:
+                    first_cue = batch[0]
+                    pair_src = [
+                        deferred_tail_retry["source_text_with_placeholders"],
+                        self.term_handler.apply_dnt_placeholders(first_cue.text),
+                    ]
+                    pair_ids = [deferred_tail_retry["cue_index"], first_cue.idx]
+                    file_logger.info(
+                        "Empty target at idx=%s; attempting pair retry with next cue across batch boundary.",
+                        deferred_tail_retry["cue_index"],
+                    )
+                    pair_items = self._translate_batch_json(
+                        src_items=pair_src,
+                        target_lang=target_lang,
+                        termbase=self.termbase,
+                        batch_ids=pair_ids,
+                    )
+                    if isinstance(pair_items, list) and len(pair_items) >= 1:
+                        candidate = pair_items[0].get("tgt", "")
+                        if candidate and candidate.strip():
+                            fixed = self.term_handler.restore_dnt_placeholders(
+                                candidate
+                            )
+                            # Patch the fixed text back into the global list
+                            all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
+                            file_logger.info(
+                                "Pair retry filled idx=%s successfully.",
+                                deferred_tail_retry["cue_index"],
+                            )
+                        else:
+                            file_logger.error(
+                                "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                                deferred_tail_retry["cue_index"],
+                            )
+                    else:
+                        file_logger.error(
+                            "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                            deferred_tail_retry["cue_index"],
+                        )
+                except Exception as ex:
+                    file_logger.warning(
+                        "Pair retry failed for idx=%s: %s",
+                        deferred_tail_retry["cue_index"],
+                        ex,
+                    )
+                    file_logger.error(
+                        "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                        deferred_tail_retry["cue_index"],
+                    )
+                finally:
+                    # Clear the deferred slot. If the *current* batch's tail is also empty,
+                    # we will have just set a new deferred entry above; that will be handled
+                    # on the next loop iteration.
+                    deferred_tail_retry = None
 
         # 3) Render and write
         out_text = render_srt(all_tgt_subs)
