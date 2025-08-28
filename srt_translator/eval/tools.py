@@ -102,6 +102,7 @@ def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
 # Enforce *pure digit* subset: every token of digits in the source must
 # appear in the target (ignore alpha+digit like 'Q3'). If subset fails,
 # accept CJK money magnitudes equivalent to English magnitudes.
+# Pure ASCII digits by default; we can normalize unicode digits before matching.
 PURE_DIGIT = re.compile(r"(?<![A-Za-z])\d+(?![A-Za-z])")
 HAS_CJK_WAN = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*万")
 HAS_CJK_YI = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*亿")
@@ -173,24 +174,20 @@ def numbers_ok(src: str, tgt: str) -> bool:
     return False
 
 
-# ---------------------------------------------------------------------------
-# Back-compat symbol shims for current call sites in evaluate_pair().
-# These are *local adapters*, not a long-term API. They keep the code readable
-# and map the old names to the new single-source-of-truth logic above.
-# ---------------------------------------------------------------------------
-
-
-def extract_pure_digits(text: str) -> List[str]:
-    """Adapter: old helper name -> new implementation."""
-    return _pure_digit_tokens(text or "")
-
-
-def numbers_integrity_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
-    return (
-        ("pass", "")
-        if numbers_ok(src, tgt)
-        else ("fail", "Pure digit mismatch (missing/changed numerals).")
-    )
+def _normalize_unicode_digits_to_ascii(s: str) -> str:
+    """
+    Map any unicode decimal digits (Nd) to ASCII 0-9. Leaves other chars intact.
+    """
+    out = []
+    for ch in s or "":
+        if ch.isdigit() and not ("0" <= ch <= "9"):
+            try:
+                out.append(str(unicodedata.digit(ch)))
+            except Exception:
+                out.append(ch)
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
@@ -576,17 +573,26 @@ def evaluate_pair(
             w.writerow(["cue", "index", "target_text", "snippet"])
             w.writerows(source_fragment_rows)
 
-    # --- Numbers integrity (pure digits only) ---
+    # --- Numbers integrity (pure digits only; rubric-driven) ---
+    numbers_cfg = (rubric or {}).get("numbers", {})
+    per_lang = numbers_cfg.get("per_language", {}) or {}
+    lang_cfg = per_lang.get(lang, {}) if isinstance(per_lang, dict) else {}
+    numbers_gate = bool(lang_cfg.get("gate", numbers_cfg.get("gate", True)))
+    normalize_digits = bool(lang_cfg.get("normalize_digits",
+                                         numbers_cfg.get("normalize_digits", False)))
     number_mismatch_rows: List[List[Any]] = []
     for cue_idx in range(cue_count):
-        # Numbers integrity (boolean check; subset + CJK magnitude equivalence)
-        if not numbers_ok(source_cues[cue_idx].text, target_cues[cue_idx].text):
+        # Optional unicode-digit normalization for target
+        tgt_text = target_cues[cue_idx].text
+        chk_tgt = _normalize_unicode_digits_to_ascii(tgt_text) if normalize_digits else tgt_text
+        # Numbers integrity (subset + CJK magnitude equivalence)
+        if not numbers_ok(source_cues[cue_idx].text, chk_tgt):
             number_mismatch_rows.append(
                 [
                     cue_idx + 1,
                     source_cues[cue_idx].index,
                     source_cues[cue_idx].text.replace("\n", " / "),
-                    target_cues[cue_idx].text.replace("\n", " / "),
+                    tgt_text.replace("\n", " / "),
                     "Pure digit mismatch (missing/changed numerals).",
                 ]
             )
@@ -616,7 +622,7 @@ def evaluate_pair(
         fail_reasons.append(
             f"Untranslated after DNT: {len(untranslated_after_dnt_rows)}"
         )
-    if number_mismatch_rows:
+    if number_mismatch_rows and numbers_gate:
         fail_reasons.append(f"Numbers mismatch: {len(number_mismatch_rows)} cues")
     verdict = "PASS" if not fail_reasons else "FAIL"
 

@@ -47,22 +47,21 @@ def show_translation_results(parent, results: dict):
     output_directory = results.get("output_directory", "translated_srt_files")
 
     logging.info(
-        f"Success count: {success_count}, Error count: {error_count}, Total files: {total_files}"
+        f"Success count: {success_count} (languages), Error count: {error_count}, Total files: {total_files}"
     )
 
     if error_count == 0:
         QMessageBox.information(
             parent,
             "Translation Complete",
-            f"Successfully translated {success_count} files!\n\n"
+            f"Successfully translated {total_files} files!\n\n"
             f"Output files are available in the '{output_directory}' directory.",
         )
     else:
         QMessageBox.warning(
             parent,
             "Translation Complete with Errors",
-            f"Translated {success_count} files successfully.\n"
-            f"Encountered {error_count} errors.\n\n"
+            f"Translated {total_files} files with {error_count} errors.\n\n"
             f"Check the log output above for details.",
         )
 

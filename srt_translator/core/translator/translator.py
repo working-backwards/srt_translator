@@ -231,15 +231,20 @@ class SRTTranslator:
         self._consecutive_decode_failures = 0
 
     def _strict_retry_kwargs(self, src_items: list[str]) -> dict:
-        # Length cap: ~2.4× source tokens, hard cap 900 tokens for safety
+        """
+        Strict decoding for retries: cools repetition and caps length conservatively,
+        but guarantees enough budget to close the JSON wrapper even for tiny inputs.
+        """
         src_tok = sum(estimate_tokens(s or "") for s in src_items)
-        max_tokens = min(900, int(math.ceil(2.4 * max(1, src_tok))))
+        cap = int(math.ceil(2.4 * max(1, src_tok)))
+        floor = 120  # <-- token floor: prevents cut-off JSON on very short cues
+        max_tokens = min(900, max(floor, cap))
         return {
             "temperature": 0,
-            "frequency_penalty": 0.6,  # discourage token loops like "ek ek ek…"
+            "frequency_penalty": 0.6,  # discourage loops like "ek ek ek…"
             "presence_penalty": 0.0,
             "max_tokens": max_tokens,
-            # optional: stop after JSON closes; remove if your provider doesn't support 'stop'
+            # Optional: stop right after JSON; remove if provider doesn't support 'stop'
             "stop": ["]}"],
         }
 
@@ -1090,13 +1095,56 @@ INPUT ITEMS:
             except Exception as diag_ex:
                 self.logger.debug("Diagnostics capture skipped: %s", diag_ex)
 
-            # If the model ignored JSON mode, we cannot recover - fail fast
-            self.logger.error(
-                "Model did not return JSON; cannot recover without shape lock."
-            )
-            raise RuntimeError(
-                "Translation failed: model did not return valid JSON format"
-            )
+            # LAST-CHANCE FALLBACK:
+            # If strict retry still produced malformed/partial JSON and there is only ONE item,
+            # ask once for a plain string and wrap it into the expected JSON structure.
+            if len(src_items) == 1:
+                try:
+                    self.logger.info(
+                        "Attempting plain-string fallback for single item (lang=%s, id=%s).",
+                        target_lang, (batch_ids[0] if batch_ids else "?"),
+                    )
+                    fallback_txt = self._translate_single_string_fallback(
+                        src_text=src_items[0],
+                        target_lang=target_lang,
+                    )
+                    wrapped = [{"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}]
+                    return wrapped
+                except Exception as _fallback_ex:
+                    self.logger.warning("Plain-string fallback failed: %s", _fallback_ex)
+
+            # Otherwise, let shape-lock handle it as before.
+            self.logger.error("Model did not return JSON; cannot recover without shape lock.")
+            raise RuntimeError("Translation failed: model did not return valid JSON format")
+
+    def _translate_single_string_fallback(self, *, src_text: str, target_lang: str) -> str:
+        """
+        Minimal escape hatch for repeated JSON truncation in size=1 strict retries.
+        Returns ONLY a translated string; caller will wrap into JSON.
+        """
+        sys = (
+            "You are a professional subtitle translator. "
+            "Reply with the translation ONLY—no JSON, no code, no quotes, no commentary."
+        )
+        usr = (
+            f"Translate to {target_lang}.\n\n"
+            "DNT PLACEHOLDERS:\n"
+            "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
+            "- Do not invent or drop placeholders.\n\n"
+            "TEXT:\n{src_text}\n"
+        )
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "system", "content": sys},
+                      {"role": "user", "content": usr}],
+            temperature=0.0,
+            max_tokens=256,
+        )
+        out = (resp.choices[0].message.content or "").strip()
+        # Be defensive about accidental quoting
+        if (out.startswith('"') and out.endswith('"')) or (out.startswith("'") and out.endswith("'")):
+            out = out[1:-1].strip()
+        return out
 
     def _reformat_fix_placeholders(
         self,
