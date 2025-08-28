@@ -221,7 +221,7 @@ def run_batch_evaluation(
     Args:
         batch_root: Path to the translation batch directory
         logger: Logger instance for evaluation output
-        language_config: Optional TranslationConfiguration object containing source_language info
+        language_config: Optional TranslationConfig object containing source_language info
     """
     log = logger.getChild("runner")
     batch_root = Path(batch_root)
@@ -258,7 +258,7 @@ def run_batch_evaluation(
     language_dirs = _collect_language_dirs(batch_root)
     languages = [p.name for p in language_dirs]
 
-    # Friendly source language from TranslationConfiguration (if available)
+    # Friendly source language from TranslationConfig (if available)
     src_lang_info = {}
     log.info("DEBUG: language_config type: %s", type(language_config))
     if language_config:
@@ -289,7 +289,8 @@ def run_batch_evaluation(
     else:
         log.info("DEBUG: No language_config provided")
 
-    log.info("Source language info from TranslationConfiguration: %s", src_lang_info)
+    if src_lang_info:
+        log.info("Source language info from TranslationConfig: %s", src_lang_info)
 
     # ensure manifest is complete (source name, versions)
     _ensure_manifest_fields(batch_root, log)

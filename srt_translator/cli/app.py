@@ -80,22 +80,26 @@ Examples:
 
     # Collect raw configuration and build TranslationConfig
     try:
-        from srt_translator.api import TranslationConfiguration, Translator
+        from srt_translator.core.config.models import TranslationConfig
+        from srt_translator.api import Translator
         from srt_translator.cli.config_loader import collect_cli_raw
 
         raw_config = collect_cli_raw()
-        api_cfg = TranslationConfiguration(
+        api_cfg = TranslationConfig(
             files=None,  # set after enumeration
-            output_dir=Path(raw_config.get("output_directory", "translated_srt_files")),
+            output_directory=Path(
+                raw_config.get("output_directory", "translated_srt_files")
+            ),
             target_languages=raw_config.get("target_languages"),
             dnt_terms=raw_config.get("dnt_terms"),
             termbase=raw_config.get("termbase") or {},
-            openai_model=raw_config.get("openai_model", "gpt-4o-mini"),
-            batch_size=int(raw_config.get("batch_size", 5)),
+            model_name=raw_config.get("openai_model", "gpt-4o-mini"),
             aggressiveness=float(raw_config.get("aggressiveness", 0.75)),
             log_mode=raw_config.get("log_mode", "Standard"),
             api_key=raw_config.get("api_key"),
             mode="CLI",
+            source_language=raw_config.get("source_language"),
+            language_policies=raw_config.get("language_policies"),
         )
 
         logger.info("Configuration loaded successfully")

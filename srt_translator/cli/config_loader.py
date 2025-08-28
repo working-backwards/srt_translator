@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from dotenv import dotenv_values, find_dotenv
+from json import JSONDecodeError
 
 DEFAULT_LANGS = {
     "Spanish": "es",
@@ -15,6 +16,54 @@ DEFAULT_LANGS = {
     "German": "de",
     "Chinese (Simplified)": "zh-Hans",
 }
+
+
+def _resolve_languages_json_path() -> Path:
+    candidates = [
+        Path("languages.json"),
+        Path("config/languages.json"),
+        Path("srt_translator/resources/languages.json"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    raise FileNotFoundError(
+        f"Could not find languages.json. Tried: {', '.join(str(c) for c in candidates)}"
+    )
+
+
+def _load_language_policies(selected_codes: list[str]) -> dict:
+    path = _resolve_languages_json_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except JSONDecodeError as e:
+        raise RuntimeError(f"languages.json is malformed ({path}): {e}") from e
+    if "languages" not in raw:
+        raise RuntimeError(f"languages.json missing 'languages' key ({path})")
+    # policy_defaults is recommended to avoid per-lang bloat
+    defaults = raw.get("policy_defaults", {})
+    langs = raw["languages"]
+    # Validate required keys for selected targets
+    missing = {}
+    for code in selected_codes:
+        entry = langs.get(code, {})
+        need = []
+        # policy knobs may come from defaults or overrides
+        for k in (
+            "target_batch_size",
+            "max_batch_size",
+            "allow_placeholder_apostrophe",
+        ):
+            if k not in entry and k not in defaults:
+                need.append(k)
+        # cps_cap must be defined per language (used by formatter)
+        if "cps_cap" not in entry:
+            need.append("cps_cap")
+        if need:
+            missing[code] = need
+    if missing:
+        raise RuntimeError(f"languages.json missing required keys: {missing}")
+    return raw
 
 
 def collect_cli_raw() -> dict:
@@ -73,15 +122,32 @@ def collect_cli_raw() -> dict:
     else:
         print(f"Warning: Termbase file not found at {termbase_path}")
 
+    # Load per-language policy (batch size, apostrophe flag, cps cap)
+    target_map = {}
+    try:
+        target_langs_str = env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS))
+        target_map = json.loads(target_langs_str)
+    except Exception as e:
+        print(f"Warning: Failed to parse TARGET_LANGUAGES, using defaults: {e}")
+        target_map = DEFAULT_LANGS
+
+    language_policies = {}
+    try:
+        language_policies = _load_language_policies(list(target_map.values()))
+    except Exception as e:
+        print(f"Warning: Failed to load language policies, using defaults: {e}")
+        # Continue with empty policies - will use defaults
+
     return {
         "api_key": api_key,
         "openai_model": env_file.get("OPENAI_MODEL", "gpt-4o-mini"),
-        "batch_size": env_file.get("BATCH_SIZE", "5"),
+        # batch size now set per language during orchestration
         "aggressiveness": env_file.get("AGGRESSIVENESS", "0.75"),
         "log_mode": env_file.get("LOG_MODE", "Standard"),
         "output_directory": env_file.get("OUTPUT_DIRECTORY", "translated_srt_files"),
-        "input_directory": env_file.get("INPUT_DIRECTORY", "original_captions"),  # ← Add this
-        "target_languages": env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS)),
+        "input_directory": env_file.get("INPUT_DIRECTORY", "original_captions"),
+        "target_languages": target_map,
         "dnt_terms": env_file.get("DNT_TERMS", "[]"),
         "termbase": termbase_data,  # Actual data, not file path
+        "language_policies": language_policies,
     }

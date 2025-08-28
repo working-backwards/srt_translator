@@ -29,6 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **No-Orphans Protection**: Language-aware subtitle reflow that prevents orphaned function words
   - **Language-Specific Configuration**: Support for customizing orphan prevention rules per language
   - **Family Defaults**: Sensible defaults for unconfigured languages with safe fallbacks
+- **Policy-Driven Language Configuration**: New policy system in `languages.json` for per-language batch sizes and apostrophe handling
+  - **Policy Defaults**: Centralized configuration with sensible defaults for all languages
+  - **Per-Language Overrides**: Support for language-specific batch sizes (e.g., TR/AZ use batch_size=4 for stability)
+  - **Apostrophe Policy**: Configurable handling of apostrophes after DNT placeholders per language
+- **Policy-Aware Apostrophe Validation**: Enhanced placeholder validation that respects language-specific apostrophe policies
+  - **TR/AZ Support**: Turkish and Azerbaijani can now use apostrophes after DNT placeholders without validation errors
+  - **Smart Normalization**: Apostrophes are normalized during validation when allowed by policy
+  - **Policy-Driven Logging**: Log level and content adjusts based on apostrophe policy (info vs. warning)
+- **Per-Language Policy Injection**: Complete policy system implementation with automatic loading and validation
+  - **CLI Integration**: CLI now loads language policies from `languages.json` and validates required keys
+  - **GUI Integration**: GUI translation worker loads policies and passes them to core engine
+  - **API Enhancement**: TranslationConfig now supports language policies and optional batch sizes
+  - **Core Orchestration**: Core engine uses per-language batch sizes and logs policy configuration
+  - **Policy Validation**: System validates that all required policy keys exist before translation
+  - **Architecture Cleanup**: Removed all direct file I/O from core modules, enforcing dependency injection pattern
+  - **Simplified Batch Size Configuration**: Removed confusing `None` batch_size flags, system now uses sensible defaults with per-language overrides
+  - **Core Language Policies Support**: Added language_policies field to core TranslationConfig for proper policy injection
 
 ### Changed
 - Replaced print() statements with proper logging in CLI
@@ -43,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Batch Translation Logic**: Replaced immediate fallback to individual translation with progressive shrinking
 - **Reflow Engine**: Enhanced with language-aware orphan rebalancing for better subtitle quality
 - **Language Configuration**: Extended `languages.json` with orphan prevention rules and family defaults
+- **Language Configuration Version**: Updated `languages.json` from version 1.2 to 1.3 with new policy structure
+- **Batch Size Configuration**: Batch sizes are now configured per-language instead of globally, with TR/AZ using size 4 for stability
 
 ### Fixed
 - SRT writer edge case for empty output directories

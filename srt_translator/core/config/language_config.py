@@ -13,22 +13,23 @@ class LanguageConfig:
     Core code MUST receive this via DI; it never reads files itself."""
 
     def __init__(self, data: Dict[str, Any]):
-        if not isinstance(data, dict) or "languages" not in data:
-            raise ValueError(
-                "LanguageConfig requires a preloaded mapping with a 'languages' key."
-            )
-        if not data["languages"]:
-            raise ValueError("LanguageConfig requires non-empty languages mapping.")
-        self._config: Dict[str, Any] = data
+        # Injected languages.json content (nested or flat). No file I/O here.
+        self._raw = data or {}
+        self._defaults = self._raw.get("policy_defaults", {})
+        self._langs = self._raw.get("languages", self._raw)
         self.logger = logging.getLogger(__name__)
+
+    def codes(self) -> list[str]:
+        "Return language codes available in the injected policy."
+        return list(self._langs.keys())
 
     def get_all_languages(self) -> Dict[str, Any]:
         """Get all available languages"""
-        return self._config.get("languages", {})
+        return self._langs
 
     def get_popular_languages(self) -> list[str]:
         """Get current popular languages"""
-        return self._config.get("default_popular_languages", [])
+        return self._raw.get("default_popular_languages", [])
 
     def get_language_name(self, code: str) -> str:
         """Get display name for language code"""
@@ -63,11 +64,11 @@ class LanguageConfig:
 
     def get_config_version(self) -> str:
         """Get the configuration version"""
-        return self._config.get("version", "1.0")
+        return self._raw.get("version", "1.0")
 
     def get_popular_limit(self) -> int:
         """Get the default popular languages limit"""
-        return self._config.get("default_popular_limit", 12)
+        return self._raw.get("default_popular_limit", 12)
 
     def get_target_languages_dict(self) -> dict[str, str]:
         """Get target languages in the format expected by CLI (name: code)"""
@@ -98,6 +99,54 @@ class LanguageConfig:
             # Default fallback for robustness
             return 20
         return int(cap)
+
+    def get_target_batch_size(self, code: str) -> int:
+        """Get the target batch size for a language."""
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        # Check language-specific override first
+        if "target_batch_size" in lang_info:
+            return int(lang_info["target_batch_size"])
+        # Check policy defaults
+        if "target_batch_size" in self._defaults:
+            return int(self._defaults["target_batch_size"])
+        # Log the error before raising
+        self.logger.error(
+            "Missing target_batch_size for language %s and no policy default", code
+        )
+        raise ValueError(
+            f"Missing target_batch_size for language {code} and no policy default"
+        )
+
+    def get_max_batch_size(self, code: str) -> int:
+        """Get the maximum batch size for a language."""
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        # Check language-specific override first
+        if "max_batch_size" in lang_info:
+            return int(lang_info["max_batch_size"])
+        # Check policy defaults
+        if "max_batch_size" in self._defaults:
+            return int(self._defaults["max_batch_size"])
+        # Log the error before raising
+        self.logger.error(
+            "Missing max_batch_size for language %s and no policy default", code
+        )
+        raise ValueError(
+            f"Missing max_batch_size for language {code} and no policy default"
+        )
+
+    def allows_placeholder_apostrophe(self, code: str) -> bool:
+        """Check if a language allows apostrophes after DNT placeholders."""
+        languages = self.get_all_languages()
+        lang_info = languages.get(code, {})
+        # Check language-specific override first, then fall back to policy defaults
+        return bool(
+            lang_info.get(
+                "allow_placeholder_apostrophe",
+                self._defaults.get("allow_placeholder_apostrophe", False),
+            )
+        )
 
     @classmethod
     def normalize_language_code(cls, code: str) -> str:
@@ -254,8 +303,7 @@ class LanguageConfig:
     }
 
     def get_family_defaults(self, family: str) -> dict:
-        cfg = self._config
-        return (cfg.get("family_defaults") or {}).get(family, {})
+        return (self._raw.get("family_defaults") or {}).get(family, {})
 
     def family(self, code: str) -> str:
         return (self.get_all_languages().get(code, {}) or {}).get("family", "")

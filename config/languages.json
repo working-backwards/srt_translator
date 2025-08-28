@@ -1,6 +1,11 @@
 {
-  "version": "1.2",
-  "default_popular_limit": 12,
+  "version": "1.3",
+  "policy_defaults": {
+    "target_batch_size": 5,
+    "max_batch_size": 8,
+    "allow_placeholder_apostrophe": false
+  },
+  "default_popular_limit": 24,
   "default_popular_languages": [
     "en-US",
     "es",
@@ -55,7 +60,9 @@
       ],
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "target_batch_size": 4,
+      "allow_placeholder_apostrophe": true
     },
     "eu": {
       "name": "Basque",
@@ -629,7 +636,9 @@
       ],
       "family": "latin",
       "script": "latin",
-      "cps_cap": 24
+      "cps_cap": 24,
+      "target_batch_size": 4,
+      "allow_placeholder_apostrophe": true
     },
     "tk": {
       "name": "Turkmen",

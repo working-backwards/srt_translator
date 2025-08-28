@@ -12,11 +12,13 @@ from collections import deque
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import json
+from json import JSONDecodeError
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
-from srt_translator.api import TranslationConfiguration
+from srt_translator.core.config.models import TranslationConfig
 
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
@@ -25,6 +27,51 @@ from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.eval.report import write_batch_report
+
+
+def _resolve_languages_json_path() -> Path:
+    for c in (
+        Path("languages.json"),
+        Path("config/languages.json"),
+        Path("srt_translator/resources/languages.json"),
+    ):
+        if c.exists():
+            return c
+    raise FileNotFoundError(
+        "Could not find languages.json (looked in project root, config/, and resources/)."
+    )
+
+
+def _load_language_policies(selected_codes: list[str]) -> dict:
+    path = _resolve_languages_json_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except JSONDecodeError as e:
+        raise RuntimeError(f"languages.json is malformed ({path}): {e}") from e
+    if "languages" not in raw:
+        raise RuntimeError(f"languages.json missing 'languages' key ({path})")
+    defaults = raw.get("policy_defaults", {})
+    langs = raw["languages"]
+    missing = {}
+    for code in selected_codes:
+        entry = langs.get(code, {})
+        need = []
+        for k in (
+            "target_batch_size",
+            "max_batch_size",
+            "allow_placeholder_apostrophe",
+        ):
+            if k not in entry and k not in defaults:
+                need.append(k)
+        if "cps_cap" not in entry:
+            need.append("cps_cap")
+        if need:
+            missing[code] = need
+    if missing:
+        raise RuntimeError(
+            f"languages.json missing required keys for GUI run: {missing}"
+        )
+    return raw
 
 
 class TranslationWorker(QObject):
@@ -168,20 +215,34 @@ class TranslationWorker(QObject):
                     self.settings_manager.load_ai_config()
                 )
 
+                # Load language policies for selected target languages
+                lang_policies = {}
+                try:
+                    lang_policies = _load_language_policies(
+                        list((self.target_languages or {}).values())
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to load language policies, using defaults: {e}"
+                    )
+                    # Continue with empty policies - will use defaults
+
                 # Build config from settings manager with actual data
-                api_cfg = TranslationConfiguration(
+                api_cfg = TranslationConfig(
                     files=[Path(p) for p in self.selected_files],
-                    output_dir=Path(self.output_directory or "translated_srt_files"),
+                    output_directory=Path(
+                        self.output_directory or "translated_srt_files"
+                    ),
                     target_languages=self.target_languages,
                     dnt_terms=dnt_terms,
                     termbase=termbase,
-                    openai_model="gpt-4o-mini",
-                    batch_size=5,
+                    model_name="gpt-4o-mini",
                     aggressiveness=0.75,
                     log_mode="Standard",
                     api_key=self.api_key,
                     mode="GUI",
                     source_language=source_language,
+                    language_policies=lang_policies,
                 )
                 self.logger.info(
                     f"Using configuration from settings manager: "
@@ -194,19 +255,33 @@ class TranslationWorker(QObject):
                         f"Termbase languages: {list(api_cfg.termbase.keys())}"
                     )
             else:
+                # Load language policies for selected target languages
+                lang_policies = {}
+                try:
+                    lang_policies = _load_language_policies(
+                        list((self.target_languages or {}).values())
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to load language policies, using defaults: {e}"
+                    )
+                    # Continue with empty policies - will use defaults
+
                 # Fallback to direct parameters
-                api_cfg = TranslationConfiguration(
+                api_cfg = TranslationConfig(
                     files=[Path(p) for p in self.selected_files],
-                    output_dir=Path(self.output_directory or "translated_srt_files"),
+                    output_directory=Path(
+                        self.output_directory or "translated_srt_files"
+                    ),
                     target_languages=self.target_languages,
                     dnt_terms=[],
                     termbase={},
-                    openai_model="gpt-4o-mini",
-                    batch_size=5,
+                    model_name="gpt-4o-mini",
                     aggressiveness=0.75,
                     log_mode="Standard",
                     api_key=self.api_key,
                     mode="GUI",
+                    language_policies=lang_policies,
                 )
                 self.logger.info(
                     f"Using configuration from direct parameters: "

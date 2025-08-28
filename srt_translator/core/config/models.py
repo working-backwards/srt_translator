@@ -6,7 +6,7 @@ Typed configuration models for SRT Translator.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional
 
 from .language_config import LanguageConfig
 
@@ -21,6 +21,7 @@ class LogMode(str, Enum):
 
 @dataclass(frozen=True)
 class TranslationConfig:
+    # Core translation parameters
     target_languages: Dict[str, str]  # e.g., {"Spanish": "es", ...}
     dnt_terms: List[str]
     termbase: Dict[
@@ -29,15 +30,30 @@ class TranslationConfig:
     output_directory: Path
     api_key: str
     model_name: str
-    batch_size: int
     aggressiveness: float  # Aggressiveness of automatic placeholder fixes
     log_mode: LogMode
     mode: Literal["CLI", "GUI"]
     error_policy: Literal["STRICT", "BOUNDED", "DEV"] = (
         "BOUNDED"  # Error handling policy for translation system (BOUNDED for testing)
     )
+    # File handling
+    files: Optional[Iterable[Path]] = None
     # NEW: optional batch-level source language detection payload
     source_language: Optional[Dict[str, object]] = None
+    # NEW: language policies injected by GUI/CLI loaders
+    language_policies: Optional[Dict[str, Dict[str, Any]]] = None
+
+    def run(self) -> Dict[str, Any]:
+        """Run the translation with this configuration and return summary."""
+        from srt_translator.core.main import translate_srt_files
+
+        if not self.files:
+            raise ValueError("No files specified for translation")
+
+        return translate_srt_files(
+            file_paths=[str(f) for f in self.files],
+            config=self,
+        )
 
     @classmethod
     def from_raw(cls, raw: Dict[str, Any], mode: str = "GUI") -> "TranslationConfig":
@@ -79,18 +95,8 @@ class TranslationConfig:
             errors.append("api_key is required")
             api_key = ""
 
-        # Validate model name
-        model_name = raw.get("openai_model", "gpt-4o-mini")
-
-        # Validate batch size
-        try:
-            batch_size = int(raw.get("batch_size", 5))
-            if batch_size < 1:
-                errors.append("batch_size must be at least 1")
-                batch_size = 5
-        except (ValueError, TypeError):
-            errors.append("batch_size must be an integer")
-            batch_size = 5
+        # Validate model name (handle both openai_model and model_name)
+        model_name = raw.get("openai_model") or raw.get("model_name", "gpt-4o-mini")
 
         # Validate aggressiveness
         try:
@@ -125,10 +131,11 @@ class TranslationConfig:
             output_directory=output_dir,
             api_key=api_key,
             model_name=model_name,
-            batch_size=batch_size,
             aggressiveness=aggressiveness,
             log_mode=log_mode,
             mode=mode,
             error_policy=error_policy,
+            files=raw.get("files"),
             source_language=raw.get("source_language"),
+            language_policies=raw.get("language_policies"),
         )

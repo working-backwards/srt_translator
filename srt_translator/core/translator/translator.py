@@ -5,6 +5,9 @@ import json
 import logging
 import os
 import re
+import time
+import random
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Set
 
@@ -12,6 +15,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Set
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
+from srt_translator.core.translator.diagnostics import (
+    estimate_tokens,
+    has_repetitive_loop,
+    MalformedProbeBudget,
+    probe_malformed_json,
+)
 
 
 # OpenAI client
@@ -38,19 +47,6 @@ class Subtitle:
     text: str
 
 
-@dataclass
-class TranslationConfiguration:
-    target_languages: Dict[str, str]  # {"Spanish":"es", ...}
-    dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]  # {"es": {"term": "term"}, "zh-hans": {...}}
-    batch_size: int
-    aggressiveness: float
-    api_key: str
-    model_name: str = "gpt-4o-mini"
-    error_policy: str = "STRICT"  # "STRICT" | "BOUNDED" | "DEV"
-    mode: str = "GUI"  # "GUI" | "CLI"
-
-
 # ---------------------------
 # Utilities
 # ---------------------------
@@ -66,6 +62,8 @@ SRT_BLOCK_RE = re.compile(
 TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
 
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__")
+# Detector (Stage 1): placeholder immediately followed by apostrophe (straight or curly)
+TR_PLACEHOLDER_APOS_RE = re.compile(r"__DNT_TERM_\d+__['']")
 
 
 def _parse_time_to_seconds(ts: str) -> float:
@@ -165,6 +163,12 @@ def strip_invented_placeholders(
 class SRTTranslator:
     # Expert configuration - modify these values as needed
     MAX_BATCH_SIZE = 8  # Maximum subtitles per batch (safety cap)
+    # Internal bounded shape-lock caps (not user-configurable)
+    _MAX_SPLIT_DEPTH = 3
+    _MAX_JSON_RETRIES_PER_SEGMENT = 2
+    _MAX_CONSECUTIVE_DECODE_FAILURES = 8
+    _MICRO_BACKOFF_BASE_S = 0.25
+    _MICRO_BACKOFF_CAP_S = 1.0
 
     def __init__(
         self,
@@ -175,7 +179,7 @@ class SRTTranslator:
         logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
         model_name: str = "gpt-4o-mini",
-        batch_size: int = 5,
+        batch_size: int,
         error_policy: str = "STRICT",
         language_config: Optional[LanguageConfig] = None,
     ) -> None:
@@ -199,7 +203,7 @@ class SRTTranslator:
         if isinstance(logger, logging.LoggerAdapter):
             self.logger = logging.LoggerAdapter(self.logger, logger.extra)
 
-        self.language_config = language_config or LanguageConfig()
+        self.language_config = language_config or LanguageConfig({"languages": {}})
 
         # Initialize TermHandler for DNT and termbase management
         self.term_handler = TermHandler(
@@ -215,6 +219,11 @@ class SRTTranslator:
             )
 
         self.client = OpenAI(api_key=api_key)
+
+        # One-shot advisory probe budget per (file, lang)
+        self._probe_budget = MalformedProbeBudget()
+        # Simple per-file/lang circuit breaker for repeated JSON failures
+        self._consecutive_decode_failures = 0
 
     # --- Sentence-aware batching ----------------------------
     def _create_batches(
@@ -287,6 +296,9 @@ class SRTTranslator:
             },
         )
 
+        # Reset consecutive failure counter for this file/lang run
+        self._consecutive_decode_failures = 0
+
         file_logger.info(
             "Using subtitle-based translation system for %s → %s",
             os.path.basename(input_filepath),
@@ -343,7 +355,75 @@ class SRTTranslator:
         cps_cap = self.language_config.get_cps_cap(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
-            file_logger.info(
+            # Batch-scoped logger with correlation ids
+            batch_logger = logging.LoggerAdapter(
+                file_logger, {"batch": bi, "ids": [s.idx for s in batch]}
+            )
+
+            # Handle deferred tail now, pairing with THIS batch's head via shape-lock
+            if deferred_tail_retry is not None:
+                if batch:
+                    head = batch[0]
+                    pair_src = [
+                        deferred_tail_retry["source_text_with_placeholders"],
+                        self.term_handler.apply_dnt_placeholders(head.text),
+                    ]
+                    pair_ids = [deferred_tail_retry["cue_index"], head.idx]
+                    batch_logger.info(
+                        "Empty target at idx=%s; attempting pair retry with next cue across batch boundary (pair_ids=%s).",
+                        deferred_tail_retry["cue_index"],
+                        pair_ids,
+                    )
+                    try:
+                        pair_tgts = self._translate_with_simple_shape_lock(
+                            pair_src,
+                            target_lang,
+                            self.termbase,
+                            pair_ids,
+                            logger=batch_logger,
+                        )
+                        fixed = self.term_handler.restore_dnt_placeholders(
+                            pair_tgts[0] if pair_tgts else ""
+                        )
+                        if fixed.strip():
+                            all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
+                            batch_logger.info(
+                                "Pair retry filled idx=%s successfully.",
+                                deferred_tail_retry["cue_index"],
+                            )
+                        else:
+                            batch_logger.error(
+                                "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                                deferred_tail_retry["cue_index"],
+                            )
+                    except Exception as ex:
+                        batch_logger.warning(
+                            "Pair retry failed for idx=%s: %s",
+                            deferred_tail_retry["cue_index"],
+                            ex,
+                        )
+                        batch_logger.error(
+                            "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                            deferred_tail_retry["cue_index"],
+                        )
+                    finally:
+                        deferred_tail_retry = None
+                else:
+                    batch_logger.error(
+                        "Empty translation for subtitle idx=%s at end-of-file; leaving empty for evaluator.",
+                        deferred_tail_retry["cue_index"],
+                    )
+                    deferred_tail_retry = None
+
+            # One-line context banner
+            batch_logger.info(
+                "Batch context: file=%s batch=%d/%d ids=%s",
+                os.path.basename(input_filepath),
+                bi,
+                len(batches),
+                [s.idx for s in batch],
+            )
+            batch_logger.info(
                 "Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches)
             )
 
@@ -364,11 +444,11 @@ class SRTTranslator:
             # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
             try:
                 items = self._translate_with_simple_shape_lock(
-                    src_items=src_items,
-                    target_lang=target_lang,
-                    termbase=self.termbase,
-                    batch_ids=[s.idx for s in batch],
-                    logger=file_logger,
+                    src_items,
+                    target_lang,
+                    self.termbase,
+                    [s.idx for s in batch],
+                    logger=batch_logger,
                 )
             except Exception as ex:
                 # Log the payload that was sent to the translator when failure occurs
@@ -403,11 +483,48 @@ class SRTTranslator:
                         tgt_placeholders,
                     )
 
-            ph_issues = validate_placeholders_pair(
-                src_items,
-                tgt_texts,
-                self.term_handler.placeholder_regex,
-            )
+            # Policy-aware placeholder validation for apostrophes after placeholders
+            if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
+                # Normalize for detection only: treat "__...__'..." as "__...__"
+                norm_tgts = [
+                    TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t)
+                    for t in tgt_texts
+                ]
+                ph_issues = validate_placeholders_pair(
+                    src_items, norm_tgts, self.term_handler.placeholder_regex
+                )
+                # Once-per-batch info (less noisy when allowed)
+                seen = False
+                for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+                    if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                        batch_logger.info(
+                            "Apostrophe after placeholder observed (allowed for %s, item=%d).",
+                            target_lang,
+                            i,
+                        )
+                        seen = True
+                        break
+            else:
+                ph_issues = validate_placeholders_pair(
+                    src_items, tgt_texts, self.term_handler.placeholder_regex
+                )
+                # Stage 1: language-agnostic detector (observational logging only, once per batch)
+                seen = False
+
+                def _snip(s: str, n: int = 120) -> str:
+                    return s if len(s) <= n else s[: n - 3] + "..."
+
+                for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+                    if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                        batch_logger.info(
+                            "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
+                            i,
+                            target_lang,
+                            _snip(s_i),
+                            _snip(t_i),
+                        )
+                        seen = True
+                        break
 
             # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
             # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
@@ -480,11 +597,12 @@ class SRTTranslator:
                             self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
                         ]
                         pair_ids = [batch[i].idx, batch[i + 1].idx]
-                        pair_items = self._translate_batch_json(
-                            src_items=pair_src,
-                            target_lang=target_lang,
-                            termbase=self.termbase,
-                            batch_ids=pair_ids,
+                        pair_items = self._translate_with_simple_shape_lock(
+                            pair_src,
+                            target_lang,
+                            self.termbase,
+                            pair_ids,
+                            logger=batch_logger,
                         )
                         if isinstance(pair_items, list) and len(pair_items) >= 1:
                             candidate = pair_items[0].get("tgt", "")
@@ -756,6 +874,41 @@ INPUT ITEMS:
                 "Translation failure - Raw response received from translator:\n%s",
                 content,
             )
+            # Diagnostics: token estimates + repetition hint + one-time probe
+            try:
+                payload_text = f"System: {system_prompt}\nUser: {user_prompt}"
+                prompt_tokens = estimate_tokens(payload_text)
+                response_tokens = estimate_tokens(content or "")
+                self.logger.info(
+                    "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
+                    prompt_tokens,
+                    response_tokens,
+                    prompt_tokens + response_tokens,
+                    len(payload_text),
+                    len(content or ""),
+                )
+                hint_class = (
+                    "repetitive_token_loop"
+                    if has_repetitive_loop(content or "")
+                    else "unknown"
+                )
+                file_base = "?"
+                if isinstance(self.logger, logging.LoggerAdapter):
+                    try:
+                        file_base = self.logger.extra.get("file", "?")  # type: ignore[attr-defined]
+                    except Exception:
+                        file_base = "?"
+                probe_malformed_json(
+                    logger=self.logger,
+                    budget=self._probe_budget,
+                    file_base=file_base,
+                    lang=target_lang,
+                    batch_ids=batch_ids[:8],
+                    raw_excerpt=(content or "")[:300],
+                    hint_class=hint_class,
+                )
+            except Exception as diag_ex:
+                self.logger.debug("Diagnostics capture skipped: %s", diag_ex)
 
             # If the model ignored JSON mode, we cannot recover - fail fast
             self.logger.error(
@@ -995,134 +1148,145 @@ TARGET ITEMS (TO FIX):
 
         return out
 
-    # ---------- Simple shape lock: split batch into halves and retry once ----------
     def _translate_with_simple_shape_lock(
         self,
-        src_items: List[SubtitleItem],
+        src_items: List[str],
         target_lang: str,
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
         logger: logging.Logger,
-        depth: int = 0,
-    ) -> List[str]:
-        """Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once."""
-        if depth > 3:  # Prevent infinite recursion
-            raise RuntimeError("Maximum recursion depth exceeded in shape lock")
+    ) -> List[Dict[str, Any]]:
+        """
+        Bounded, iterative shape-lock:
+        - Try the full batch once.
+        - On decode/shape failure, split into halves up to _MAX_SPLIT_DEPTH.
+        - For single-item segments, allow up to _MAX_JSON_RETRIES_PER_SEGMENT micro-retries
+          with tiny exponential backoff.
+        - Hard-stop via a simple per-run circuit breaker to avoid infinite loops.
+        Always returns a list of length == len(src_items), emitting empty targets for
+        unrecoverable cues (the evaluator will flag them).
+        """
+        total = len(src_items)
+        if total == 0:
+            return []
 
-        # Initial attempt: translate the full batch
-        try:
-            items = self._translate_batch_json(
-                src_items=src_items,
-                target_lang=target_lang,
-                termbase=termbase,
-                batch_ids=batch_ids,
-            )
-        except Exception as ex:
-            # Decode/format failure: treat like a count mismatch and force the split path.
-            self.logger.warning(
-                "Initial batch failed to parse/validate JSON (items=%d). "
-                "Will split and retry once. error=%s",
-                len(src_items),
-                ex,
-            )
-            items = []
+        results: List[Optional[Dict[str, Any]]] = [None] * total
 
-        # If we got the right count, we're done
-        if len(items) == len(src_items):
-            return items
+        # Queue holds (start, end, depth, retries)
+        work_q = deque()
+        work_q.append((0, total, 0, 0))
 
-        # Shape mismatch: split into halves and retry
-        logger.info(
-            "JSON batch count mismatch: expected %d, got %d — reducing batch size...",
-            len(src_items),
-            len(items),
+        # Guard maximum iterations to ensure termination
+        max_iterations = (
+            total
+            * (self._MAX_SPLIT_DEPTH + 1)
+            * (self._MAX_JSON_RETRIES_PER_SEGMENT + 1)
+            + 10
         )
+        iterations = 0
 
-        # Split the source items into halves
-        mid = len(src_items) // 2
-        left_src = src_items[:mid]
-        right_src = src_items[mid:]
-        left_ids = batch_ids[:mid]
-        right_ids = batch_ids[mid:]
-
-        # Try left half
-        try:
-            left_items = self._translate_batch_json(
-                src_items=left_src,
-                target_lang=target_lang,
-                termbase=termbase,
-                batch_ids=left_ids,
-            )
-        except Exception as ex:
-            if len(left_src) == 1:
-                # One-item micro-retry: a second ask often succeeds after truncation.
-                try:
-                    left_items = self._translate_batch_json(
-                        src_items=left_src,
-                        target_lang=target_lang,
-                        termbase=termbase,
-                        batch_ids=left_ids,
-                    )
-                except Exception:
-                    raise RuntimeError(
-                        "Shape lock failed in left sub-batch (size=1): JSON decode/format error"
-                    )
-            else:
-                # Recursively shape-lock this half.
-                self.logger.info(
-                    "Recursively splitting left half (size=%d) due to JSON failure",
-                    len(left_src),
+        while work_q:
+            iterations += 1
+            if iterations > max_iterations:
+                logger.error(
+                    "Shape-lock guard tripped; emitting empties for remaining %d item(s).",
+                    sum(e - s for s, e, _, _ in work_q),
                 )
-                left_items = self._translate_with_simple_shape_lock(
-                    src_items=left_src,
+                # Emit empties for all remaining pieces
+                while work_q:
+                    start, end, _, _ = work_q.popleft()
+                    seg_ids = batch_ids[start:end]
+                    for i, cue_id in enumerate(seg_ids, start=start):
+                        results[i] = {"id": cue_id, "tgt": ""}
+                break
+
+            start, end, depth, retries = work_q.popleft()
+            seg_src = src_items[start:end]
+            seg_ids = batch_ids[start:end]
+
+            try:
+                items = self._translate_batch_json(
+                    src_items=seg_src,
                     target_lang=target_lang,
                     termbase=termbase,
-                    batch_ids=left_ids,
-                    logger=logger,
-                    depth=depth + 1,
+                    batch_ids=seg_ids,
                 )
-
-        # Try right half
-        try:
-            right_items = self._translate_batch_json(
-                src_items=right_src,
-                target_lang=target_lang,
-                termbase=termbase,
-                batch_ids=right_ids,
-            )
-        except Exception as ex:
-            if len(right_src) == 1:
-                try:
-                    right_items = self._translate_batch_json(
-                        src_items=right_src,
-                        target_lang=target_lang,
-                        termbase=termbase,
-                        batch_ids=right_ids,
-                    )
-                except Exception:
+                if len(items) != len(seg_src):
                     raise RuntimeError(
-                        "Shape lock failed in right sub-batch (size=1): JSON decode/format error"
+                        f"Count mismatch: expected {len(seg_src)} got {len(items)}"
                     )
-            else:
-                # Recursively shape-lock this half.
-                self.logger.info(
-                    "Recursively splitting right half (size=%d) due to JSON failure",
-                    len(right_src),
-                )
-                right_items = self._translate_with_simple_shape_lock(
-                    src_items=right_src,
-                    target_lang=target_lang,
-                    termbase=termbase,
-                    batch_ids=right_ids,
-                    logger=logger,
-                    depth=depth + 1,
+
+                # Success: place into results
+                for offset, obj in enumerate(items):
+                    results[start + offset] = {
+                        "id": obj.get("id"),
+                        "tgt": obj.get("tgt", ""),
+                    }
+                self._consecutive_decode_failures = 0  # reset breaker on success
+                continue
+
+            except Exception as ex:
+                self._consecutive_decode_failures += 1
+                logger.info(
+                    "Shape-lock failure (size=%d depth=%d retries=%d): %s",
+                    len(seg_src),
+                    depth,
+                    retries,
+                    ex,
                 )
 
-        # Combine the results
-        combined = left_items + right_items
-        logger.info(
-            "Shape mismatch resolved by splitting into halves (%d + %d).",
-            len(left_items),
-            len(right_items),
-        )
-        return combined
+                # Circuit breaker: too many failures in a row → emit empties and stop
+                if (
+                    self._consecutive_decode_failures
+                    >= self._MAX_CONSECUTIVE_DECODE_FAILURES
+                ):
+                    logger.error(
+                        "Circuit breaker hit after %d consecutive failures; emitting empties for remaining segments.",
+                        self._consecutive_decode_failures,
+                    )
+                    # Current segment empties
+                    for i, cue_id in enumerate(seg_ids, start=start):
+                        results[i] = {"id": cue_id, "tgt": ""}
+                    # Remaining queue segments empties
+                    while work_q:
+                        s2, e2, _, _ = work_q.popleft()
+                        for i2, cue_id in enumerate(batch_ids[s2:e2], start=s2):
+                            results[i2] = {"id": cue_id, "tgt": ""}
+                    break
+
+                seg_len = len(seg_src)
+                if seg_len == 1:
+                    # Single item micro-retry with tiny backoff, capped
+                    if retries < self._MAX_JSON_RETRIES_PER_SEGMENT:
+                        backoff = min(
+                            self._MICRO_BACKOFF_CAP_S,
+                            self._MICRO_BACKOFF_BASE_S * (2**retries),
+                        )
+                        # jitter ±50ms
+                        time.sleep(max(0.0, backoff + random.uniform(-0.05, 0.05)))
+                        work_q.appendleft((start, end, depth, retries + 1))
+                    else:
+                        logger.warning(
+                            "Giving up on cue id=%s after %d retries; leaving empty.",
+                            seg_ids[0],
+                            retries,
+                        )
+                        results[start] = {"id": seg_ids[0], "tgt": ""}
+                    continue
+
+                # Split into halves if depth budget remains; otherwise fall back to singles
+                if depth < self._MAX_SPLIT_DEPTH:
+                    mid = start + (seg_len // 2)
+                    # Process left first to preserve natural order in logging
+                    work_q.appendleft((mid, end, depth + 1, 0))
+                    work_q.appendleft((start, mid, depth + 1, 0))
+                else:
+                    # Enqueue each item singly with fresh retry budget
+                    for i in range(end - 1, start - 1, -1):
+                        work_q.appendleft((i, i + 1, depth, 0))
+
+        # Ensure all slots are filled
+        for i, val in enumerate(results):
+            if val is None:
+                results[i] = {"id": batch_ids[i], "tgt": ""}
+        return results  # type: ignore[return-value]

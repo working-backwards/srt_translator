@@ -72,23 +72,22 @@ def translate_srt_files(
 
     logger.info(f"Batch folder: {batch_dir}")
     logger.info(f"Log file: {log_file}")
-    logger.info(f"Translating with batch size: {config.batch_size}")
+    logger.info("Translating with per-language batch sizes from injected policies")
 
-    # Load language configuration for the core engine
-    try:
-        import json
-
-        languages_path = "config/languages.json"
-        with open(languages_path, "r", encoding="utf-8") as f:
-            lang_data = json.load(f)
-        language_config = LanguageConfig(lang_data)
-        logger.info(
-            "Loaded language configuration with %d languages",
-            len(language_config.get_all_languages()),
+    # Stage 3: the core must not read languages.json directly.
+    # Language policy is injected by GUI/CLI loaders via config.language_policies.
+    if not config.language_policies:
+        raise RuntimeError(
+            "Missing language_policies in TranslationConfig. "
+            "Entry points (GUI/CLI) must load languages.json and inject the policy."
         )
-    except Exception as e:
-        logger.error("Failed to load language configuration: %s", e)
-        raise RuntimeError(f"Language configuration load failed: {e}")
+    language_config = LanguageConfig(config.language_policies)
+    try:
+        num_langs = len(language_config.codes())
+    except AttributeError:
+        # Backward compatibility if codes() is not present
+        num_langs = len(getattr(language_config, "_langs", {}) or {})
+    logger.info("Language policy injected (languages=%d)", num_langs)
 
     # === Same-language guard: drop targets that match detected source ===
     source_lang = getattr(config, "source_language", None)
@@ -136,7 +135,8 @@ def translate_srt_files(
         )
 
         try:
-            # Create translator instance
+            # Create translator instance with per-language batch size
+            batch_size_for_lang = language_config.get_target_batch_size(lang_code)
             translator = SRTTranslator(
                 dnt_terms=config.dnt_terms,
                 termbase=config.termbase.get(lang_code, {}),
@@ -144,10 +144,18 @@ def translate_srt_files(
                 allow_global_termbase_fallback=config.mode
                 == "CLI",  # GUI: no fallback; CLI: allow
                 model_name=config.model_name,
-                batch_size=config.batch_size,
+                batch_size=batch_size_for_lang,
                 logger=logger,
                 error_policy=config.error_policy,  # Pass error policy
                 language_config=language_config,  # Pass language configuration
+            )
+            logger.info(
+                "Language run: %s (%s) batch_size=%d cps_cap=%s apostrophe_allowed=%s",
+                lang_name,
+                lang_code,
+                batch_size_for_lang,
+                language_config.get_cps_cap(lang_code),
+                language_config.allows_placeholder_apostrophe(lang_code),
             )
 
             # Translate files for this language
