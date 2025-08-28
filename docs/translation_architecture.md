@@ -54,6 +54,22 @@ The model sometimes under-runs on the **last item of a batch**. When the last it
 
 > We only keep **one** deferred slot at a time, resolved immediately on the next batch.
 
+### Iterative shape-lock with exponential backoff (new)
+When JSON parsing or shape validation fails, the system uses a bounded, iterative approach instead of recursion:
+
+- **Maximum depth**: 3 split levels per segment
+- **Retry budget**: 2 retries per single-item segment
+- **Exponential backoff**: 250ms → 500ms → 1000ms (capped)
+- **Circuit breaker**: Stops after 8 consecutive failures per file/lang
+
+**Backoff progression:**
+- **Retry 0**: 250ms base delay
+- **Retry 1**: 500ms (2× base)
+- **Retry 2**: 1000ms (4× base, capped at maximum)
+- **Retry 3+**: Not allowed (segment marked as empty)
+
+The backoff gradually speeds up initially but then plateaus at 1 second maximum to prevent runaway delays. Each new segment gets a fresh retry budget, so backoff doesn't compound across the entire file.
+
 ---
 
 ## Writer behavior
@@ -73,6 +89,12 @@ An empty line for the text is intentional and correct. It preserves structure, a
 - `INFO Deferred cross-batch pair retry for end-of-batch empty at idx=<id>.`
 - `INFO Empty target at idx=<id>; attempting pair retry with next cue across batch boundary.`
 - `ERROR Empty translation for subtitle idx=<id>; leaving empty for evaluator.`
+
+**Shape-lock and backoff logs:**
+- `INFO Shape-lock failure (size=<n> depth=<d> retries=<r>): <error>`
+- `WARNING Giving up on cue id=<id> after <n> retries; leaving empty.`
+- `ERROR Circuit breaker hit after <n> consecutive failures; emitting empties for remaining segments.`
+- `ERROR Shape-lock guard tripped; emitting empties for remaining <n> item(s).`
 
 These lines are intentionally specific so you can search logs and quickly spot which resilience path fired.
 

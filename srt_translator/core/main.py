@@ -185,6 +185,19 @@ def translate_srt_files(
 
     # Write AI config manifest
     try:
+
+        # Collect the actual batch sizes used for each language
+        language_batch_sizes = {}
+        for lang_name, lang_code in config.target_languages.items():
+            if lang_code:
+                try:
+                    batch_size_for_lang = language_config.get_target_batch_size(
+                        lang_code
+                    )
+                    language_batch_sizes[lang_code] = batch_size_for_lang
+                except Exception:
+                    language_batch_sizes[lang_code] = "unknown"
+
         manifest_data = {
             "version": __version__,
             "timestamp": ts_str,
@@ -193,7 +206,7 @@ def translate_srt_files(
             "target_languages": list(config.target_languages.values()),
             "dnt_terms": config.dnt_terms,
             "termbase": config.termbase,
-            "batch_size": config.batch_size,
+            "language_batch_sizes": language_batch_sizes,
             "aggressiveness": config.aggressiveness,
         }
 

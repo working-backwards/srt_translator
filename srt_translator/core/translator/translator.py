@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -17,9 +18,11 @@ from srt_translator.core.translator.subtitle_formatter import format_subtitle_te
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.translator.diagnostics import (
     estimate_tokens,
-    has_repetitive_loop,
+    looks_like_repetitive_loop,
+    build_oversize_probe_question,
+    snip,
     MalformedProbeBudget,
-    probe_malformed_json,
+    probe_malformed_json_with_translator,
 )
 
 
@@ -222,8 +225,23 @@ class SRTTranslator:
 
         # One-shot advisory probe budget per (file, lang)
         self._probe_budget = MalformedProbeBudget()
+        # Probe budget: only ask the "why was it oversized?" question once per target language
+        self._probe_budget_langs: Set[str] = set()
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
+
+    def _strict_retry_kwargs(self, src_items: list[str]) -> dict:
+        # Length cap: ~2.4× source tokens, hard cap 900 tokens for safety
+        src_tok = sum(estimate_tokens(s or "") for s in src_items)
+        max_tokens = min(900, int(math.ceil(2.4 * max(1, src_tok))))
+        return {
+            "temperature": 0,
+            "frequency_penalty": 0.6,  # discourage token loops like "ek ek ek…"
+            "presence_penalty": 0.0,
+            "max_tokens": max_tokens,
+            # optional: stop after JSON closes; remove if your provider doesn't support 'stop'
+            "stop": ["]}"],
+        }
 
     # --- Sentence-aware batching ----------------------------
     def _create_batches(
@@ -603,6 +621,7 @@ class SRTTranslator:
                             self.termbase,
                             pair_ids,
                             logger=batch_logger,
+                            strict=True,
                         )
                         if isinstance(pair_items, list) and len(pair_items) >= 1:
                             candidate = pair_items[0].get("tgt", "")
@@ -625,6 +644,29 @@ class SRTTranslator:
                             target_lang,
                         )
                         file_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
+
+                        # Add AI probe for pair retry failures
+                        try:
+                            # Extract source text for the probe
+                            source_text = "\n".join(
+                                [f"{i+1}) {src}" for i, src in enumerate(pair_src)]
+                            )
+
+                            # Call the AI probe (translator-powered) to understand what went wrong
+                            probe_malformed_json_with_translator(
+                                translator=self,
+                                budget=self._probe_budget,
+                                file_base=os.path.basename(input_filepath),
+                                lang=target_lang,
+                                batch_ids=pair_ids,
+                                raw_excerpt="[Pair retry response not available - exception occurred]",
+                                hint_class="pair_retry_failure",
+                                source_text=source_text,
+                            )
+                        except Exception as probe_ex:
+                            file_logger.debug(
+                                "AI probe for pair retry failure failed: %s", probe_ex
+                            )
                 if not filled:
                     if self.error_policy == "STRICT":
                         raise RuntimeError(f"Empty translation for subtitle idx={sid}")
@@ -693,6 +735,7 @@ class SRTTranslator:
                         target_lang=target_lang,
                         termbase=self.termbase,
                         batch_ids=pair_ids,
+                        strict=True,
                     )
                     if isinstance(pair_items, list) and len(pair_items) >= 1:
                         candidate = pair_items[0].get("tgt", "")
@@ -733,6 +776,30 @@ class SRTTranslator:
                         "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
                         deferred_tail_retry["cue_index"],
                     )
+
+                    # Add AI probe for cross-batch pair retry failures
+                    try:
+                        # Extract source text for the probe
+                        source_text = "\n".join(
+                            [f"{i+1}) {src}" for i, src in enumerate(pair_src)]
+                        )
+
+                        # Call the AI probe (translator-powered) to understand what went wrong
+                        probe_malformed_json_with_translator(
+                            translator=self,
+                            budget=self._probe_budget,
+                            file_base=os.path.basename(input_filepath),
+                            lang=target_lang,
+                            batch_ids=pair_ids,
+                            raw_excerpt="[Cross-batch pair retry response not available - exception occurred]",
+                            hint_class="cross_batch_pair_retry_failure",
+                            source_text=source_text,
+                        )
+                    except Exception as probe_ex:
+                        file_logger.debug(
+                            "AI probe for cross-batch pair retry failure failed: %s",
+                            probe_ex,
+                        )
                 finally:
                     # Clear the deferred slot. If the *current* batch's tail is also empty,
                     # we will have just set a new deferred entry above; that will be handled
@@ -768,6 +835,7 @@ class SRTTranslator:
         target_lang: str,
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
+        strict: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
@@ -780,6 +848,11 @@ class SRTTranslator:
             "You are a professional subtitle translator. "
             "Return valid JSON ONLY, never prose."
         )
+        if strict:
+            system_prompt += (
+                " Hard constraint: never repeat any single word/syllable/token more than 3 times consecutively;"
+                " do not pad, chant, or fill with repeated fragments."
+            )
 
         # The translation rules here preserve the core behavior you've tuned:
         user_prompt = f"""Translate each item to {mapped_target_lang}. Keep 1:1 count and order.
@@ -815,14 +888,94 @@ INPUT ITEMS:
         ]
 
         # Use JSON mode if available; otherwise rely on instruction.
+        kwargs = (
+            self._strict_retry_kwargs(src_items)
+            if strict
+            else {"temperature": 0.1, "response_format": {"type": "json_object"}}
+        )
         resp = self.client.chat.completions.create(
             model=self.model_name,
             messages=messages_payload,
-            temperature=0.1,
-            # Some clients support JSON mode; if your SDK doesn't, remove this line.
-            response_format={"type": "json_object"},  # harmless if unsupported
+            **kwargs,
         )
         content = (resp.choices[0].message.content or "").strip()
+
+        # --- Oversize/repetition diagnostics (purely advisory; never changes flow) ---
+
+        prompt_token_est = estimate_tokens(user_prompt)
+        response_token_est = estimate_tokens(content or "")
+        repetitive_loop = looks_like_repetitive_loop(content or "")
+
+        # Heuristic: response wildly larger than prompt (>= 4x), or loop detected
+        oversize = response_token_est >= 4 * prompt_token_est
+        if oversize or repetitive_loop:
+            self.logger.info(
+                "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
+                prompt_token_est,
+                response_token_est,
+                prompt_token_est + response_token_est,
+                len(user_prompt or ""),
+                len(content or ""),
+            )
+
+            # Ask the AI *once per language* why it might have done this.
+            if target_lang not in self._probe_budget_langs:
+                self._probe_budget_langs.add(target_lang)
+                try:
+                    # Build a concise source excerpt and response preview for the question
+                    # Limit source items to the same number we asked the model to translate.
+                    src_excerpt: Sequence[str] = tuple(
+                        src_items[: min(len(src_items), 8)]
+                    )
+                    response_preview = content or ""
+                    if len(response_preview) > 500:
+                        response_preview = response_preview[:500] + "…"
+
+                    question = build_oversize_probe_question(
+                        lang_code=target_lang,
+                        batch_ids=batch_ids,
+                        source_items=src_excerpt,
+                        response_preview=response_preview,
+                        prompt_token_estimate=prompt_token_est,
+                        response_token_estimate=response_token_est,
+                        repetitive_loop_detected=repetitive_loop,
+                    )
+
+                    self.logger.info(
+                        "Probing AI for oversized/malformed response (lang=%s, ids=%s)",
+                        target_lang,
+                        batch_ids,
+                    )
+                    diag_resp = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a concise diagnostic assistant. "
+                                    "Explain the likely reason for the prior translation model's oversized "
+                                    "or repetitive output in 1–2 sentences. Do not produce translations."
+                                ),
+                            },
+                            {"role": "user", "content": question},
+                        ],
+                        temperature=0,
+                        max_tokens=160,
+                    )
+                    diag_text = (diag_resp.choices[0].message.content or "").strip()
+                    self.logger.info(
+                        "AI diagnostic explanation (lang=%s, ids=%s): %s",
+                        target_lang,
+                        batch_ids,
+                        snip(diag_text, 400),
+                    )
+                except Exception as probe_ex:
+                    self.logger.warning(
+                        "AI diagnostic probe failed (lang=%s, ids=%s): %s",
+                        target_lang,
+                        batch_ids,
+                        probe_ex,
+                    )
 
         # Log the raw AI response for troubleshooting
         self.logger.debug(
@@ -860,6 +1013,28 @@ INPUT ITEMS:
                 ],
             )
 
+            # Lightweight degeneracy check per item (advisory; retry paths already exist)
+            bad = []
+            for i, (src, out) in enumerate(zip(src_items, norm)):
+                tgt = (out or {}).get("tgt", "")
+                if not tgt:
+                    continue
+                if looks_like_repetitive_loop(tgt):
+                    bad.append((i, "repetitive_loop"))
+                    continue
+                # 2.8× is conservative; adjust later per language if needed
+                if estimate_tokens(tgt) >= 2.8 * max(1, estimate_tokens(src or "")):
+                    bad.append((i, "oversize_ratio"))
+            if bad:
+                self.logger.warning(
+                    "Degenerate outputs detected (lang=%s, ids=%s, bad=%s)",
+                    target_lang,
+                    batch_ids,
+                    bad,
+                )
+
+            # (Removed) legacy logger-based oversize probe; translator already ran a direct probe above.
+
             return norm
         except Exception:
             # Log the payload sent to translator and the response received when failure occurs
@@ -889,7 +1064,7 @@ INPUT ITEMS:
                 )
                 hint_class = (
                     "repetitive_token_loop"
-                    if has_repetitive_loop(content or "")
+                    if looks_like_repetitive_loop(content or "")
                     else "unknown"
                 )
                 file_base = "?"
@@ -898,14 +1073,19 @@ INPUT ITEMS:
                         file_base = self.logger.extra.get("file", "?")  # type: ignore[attr-defined]
                     except Exception:
                         file_base = "?"
-                probe_malformed_json(
-                    logger=self.logger,
+                # Call the AI probe to understand what went wrong
+                source_text = "\n".join(
+                    [f"{i+1}) {src}" for i, src in enumerate(src_items)]
+                )
+                probe_malformed_json_with_translator(
+                    translator=self,
                     budget=self._probe_budget,
                     file_base=file_base,
                     lang=target_lang,
                     batch_ids=batch_ids[:8],
-                    raw_excerpt=(content or "")[:300],
+                    raw_excerpt=(content or "")[:500],
                     hint_class=hint_class,
+                    source_text=source_text,
                 )
             except Exception as diag_ex:
                 self.logger.debug("Diagnostics capture skipped: %s", diag_ex)
@@ -1155,6 +1335,7 @@ TARGET ITEMS (TO FIX):
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
         logger: logging.Logger,
+        strict: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Bounded, iterative shape-lock:
@@ -1210,6 +1391,7 @@ TARGET ITEMS (TO FIX):
                     target_lang=target_lang,
                     termbase=termbase,
                     batch_ids=seg_ids,
+                    strict=strict,
                 )
                 if len(items) != len(seg_src):
                     raise RuntimeError(
