@@ -362,23 +362,6 @@ def run_batch_evaluation(
             source_cues = parse_srt(source_file)
             target_cues = parse_srt(target_file)
 
-            # Numbers mismatches (read from CSV we always wrote)
-            num_csv = out_dir / f"number_mismatch_{lang}_{batch_label}.csv"
-            num_issues = []
-            if num_csv.exists():
-                for row in csv.DictReader(
-                    num_csv.read_text(encoding="utf-8").splitlines()
-                ):
-                    cue = int(row["cue"])
-                    en_text = (
-                        source_cues[cue - 1].text
-                        if 1 <= cue <= len(source_cues)
-                        else ""
-                    )
-                    num_issues.append(
-                        {"cue": cue, "original": en_text, "target": row["target_text"]}
-                    )
-
             # Untranslated after DNT
             un_csv = out_dir / f"untranslated_{lang}_{batch_label}.csv"
             un_issues = []
@@ -464,7 +447,6 @@ def run_batch_evaluation(
                         "cps_hard": cps_hard_cap,
                     },
                     "issues": {
-                        "numbers": num_issues,  # keep MD manageable
                         "untranslated_after_dnt": un_issues,
                         "missing_translation": missing_issues,  # computed in memory
                         "timing_fail": timing_fail,

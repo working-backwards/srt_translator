@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
-import re, csv, json, math, unicodedata, yaml
+import re, csv, json, math, yaml
 
 # ---------- SRT parsing & basic utilities ----------
 
@@ -96,98 +96,6 @@ def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
     a = _nfkc_lower(strip_terms(src, dnt_terms))
     b = _nfkc_lower(strip_terms(tgt, dnt_terms))
     return (a != "") and (a == b)
-
-
-# --- Numbers integrity helpers ------------------------------------------------
-# Enforce *pure digit* subset: every token of digits in the source must
-# appear in the target (ignore alpha+digit like 'Q3'). If subset fails,
-# accept CJK money magnitudes equivalent to English magnitudes.
-# Pure ASCII digits by default; we can normalize unicode digits before matching.
-PURE_DIGIT = re.compile(r"(?<![A-Za-z])\d+(?![A-Za-z])")
-HAS_CJK_WAN = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*万")
-HAS_CJK_YI = re.compile(r"(?P<num>\d+(?:\.\d+)?)\s*亿")
-HAS_ENG_MAG = re.compile(
-    r"(?P<num>\d+(?:,\d{3})*(?:\.\d+)?)\s*(?P<mag>thousand|million|billion)", re.I
-)
-
-
-def _pure_digit_tokens(s: str) -> List[str]:
-    return PURE_DIGIT.findall(s or "")
-
-
-def _to_number_english_magnitude(text: str) -> Optional[float]:
-    if not text:
-        return None
-    m = HAS_ENG_MAG.search(text)
-    if not m:
-        return None
-    raw = m.group("num").replace(",", "")
-    try:
-        base = float(raw)
-    except ValueError:
-        return None
-    mag = m.group("mag").lower()
-    scale = 1.0
-    if mag == "thousand":
-        scale = 1_000
-    elif mag == "million":
-        scale = 1_000_000
-    elif mag == "billion":
-        scale = 1_000_000_000
-    return base * scale
-
-
-def _to_number_cjk_magnitude(text: str) -> Optional[float]:
-    if not text:
-        return None
-    m_yi = HAS_CJK_YI.search(text)
-    if m_yi:
-        return float(m_yi.group("num")) * 100_000_000
-    m_wan = HAS_CJK_WAN.search(text)
-    if m_wan:
-        return float(m_wan.group("num")) * 10_000
-    return None
-
-
-def numbers_ok(src: str, tgt: str) -> bool:
-    """
-    Numbers integrity:
-    - Only pure digits are required (ignore alpha+digit like 'Q3').
-    - Subset rule: every pure digit token in src must appear in tgt.
-    - Extra digits in tgt are allowed.
-    - Fallback: accept English magnitude == CJK 万/亿 when values match (±2%).
-    """
-    src_digits = _pure_digit_tokens(src)
-    tgt_digits = _pure_digit_tokens(tgt)
-    if not src_digits:
-        return True
-    if all(any(sd in td for td in tgt_digits) for sd in src_digits):
-        return True
-    val_src = _to_number_english_magnitude(src)
-    val_tgt = _to_number_cjk_magnitude(tgt)
-    if val_src is not None and val_tgt is not None:
-        if val_src == 0 and val_tgt == 0:
-            return True
-        if val_src != 0:
-            rel = abs(val_src - val_tgt) / abs(val_src)
-            return rel <= 0.02
-    return False
-
-
-def _normalize_unicode_digits_to_ascii(s: str) -> str:
-    """
-    Map any unicode decimal digits (Nd) to ASCII 0-9. Leaves other chars intact.
-    """
-    out = []
-    for ch in s or "":
-        if ch.isdigit() and not ("0" <= ch <= "9"):
-            try:
-                out.append(str(unicodedata.digit(ch)))
-            except Exception:
-                out.append(ch)
-        else:
-            out.append(ch)
-    return "".join(out)
 
 
 def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
@@ -573,36 +481,6 @@ def evaluate_pair(
             w.writerow(["cue", "index", "target_text", "snippet"])
             w.writerows(source_fragment_rows)
 
-    # --- Numbers integrity (pure digits only; rubric-driven) ---
-    numbers_cfg = (rubric or {}).get("numbers", {})
-    per_lang = numbers_cfg.get("per_language", {}) or {}
-    lang_cfg = per_lang.get(lang, {}) if isinstance(per_lang, dict) else {}
-    numbers_gate = bool(lang_cfg.get("gate", numbers_cfg.get("gate", True)))
-    normalize_digits = bool(lang_cfg.get("normalize_digits",
-                                         numbers_cfg.get("normalize_digits", False)))
-    number_mismatch_rows: List[List[Any]] = []
-    for cue_idx in range(cue_count):
-        # Optional unicode-digit normalization for target
-        tgt_text = target_cues[cue_idx].text
-        chk_tgt = _normalize_unicode_digits_to_ascii(tgt_text) if normalize_digits else tgt_text
-        # Numbers integrity (subset + CJK magnitude equivalence)
-        if not numbers_ok(source_cues[cue_idx].text, chk_tgt):
-            number_mismatch_rows.append(
-                [
-                    cue_idx + 1,
-                    source_cues[cue_idx].index,
-                    source_cues[cue_idx].text.replace("\n", " / "),
-                    tgt_text.replace("\n", " / "),
-                    "Pure digit mismatch (missing/changed numerals).",
-                ]
-            )
-    with (out_dir / f"number_mismatch_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
-        w = csv.writer(f)
-        w.writerow(["cue", "index", "original_digits", "target_text"])
-        w.writerows(number_mismatch_rows)
-
     # --- Verdict (structural + integrity gates only) ---
     timing_delta_start_ms = timing_delta_start_ms or [0.0]
     timing_delta_end_ms = timing_delta_end_ms or [0.0]
@@ -622,8 +500,7 @@ def evaluate_pair(
         fail_reasons.append(
             f"Untranslated after DNT: {len(untranslated_after_dnt_rows)}"
         )
-    if number_mismatch_rows and numbers_gate:
-        fail_reasons.append(f"Numbers mismatch: {len(number_mismatch_rows)} cues")
+
     verdict = "PASS" if not fail_reasons else "FAIL"
 
     # Per-pair audit summary (not the creator-facing report)

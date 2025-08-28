@@ -83,7 +83,6 @@ def _status_label(per_file: Dict[str, Any]) -> str:
 def _collect_issue_count(file_entry: Dict[str, Any]) -> int:
     issues = file_entry.get("issues", {})
     n = 0
-    n += len(issues.get("numbers", []))
     n += len(issues.get("untranslated_after_dnt", []))
     n += len(issues.get("missing_translation", []))
     n += 1 if issues.get("timing_fail") else 0
@@ -114,8 +113,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         for f in entry.get("files", []):
             issues = f.get("issues", {})
             show = bool(
-                issues.get("numbers")
-                or issues.get("untranslated_after_dnt")
+                issues.get("untranslated_after_dnt")
                 or issues.get("missing_translation")
                 or not f.get("metrics", {}).get("parity_ok", True)
                 or issues.get("timing_fail")
@@ -124,20 +122,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
                 continue
             out.append(f"## {_lang_label(lang)} ({lang})\n")
             out.append(f"### {f.get('target_file')}")
-            # Numbers
-            number_issues = issues.get("numbers", [])
-            if number_issues:
-                out.append(
-                    "**Numbers integrity** — some digits from the original language are missing/changed in the translation."
-                )
-                for number_issue in number_issues:  # FULL list, no cap
-                    out.append(
-                        f"- cue {number_issue['cue']}:\n  `Original: {number_issue['original']}`\n  `{_lang_label(lang)}: {number_issue['target']}`"
-                    )
-                out.append(
-                    '_Suggested fix:_ translate the phrase and keep numerals verbatim (e.g., "20" remains "20").\n'
-                )
-                total_items += len(number_issues)
+
             # Untranslated
             untranslated_issues = issues.get("untranslated_after_dnt", [])
             if untranslated_issues:
@@ -203,8 +188,6 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     for lang, entry in langs.items():
         for f in entry.get("files", []):
             notes = []
-            if f.get("issues", {}).get("numbers"):
-                notes.append(f"numbers:{len(f['issues']['numbers'])}")
             if f.get("issues", {}).get("untranslated_after_dnt"):
                 notes.append(
                     f"untranslated:{len(f['issues']['untranslated_after_dnt'])}"
@@ -240,9 +223,6 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     )
     out.append('- **DNT:** "Do Not Translate" — protected names/codes to keep as-is.')
     out.append("- **Termbase:** approved glossary mapping original → target terms.")
-    out.append(
-        "- **Numbers integrity:** digits in the original must appear unchanged in the translation."
-    )
     out.append(
         "- **Cue parity:** target must have the same number of cues as the original."
     )

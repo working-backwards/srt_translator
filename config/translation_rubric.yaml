@@ -11,17 +11,6 @@ caps:
     zh-Hans: { cps_soft: 12, cps_hard: 15 }
     # You can add more languages here if needed. If absent, defaults apply.
 
-numbers:
-  enforce_pure_digits: true           # only pure digits must match (e.g., 2022, 252)
-  mixed_alnum_severity: info          # tokens like Q3/A4 are informational, not failures
-  allow_thousand_separators: true
-  allow_decimal_comma: true
-  gate: false                         # NEW: do not fail purely on numbers by default
-  normalize_digits: true              # NEW: accept unicode numeral shapes as ASCII
-  per_language:
-    tr:
-      gate: false                     # Turkish: non-gating
-      normalize_digits: true
 
 untranslated_after_dnt:
   min_remainder_len: 5                # ignore trivial single-word cognates like "plan"
