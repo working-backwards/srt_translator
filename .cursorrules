@@ -174,3 +174,38 @@ When working with the core engine (srt_translator/core/):
 5. **If you need a configurable parameter, add it to TranslationConfig class**
 
 Violating these rules will break the app's architecture and introduce fragility. The core engine must remain pure and only consume the configuration objects passed to it.
+
+## 📊 EVALUATION & CONFIGURATION RULES (v1.0)
+
+### [Source of Truth]
+- **Core/GUI/CLI**: use TranslationConfig during translation.
+- **Evaluator**: MUST NOT depend on TranslationConfig; reads batch files only.
+
+### [Batch Contract (files eval reads)]
+- **REQUIRED**: batch_root/ai_config.json (snapshot), SRTs (originals/, targets/<lang>/).
+- **OPTIONAL**: DNT (batch-wide) & Termbases (per-language) inside ai_config.json.
+
+### [Required vs Optional]
+- **Missing/invalid REQUIRED inputs** → ERROR & STOP. No fallbacks.
+- **Missing OPTIONAL (DNT/TB)** → INFO & CONTINUE. Report coverage explicitly.
+
+### [Artifacts are not truth]
+- **artifacts/<lang>/{dnt_summary.json, termbase_summary.json}** are derived for audit only.
+
+### [Reporting]
+- **eval_report.json** MUST include:
+  - config_source: "ai_config.json"
+  - dnt_coverage: "present"|"none"
+  - termbase_coverage: "full"|"partial"|"none"
+  - termbase_entry_counts: { "<lang>": <int>, ... }
+
+### [Logging]
+- **Eval logs MUST go to console AND the batch's translation log file.**
+
+### [ai_config.json shape (what eval consumes)]
+- version, timestamp, target_languages
+- dnt_terms: [str, ...]                # OPTIONAL (batch-wide)
+- termbase: { "<lang>": { "<src>": "<tgt>", ... } }  # OPTIONAL (per-lang map)
+- **Evaluator normalizes to**:
+  - DNT = list[str]
+  - Termbase = { "<lang>": [ {source, target}, ... ] }

@@ -151,6 +151,52 @@ The pre-commit hooks will automatically:
 - Scan for security issues (Bandit + Safety)
 - Ensure consistent code quality across all commits
 
+## Evaluation System Guardrails
+
+### Core Principle
+The evaluation system must be **completely independent** of the translation runtime. It reads only batch artifacts to ensure reproducibility and decoupling.
+
+### Critical Rules (NEVER VIOLATE)
+
+#### ❌ FORBIDDEN
+- **Do NOT import or pass `TranslationConfig` objects into evaluation code**
+- **Do NOT depend on runtime state or environment variables**
+- **Do NOT create fallbacks to legacy summary files**
+
+#### ✅ REQUIRED
+- **Evaluation must be reproducible from batch folder alone**
+- **Read only from `ai_config.json` and SRT files on disk**
+- **Any new evaluation checks must document the exact `ai_config.json` keys they consume**
+
+### Implementation Requirements
+
+#### Input Sources
+- **Primary**: `batch_root/ai_config.json` (configuration snapshot)
+- **Required**: `batch_root/originals/` and `batch_root/targets/<lang>/` (SRT files)
+- **Optional**: DNT terms and termbases inside `ai_config.json`
+
+#### Data Normalization
+- **DNT terms**: `dnt_terms: [str, ...]` → list of strings
+- **Termbases**: `termbase: {lang: {src: tgt}}` → per-language list of {source, target} pairs
+
+#### Error Handling
+- **Required inputs missing** → ERROR and STOP evaluation
+- **Optional inputs missing** → INFO log and CONTINUE evaluation
+
+### Why These Rules Matter
+- **Reproducibility**: Evaluation can be re-run on old batches
+- **Decoupling**: Changes to translation config don't affect evaluation
+- **Auditability**: Complete configuration snapshot preserved in batch
+- **Debugging**: Evaluation failures are clearly traceable to missing files
+
+### Testing the Rules
+When adding evaluation functionality, ensure:
+- [ ] No imports from `srt_translator.core.config.models`
+- [ ] No dependency on `TranslationConfig` objects
+- [ ] All inputs read from batch directory files
+- [ ] Clear documentation of required `ai_config.json` keys
+- [ ] Tests pass with only batch artifacts (no runtime config)
+
 ## Testing
 
 ### Running Tests
