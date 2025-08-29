@@ -10,6 +10,8 @@ from srt_translator.eval.tools import (
     parse_srt,
     percentile,
     should_emit_fragments,
+    normalize_for_empty_check,
+    classify_empty_target_rollup,
 )
 from srt_translator.core.config.language_config import LanguageConfig
 from importlib.metadata import version as _pkg_version
@@ -117,6 +119,30 @@ def _get_language_info(code: str) -> Dict[str, str]:
     except Exception:
         pass
     return {"name": code, "code": code}
+
+
+def _extract_dnt_terms(dnt_json: Dict[str, Any]) -> List[str]:
+    """Accepts {'terms': [...]} or legacy {'dnt_terms': [...]}."""
+    if not isinstance(dnt_json, dict):
+        return []
+    terms = dnt_json.get("terms") or dnt_json.get("dnt_terms")
+    return terms if isinstance(terms, list) else []
+
+
+def _extract_tb_map(tb_json: Dict[str, Any], lang: str) -> Dict[str, str]:
+    """
+    Accepts {'languages': {'az': {...}}} or legacy {'az': {...}}.
+    Returns a target-side term map for the language, or {}.
+    """
+    if not isinstance(tb_json, dict):
+        return {}
+    lang_key = lang
+    short = lang.split("-")[0]
+    if isinstance(tb_json.get("languages"), dict):
+        m = tb_json["languages"].get(lang_key) or tb_json["languages"].get(short)
+        return m if isinstance(m, dict) else {}
+    m = tb_json.get(lang_key) or tb_json.get(short)
+    return m if isinstance(m, dict) else {}
 
 
 def _calculate_termbase_coverage(termbase: Dict[str, list]) -> str:
@@ -512,23 +538,20 @@ def run_batch_evaluation(
         out_dir = artifacts_root / lang
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get DNT/TB data from normalized batch configuration
-        dnt_terms = batch_config.get("dnt_terms", [])
-        termbase_entries = batch_config.get("termbase", {}).get(lang, [])
-
-        # Convert normalized termbase back to the format expected by generate_eval
-        # (This maintains compatibility with existing evaluation tools)
-        dnt_data = {"terms": dnt_terms} if dnt_terms else {}
-        tb_data = {"entries": termbase_entries} if termbase_entries else {}
+        # Read once from ai_config.json earlier in runner
+        batch_dnt_terms = batch_config.get("dnt_terms", []) or []
+        tb_per_lang = batch_config.get("termbase", {}) or {}
 
         # Write normalized DNT/TB to artifacts for audit purposes
-        if dnt_data:
+        if batch_dnt_terms:
             (out_dir / "dnt_summary.json").write_text(
-                json.dumps(dnt_data, ensure_ascii=False, indent=2), encoding="utf-8"
+                json.dumps({"terms": batch_dnt_terms}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
             )
-        if tb_data:
+        if tb_per_lang:
             (out_dir / "termbase_summary.json").write_text(
-                json.dumps(tb_data, ensure_ascii=False, indent=2), encoding="utf-8"
+                json.dumps({"languages": tb_per_lang}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
             )
 
         cps_soft_cap, cps_hard_cap = _caps_for(lang, rubric)
@@ -538,16 +561,26 @@ def run_batch_evaluation(
         for source_file, target_file in pairs:
             # Run evaluator (writes CSVs/MD)
             try:
+                # Build termbase map for this language
+                tb_map = {}
+                raw_map = (
+                    tb_per_lang.get(lang) or tb_per_lang.get(lang.split("-")[0]) or {}
+                )
+                # raw_map is expected to be {source: target}
+                if isinstance(raw_map, dict):
+                    tb_map = {str(k): str(v) for k, v in raw_map.items() if k}
+
                 res = generate_eval(
                     source_path=str(source_file),
                     target_path=str(target_file),
                     lang=lang,
                     batch_label=batch_label,
                     out_dir=str(out_dir),
-                    dnt_path=None,  # No longer using file paths
-                    tb_path=None,  # No longer using file paths
+                    dnt_terms=batch_dnt_terms,
+                    tb_map=tb_map,
                     cps_soft=cps_soft_cap,
                     cps_hard=cps_hard_cap,
+                    rubric=rubric,
                 )
             except Exception as e:
                 log.error(
@@ -580,19 +613,32 @@ def run_batch_evaluation(
                         }
                     )
 
-            # Missing translation (empty cue text) - computed in memory
-            missing_issues = []
+            # Missing translation with roll-up classification:
+            # treat punctuation-only / placeholders as empty; exclude benign/suspect roll-ups.
+            dnt_terms = _extract_dnt_terms({"terms": batch_dnt_terms})
+            tb_map = _extract_tb_map(
+                {"languages": {lang: tb_per_lang.get(lang, {})}}, lang
+            )
+            missing_issues: List[Dict[str, Any]] = []
             for cue_idx, target_cue in enumerate(target_cues):
-                if not target_cue.text or not target_cue.text.strip():
+                tgt_norm = normalize_for_empty_check(target_cue.text or "")
+                if tgt_norm:
+                    continue  # definitely not empty
+                # Target is effectively empty: decide if it was rolled into a neighbor
+                rollup_class, _reason = classify_empty_target_rollup(
+                    lang=lang,
+                    cue_index=cue_idx,
+                    source_cues=source_cues,
+                    target_cues=target_cues,
+                    do_not_translate_terms=dnt_terms,
+                    termbase_map_for_lang=tb_map,
+                )
+                if rollup_class == "MISSING":
                     src_text = (
                         source_cues[cue_idx].text if cue_idx < len(source_cues) else ""
                     )
                     missing_issues.append(
-                        {
-                            "idx": target_cue.index,  # Cue class uses 'index' field
-                            "src": src_text,
-                            "tgt": "",  # empty target text
-                        }
+                        {"idx": target_cue.index, "src": src_text, "tgt": ""}
                     )
 
                     # Timing stats (quick re-summarize)

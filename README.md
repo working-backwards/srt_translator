@@ -74,13 +74,12 @@ After each translation, the evaluator runs automatically and writes artifacts to
 At the batch root:
 
 - `eval_report.md` — creator-friendly, consolidated punch list (shows **all** issues).
-- `artifacts/<lang>/…` — per-language CSVs and summaries (numbers, DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
+- `artifacts/<lang>/…` — per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
   - DNT/TB snapshots are copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for self-contained audits.
   - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
 
 ### Reporting behavior
 
-- **Numbers Integrity:** enforces **pure digits** only (e.g., `2022`, `252`). Mixed alphanumerics like `Q3` are informational.
 - **Untranslated after DNT:** ignores trivial single-word cognates; upper-case acronyms are **INFO** unless covered by DNT/TB.
 - **Missing translation:** empty cues are listed explicitly.
 - **Timing drift:** omitted unless there are findings.

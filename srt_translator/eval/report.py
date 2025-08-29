@@ -72,12 +72,18 @@ def _resolve_source_label(batch_root: Path, rollup: Dict[str, Any]) -> str:
 
 
 def _status_label(per_file: Dict[str, Any]) -> str:
-    st = (per_file.get("status") or "").upper()
-    if st.startswith("PASS"):
-        return "✅ Ready"
-    if "WARN" in st or st.startswith("READY WITH"):
-        return "⚠️ Ready w/ warnings"
-    return "❌ Not ready"
+    """
+    Ready? depends ONLY on ERROR categories present in per_file['issues'] and parity/timing.
+    """
+    issues = per_file.get("issues", {}) or {}
+    error_total = 0
+    error_total += len(issues.get("untranslated_after_dnt", []) or [])
+    error_total += len(issues.get("missing_translation", []) or [])
+    if issues.get("timing_fail"):
+        error_total += 1
+    if not per_file.get("metrics", {}).get("parity_ok", True):
+        error_total += 1
+    return "✅ Ready" if error_total == 0 else "❌ Not ready"
 
 
 def _collect_issue_count(file_entry: Dict[str, Any]) -> int:
@@ -247,6 +253,8 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
                 notes.append(
                     f"untranslated:{len(f['issues']['untranslated_after_dnt'])}"
                 )
+            if f.get("issues", {}).get("missing_translation"):
+                notes.append(f"missing:{len(f['issues']['missing_translation'])}")
             if f.get("issues", {}).get("timing_fail"):
                 notes.append("timing")
             if not f.get("metrics", {}).get("parity_ok", True):

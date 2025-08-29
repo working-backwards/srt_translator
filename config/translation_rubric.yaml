@@ -11,7 +11,6 @@ caps:
     zh-Hans: { cps_soft: 12, cps_hard: 15 }
     # You can add more languages here if needed. If absent, defaults apply.
 
-
 untranslated_after_dnt:
   min_remainder_len: 5                # ignore trivial single-word cognates like "plan"
   uppercase_acronym_treated_as: info  # PRFAQ/S3/etc. INFO unless in DNT/TB

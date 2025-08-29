@@ -82,7 +82,5 @@ These lines are intentionally specific so you can search logs and quickly spot w
 
 - **Missing translations spike?**
   - Check for boundary empties (8th item of a batch). Look for `Deferred cross-batch pair retry…` followed by cross-batch logs.
-- **Numbers mismatches "move" around?**
-  - Likely a prior missing/empty caused alignment drift. Once empties are filled (or rendered as empty without dropping blocks), numbers stabilize.
 - **Cue count mismatch?**
   - Should never happen post-fix. If it does, fail fast—do not attempt to invent or drop cues.

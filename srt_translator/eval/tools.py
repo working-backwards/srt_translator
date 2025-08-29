@@ -2,8 +2,80 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
-import re, csv, json, math, yaml
+from typing import List, Tuple, Dict, Any, Optional, Literal
+import re, csv, json, math, yaml, unicodedata
+
+# -----------------------------
+# Roll-up helpers (normalization & evidence)
+# -----------------------------
+RollupClass = Literal["BENIGN_ROLLUP", "SUSPECT_ROLLUP", "MISSING"]
+
+# Strings that should count as "empty" in targets for eval purposes
+PLACEHOLDER_EMPTY_STRINGS = {"(none)", "(null)", "n/a", "—", "–", "…"}
+
+# Lightweight discourse markers as evidence that a sentence moved across cues
+DISCOURSE_MARKERS = {
+    "en": {"first", "second", "third"},
+    "az": {"birincisi", "ikincisi", "üçüncüsü"},
+    "ar": {"أولًا", "ثانيًا", "ثالثًا"},
+}
+
+
+def normalize_for_empty_check(text: str) -> str:
+    """
+    Normalize text solely to decide if a target cue is effectively empty:
+    - trim, lowercase, strip bidi/zero-width, map placeholder strings to ''
+    """
+    if not text:
+        return ""
+    t = (text or "").strip().lower()
+    t = re.sub(r"[\u200b-\u200f\u061C\u2066-\u2069]", "", t)  # zero-width/bidi
+    return "" if t in PLACEHOLDER_EMPTY_STRINGS else t
+
+
+def is_numbers_or_punct_only(text: str) -> bool:
+    """True if text is only whitespace/punctuation/digits (Latin or Arabic-Indic)."""
+    if not text:
+        return True
+    arabic_indic = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+    t = text.translate(arabic_indic)
+    return bool(re.fullmatch(r"[\s\W\d]+", t))
+
+
+def extract_numbers(text: str) -> List[str]:
+    """Extract number tokens (Latin & Arabic-Indic digits)."""
+    if not text:
+        return []
+    arabic_indic = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+    t = text.translate(arabic_indic)
+    return re.findall(r"\d+(?:[.,]\d+)?", t)
+
+
+def has_discourse_marker(lang: str, text: str) -> bool:
+    """Check for known discourse markers (e.g., First/Birincisi/أولًا)."""
+    markers = DISCOURSE_MARKERS.get(lang, set())
+    if not markers or not text:
+        return False
+    norm = (text or "").strip().lower()
+    return any(norm.startswith(m) or f" {m} " in f" {norm} " for m in markers)
+
+
+def termbase_hit_in_text(tb_map: Dict[str, str], text: str) -> bool:
+    """
+    Conservative TB evidence: any *target-side* term appears in text.
+    (Avoids noisy EN→target fuzzy matching.)
+    """
+    if not tb_map or not text:
+        return False
+    tnorm = (text or "").lower()
+    for target_term in tb_map.values():
+        if not target_term:
+            continue
+        patt = re.escape(target_term.strip().lower())
+        if re.search(rf"(?<!\w){patt}(?!\w)", tnorm):
+            return True
+    return False
+
 
 # ---------- SRT parsing & basic utilities ----------
 
@@ -81,15 +153,119 @@ def _nfkc_lower(s: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s or "")).strip().lower()
 
 
+def median_expansion_ratio(
+    source_after_dnt: List[str], target_norm: List[str]
+) -> float:
+    """
+    Robust expansion ratio R = median(len(target)/len(source_after_dnt))
+    over cues where both sides are non-empty.
+    """
+    vals: List[float] = []
+    for s, t in zip(source_after_dnt, target_norm):
+        if not s or not t:
+            continue
+        vals.append(len(t) / max(1, len(s)))
+    if not vals:
+        return 1.0
+    import statistics
+
+    try:
+        return statistics.median(vals)
+    except statistics.StatisticsError:
+        return 1.0
+
+
+def classify_empty_target_rollup(
+    *,
+    lang: str,
+    cue_index: int,
+    source_cues: List[Cue],
+    target_cues: List[Cue],
+    do_not_translate_terms: List[str],
+    termbase_map_for_lang: Dict[str, str],
+    length_ratio_alpha: float = 0.8,
+) -> Tuple[RollupClass, str]:
+    """
+    Classify a normalized-empty target cue as:
+      - BENIGN_ROLLUP: sufficient neighbor length + at least one evidence signal
+      - SUSPECT_ROLLUP: sufficient neighbor length but no evidence
+      - MISSING: neither sufficiency nor evidence
+    Evidence signals: discourse marker, numbers, termbase hit, or tiny remainder after DNT.
+    """
+    i = cue_index
+    if i < 0 or i >= len(source_cues):
+        return "MISSING", "index out of range"
+
+    # Precompute normalized lists for ratio estimation
+    src_after_all = [strip_terms(c.text, do_not_translate_terms) for c in source_cues]
+    tgt_norm_all = [normalize_for_empty_check(c.text) for c in target_cues]
+    R = median_expansion_ratio(src_after_all, tgt_norm_all)
+
+    src_this_after = src_after_all[i] or ""
+    # Tiny remainder: accept roll-up if a neighbor exists and is non-empty
+    if (
+        not src_this_after
+        or len(src_this_after) <= 5
+        or is_numbers_or_punct_only(src_this_after)
+    ):
+        if i > 0 and tgt_norm_all[i - 1]:
+            return "BENIGN_ROLLUP", "tiny remainder rolled up to previous cue"
+        if i + 1 < len(target_cues) and tgt_norm_all[i + 1]:
+            return "BENIGN_ROLLUP", "tiny remainder rolled up to next cue"
+        return "MISSING", "tiny remainder but no non-empty neighbors"
+
+    # Prefer previous neighbor; otherwise next
+    neighbor = (
+        i - 1
+        if (i > 0 and tgt_norm_all[i - 1])
+        else (i + 1 if (i + 1 < len(target_cues) and tgt_norm_all[i + 1]) else -1)
+    )
+    if neighbor == -1:
+        return "MISSING", "no non-empty neighbors"
+
+    # Evidence signals
+    evidence: List[str] = []
+    if has_discourse_marker(lang, source_cues[i].text or "") and has_discourse_marker(
+        lang, target_cues[neighbor].text or ""
+    ):
+        evidence.append("discourse-marker")
+    src_nums = set(extract_numbers(source_cues[i].text or ""))
+    tgt_nums = set(extract_numbers(target_cues[neighbor].text or ""))
+    if src_nums and (src_nums & tgt_nums):
+        evidence.append("numbers")
+    if termbase_hit_in_text(termbase_map_for_lang, target_cues[neighbor].text or ""):
+        evidence.append("termbase-hit")
+
+    # Sufficiency: neighbor should be large enough to plausibly include *this* missing cue.
+    # Using only src_this_after makes the classifier robust to real-world resegmentations
+    # where the neighbor's own source was merged elsewhere (earlier/later cues).
+    required_len = len(src_this_after) * R * length_ratio_alpha
+    neighbor_len = len(tgt_norm_all[neighbor])
+    sufficient = neighbor_len >= required_len
+
+    if sufficient and evidence:
+        return "BENIGN_ROLLUP", f"sufficient length + evidence: {','.join(evidence)}"
+    if sufficient and not evidence:
+        return "SUSPECT_ROLLUP", "sufficient length but no content evidence"
+    return "MISSING", "insufficient neighbor length to justify roll-up"
+
+
 # ---------- DNT / TB helpers ----------
 
 
 def strip_terms(text: str, terms: List[str]) -> str:
+    """
+    Boundary-aware, case-insensitive removal of DNT terms from text
+    to assess "what remains to be translated".
+    """
     out = text or ""
     for t in terms or []:
-        if t:
-            out = re.sub(re.escape(t), "", out, flags=re.IGNORECASE)
-    return out
+        if not t:
+            continue
+        # allow space/hyphen variants, enforce word-ish boundaries
+        patt = re.escape(t).replace(r"\ ", r"[ \-]")
+        out = re.sub(rf"(?<!\w){patt}(?!\w)", "", out, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", out).strip()
 
 
 def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
@@ -109,6 +285,11 @@ def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str,
     t = (tgt or "").strip()
     if not s:
         return "pass", ""
+
+    # Numbers/punctuation-only guard (skip)
+    if re.fullmatch(r"[\s\W\d]+", s) and re.fullmatch(r"[\s\W\d]+", t):
+        return "pass", ""
+
     if s == t:
         toks = s.split()
         if len(toks) == 1:
@@ -135,62 +316,6 @@ def _occurrences(cues: List[Cue], term: str) -> List[int]:
 def _localized_hits(cues: List[Cue], localized: str) -> List[int]:
     pat = re.compile(re.escape(localized))
     return [c.index for c in cues if pat.search(c.text)]
-
-
-def load_dnt(path: Optional[Path]) -> Dict[str, Any]:
-    """
-    Returns dict with either:
-      {"terms": [...]}  (global list)  OR
-      {"languages": {"es":[...], "zh-Hans":[...]}}
-    Unknown shapes are treated as no-terms.
-    """
-    if not path or not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-        if isinstance(data, dict):
-            if "languages" in data and isinstance(data["languages"], dict):
-                return {"languages": data["languages"]}
-            if "terms" in data and isinstance(data["terms"], list):
-                return {"terms": data["terms"]}
-    except Exception:
-        pass
-    return {}
-
-
-def load_tb(path: Optional[Path]) -> Dict[str, Any]:
-    """
-    Returns dict with either:
-      {"languages": {"es": {"A":"B", ...}, ...}}  OR
-      {"es": {...}, "zh-Hans": {...}} (legacy)
-    Unknown shapes are treated as empty.
-    """
-    if not path or not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-        if isinstance(data, dict):
-            if "languages" in data and isinstance(data["languages"], dict):
-                return {"languages": data["languages"]}
-            # legacy direct top-level per-language map
-            return {"languages": data}
-    except Exception:
-        pass
-    return {}
-
-
-def _dnt_terms_for_lang(dnt_obj: Dict[str, Any], lang: str) -> List[str]:
-    if "languages" in dnt_obj:
-        langs = dnt_obj["languages"]
-        return list(langs.get(lang) or langs.get(lang.split("-")[0]) or [])
-    return list(dnt_obj.get("terms", []))
-
-
-def _tb_map_for_lang(tb_obj: Dict[str, Any], lang: str) -> Dict[str, str]:
-    if "languages" in tb_obj:
-        langs = tb_obj["languages"]
-        return dict(langs.get(lang) or langs.get(lang.split("-")[0]) or {})
-    return {}
 
 
 # ---------- Fragments global policy ----------
@@ -239,14 +364,15 @@ def _target_is_non_latin(cues: List[Cue]) -> bool:
 def evaluate_pair(
     source_path: Path,
     target_path: Path,
-    dnt_path: Optional[Path],
-    tb_path: Optional[Path],
     lang: str,
     batch_label: str,
     out_dir: Path,
-    cps_soft_hard: Optional[Tuple[int, int]] = None,
-    rubric: Optional[Dict] = None,
-) -> Dict[str, Any]:
+    *,
+    dnt_terms: list[str],
+    tb_map: dict[str, str],
+    cps_soft_hard: tuple[int, int] | None = None,
+    rubric: dict | None = None,
+) -> dict[str, any]:
     """
     Evaluate one (source,target) pair and write artifacts into out_dir.
     Returns verdict + fail reasons + path to per-file MD summary.
@@ -277,11 +403,9 @@ def evaluate_pair(
         except Exception:
             rubric = {}
 
-    # DNT/TB inputs
-    dnt_obj = load_dnt(dnt_path)
-    tb_obj = load_tb(tb_path)
-    dnt_terms = _dnt_terms_for_lang(dnt_obj, lang)
-    tb_map = _tb_map_for_lang(tb_obj, lang)
+    # DNT/TB inputs - use passed values directly
+    dnt_terms = dnt_terms or []
+    tb_map = tb_map or {}
 
     batch = batch_label
 
@@ -527,25 +651,30 @@ def generate_eval(
     lang: str,
     batch_label: str,
     out_dir: str,
-    dnt_path: Optional[str] = None,
-    tb_path: Optional[str] = None,
-    cps_soft: Optional[int] = None,
-    cps_hard: Optional[int] = None,
-    rubric: Optional[Dict] = None,
+    *,
+    dnt_terms: list[str],
+    tb_map: dict[str, str],
+    cps_soft: int | None = None,
+    cps_hard: int | None = None,
+    rubric: dict | None = None,
 ):
+    """
+    v1.0: accepts in-memory DNT and termbase map; no file-path inputs.
+    """
     cps = (
         (cps_soft, cps_hard)
         if (cps_soft is not None and cps_hard is not None)
         else None
     )
+
     return evaluate_pair(
         Path(source_path),
         Path(target_path),
-        Path(dnt_path) if dnt_path else None,
-        Path(tb_path) if tb_path else None,
         lang,
         batch_label,
         Path(out_dir),
+        dnt_terms=dnt_terms or [],
+        tb_map=tb_map or {},
         cps_soft_hard=cps,
         rubric=rubric,
     )
