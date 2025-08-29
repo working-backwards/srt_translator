@@ -121,19 +121,19 @@ def _get_language_info(code: str) -> Dict[str, str]:
 def _calculate_termbase_coverage(termbase: Dict[str, list]) -> str:
     """
     Calculate termbase coverage across all languages.
-    
+
     Args:
         termbase: Dictionary mapping language codes to lists of term entries
-        
+
     Returns:
         Coverage level: "full", "partial", or "none"
     """
     if not termbase:
         return "none"
-    
+
     languages_with_terms = [lang for lang, entries in termbase.items() if entries]
     total_languages = len(termbase)
-    
+
     if len(languages_with_terms) == 0:
         return "none"
     elif len(languages_with_terms) == total_languages:
@@ -145,14 +145,14 @@ def _calculate_termbase_coverage(termbase: Dict[str, list]) -> str:
 def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     """
     Load and normalize configuration from ai_config.json.
-    
+
     Args:
         batch_root: Path to the batch directory
         logger: Logger instance for error reporting
-        
+
     Returns:
         Normalized configuration with DNT terms and termbases
-        
+
     Raises:
         FileNotFoundError: If ai_config.json is missing
         ValueError: If ai_config.json is invalid
@@ -160,52 +160,55 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     config_path = batch_root / "ai_config.json"
     if not config_path.exists():
         logger.error("Required ai_config.json not found - stopping evaluation")
-        raise FileNotFoundError(f"ai_config.json required for evaluation: {config_path}")
-    
+        raise FileNotFoundError(
+            f"ai_config.json required for evaluation: {config_path}"
+        )
+
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except Exception as e:
         logger.error(f"Failed to parse ai_config.json: {e}")
         raise ValueError(f"Invalid ai_config.json: {e}")
-    
+
     # Normalize the data structure
     normalized = {
         "version": config.get("version", "unknown"),
         "timestamp": config.get("timestamp", "unknown"),
         "target_languages": config.get("target_languages", []),
         "dnt_terms": config.get("dnt_terms", []),
-        "termbase": {}
+        "termbase": {},
     }
-    
+
     # Normalize termbase from per-language maps to lists of {source, target} pairs
     raw_termbase = config.get("termbase", {})
     for lang, term_map in raw_termbase.items():
         if isinstance(term_map, dict):
             normalized["termbase"][lang] = [
-                {"source": src, "target": tgt} 
-                for src, tgt in term_map.items()
+                {"source": src, "target": tgt} for src, tgt in term_map.items()
             ]
         else:
             logger.warning(f"Invalid termbase format for {lang}, skipping")
             normalized["termbase"][lang] = []
-    
-    logger.info(f"Loaded config from ai_config.json: version={normalized['version']}, "
-                f"target_languages={len(normalized['target_languages'])}, "
-                f"dnt_terms={len(normalized['dnt_terms'])}, "
-                f"termbase_languages={len(normalized['termbase'])}")
-    
+
+    logger.info(
+        f"Loaded config from ai_config.json: version={normalized['version']}, "
+        f"target_languages={len(normalized['target_languages'])}, "
+        f"dnt_terms={len(normalized['dnt_terms'])}, "
+        f"termbase_languages={len(normalized['termbase'])}"
+    )
+
     return normalized
 
 
 def _validate_batch_structure(batch_root: Path, logger, config: Dict[str, Any]) -> bool:
     """
     Validate that the batch has the required structure.
-    
+
     Args:
         batch_root: Path to the batch directory
         logger: Logger instance for error reporting
         config: Normalized configuration from _load_batch_config
-        
+
     Returns:
         True if structure is valid, False otherwise
     """
@@ -214,13 +217,13 @@ def _validate_batch_structure(batch_root: Path, logger, config: Dict[str, Any]) 
     if not originals_dir.exists():
         logger.error("Required originals/ directory not found")
         return False
-    
+
     # Check that we have at least one target language directory
     target_langs = config.get("target_languages", [])
     if not target_langs:
         logger.error("No target languages specified in ai_config.json")
         return False
-    
+
     # Check that target language directories exist and contain SRT files
     missing_langs = []
     for lang in target_langs:
@@ -228,16 +231,16 @@ def _validate_batch_structure(batch_root: Path, logger, config: Dict[str, Any]) 
         if not lang_dir.exists():
             missing_langs.append(lang)
             continue
-        
+
         # Check if directory contains SRT files
         srt_files = list(lang_dir.glob("*.srt"))
         if not srt_files:
             missing_langs.append(f"{lang} (no SRT files)")
-    
+
     if missing_langs:
         logger.error(f"Missing or empty target language directories: {missing_langs}")
         return False
-    
+
     logger.info("Batch structure validation passed")
     return True
 
@@ -295,9 +298,7 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
                 )
 
     man.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    log.info(
-        "Ensured manifest.json has all required fields", extra={"path": str(man)}
-    )
+    log.info("Ensured manifest.json has all required fields", extra={"path": str(man)})
 
 
 def _write_manifest_if_missing(
@@ -425,19 +426,19 @@ def run_batch_evaluation(
     except (FileNotFoundError, ValueError) as e:
         log.error(f"Failed to load batch configuration: {e}")
         return None
-    
+
     # Validate batch structure
     if not _validate_batch_structure(batch_root, log, batch_config):
         log.error("Batch structure validation failed - stopping evaluation")
         return None
-    
+
     # Log coverage information for optional inputs
     dnt_terms = batch_config.get("dnt_terms", [])
     if not dnt_terms:
         log.info("No DNT terms provided; continuing without DNT coverage")
     else:
         log.info(f"DNT terms loaded: {len(dnt_terms)} terms")
-    
+
     termbase = batch_config.get("termbase", {})
     if not termbase:
         log.info("No termbase provided; continuing without termbase coverage")
@@ -453,7 +454,9 @@ def run_batch_evaluation(
         "config_source": "ai_config.json",
         "dnt_coverage": "present" if dnt_terms else "none",
         "termbase_coverage": _calculate_termbase_coverage(termbase),
-        "termbase_entry_counts": {lang: len(entries) for lang, entries in termbase.items()}
+        "termbase_entry_counts": {
+            lang: len(entries) for lang, entries in termbase.items()
+        },
     }
 
     for lang_dir in language_dirs:
@@ -464,12 +467,12 @@ def run_batch_evaluation(
         # Get DNT/TB data from normalized batch configuration
         dnt_terms = batch_config.get("dnt_terms", [])
         termbase_entries = batch_config.get("termbase", {}).get(lang, [])
-        
+
         # Convert normalized termbase back to the format expected by generate_eval
         # (This maintains compatibility with existing evaluation tools)
         dnt_data = {"terms": dnt_terms} if dnt_terms else {}
         tb_data = {"entries": termbase_entries} if termbase_entries else {}
-        
+
         # Write normalized DNT/TB to artifacts for audit purposes
         if dnt_data:
             (out_dir / "dnt_summary.json").write_text(
@@ -494,7 +497,7 @@ def run_batch_evaluation(
                     batch_label=batch_label,
                     out_dir=str(out_dir),
                     dnt_path=None,  # No longer using file paths
-                    tb_path=None,    # No longer using file paths
+                    tb_path=None,  # No longer using file paths
                     cps_soft=cps_soft_cap,
                     cps_hard=cps_hard_cap,
                 )
