@@ -342,7 +342,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
     """
     Ensure the evaluation logger has access to the batch log file handler.
     This ensures evaluation logs appear in both console and batch log file.
-    
+
     Args:
         batch_root: Path to the batch directory
         logger: Logger instance to configure
@@ -350,20 +350,24 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
     # Find the batch log file
     log_files = list(batch_root.glob("translation_issues_*.log"))
     if not log_files:
-        logger.warning("No batch log file found - evaluation logs will only go to console")
+        logger.warning(
+            "No batch log file found - evaluation logs will only go to console"
+        )
         return
-    
+
     # Use the first (and should be only) log file
     log_file = log_files[0]
-    
+
     # Check if this logger already has a file handler for this log file
     for handler in logger.handlers:
-        if (isinstance(handler, logging.FileHandler) and 
-            hasattr(handler, 'baseFilename') and 
-            handler.baseFilename == str(log_file.absolute())):
+        if (
+            isinstance(handler, logging.FileHandler)
+            and hasattr(handler, "baseFilename")
+            and handler.baseFilename == str(log_file.absolute())
+        ):
             logger.debug("Logger already has batch log file handler")
             return
-    
+
     # Add file handler to ensure evaluation logs go to batch log file
     try:
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
@@ -391,7 +395,7 @@ def run_batch_evaluation(
     """
     log = logger.getChild("runner")
     batch_root = Path(batch_root)
-    
+
     # Ensure evaluation logger has access to batch log file handler
     _ensure_batch_log_handler(batch_root, logger)
 
