@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 import re, json, datetime, yaml, shutil, csv
+import logging
 
 from srt_translator.eval.tools import (
     generate_eval,
@@ -337,6 +338,46 @@ def _write_manifest_if_missing(
         )
 
 
+def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
+    """
+    Ensure the evaluation logger has access to the batch log file handler.
+    This ensures evaluation logs appear in both console and batch log file.
+    
+    Args:
+        batch_root: Path to the batch directory
+        logger: Logger instance to configure
+    """
+    # Find the batch log file
+    log_files = list(batch_root.glob("translation_issues_*.log"))
+    if not log_files:
+        logger.warning("No batch log file found - evaluation logs will only go to console")
+        return
+    
+    # Use the first (and should be only) log file
+    log_file = log_files[0]
+    
+    # Check if this logger already has a file handler for this log file
+    for handler in logger.handlers:
+        if (isinstance(handler, logging.FileHandler) and 
+            hasattr(handler, 'baseFilename') and 
+            handler.baseFilename == str(log_file.absolute())):
+            logger.debug("Logger already has batch log file handler")
+            return
+    
+    # Add file handler to ensure evaluation logs go to batch log file
+    try:
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        logger.info(f"Added batch log file handler: {log_file.name}")
+    except Exception as e:
+        logger.warning(f"Failed to add batch log file handler: {e}")
+
+
 def run_batch_evaluation(
     batch_root: Path, logger, language_config: Optional[Any] = None
 ) -> Optional[Dict[str, Any]]:
@@ -350,6 +391,9 @@ def run_batch_evaluation(
     """
     log = logger.getChild("runner")
     batch_root = Path(batch_root)
+    
+    # Ensure evaluation logger has access to batch log file handler
+    _ensure_batch_log_handler(batch_root, logger)
 
     # Rubric gating
     rubric_file = _rubric_path()

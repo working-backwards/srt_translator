@@ -94,17 +94,17 @@ def _collect_issue_count(file_entry: Dict[str, Any]) -> int:
 def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path:
     """
     Write eval_report.json with structured data including coverage information.
-    
+
     Args:
         batch_root: Path to the batch directory
         rollup: Evaluation rollup data
         logger: Logger instance
-        
+
     Returns:
         Path to the written JSON report
     """
     log = logger.getChild("report.json")
-    
+
     # Create the JSON report with all required fields
     json_report = {
         "batch_label": rollup.get("batch_label"),
@@ -115,17 +115,17 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         "original_language": rollup.get("original_language", {}),
         "languages": rollup.get("languages", {}),
         "timestamp": rollup.get("timestamp", "unknown"),
-        "version": rollup.get("version", "unknown")
+        "version": rollup.get("version", "unknown"),
     }
-    
+
     # Write to artifacts directory
     artifacts_dir = batch_root / "artifacts"
     artifacts_dir.mkdir(exist_ok=True)
-    
+
     json_path = artifacts_dir / "eval_report.json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(json_report, f, ensure_ascii=False, indent=2)
-    
+
     log.info("Wrote eval_report.json", extra={"path": str(json_path)})
     return json_path
 
@@ -209,22 +209,22 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Header/intro now that we know total_items
     intro = [f"*Detected source language:* **{src_label}**"]
-    
+
     # Add coverage information from v1.0 evaluation policy
     config_source = rollup.get("config_source", "unknown")
     dnt_coverage = rollup.get("dnt_coverage", "unknown")
     termbase_coverage = rollup.get("termbase_coverage", "unknown")
-    
+
     intro.append(f"*Configuration source:* **{config_source}**")
     intro.append(f"*DNT coverage:* **{dnt_coverage}**")
     intro.append(f"*Termbase coverage:* **{termbase_coverage}**")
-    
+
     # Add termbase entry counts if available
     termbase_counts = rollup.get("termbase_entry_counts", {})
     if termbase_counts:
         count_details = [f"{lang}: {count}" for lang, count in termbase_counts.items()]
         intro.append(f"*Termbase entries:* {', '.join(count_details)}")
-    
+
     if total_items == 0:
         intro.append(
             "Everything looks great. Your translated files are **ready for use**."
@@ -291,11 +291,11 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     out_path = batch_root / "eval_report.md"
     out_path.write_text("\n".join(out) + "\n", encoding="utf-8")
     log.info("Wrote eval_report.md", extra={"path": str(out_path)})
-    
+
     # Also write JSON report with coverage information
     try:
         _write_json_report(batch_root, rollup, logger)
     except Exception as e:
         log.warning(f"Failed to write JSON report: {e}")
-    
+
     return out_path
