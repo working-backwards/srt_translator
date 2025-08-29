@@ -1,9 +1,236 @@
 # srt_translator/eval/report.py
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import json
+import re
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.eval.tools import parse_srt
+
+
+# -----------------------------
+# Helpers to keep Markdown errors-only
+# -----------------------------
+def _only_errors_list(issues: List[dict]) -> List[dict]:
+    """Return only ERROR-severity issues for Markdown rendering."""
+    return [
+        i for i in (issues or []) if str(i.get("severity", "ERROR")).upper() == "ERROR"
+    ]
+
+
+# -----------------------------
+# Context-window helpers (prev2/current/next2), boundary-safe
+# -----------------------------
+
+
+def _load_ai_config(batch_root: Path) -> Dict[str, Any]:
+    """Read ai_config.json to derive source language name (optional)."""
+    cfg_path = batch_root / "ai_config.json"
+    if cfg_path.exists():
+        try:
+            return json.loads(cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _source_language_name(batch_root: Path) -> str:
+    """
+    Try to resolve a friendly source language name from ai_config.json;
+    fallback to 'English' (current app default).
+    """
+    cfg = _load_ai_config(batch_root)
+    for key in ("source_language_name", "source_lang_name", "source_language"):
+        val = cfg.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    code = cfg.get("source_language_code") or cfg.get("source_lang") or "en"
+    try:
+        return lang_to_name(code)
+    except Exception:
+        return "English"
+
+
+def _window_indices(
+    center_index: int, min_index: int, max_index: int, radius: int = 2
+) -> Tuple[int, int]:
+    """Return clamped (start, end) indices for a symmetric window around center_index."""
+    start_idx = max(min_index, center_index - radius)
+    end_idx = min(max_index, center_index + radius)
+    return start_idx, end_idx
+
+
+def _render_window_block(cues: List[Any], start_idx: int, end_idx: int) -> str:
+    """Render window of cue texts as 'NN: text' lines (collapsing inner whitespace)."""
+    by_num = {c.index: (c.text or "").strip() for c in cues}
+    lines: List[str] = []
+    for n in range(start_idx, end_idx + 1):
+        txt = by_num.get(n, "")
+        clean = re.sub(r"\s+", " ", txt).strip()
+        lines.append(f"{n}: {clean}")
+    return "\n".join(lines)
+
+
+def _context_blocks_for_issue(
+    *,
+    batch_root: Path,
+    source_file: str,
+    target_file: str,
+    cue_number: int,
+    radius: int = 2,
+) -> Tuple[str, str]:
+    """
+    Return (target_context_block, source_context_block) containing prev {radius},
+    current, next {radius} cues. Bounds are clamped at file edges.
+    """
+    src_path = Path(batch_root) / source_file
+    tgt_path = Path(batch_root) / target_file
+    source_cues = parse_srt(src_path)
+    target_cues = parse_srt(tgt_path)
+    if not source_cues:
+        return "", ""
+    min_idx = source_cues[0].index
+    max_idx = source_cues[-1].index
+    start_idx, end_idx = _window_indices(
+        int(cue_number), min_idx, max_idx, radius=radius
+    )
+    target_block = _render_window_block(target_cues, start_idx, end_idx)
+    source_block = _render_window_block(source_cues, start_idx, end_idx)
+    return target_block, source_block
+
+
+def render_consolidated_punchlist(languages: Dict, *, batch_root: Path) -> str:
+    """
+    Top-of-report list of issues with suggested fixes.
+    Markdown shows ERRORs only (no INFO/WARN) and includes a contextual check.
+    """
+    # Flatten ERROR issues across languages/files
+    error_issues: List[dict] = []
+    for lang, entry in languages.items():
+        for f in entry.get("files", []) or []:
+            # Defensive: ensure f is a dictionary
+            if not isinstance(f, dict):
+                continue
+            issues = f.get("issues", {}) or {}
+            # Only render missing_translation and untranslated_after_dnt
+            for issue in issues.get("missing_translation", []) or []:
+                i = dict(issue)
+                i["_lang"] = lang
+                i["_target_file"] = f.get("target_file", f.get("file_name", ""))
+                i["_source_file"] = f.get("source_file", "")
+                error_issues.append(i)
+            for issue in issues.get("untranslated_after_dnt", []) or []:
+                i = dict(issue)
+                i["_lang"] = lang
+                i["_target_file"] = f.get("target_file", f.get("file_name", ""))
+                i["_source_file"] = f.get("source_file", "")
+                error_issues.append(i)
+
+    if not error_issues:
+        return "Everything looks great. Your translated files are **ready for use**."
+
+    total = len(error_issues)
+    lines = []
+    lines.append(
+        f"Some files need attention. Below is a consolidated punch list of **{total}** issue(s). For each cue, we show the original and the translation with a contextual suggested check.\n"
+    )
+    for issue in error_issues:
+        lang = issue["_lang"]
+        target_file = issue["_target_file"]
+        source_file = issue["_source_file"]
+        cue = issue.get("cue") or issue.get("idx")
+        orig = issue.get("src") or issue.get("original") or ""
+        tgt = issue.get("tgt") or issue.get("target") or ""
+        lines.append(f"### {_lang_label(lang)} ({lang})\n")
+        lines.append(f"#### {target_file}")
+        lines.append(
+            f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
+        )
+        # Contextual "Suggested check" (prev2/current/next2), boundary-safe
+        try:
+            tgt_block, src_block = _context_blocks_for_issue(
+                batch_root=batch_root,
+                source_file=source_file,
+                target_file=target_file,
+                cue_number=int(cue),
+                radius=2,
+            )
+            if tgt_block and src_block:
+                src_lang_name = _source_language_name(batch_root)
+                lines.append(
+                    f"\n_Suggested check:_ Copy the **Target context** below into your AI assistant and ask for a translation into **{src_lang_name}**, then compare it to the **Source context**.\n"
+                )
+                lines.append("**Target context (prev 2 / current / next 2):**")
+                lines.append("```")
+                lines.append(tgt_block)
+                lines.append("```")
+                lines.append("**Source context (prev 2 / current / next 2):**")
+                lines.append("```")
+                lines.append(src_block)
+                lines.append("```")
+        except Exception:
+            # Never let context rendering break the report; skip on error
+            pass
+        lines.append("")  # spacing
+    return "\n".join(lines)
+
+
+def render_issue_sections(languages: Dict, *, batch_root: Path) -> str:
+    """
+    Render ERROR sections grouped by language/file with contextual "Suggested check".
+    INFO/WARN are intentionally omitted from Markdown.
+    """
+    lines: List[str] = []
+    for lang, entry in languages.items():
+        lines.append(f"## {_lang_label(lang)} ({lang})\n")
+        for f in entry.get("files", []) or []:
+            # Defensive: ensure f is a dictionary
+            if not isinstance(f, dict):
+                continue
+            target_file = f.get("target_file", f.get("file_name", "—"))
+            source_file = f.get("source_file", "—")
+            issues = f.get("issues", {}) or {}
+            # Only render missing_translation and untranslated_after_dnt
+            errs_flat = []
+            errs_flat += issues.get("missing_translation", []) or []
+            errs_flat += issues.get("untranslated_after_dnt", []) or []
+            if not errs_flat:
+                continue
+            lines.append(f"### {target_file}")
+            lines.append("**Blocking issues**\n")
+            src_lang_name = _source_language_name(batch_root)
+            for issue in errs_flat:
+                cue = issue.get("cue") or issue.get("idx")
+                orig = issue.get("src") or issue.get("original") or ""
+                tgt = issue.get("tgt") or issue.get("target") or ""
+                lines.append(
+                    f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
+                )
+                # Contextual suggested check (prev2/current/next2)
+                try:
+                    tgt_block, src_block = _context_blocks_for_issue(
+                        batch_root=batch_root,
+                        source_file=source_file,
+                        target_file=target_file,
+                        cue_number=int(cue),
+                        radius=2,
+                    )
+                    if tgt_block and src_block:
+                        lines.append(
+                            f"\n_Suggested check:_ Copy the **Target context** below into your AI assistant and ask for a translation into **{src_lang_name}**, then compare it to the **Source context**.\n"
+                        )
+                        lines.append("**Target context (prev 2 / current / next 2):**")
+                        lines.append("```")
+                        lines.append(tgt_block)
+                        lines.append("```")
+                        lines.append("**Source context (prev 2 / current / next 2):**")
+                        lines.append("```")
+                        lines.append(src_block)
+                        lines.append("```")
+                except Exception:
+                    pass
+            lines.append("")  # spacing
+    return "\n".join(lines)
 
 
 def _get_language_info(code: str) -> Dict[str, str]:
@@ -148,70 +375,9 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     out = []
     src_label = _resolve_source_label(batch_root, rollup)
-    total_items = 0
 
     # Render header
     out.append("# Evaluation Report\n")
-
-    # Punch list per language/file (only sections that have issues)
-    for lang, entry in langs.items():
-        for f in entry.get("files", []):
-            issues = f.get("issues", {})
-            show = bool(
-                issues.get("untranslated_after_dnt")
-                or issues.get("missing_translation")
-                or not f.get("metrics", {}).get("parity_ok", True)
-                or issues.get("timing_fail")
-            )
-            if not show:
-                continue
-            out.append(f"## {_lang_label(lang)} ({lang})\n")
-            out.append(f"### {f.get('target_file')}")
-
-            # Untranslated
-            untranslated_issues = issues.get("untranslated_after_dnt", [])
-            if untranslated_issues:
-                out.append(
-                    "**Untranslated after DNT removal** — identical to the original language once protected terms are removed."
-                )
-                for untranslated_issue in untranslated_issues:  # FULL list, no cap
-                    out.append(
-                        f"- cue {untranslated_issue['cue']}:\n  `Original: {untranslated_issue['original']}`\n  `{_lang_label(lang)}: {untranslated_issue['target']}`"
-                    )
-                out.append(
-                    "_Suggested fix:_ translate the sentence fully while preserving protected terms (DNT). Add missing items to DNT/Termbase if needed.\n"
-                )
-                total_items += len(untranslated_issues)
-
-            # Missing translation
-            missing_translation_issues = issues.get("missing_translation", [])
-            if missing_translation_issues:
-                out.append(
-                    "**Missing translation** — this subtitle has no translated text.\n"
-                )
-                for missing_issue in missing_translation_issues:
-                    out.append(
-                        f"- cue {missing_issue['idx']}:\n  `Original: {missing_issue['src']}`\n  `{_lang_label(lang)}: `\n"
-                    )
-                out.append(
-                    "_Suggested fix:_ translate this subtitle. You can copy the original into your AI assistant and ask for a translation into the target language, then paste it back into the SRT.\n"
-                )
-                total_items += len(missing_translation_issues)
-
-            # Parity
-            if not f.get("metrics", {}).get("parity_ok", True):
-                out.append(
-                    "**Cue parity** — counts differ between original and translation."
-                )
-                out.append(
-                    "_Suggested fix:_ align cue splits/merges to match counts.\n"
-                )
-            # Timing drift section (only if there are drift findings or rubric says to always show)
-            drift = f.get("metrics", {})
-            if issues.get("timing_fail"):
-                out.append(
-                    f"**Timing drift** — review per-cue timing deltas in artifacts if requested by reviewers.\n"
-                )
 
     # Header/intro now that we know total_items
     intro = [f"*Detected source language:* **{src_label}**"]
@@ -231,15 +397,11 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         count_details = [f"{lang}: {count}" for lang, count in termbase_counts.items()]
         intro.append(f"*Termbase entries:* {', '.join(count_details)}")
 
-    if total_items == 0:
-        intro.append(
-            "Everything looks great. Your translated files are **ready for use**."
-        )
-    else:
-        intro.append(
-            f"Some files need attention. Below is a consolidated punch list of **{total_items}** issue(s). For each cue, we show the original and the translation with a suggested fix."
-        )
     out.insert(1, "\n\n".join(intro) + "\n")
+
+    # Add consolidated punch list using new function
+    out.append(render_consolidated_punchlist(langs, batch_root=batch_root))
+    out.append("\n")
 
     # Roll-up table
     out.append("\n---\n")
@@ -263,6 +425,11 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
                 f"| {lang} | {f.get('target_file')} | {_status_label(f)} | {', '.join(notes) or '—'} |"
             )
 
+    # Add detailed issue sections using new function
+    out.append("\n")
+    out.append(render_issue_sections(langs, batch_root=batch_root))
+    out.append("\n")
+
     # Per-language key metrics (brief)
     out.append("\n---\n## Per-Language Details (key metrics)")
     for lang, entry in langs.items():
@@ -281,6 +448,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Glossary
     out.append("\n---\n## Glossary")
+    out.append("\n")
     out.append(
         "- **Cue (subtitle):** one numbered subtitle block with in/out times and text."
     )

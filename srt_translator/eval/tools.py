@@ -62,17 +62,18 @@ def has_discourse_marker(lang: str, text: str) -> bool:
 
 def termbase_hit_in_text(tb_map: Dict[str, str], text: str) -> bool:
     """
-    Conservative TB evidence: any *target-side* term appears in text.
-    (Avoids noisy EN→target fuzzy matching.)
+    Termbase presence: True if ANY target-side term appears in `text`, allowing
+    trailing punctuation (e.g., 'OKRs?' matches 'OKRs'). Uses word-ish boundaries.
     """
     if not tb_map or not text:
         return False
     tnorm = (text or "").lower()
-    for target_term in tb_map.values():
-        if not target_term:
+    for tgt in tb_map.values():
+        if not tgt:
             continue
-        patt = re.escape(target_term.strip().lower())
-        if re.search(rf"(?<!\w){patt}(?!\w)", tnorm):
+        patt = re.escape(tgt.strip().lower())
+        # (?<!\w) no letter/number before; (?=\W|$) allows punctuation or end after
+        if re.search(rf"(?<!\w){patt}(?=\W|$)", tnorm):
             return True
     return False
 
@@ -291,13 +292,17 @@ def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str,
         return "pass", ""
 
     if s == t:
-        toks = s.split()
+        # strip leading/trailing punctuation before token tests
+        core = re.sub(r"^\W+|\W+$", "", s)
+        toks = [core] if core else []
         if len(toks) == 1:
             tok = toks[0]
             ua_cfg = rubric.get("untranslated_after_dnt", {}) or {}
             min_len = int(ua_cfg.get("min_remainder_len", 5))
-            if len(tok) < min_len:
+            # Treat common acronym forms as tiny too (OKR/OKRs, etc.)
+            if len(tok) < min_len or re.fullmatch(r"[A-Z]{2,}s?", tok):
                 return "pass", ""
+            # For longer all-caps tokens, allow rubric-based downgrade
             if tok.isupper():
                 sev = str(ua_cfg.get("uppercase_acronym_treated_as", "info")).lower()
                 return sev, "Uppercase acronym carried through."
