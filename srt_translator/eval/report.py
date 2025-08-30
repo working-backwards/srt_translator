@@ -1,7 +1,7 @@
 # srt_translator/eval/report.py
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 import json
 import re
 from srt_translator.core.config.language_config import LanguageConfig
@@ -93,19 +93,43 @@ def _render_window_block(cues: List[Any], start_idx: int, end_idx: int) -> str:
 def _context_blocks_for_issue(
     *,
     batch_root: Path,
-    source_file: str,
-    target_file: str,
+    lang_code: str,
+    source_file_name: str,
+    target_file_name: str,
+    source_rel_path: Optional[str] = None,
+    target_rel_path: Optional[str] = None,
     cue_number: int,
     radius: int = 2,
 ) -> Tuple[str, str]:
     """
-    Return (target_context_block, source_context_block) for prev{radius}/current/next{radius}.
-    Clamps at file edges and never throws.
+    Build prev{radius}/current/next{radius} context blocks for target and source.
+    Resolution rules (in this order):
+      1) If rollup provides batch-relative paths (source_rel_path/target_rel_path), use them.
+      2) Otherwise, fall back to predictable defaults:
+         - Source: <batch_root>/originals/<source_file_name>
+         - Target: <batch_root>/<lang_code>/<target_file_name>
+    The function never throws; if either file can't be resolved, it returns ("", "").
     """
-    src_path = Path(batch_root) / source_file
-    tgt_path = Path(batch_root) / target_file
-    source_cues = _load_cues_from_srt(src_path)
-    target_cues = _load_cues_from_srt(tgt_path)
+    # 1) Prefer batch-relative paths carried in the rollup
+    if source_rel_path:
+        source_srt_path = batch_root / source_rel_path
+    else:
+        # 2) Fallback: the standardized v1.0 layout
+        source_srt_path = batch_root / "originals" / source_file_name
+
+    if target_rel_path:
+        target_srt_path = batch_root / target_rel_path
+    else:
+        # Fallback: <batch_root>/<lang_code>/<target_file_name>
+        target_srt_path = batch_root / lang_code / target_file_name
+
+    # If either file doesn't exist, we can't build context blocks
+    if not source_srt_path.exists() or not target_srt_path.exists():
+        return "", ""
+
+    # Parse SRTs (parse_srt expects TEXT; _load_cues_from_srt handles that)
+    source_cues = _load_cues_from_srt(source_srt_path)
+    target_cues = _load_cues_from_srt(target_srt_path)
     if not source_cues:
         return "", ""
     first_idx = int(getattr(source_cues[0], "idx", getattr(source_cues[0], "index", 1)))
@@ -180,7 +204,11 @@ def render_consolidated_punchlist(languages: Dict, *, batch_root: Path) -> str:
     for issue in error_issues:
         lang = issue["lang"]
         file_name = issue["file"]
-        source_file = issue.get("source_file", "")
+        # Human labels (filenames) as already stored in rollup for display
+        source_file_name = issue.get("source_file", "")
+        # Machine-resolvable paths, if the runner provided them
+        source_rel_path = issue.get("_source_rel")
+        target_rel_path = issue.get("_target_rel")
         cue = issue["cue"]
         orig = issue["orig"]
         tgt = issue["tgt"]
@@ -191,8 +219,11 @@ def render_consolidated_punchlist(languages: Dict, *, batch_root: Path) -> str:
         )
         tgt_block, src_block = _context_blocks_for_issue(
             batch_root=batch_root,
-            source_file=source_file,
-            target_file=file_name,
+            lang_code=lang,
+            source_file_name=source_file_name,
+            target_file_name=file_name,
+            source_rel_path=source_rel_path,
+            target_rel_path=target_rel_path,
             cue_number=int(cue),
             radius=2,
         )
@@ -209,6 +240,13 @@ def render_consolidated_punchlist(languages: Dict, *, batch_root: Path) -> str:
             lines.append("```")
             lines.append(src_block)
             lines.append("```")
+        else:
+            # Always provide actionable guidance even if files couldn't be resolved.
+            lines.append(
+                "\n_Suggested check:_ Copy this subtitle and its two neighbors (one before and one after) "
+                "into your AI assistant, ask for a translation into the source language, and verify the target "
+                "conveys the same meaning in context.\n"
+            )
         lines.append("")
     return "\n".join(lines)
 
@@ -221,7 +259,9 @@ def render_issue_sections(languages: Dict, *, batch_root: Path) -> str:
     lines: List[str] = []
     for lang, f in _iter_language_files(languages):
         file_name = f.get("target_file") or f.get("file_name", "—")
-        source_file = f.get("source_file", "")
+        source_file_name = f.get("source_file", "")
+        source_rel_path = f.get("source_rel")
+        target_rel_path = f.get("target_rel")
         issues = f.get("issues", {}) or {}
         missing = issues.get("missing_translation", []) or []
         un = issues.get("untranslated_after_dnt", []) or []
@@ -241,8 +281,11 @@ def render_issue_sections(languages: Dict, *, batch_root: Path) -> str:
             )
             tgt_block, src_block = _context_blocks_for_issue(
                 batch_root=batch_root,
-                source_file=source_file,
-                target_file=file_name,
+                lang_code=lang,
+                source_file_name=source_file_name,
+                target_file_name=file_name,
+                source_rel_path=source_rel_path,
+                target_rel_path=target_rel_path,
                 cue_number=int(cue),
                 radius=2,
             )
@@ -258,6 +301,12 @@ def render_issue_sections(languages: Dict, *, batch_root: Path) -> str:
                 lines.append("```")
                 lines.append(src_block)
                 lines.append("```")
+            else:
+                lines.append(
+                    "\n_Suggested check:_ Copy this subtitle and its two neighbors (one before and one after) "
+                    "into your AI assistant, ask for a translation into the source language, and verify the target "
+                    "conveys the same meaning in context.\n"
+                )
         lines.append("")  # spacing
     return "\n".join(lines)
 

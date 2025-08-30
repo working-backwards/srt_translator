@@ -685,8 +685,12 @@ def run_batch_evaluation(
             verdict = res.get("verdict", "FAIL")
             per_files.append(
                 {
+                    # human-friendly names (what MD shows)
                     "source_file": source_file.name,
                     "target_file": target_file.name,
+                    # machine-resolvable paths (what report uses)
+                    "source_rel": str(source_file.relative_to(batch_root)),
+                    "target_rel": str(target_file.relative_to(batch_root)),
                     "status": verdict,
                     "metrics": {
                         "parity_ok": len(source_cues) == len(target_cues),
