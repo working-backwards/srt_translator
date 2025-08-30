@@ -100,8 +100,7 @@ class TestEvaluationTools:
             "lang",
             "batch_label",
             "out_dir",
-            "dnt_path",
-            "tb_path",
+            # v1.0: no path-based inputs; DNT/TB are passed in-memory (dnt_terms, tb_map)
             "cps_soft",
             "cps_hard",
         ]

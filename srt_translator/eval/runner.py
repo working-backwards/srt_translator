@@ -544,11 +544,13 @@ def run_batch_evaluation(
 
         # Write normalized DNT/TB to artifacts for audit purposes
         if batch_dnt_terms:
+            # NOTE: audit mirror only — not used by evaluation in v1.0
             (out_dir / "dnt_summary.json").write_text(
                 json.dumps({"terms": batch_dnt_terms}, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
         if tb_per_lang:
+            # NOTE: audit mirror only — not used by evaluation in v1.0
             (out_dir / "termbase_summary.json").write_text(
                 json.dumps({"languages": tb_per_lang}, ensure_ascii=False, indent=2),
                 encoding="utf-8",

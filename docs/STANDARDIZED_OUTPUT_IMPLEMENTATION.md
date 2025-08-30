@@ -21,12 +21,12 @@ The new output structure follows this pattern:
 translation-batch-<timestamp>/
 ├── artifacts/                       # Per-language artifacts
 │   ├── es/                         # Spanish artifacts
-│   │   ├── dnt_summary.json       # DNT terms summary
-│   │   ├── termbase_summary.json  # Termbase summary
+│   │   ├── dnt_summary.json       # (audit mirror) DNT terms snapshot – optional, not used by eval
+│   │   ├── termbase_summary.json  # (audit mirror) termbase snapshot – optional, not used by eval
 │   │   └── manifest.json          # Language-specific manifest
 │   ├── zh-Hans/                    # Chinese (Simplified) artifacts
-│   │   ├── dnt_summary.json
-│   │   ├── termbase_summary.json
+│   │   ├── dnt_summary.json       # (audit mirror) DNT terms snapshot – optional, not used by eval
+│   │   ├── termbase_summary.json  # (audit mirror) termbase snapshot – optional, not used by eval
 │   │   └── manifest.json
 │   └── ...                         # Other languages
 └── translation_issues_<timestamp>.log
@@ -86,7 +86,7 @@ dnt_meta = create_dnt_summary(
 from srt_translator.core.utils.run_summaries import write_run_artifacts
 
 # Write all artifacts for a language
-dnt_path, tb_path, manifest_path = write_run_artifacts(
+manifest_path = write_run_artifacts(
     artifacts_dir="/path/to/artifacts",
     lang_code="zh",
     dnt_meta=dnt_meta,
@@ -136,7 +136,8 @@ dnt_path, tb_path, manifest_path = write_run_artifacts(
 
 ## Example Output
 
-### DNT Summary (`dnt_summary.json`)
+### DNT Summary (`dnt_summary.json`) — audit mirror
+Optional snapshot for auditing; **evaluation does not read this file**.
 ```json
 {
   "description": "DNT terms processing summary",
@@ -164,7 +165,8 @@ dnt_path, tb_path, manifest_path = write_run_artifacts(
 }
 ```
 
-### Termbase Summary (`termbase_summary.json`)
+### Termbase Summary (`termbase_summary.json`) — audit mirror
+Optional snapshot for auditing; **evaluation does not read this file**.
 ```json
 {
   "description": "Termbase processing summary",

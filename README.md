@@ -64,8 +64,8 @@ After each translation, the evaluator runs automatically and writes artifacts to
 
 - **Rubric:** `config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
 - **DNT / Termbase:** the **client writes** these to the **batch root**:
-  - `dnt_summary.json` — list(s) of "Do Not Translate" tokens/phrases (may include all languages).
-  - `termbase_summary.json` — termbase entries, optionally per language.
+  - `dnt_summary.json` — **audit mirror** of DNT terms (optional; not used by eval).
+  - `termbase_summary.json` — **audit mirror** of termbase (optional; not used by eval).
 
 > The evaluator **does not** fall back to `ai_config.json`. If you want DNT/TB coverage, ensure those two JSON files are written to the batch root.
 
@@ -75,7 +75,7 @@ At the batch root:
 
 - `eval_report.md` — creator-friendly, consolidated punch list (shows **all** issues).
 - `artifacts/<lang>/…` — per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
-  - DNT/TB snapshots are copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for self-contained audits.
+  - DNT/TB snapshots **may** be copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for auditing. Evaluation does **not** read them.
   - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
 
 ### Reporting behavior
@@ -314,16 +314,16 @@ Your Selected Output Directory/
 │   ├── translation_issues_20250810_111157-0700.log
 │   ├── artifacts/                       # Per-language artifacts
 │   │   ├── es/                         # Spanish artifacts
-│   │   │   ├── dnt_summary.json       # DNT terms summary
-│   │   │   ├── termbase_summary.json  # Termbase summary
+│   │   │   ├── dnt_summary.json       # (audit mirror) optional; not used by eval
+│   │   │   ├── termbase_summary.json  # (audit mirror) optional; not used by eval
 │   │   │   └── manifest.json          # Language-specific manifest
 │   │   ├── fr/                         # French artifacts
-│   │   │   ├── dnt_summary.json
-│   │   │   ├── termbase_summary.json
+│   │   │   ├── dnt_summary.json       # (audit mirror)
+│   │   │   ├── termbase_summary.json  # (audit mirror)
 │   │   │   └── manifest.json
 │   │   └── de/                         # German artifacts
-│   │       ├── dnt_summary.json
-│   │       ├── termbase_summary.json
+│   │       ├── dnt_summary.json       # (audit mirror)
+│   │       ├── termbase_summary.json  # (audit mirror)
 │   │       └── manifest.json
 │   ├── ES/                              # Spanish translations
 │   │   └── video1 - ES.srt
@@ -337,8 +337,8 @@ Your Selected Output Directory/
 ```
 
 **Enhanced Output Files:**
-- **`artifacts/<lang>/dnt_summary.json`**: DNT terms processing summary with filtering details
-- **`artifacts/<lang>/termbase_summary.json`**: Termbase processing summary with collision resolution
+- **`artifacts/<lang>/dnt_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file  
+- **`artifacts/<lang>/termbase_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file
 - **`artifacts/<lang>/manifest.json`**: Language-specific manifest with complete metadata
 
 **Note:** Each translation session creates a new batch directory with logs and configuration files, making it easier to track and manage translation sessions. The GUI shows a "Files & Output" section where you can browse and select SRT files, then choose where to save the translated versions.
