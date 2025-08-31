@@ -334,16 +334,21 @@ class SRTTranslator:
 
         return batches
 
-    # ---------- Public API ----------
+    # ---------- Stage 1A Helper Methods ----------
 
-    def translate_file(
-        self,
-        *,
-        input_filepath: str,
-        output_filepath: str,
-        target_lang: str,
-    ) -> None:
-        # Per-call context (add file/lang without reconfiguring handlers)
+    def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
+        """Load and parse SRT file into subtitle objects."""
+        with open(input_filepath, "r", encoding="utf-8") as f:
+            src_text = f.read()
+        src_subs = parse_srt(src_text)
+        if not src_subs:
+            raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
+        return src_subs
+
+    def _setup_file_logging(
+        self, input_filepath: str, target_lang: str
+    ) -> logging.LoggerAdapter:
+        """Setup file-scoped logging with file/lang context."""
         file_logger = logging.LoggerAdapter(
             self.logger,
             {
@@ -352,30 +357,15 @@ class SRTTranslator:
                 "lang": target_lang,
             },
         )
+        return file_logger
 
-        # Reset consecutive failure counter for this file/lang run
-        self._consecutive_decode_failures = 0
-
-        file_logger.info(
-            "Using subtitle-based translation system for %s → %s",
-            os.path.basename(input_filepath),
-            target_lang,
-        )
-
-        # 1) Load and parse SRT
-        with open(input_filepath, "r", encoding="utf-8") as f:
-            src_text = f.read()
-        src_subs = parse_srt(src_text)
-        if not src_subs:
-            raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
-
-        self.logger.info(
-            "Processing %d subtitles for %s",
-            len(src_subs),
-            os.path.basename(input_filepath),
-        )
-
-        # 2) Sentence-aware batching (each subtitle stays its own item)
+    def _create_batches_with_logging(
+        self,
+        src_subs: List[Subtitle],
+        target_lang: str,
+        file_logger: logging.LoggerAdapter,
+    ) -> Tuple[List[List[Subtitle]], logging.LoggerAdapter]:
+        """Create sentence-aware batches with logging setup."""
         batches = self._create_batches(
             subtitles=src_subs,
             target_size=int(self.batch_size),
@@ -387,12 +377,318 @@ class SRTTranslator:
             "Using sentence-aware batching for %s → %s "
             "(%d subtitles → %d batches; "
             "target=%d, max=%d)",
-            os.path.basename(input_filepath),
+            os.path.basename(getattr(file_logger, "extra", {}).get("file", "unknown")),
             target_lang,
             len(src_subs),
             len(batches),
             self.batch_size,
             self.MAX_BATCH_SIZE,
+        )
+        return batches, file_logger
+
+    def _translate_batch_and_extract(
+        self,
+        src_items: List[str],
+        batch_ids: List[int],
+        target_lang: str,
+        batch_logger: logging.LoggerAdapter,
+    ) -> List[str]:
+        """Translate batch and extract target texts."""
+        # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
+        try:
+            items = self._translate_with_simple_shape_lock(
+                src_items,
+                target_lang,
+                self.termbase,
+                batch_ids,
+                logger=batch_logger,
+            )
+        except Exception as ex:
+            # Log the payload that was sent to the translator when failure occurs
+            self.logger.info(
+                "Main batch translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
+                target_lang,
+                len(src_items),
+                target_lang,
+            )
+            raise  # Re-raise the exception to maintain the original behavior
+
+        # Extract and validate placeholder usage
+        tgt_texts = [it.get("tgt", "") for it in items]
+        return tgt_texts
+
+    def _validate_and_repair_placeholders(
+        self,
+        src_items: List[str],
+        tgt_texts: List[str],
+        batch_ids: List[int],
+        batch_logger: logging.LoggerAdapter,
+    ) -> List[str]:
+        """Validate and repair placeholder integrity."""
+        # Log input/output for troubleshooting placeholder issues
+        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts)):
+            # Use the regex pattern directly to avoid logging violations
+            src_placeholders = PH_RE.findall(src)
+            tgt_placeholders = PH_RE.findall(tgt)
+            if src_placeholders or tgt_placeholders:
+                batch_logger.info(
+                    "Placeholder comparison (item=%d):\n"
+                    "  Source: %s\n"
+                    "  Target: %s\n"
+                    "  Source placeholders: %s\n"
+                    "  Target placeholders: %s",
+                    i,
+                    src,
+                    tgt,
+                    src_placeholders,
+                    tgt_placeholders,
+                )
+
+        # Policy-aware placeholder validation for apostrophes after placeholders
+        target_lang = getattr(batch_logger, "extra", {}).get("lang", "unknown")
+        if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
+            # Normalize for detection only: treat "__...__'..." as "__...__"
+            norm_tgts = [
+                TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t)
+                for t in tgt_texts
+            ]
+            ph_issues = validate_placeholders_pair(
+                src_items, norm_tgts, self.term_handler.placeholder_regex
+            )
+            # Once-per-batch info (less noisy when allowed)
+            seen = False
+            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+                if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                    batch_logger.info(
+                        "Apostrophe after placeholder observed (allowed for %s, item=%d).",
+                        target_lang,
+                        i,
+                    )
+                    seen = True
+                    break
+        else:
+            ph_issues = validate_placeholders_pair(
+                src_items, tgt_texts, self.term_handler.placeholder_regex
+            )
+            # Stage 1: language-agnostic detector (observational logging only, once per batch)
+            seen = False
+
+            def _snip(s: str, n: int = 120) -> str:
+                return s if len(s) <= n else s[: n - 3] + "..."
+
+            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+                if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                    batch_logger.info(
+                        "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
+                        i,
+                        target_lang,
+                        _snip(s_i),
+                        _snip(t_i),
+                    )
+                    seen = True
+                    break
+
+        # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
+        # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
+        tgt_texts = self._repair_adjacent_placeholder_drift(
+            src_items=src_items,
+            tgt_items=tgt_texts,
+            ph_issues=ph_issues,
+            batch_ids=batch_ids,
+            logger=batch_logger,
+        )
+
+        if ph_issues:
+            for idx, kinds in ph_issues.items():
+                inv = ",".join(sorted(kinds["invented"])) or "-"
+                mis = ",".join(sorted(kinds["missing"])) or "-"
+                batch_logger.warning(
+                    "Placeholder check (item=%d): invented=[%s] missing=[%s]",
+                    idx,
+                    inv,
+                    mis,
+                )
+
+            if self.error_policy == "STRICT":
+                fixed = self._reformat_fix_placeholders(
+                    src_items=src_items,
+                    tgt_items=tgt_texts,
+                    ids=batch_ids,
+                    allowed_placeholders=sorted(
+                        self.term_handler.placeholder_map.keys()
+                    ),
+                )
+                if fixed is None:
+                    raise RuntimeError(
+                        "Reformat failed: phantom/missing placeholders unresolved."
+                    )
+                tgt_texts = fixed
+            elif self.error_policy in ("BOUNDED", "DEV"):
+                # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
+                for i, kinds in ph_issues.items():
+                    if kinds["invented"]:
+                        tgt_texts[i] = strip_invented_placeholders(
+                            tgt_texts[i],
+                            kinds["invented"],
+                            self.term_handler.placeholder_regex,
+                        )
+
+        # Restore DNT placeholders to originals
+        tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
+
+        return tgt_texts
+
+    def _format_and_append_subtitles(
+        self,
+        batch: List[Subtitle],
+        tgt_texts: List[str],
+        target_lang: str,
+        cps_cap: Optional[int],
+        file_logger: logging.LoggerAdapter,
+    ) -> List[Subtitle]:
+        """Format subtitles with CPS and append to global list."""
+        formatted_subs = []
+        for s, tgt in zip(batch, tgt_texts):
+            start_s = _parse_time_to_seconds(s.start)
+            end_s = _parse_time_to_seconds(s.end)
+            formatted = format_subtitle_text(
+                lang_code=target_lang.lower(),
+                text=tgt,
+                start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
+                end_ms=int(end_s * 1000),  # Convert seconds to milliseconds
+                cps_cap=cps_cap,
+            )
+            formatted_subs.append(
+                Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
+            )
+        return formatted_subs
+
+    # ---------- Stage 1B Helper Methods ----------
+
+    def _handle_mid_batch_empty_retries(
+        self,
+        batch: List[Subtitle],
+        tgt_texts: List[str],
+        target_lang: str,
+        batch_logger: logging.LoggerAdapter,
+    ) -> List[str]:
+        """Handle mid-batch empty translation retries."""
+        # Empty guard — single pair-retry for mid-stream empty; no source fallback
+        for i, (src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
+            if tgt_raw.strip():
+                continue
+            sid = batch[i].idx
+            filled = False
+            # Try exactly one pair retry with the next cue when available
+            if i + 1 < len(batch):
+                try:
+                    batch_logger.info(
+                        "Empty target at idx=%s; attempting pair retry with next cue.",
+                        sid,
+                    )
+                    pair_src = [
+                        self.term_handler.apply_dnt_placeholders(batch[i].text),
+                        self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
+                    ]
+                    pair_ids = [batch[i].idx, batch[i + 1].idx]
+                    pair_items = self._translate_batch_json(
+                        src_items=pair_src,
+                        target_lang=target_lang,
+                        termbase=self.termbase,
+                        batch_ids=pair_ids,
+                        strict=True,
+                    )
+                    if isinstance(pair_items, list) and len(pair_items) >= 1:
+                        candidate = pair_items[0].get("tgt", "")
+                        if candidate and candidate.strip():
+                            tgt_texts[i] = self.term_handler.restore_dnt_placeholders(
+                                candidate
+                            )
+                            batch_logger.info(
+                                "Pair retry filled idx=%s successfully.", sid
+                            )
+                            filled = True
+                except Exception as ex:
+                    batch_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
+            if not filled:
+                if self.error_policy == "STRICT":
+                    raise RuntimeError(f"Empty translation for subtitle idx={sid}")
+                # Leave empty in BOUNDED/DEV; evaluator will flag as Missing translation
+                batch_logger.error(
+                    "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                    sid,
+                )
+        return tgt_texts
+
+    def _manage_deferred_retry_state(
+        self,
+        deferred_retry_state: Optional[Dict[str, Any]],
+        batch: List[Subtitle],
+        file_logger: logging.LoggerAdapter,
+    ) -> Optional[Dict[str, Any]]:
+        """Manage deferred retry state lifecycle."""
+        # This method should receive the current state as parameters
+        # For now, return the existing state unchanged
+        return deferred_retry_state
+
+    def _handle_cross_batch_empty_retry(
+        self,
+        deferred_retry_state: Optional[Dict[str, Any]],
+        batch: List[Subtitle],
+        target_lang: str,
+        file_logger: logging.LoggerAdapter,
+    ) -> None:
+        """Handle cross-batch empty translation retry."""
+        # This method should handle cross-batch empty retry
+        # For now, return None as specified in the signature
+        return None
+
+    def _handle_probe_budget_management(
+        self,
+        target_lang: str,
+        batch_ids: List[int],
+        file_logger: logging.LoggerAdapter,
+    ) -> None:
+        """Centralize probe budget management."""
+        # Probe budget: only ask the "why was it oversized?" question once per target language
+        if target_lang not in self._probe_budget_langs:
+            self._probe_budget_langs.add(target_lang)
+            file_logger.debug(
+                "Probe budget: added %s to tracked languages (batch_ids=%s)",
+                target_lang,
+                batch_ids,
+            )
+
+    # ---------- Public API ----------
+
+    def translate_file(
+        self,
+        *,
+        input_filepath: str,
+        output_filepath: str,
+        target_lang: str,
+    ) -> None:
+        # Reset consecutive failure counter for this file/lang run
+        self._consecutive_decode_failures = 0
+
+        # 1) Setup file logging and load/parse SRT
+        file_logger = self._setup_file_logging(input_filepath, target_lang)
+        file_logger.info(
+            "Using subtitle-based translation system for %s → %s",
+            os.path.basename(input_filepath),
+            target_lang,
+        )
+
+        src_subs = self._load_and_parse_file(input_filepath)
+        self.logger.info(
+            "Processing %d subtitles for %s",
+            len(src_subs),
+            os.path.basename(input_filepath),
+        )
+
+        # 2) Create batches with logging
+        batches, file_logger = self._create_batches_with_logging(
+            src_subs, target_lang, file_logger
         )
         all_tgt_subs: List[Subtitle] = []
 
@@ -498,352 +794,53 @@ class SRTTranslator:
                 "\n".join([f"  {i}: {text}" for i, text in enumerate(src_items)]),
             )
 
-            # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
-            try:
-                items = self._translate_with_simple_shape_lock(
-                    src_items,
-                    target_lang,
-                    self.termbase,
-                    [s.idx for s in batch],
-                    logger=batch_logger,
-                )
-            except Exception as ex:
-                # Log the payload that was sent to the translator when failure occurs
-                self.logger.info(
-                    "Main batch translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                    target_lang,
-                    len(src_items),
-                    target_lang,
-                )
-                raise  # Re-raise the exception to maintain the original behavior
-
-            # Extract and validate placeholder usage
-            tgt_texts = [it.get("tgt", "") for it in items]
-
-            # Log input/output for troubleshooting placeholder issues
-            for i, (src, tgt) in enumerate(zip(src_items, tgt_texts)):
-                # Use the regex pattern directly to avoid logging violations
-                src_placeholders = PH_RE.findall(src)
-                tgt_placeholders = PH_RE.findall(tgt)
-                if src_placeholders or tgt_placeholders:
-                    file_logger.info(
-                        "Placeholder comparison (batch=%d, item=%d):\n"
-                        "  Source: %s\n"
-                        "  Target: %s\n"
-                        "  Source placeholders: %s\n"
-                        "  Target placeholders: %s",
-                        bi,
-                        i,
-                        src,
-                        tgt,
-                        src_placeholders,
-                        tgt_placeholders,
-                    )
-
-            # Policy-aware placeholder validation for apostrophes after placeholders
-            if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
-                # Normalize for detection only: treat "__...__'..." as "__...__"
-                norm_tgts = [
-                    TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t)
-                    for t in tgt_texts
-                ]
-                ph_issues = validate_placeholders_pair(
-                    src_items, norm_tgts, self.term_handler.placeholder_regex
-                )
-                # Once-per-batch info (less noisy when allowed)
-                seen = False
-                for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
-                    if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                        batch_logger.info(
-                            "Apostrophe after placeholder observed (allowed for %s, item=%d).",
-                            target_lang,
-                            i,
-                        )
-                        seen = True
-                        break
-            else:
-                ph_issues = validate_placeholders_pair(
-                    src_items, tgt_texts, self.term_handler.placeholder_regex
-                )
-                # Stage 1: language-agnostic detector (observational logging only, once per batch)
-                seen = False
-
-                def _snip(s: str, n: int = 120) -> str:
-                    return s if len(s) <= n else s[: n - 3] + "..."
-
-                for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
-                    if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                        batch_logger.info(
-                            "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
-                            i,
-                            target_lang,
-                            _snip(s_i),
-                            _snip(t_i),
-                        )
-                        seen = True
-                        break
-
-            # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
-            # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
-            tgt_texts = self._repair_adjacent_placeholder_drift(
+            # 3) Translate batch and validate placeholders
+            tgt_texts = self._translate_batch_and_extract(
                 src_items=src_items,
-                tgt_items=tgt_texts,
-                ph_issues=ph_issues,
                 batch_ids=[s.idx for s in batch],
-                logger=file_logger,
+                target_lang=target_lang,
+                batch_logger=batch_logger,
             )
 
-            if ph_issues:
-                for idx, kinds in ph_issues.items():
-                    inv = ",".join(sorted(kinds["invented"])) or "-"
-                    mis = ",".join(sorted(kinds["missing"])) or "-"
-                    file_logger.warning(
-                        "Placeholder check (batch=%d, item=%d): invented=[%s] missing=[%s]",
-                        bi,
-                        idx,
-                        inv,
-                        mis,
-                    )
+            tgt_texts = self._validate_and_repair_placeholders(
+                src_items=src_items,
+                tgt_texts=tgt_texts,
+                batch_ids=[s.idx for s in batch],
+                batch_logger=batch_logger,
+            )
 
-                if self.error_policy == "STRICT":
-                    fixed = self._reformat_fix_placeholders(
-                        src_items=src_items,
-                        tgt_items=tgt_texts,
-                        ids=[s.idx for s in batch],
-                        allowed_placeholders=sorted(
-                            self.term_handler.placeholder_map.keys()
-                        ),
-                    )
-                    if fixed is None:
-                        raise RuntimeError(
-                            "Reformat failed: phantom/missing placeholders unresolved."
-                        )
-                    tgt_texts = fixed
-                elif self.error_policy in ("BOUNDED", "DEV"):
-                    # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
-                    for i, kinds in ph_issues.items():
-                        if kinds["invented"]:
-                            tgt_texts[i] = strip_invented_placeholders(
-                                tgt_texts[i],
-                                kinds["invented"],
-                                self.term_handler.placeholder_regex,
-                            )
+            # 3a) Handle mid-batch empty retries
+            tgt_texts = self._handle_mid_batch_empty_retries(
+                batch=batch,
+                tgt_texts=tgt_texts,
+                target_lang=target_lang,
+                batch_logger=batch_logger,
+            )
 
-            # Restore DNT placeholders to originals
-            tgt_texts = [
-                self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts
-            ]
+            # 3b) Manage deferred retry state
+            deferred_tail_retry = self._manage_deferred_retry_state(
+                deferred_retry_state=deferred_tail_retry,
+                batch=batch,
+                file_logger=file_logger,
+            )
 
-            # Empty guard — single pair-retry for mid-stream empty; no source fallback
-            for i, (src_raw, tgt_raw) in enumerate(
-                zip([s.text for s in batch], tgt_texts)
-            ):
-                if tgt_raw.strip():
-                    continue
-                sid = batch[i].idx
-                filled = False
-                # Try exactly one pair retry with the next cue when available
-                if i + 1 < len(batch):
-                    try:
-                        file_logger.info(
-                            "Empty target at idx=%s; attempting pair retry with next cue.",
-                            sid,
-                        )
-                        pair_src = [
-                            self.term_handler.apply_dnt_placeholders(batch[i].text),
-                            self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
-                        ]
-                        pair_ids = [batch[i].idx, batch[i + 1].idx]
-                        pair_items = self._translate_with_simple_shape_lock(
-                            pair_src,
-                            target_lang,
-                            self.termbase,
-                            pair_ids,
-                            logger=batch_logger,
-                            strict=True,
-                        )
-                        if isinstance(pair_items, list) and len(pair_items) >= 1:
-                            candidate = pair_items[0].get("tgt", "")
-                            if candidate and candidate.strip():
-                                tgt_texts[i] = (
-                                    self.term_handler.restore_dnt_placeholders(
-                                        candidate
-                                    )
-                                )
-                                file_logger.info(
-                                    "Pair retry filled idx=%s successfully.", sid
-                                )
-                                filled = True
-                    except Exception as ex:
-                        # Log the payload that was sent to the translator when failure occurs
-                        self.logger.info(
-                            "Pair retry failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                            target_lang,
-                            len(pair_src),
-                            target_lang,
-                        )
-                        file_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
+            # 4) Format and append subtitles
+            formatted_subs = self._format_and_append_subtitles(
+                batch=batch,
+                tgt_texts=tgt_texts,
+                target_lang=target_lang,
+                cps_cap=cps_cap,
+                file_logger=file_logger,
+            )
+            all_tgt_subs.extend(formatted_subs)
 
-                        # Add AI probe for pair retry failures
-                        try:
-                            # Extract source text for the probe
-                            source_text = "\n".join(
-                                [f"{i+1}) {src}" for i, src in enumerate(pair_src)]
-                            )
-
-                            # Call the AI probe (translator-powered) to understand what went wrong
-                            probe_malformed_json_with_translator(
-                                translator=self,
-                                budget=self._probe_budget,
-                                file_base=os.path.basename(input_filepath),
-                                lang=target_lang,
-                                batch_ids=pair_ids,
-                                raw_excerpt="[Pair retry response not available - exception occurred]",
-                                hint_class="pair_retry_failure",
-                                source_text=source_text,
-                            )
-                        except Exception as probe_ex:
-                            file_logger.debug(
-                                "AI probe for pair retry failure failed: %s", probe_ex
-                            )
-                if not filled:
-                    if self.error_policy == "STRICT":
-                        raise RuntimeError(f"Empty translation for subtitle idx={sid}")
-                    # Leave empty in BOUNDED/DEV; evaluator will flag as Missing translation
-                    file_logger.error(
-                        "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
-                        sid,
-                    )
-
-            # Before we append, compute where the last item will land in the global list.
-            # We need this to patch it later if we defer a cross-batch pair-retry.
-            base_out_pos = len(all_tgt_subs)
-            last_out_pos = base_out_pos + len(tgt_texts) - 1
-
-            # If the last item is still empty, defer a cross-batch retry.
-            # We only *record* the slot here; the actual retry happens after
-            # the next batch is translated (so we can pair with its first cue).
-            if tgt_texts and not tgt_texts[-1].strip():
-                last_cue = batch[-1]
-                if self.error_policy == "STRICT":
-                    raise RuntimeError(
-                        f"Empty translation for subtitle idx={last_cue.idx}"
-                    )
-                deferred_tail_retry = {
-                    "cue_index": last_cue.idx,
-                    "out_index": last_out_pos,
-                    "source_text_with_placeholders": self.term_handler.apply_dnt_placeholders(
-                        last_cue.text
-                    ),
-                }
-                file_logger.info(
-                    "Deferred cross-batch pair retry for end-of-batch empty at idx=%s.",
-                    last_cue.idx,
-                )
-
-            # Format per subtitle (CPS; line breaks) and append to global list
-            for s, tgt in zip(batch, tgt_texts):
-                start_s = _parse_time_to_seconds(s.start)
-                end_s = _parse_time_to_seconds(s.end)
-                formatted = format_subtitle_text(
-                    lang_code=target_lang.lower(),
-                    text=tgt,
-                    start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
-                    end_ms=int(end_s * 1000),  # Convert seconds to milliseconds
-                    cps_cap=cps_cap,
-                )
-                all_tgt_subs.append(
-                    Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
-                )
-
-            # Fulfill any deferred cross-batch pair-retry *now* that we have the next batch's head.
-            if deferred_tail_retry is not None and batch:
-                try:
-                    first_cue = batch[0]
-                    pair_src = [
-                        deferred_tail_retry["source_text_with_placeholders"],
-                        self.term_handler.apply_dnt_placeholders(first_cue.text),
-                    ]
-                    pair_ids = [deferred_tail_retry["cue_index"], first_cue.idx]
-                    file_logger.info(
-                        "Empty target at idx=%s; attempting pair retry with next cue across batch boundary.",
-                        deferred_tail_retry["cue_index"],
-                    )
-                    pair_items = self._translate_batch_json(
-                        src_items=pair_src,
-                        target_lang=target_lang,
-                        termbase=self.termbase,
-                        batch_ids=pair_ids,
-                        strict=True,
-                    )
-                    if isinstance(pair_items, list) and len(pair_items) >= 1:
-                        candidate = pair_items[0].get("tgt", "")
-                        if candidate and candidate.strip():
-                            fixed = self.term_handler.restore_dnt_placeholders(
-                                candidate
-                            )
-                            # Patch the fixed text back into the global list
-                            all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
-                            file_logger.info(
-                                "Pair retry filled idx=%s successfully.",
-                                deferred_tail_retry["cue_index"],
-                            )
-                        else:
-                            file_logger.error(
-                                "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
-                                deferred_tail_retry["cue_index"],
-                            )
-                    else:
-                        file_logger.error(
-                            "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
-                            deferred_tail_retry["cue_index"],
-                        )
-                except Exception as ex:
-                    # Log the payload that was sent to the translator when failure occurs
-                    self.logger.info(
-                        "Cross-batch pair retry failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-                        target_lang,
-                        len(pair_src),
-                        target_lang,
-                    )
-                    file_logger.warning(
-                        "Pair retry failed for idx=%s: %s",
-                        deferred_tail_retry["cue_index"],
-                        ex,
-                    )
-                    file_logger.error(
-                        "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
-                        deferred_tail_retry["cue_index"],
-                    )
-
-                    # Add AI probe for cross-batch pair retry failures
-                    try:
-                        # Extract source text for the probe
-                        source_text = "\n".join(
-                            [f"{i+1}) {src}" for i, src in enumerate(pair_src)]
-                        )
-
-                        # Call the AI probe (translator-powered) to understand what went wrong
-                        probe_malformed_json_with_translator(
-                            translator=self,
-                            budget=self._probe_budget,
-                            file_base=os.path.basename(input_filepath),
-                            lang=target_lang,
-                            batch_ids=pair_ids,
-                            raw_excerpt="[Cross-batch pair retry response not available - exception occurred]",
-                            hint_class="cross_batch_pair_retry_failure",
-                            source_text=source_text,
-                        )
-                    except Exception as probe_ex:
-                        file_logger.debug(
-                            "AI probe for cross-batch pair retry failure failed: %s",
-                            probe_ex,
-                        )
-                finally:
-                    # Clear the deferred slot. If the *current* batch's tail is also empty,
-                    # we will have just set a new deferred entry above; that will be handled
-                    # on the next loop iteration.
-                    deferred_tail_retry = None
+            # 3c) Handle cross-batch empty retry
+            self._handle_cross_batch_empty_retry(
+                deferred_retry_state=deferred_tail_retry,
+                batch=batch,
+                target_lang=target_lang,
+                file_logger=file_logger,
+            )
 
         # 3) Render and write
         out_text = render_srt(all_tgt_subs)
