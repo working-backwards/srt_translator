@@ -83,6 +83,38 @@ def _caps_for(lang: str, rubric: dict) -> Tuple[int, int]:
     return (soft, hard)
 
 
+# === Context helpers (evaluator owns context in v1.0) =======================
+# We already have source_cues and target_cues in memory during evaluation.
+# Add a small, boundary-safe ±2 window around a 1-based cue index.
+def _ctx_window(cues, idx1: int, k: int = 2) -> list[tuple[int, str]]:
+    lines: list[tuple[int, str]] = []
+    if not cues or not isinstance(idx1, int) or idx1 <= 0:
+        return lines
+    n = len(cues)
+    i0 = min(max(idx1 - 1, 0), n - 1)  # clamp to [0, n-1]
+    lo = max(0, i0 - k)
+    hi = min(n - 1, i0 + k)
+    for j in range(lo, hi + 1):
+        # cues[j].text is expected to be the raw text for that cue
+        lines.append((j + 1, (cues[j].text or "")))
+    return lines
+
+
+def _attach_context_to_issues(issue_list: list[dict], source_cues, target_cues) -> None:
+    # Mutates each issue dict in place, adding a "context" field:
+    # {"source":[(n,text)...], "target":[(n,text)...]}
+    if not issue_list:
+        return
+    for it in issue_list:
+        idx = it.get("idx")
+        if not isinstance(idx, int):
+            continue
+        it["context"] = {
+            "source": _ctx_window(source_cues, idx, 2),
+            "target": _ctx_window(target_cues, idx, 2),
+        }
+
+
 def _find_summary(candidates: List[Path]) -> Optional[Path]:
     for p in candidates:
         if p and p.exists():
@@ -683,6 +715,11 @@ def run_batch_evaluation(
             timing_fail = med_ds > 200 or med_de > 200 or p95_ds > 500 or p95_de > 500
 
             verdict = res.get("verdict", "FAIL")
+
+            # Attach ±2 context to issues (stored directly in the rollup JSON).
+            _attach_context_to_issues(missing_issues, source_cues, target_cues)
+            _attach_context_to_issues(un_issues, source_cues, target_cues)
+
             per_files.append(
                 {
                     # human-friendly names (what MD shows)
@@ -715,5 +752,17 @@ def run_batch_evaluation(
             "cps_hard": cps_hard_cap,
             "files": per_files,
         }
+
+    # Persist evaluator output so reporting can be decoupled and never blocks JSON.
+    try:
+        artifacts_dir = batch_root / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        out_json = artifacts_dir / "eval_report.json"
+        out_json.write_text(
+            json.dumps(rollup, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        logger.info(f"Wrote evaluator JSON: {out_json}")
+    except Exception as e:
+        logger.error(f"Failed to write eval_report.json: {e}")
 
     return rollup

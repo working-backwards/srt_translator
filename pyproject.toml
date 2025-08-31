@@ -47,6 +47,7 @@ gui = [
 [project.scripts]
 srtx = "srt_translator.gui.app:main"
 srtx-cli = "srt_translator.cli.app:main"
+st-eval = "srt_translator.eval.cli:main"
 
 # PyInstaller configuration
 #[tool.pyinstaller]

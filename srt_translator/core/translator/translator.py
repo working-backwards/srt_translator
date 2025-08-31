@@ -55,10 +55,12 @@ class Subtitle:
 # ---------------------------
 
 SRT_BLOCK_RE = re.compile(
-    r"^\s*(\d+)\s*\n"  # index
-    r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*"
-    r"(\d{2}:\d{2}:\d{2},\d{3})\s*\n"
-    r"(.*?)(?=\n{2,}|\Z)",  # text
+    # index line
+    r"^\s*(\d+)\s*\r?\n"
+    # timing line
+    r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})\s*\r?\n"
+    # text (may be empty). Stop at: blank line, or next index line, or EOF.
+    r"(.*?)(?=\r?\n\r?\n|\r?\n\d+\s*\r?\n|\Z)",
     re.DOTALL | re.MULTILINE,
 )
 
@@ -81,13 +83,45 @@ def _parse_time_to_seconds(ts: str) -> float:
 
 
 def parse_srt(text: str) -> List[Subtitle]:
+    """
+    Parse SRT content into Subtitle objects.
+    Handles empty cues correctly by stopping at blank lines or next index.
+    """
     subs: List[Subtitle] = []
-    for m in SRT_BLOCK_RE.finditer(text):
-        idx = int(m.group(1))
-        start = m.group(2)
-        end = m.group(3)
-        body = m.group(4).strip("\n")
-        subs.append(Subtitle(idx=idx, start=start, end=end, text=body))
+
+    # Split into blocks by double newlines
+    blocks = re.split(r"\r?\n\r?\n", text.strip())
+
+    for block in blocks:
+        if not block.strip():
+            continue
+
+        lines = block.strip().split("\n")
+        if len(lines) < 2:
+            continue
+
+        try:
+            # First line should be index
+            idx = int(lines[0].strip())
+
+            # Second line should be timing
+            timing_match = re.match(
+                r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[1]
+            )
+            if not timing_match:
+                continue
+
+            start, end = timing_match.groups()
+
+            # Remaining lines are text (may be empty)
+            body = "\n".join(lines[2:]).strip() if len(lines) > 2 else ""
+
+            subs.append(Subtitle(idx=idx, start=start, end=end, text=body))
+
+        except (ValueError, IndexError):
+            # Skip malformed blocks
+            continue
+
     return subs
 
 
@@ -1102,22 +1136,33 @@ INPUT ITEMS:
                 try:
                     self.logger.info(
                         "Attempting plain-string fallback for single item (lang=%s, id=%s).",
-                        target_lang, (batch_ids[0] if batch_ids else "?"),
+                        target_lang,
+                        (batch_ids[0] if batch_ids else "?"),
                     )
                     fallback_txt = self._translate_single_string_fallback(
                         src_text=src_items[0],
                         target_lang=target_lang,
                     )
-                    wrapped = [{"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}]
+                    wrapped = [
+                        {"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}
+                    ]
                     return wrapped
                 except Exception as _fallback_ex:
-                    self.logger.warning("Plain-string fallback failed: %s", _fallback_ex)
+                    self.logger.warning(
+                        "Plain-string fallback failed: %s", _fallback_ex
+                    )
 
             # Otherwise, let shape-lock handle it as before.
-            self.logger.error("Model did not return JSON; cannot recover without shape lock.")
-            raise RuntimeError("Translation failed: model did not return valid JSON format")
+            self.logger.error(
+                "Model did not return JSON; cannot recover without shape lock."
+            )
+            raise RuntimeError(
+                "Translation failed: model did not return valid JSON format"
+            )
 
-    def _translate_single_string_fallback(self, *, src_text: str, target_lang: str) -> str:
+    def _translate_single_string_fallback(
+        self, *, src_text: str, target_lang: str
+    ) -> str:
         """
         Minimal escape hatch for repeated JSON truncation in size=1 strict retries.
         Returns ONLY a translated string; caller will wrap into JSON.
@@ -1135,14 +1180,18 @@ INPUT ITEMS:
         )
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[{"role": "system", "content": sys},
-                      {"role": "user", "content": usr}],
+            messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": usr},
+            ],
             temperature=0.0,
             max_tokens=256,
         )
         out = (resp.choices[0].message.content or "").strip()
         # Be defensive about accidental quoting
-        if (out.startswith('"') and out.endswith('"')) or (out.startswith("'") and out.endswith("'")):
+        if (out.startswith('"') and out.endswith('"')) or (
+            out.startswith("'") and out.endswith("'")
+        ):
             out = out[1:-1].strip()
         return out
 

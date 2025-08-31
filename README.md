@@ -78,6 +78,23 @@ At the batch root:
   - DNT/TB snapshots **may** be copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for auditing. Evaluation does **not** read them.
   - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
 
+### Re-running evaluation
+
+After translation is complete, you can re-run the evaluator to regenerate artifacts:
+
+```bash
+# From within the batch directory
+st-eval
+
+# From anywhere, specifying the batch path
+st-eval --batch-root "path/to/translation-batch-YYYYMMDD_HHMMSS"
+
+# With verbose logging
+st-eval -v
+```
+
+This rewrites only the evaluation artifacts (CSV/JSON/MD under `artifacts/…`) and leaves your translated SRT files untouched.
+
 ### Reporting behavior
 
 - **Untranslated after DNT:** ignores trivial single-word cognates; upper-case acronyms are **INFO** unless covered by DNT/TB.
@@ -148,6 +165,7 @@ After installation, you can use these simple commands from any terminal:
 
 - **GUI**: `srtx` - Launches the graphical interface (default, requires `pip install srt-translator[gui]`)
 - **CLI**: `srtx-cli` - Launches the command-line interface
+- **Evaluation**: `st-eval` - Re-runs evaluation on completed translation batches
 
 ### For Content Creators (Executable)
 

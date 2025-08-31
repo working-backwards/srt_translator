@@ -1,25 +1,47 @@
 # srt_translator/eval/report.py
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, List, Any, Tuple, Optional
 import json
 import re
 from srt_translator.core.config.language_config import LanguageConfig
 
-# parse_srt expects SRT TEXT, not a path. We read the file, then call it.
-from srt_translator.core.translator.translator import parse_srt
+# v1.0: reporter is JSON-only. No SRT parsing/imports here.
 
 
-# -----------------------------
-# Context-window helpers (prev2/current/next2), boundary-safe
-# -----------------------------
+# Display blanks as real empty lines; avoid glyphs like "(none)" that look odd to users.
+EMPTY_CUE_PLACEHOLDER = ""
 
 
-def _only_errors(issues: List[dict]) -> List[dict]:
-    """Return only ERROR-severity issues for Markdown rendering."""
-    return [
-        i for i in (issues or []) if str(i.get("severity", "ERROR")).upper() == "ERROR"
-    ]
+def _render_context_pairs(pairs: list[tuple[int, str]]) -> str:
+    """
+    Given [(index, text), ...] pairs from the evaluator, build a fenced code block.
+    """
+    if not pairs:
+        return "```\n(context unavailable)\n```"
+    lines = []
+    for idx, txt in pairs:
+        lines.append(f"{idx}: {txt or EMPTY_CUE_PLACEHOLDER}")
+    return "```\n" + "\n".join(lines) + "\n```"
+
+
+def _context_blocks_for_issue(
+    batch_root: Path, lang: str, file_entry: dict, issue: dict, source_lang_name: str
+) -> tuple[str, str, str]:
+    """
+    Returns (target_block, source_block, notice) using *embedded* context from the evaluator.
+    Reporter does not read SRT files in v1.0.
+    """
+    ctx = issue.get("context") or {}
+    tgt_pairs = ctx.get("target") or []
+    src_pairs = ctx.get("source") or []
+    if not (tgt_pairs or src_pairs):
+        return (
+            "```\n(context unavailable)\n```",
+            "```\n(context unavailable)\n```",
+            "Context unavailable (no embedded context).",
+        )
+    return _render_context_pairs(tgt_pairs), _render_context_pairs(src_pairs), ""
 
 
 def _source_language_name(batch_root: Path) -> str:
@@ -52,263 +74,148 @@ def _source_language_name(batch_root: Path) -> str:
         return "English"
 
 
-def _load_cues_from_srt(path: Path) -> List[Any]:
-    """Open UTF-8 file and parse with parse_srt(text). Never raises; returns [] on error."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except Exception:
-        return []
-    try:
-        return parse_srt(text)
-    except Exception:
-        return []
+# This function is no longer needed since we use eval_parse_srt directly
 
 
-def _window_indices(
-    center_index: int, min_index: int, max_index: int, radius: int = 2
-) -> Tuple[int, int]:
-    """Return clamped (start, end) indices for a symmetric window around center_index."""
-    start_idx = max(min_index, center_index - radius)
-    end_idx = min(max_index, center_index + radius)
-    return start_idx, end_idx
+# This function is no longer needed since we directly iterate over the languages structure
 
 
-def _render_window_block(cues: List[Any], start_idx: int, end_idx: int) -> str:
-    """Render window of cue texts as 'NN: text' lines (collapsing whitespace)."""
-    # Support objects with .idx or .index and .text
-    by_num = {
-        getattr(c, "idx", getattr(c, "index", None)): (
-            getattr(c, "text", "") or ""
-        ).strip()
-        for c in cues
-    }
-    lines: List[str] = []
-    for n in range(start_idx, end_idx + 1):
-        txt = by_num.get(n, "")
-        clean = re.sub(r"\s+", " ", txt).strip()
-        lines.append(f"{n}: {clean}")
-    return "\n".join(lines)
-
-
-def _context_blocks_for_issue(
-    *,
-    batch_root: Path,
-    lang_code: str,
-    source_file_name: str,
-    target_file_name: str,
-    source_rel_path: Optional[str] = None,
-    target_rel_path: Optional[str] = None,
-    cue_number: int,
-    radius: int = 2,
-) -> Tuple[str, str]:
+def render_consolidated_punchlist(
+    languages: Dict, *, batch_root: Path, source_lang_name: str
+) -> str:
     """
-    Build prev{radius}/current/next{radius} context blocks for target and source.
-    Resolution rules (in this order):
-      1) If rollup provides batch-relative paths (source_rel_path/target_rel_path), use them.
-      2) Otherwise, fall back to predictable defaults:
-         - Source: <batch_root>/originals/<source_file_name>
-         - Target: <batch_root>/<lang_code>/<target_file_name>
-    The function never throws; if either file can't be resolved, it returns ("", "").
-    """
-    # 1) Prefer batch-relative paths carried in the rollup
-    if source_rel_path:
-        source_srt_path = batch_root / source_rel_path
-    else:
-        # 2) Fallback: the standardized v1.0 layout
-        source_srt_path = batch_root / "originals" / source_file_name
-
-    if target_rel_path:
-        target_srt_path = batch_root / target_rel_path
-    else:
-        # Fallback: <batch_root>/<lang_code>/<target_file_name>
-        target_srt_path = batch_root / lang_code / target_file_name
-
-    # If either file doesn't exist, we can't build context blocks
-    if not source_srt_path.exists() or not target_srt_path.exists():
-        return "", ""
-
-    # Parse SRTs (parse_srt expects TEXT; _load_cues_from_srt handles that)
-    source_cues = _load_cues_from_srt(source_srt_path)
-    target_cues = _load_cues_from_srt(target_srt_path)
-    if not source_cues:
-        return "", ""
-    first_idx = int(getattr(source_cues[0], "idx", getattr(source_cues[0], "index", 1)))
-    last_idx = int(
-        getattr(source_cues[-1], "idx", getattr(source_cues[-1], "index", first_idx))
-    )
-    start_idx, end_idx = _window_indices(
-        int(cue_number), first_idx, last_idx, radius=radius
-    )
-    tgt_block = _render_window_block(target_cues, start_idx, end_idx)
-    src_block = _render_window_block(source_cues, start_idx, end_idx)
-    return tgt_block, src_block
-
-
-def _iter_language_files(languages: Dict[str, Any]):
-    """
-    Yield (lang_code, file_entry) across languages.
-    Supports both shapes:
-      - languages[lang] -> {'files': [ ... ]}
-      - languages[lang] -> [ ... ]   (legacy)
-    """
-    for lang, entry in (languages or {}).items():
-        files = entry.get("files") if isinstance(entry, dict) else entry
-        for f in files or []:
-            yield lang, f
-
-
-def render_consolidated_punchlist(languages: Dict, *, batch_root: Path) -> str:
-    """
-    Top-of-report list (ERRORS ONLY) with contextual "Suggested check".
+    Top-of-report consolidated list of ERROR issues across all files.
+    Includes a contextual "Suggested check" (prev2/current/next2) block.
     """
     error_issues: List[dict] = []
-    for lang, f in _iter_language_files(languages):
-        issues = f.get("issues", {}) or {}
-        missing = issues.get("missing_translation", []) or []
-        un = issues.get("untranslated_after_dnt", []) or []
-        tgt_file = f.get("target_file") or f.get("file_name", "—")
-        src_file = f.get("source_file", "")
-        for row in missing:
-            error_issues.append(
-                {
-                    "kind": "missing",
-                    "lang": lang,
-                    "file": tgt_file,
-                    "source_file": src_file,
-                    "cue": row.get("idx") or row.get("cue"),
-                    "orig": row.get("src") or row.get("original") or "",
-                    "tgt": row.get("tgt") or row.get("target") or "",
-                }
-            )
-        for row in un:
-            error_issues.append(
-                {
-                    "kind": "un_dnt",
-                    "lang": lang,
-                    "file": tgt_file,
-                    "source_file": src_file,
-                    "cue": row.get("idx") or row.get("cue"),
-                    "orig": row.get("src") or row.get("original") or "",
-                    "tgt": row.get("tgt") or row.get("target") or "",
-                }
-            )
+    for lang, entry in languages.items():
+        files = entry.get("files", [])
+        for f in files:
+            issues = f.get("issues", {}) or {}
+            missing = issues.get("missing_translation", []) or []
+            un = issues.get("untranslated_after_dnt", []) or []
+            errs = missing + un
+            if not errs:
+                continue
+            src_rel = f.get("source_rel", "")
+            tgt_rel = f.get("target_rel", "")
+            file_name = f.get("target_file", f.get("file_name", ""))
+            for issue in errs:
+                # Inline copy with language & resolvable paths
+                i = dict(issue)
+                i["_lang"] = lang
+                i["_file"] = file_name
+                i["source_rel"] = src_rel
+                i["target_rel"] = tgt_rel
+                error_issues.append(i)
 
     if not error_issues:
         return "Everything looks great. Your translated files are **ready for use**."
 
     total = len(error_issues)
-    lines: List[str] = []
-    lines.append(
-        f"Some files need attention. Below is a consolidated punch list of **{total}** issue(s). For each cue, we show the original and the translation with a contextual suggested check.\n"
+    out: List[str] = []
+    out.append(
+        f"Some files need attention. Below is a consolidated punch list of **{total}** issue(s). "
+        "For each cue, we show the original and the translation with a contextual suggested check.\n"
     )
     for issue in error_issues:
-        lang = issue["lang"]
-        file_name = issue["file"]
-        # Human labels (filenames) as already stored in rollup for display
-        source_file_name = issue.get("source_file", "")
-        # Machine-resolvable paths, if the runner provided them
-        source_rel_path = issue.get("_source_rel")
-        target_rel_path = issue.get("_target_rel")
-        cue = issue["cue"]
-        orig = issue["orig"]
-        tgt = issue["tgt"]
-        lines.append(f"### {_lang_label(lang)}\n")
-        lines.append(f"#### {file_name}")
-        lines.append(
+        lang = issue["_lang"]
+        file_name = issue["_file"]
+        cue = issue.get("cue") or issue.get("idx")
+        orig = issue.get("original") or issue.get("src") or ""
+        tgt = issue.get("target") or issue.get("tgt") or ""
+        out.append(f"### {_lang_label(lang)}\n")
+        out.append(f"#### {file_name}")
+        out.append(
             f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
         )
-        tgt_block, src_block = _context_blocks_for_issue(
-            batch_root=batch_root,
-            lang_code=lang,
-            source_file_name=source_file_name,
-            target_file_name=file_name,
-            source_rel_path=source_rel_path,
-            target_rel_path=target_rel_path,
-            cue_number=int(cue),
-            radius=2,
-        )
-        if tgt_block and src_block:
-            src_lang_name = _source_language_name(batch_root)
-            lines.append(
-                f"\n_Suggested check:_ Copy the **Target context** below into your AI assistant and ask for a translation into **{src_lang_name}**, then compare it to the **Source context**.\n"
-            )
-            lines.append("**Target context (prev 2 / current / next 2):**")
-            lines.append("```")
-            lines.append(tgt_block)
-            lines.append("```")
-            lines.append("**Source context (prev 2 / current / next 2):**")
-            lines.append("```")
-            lines.append(src_block)
-            lines.append("```")
-        else:
-            # Always provide actionable guidance even if files couldn't be resolved.
-            lines.append(
-                "\n_Suggested check:_ Copy this subtitle and its two neighbors (one before and one after) "
-                "into your AI assistant, ask for a translation into the source language, and verify the target "
-                "conveys the same meaning in context.\n"
-            )
-        lines.append("")
-    return "\n".join(lines)
 
-
-def render_issue_sections(languages: Dict, *, batch_root: Path) -> str:
-    """
-    Render ERROR sections grouped by language/file with contextual "Suggested check".
-    INFO/WARN are intentionally omitted from Markdown.
-    """
-    lines: List[str] = []
-    for lang, f in _iter_language_files(languages):
-        file_name = f.get("target_file") or f.get("file_name", "—")
-        source_file_name = f.get("source_file", "")
-        source_rel_path = f.get("source_rel")
-        target_rel_path = f.get("target_rel")
-        issues = f.get("issues", {}) or {}
-        missing = issues.get("missing_translation", []) or []
-        un = issues.get("untranslated_after_dnt", []) or []
-        errs = missing + un
-        if not errs:
-            continue
-        lines.append(f"## {_lang_label(lang)}\n")
-        lines.append(f"### {file_name}")
-        lines.append("**Blocking issues**\n")
-        src_lang_name = _source_language_name(batch_root)
-        for row in errs:
-            cue = row.get("cue") or row.get("idx")
-            orig = row.get("src") or row.get("original") or ""
-            tgt = row.get("tgt") or row.get("target") or ""
-            lines.append(
-                f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
-            )
-            tgt_block, src_block = _context_blocks_for_issue(
+        # Context window (prev2/current/next2), boundary-safe
+        try:
+            tgt_block, src_block, notice = _context_blocks_for_issue(
                 batch_root=batch_root,
-                lang_code=lang,
-                source_file_name=source_file_name,
-                target_file_name=file_name,
-                source_rel_path=source_rel_path,
-                target_rel_path=target_rel_path,
-                cue_number=int(cue),
-                radius=2,
+                lang=lang,
+                file_entry=f,
+                issue=issue,
+                source_lang_name=source_lang_name,
             )
             if tgt_block and src_block:
-                lines.append(
-                    f"\n_Suggested check:_ Copy the **Target context** below into your AI assistant and ask for a translation into **{src_lang_name}**, then compare it to the **Source context**.\n"
+                # Friendly source language name is already shown at top; keep this simple
+                out.append(
+                    "\n_Suggested check:_ Copy the **Target context** below into your AI assistant "
+                    "and ask for a translation into **the source language**, then compare it to the **Source context**.\n"
                 )
-                lines.append("**Target context (prev 2 / current / next 2):**")
-                lines.append("```")
-                lines.append(tgt_block)
-                lines.append("```")
-                lines.append("**Source context (prev 2 / current / next 2):**")
-                lines.append("```")
-                lines.append(src_block)
-                lines.append("```")
-            else:
-                lines.append(
-                    "\n_Suggested check:_ Copy this subtitle and its two neighbors (one before and one after) "
-                    "into your AI assistant, ask for a translation into the source language, and verify the target "
-                    "conveys the same meaning in context.\n"
+                out.append("**Target context (prev 2 / current / next 2):**")
+                out.append("```")
+                out.append(tgt_block)
+                out.append("```")
+                out.append("**Source context (prev 2 / current / next 2):**")
+                out.append("```")
+                out.append(src_block)
+                out.append("```")
+        except Exception:
+            # Never let context rendering break the report
+            pass
+
+        out.append("")  # spacing
+    return "\n".join(out)
+
+
+def render_issue_sections(
+    languages: Dict, *, batch_root: Path, source_lang_name: str
+) -> str:
+    """
+    Render ERROR issues grouped by language/file with contextual "Suggested check".
+    INFO/WARN are intentionally omitted from Markdown.
+    """
+    out: List[str] = []
+    for lang, entry in languages.items():
+        out.append(f"## {_lang_label(lang)}\n")
+        files = entry.get("files", [])
+        for f in files:
+            issues = f.get("issues", {}) or {}
+            missing = issues.get("missing_translation", []) or []
+            un = issues.get("untranslated_after_dnt", []) or []
+            errs = missing + un
+            if not errs:
+                continue
+            file_name = f.get("target_file", f.get("file_name", "—"))
+            src_rel = f.get("source_rel", "")
+            tgt_rel = f.get("target_rel", "")
+            out.append(f"### {file_name}")
+            out.append("**Blocking issues**\n")
+            for issue in errs:
+                cue = issue.get("cue") or issue.get("idx")
+                orig = issue.get("original") or issue.get("src") or ""
+                tgt = issue.get("target") or issue.get("tgt") or ""
+                out.append(
+                    f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
                 )
-        lines.append("")  # spacing
-    return "\n".join(lines)
+                try:
+                    tgt_block, src_block, notice = _context_blocks_for_issue(
+                        batch_root=batch_root,
+                        lang=lang,
+                        file_entry=f,
+                        issue=issue,
+                        source_lang_name=source_lang_name,
+                    )
+                    if tgt_block and src_block:
+                        out.append(
+                            "\n_Suggested check:_ Copy the **Target context** below into your AI assistant "
+                            "and ask for a translation into **the source language**, then compare it to the **Source context**.\n"
+                        )
+                        out.append("**Target context (prev 2 / current / next 2):**")
+                        out.append("```")
+                        out.append(tgt_block)
+                        out.append("```")
+                        out.append("**Source context (prev 2 / current / next 2):**")
+                        out.append("```")
+                        out.append(src_block)
+                        out.append("```")
+                except Exception:
+                    pass
+            out.append("")  # spacing
+    return "\n".join(out)
 
 
 def _get_language_info(code: str) -> Dict[str, str]:
@@ -478,7 +385,11 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     out.insert(1, "\n\n".join(intro) + "\n")
 
     # Add consolidated punch list using new function
-    out.append(render_consolidated_punchlist(langs, batch_root=batch_root))
+    out.append(
+        render_consolidated_punchlist(
+            langs, batch_root=batch_root, source_lang_name=src_label
+        )
+    )
     out.append("\n")
 
     # Roll-up table
@@ -505,7 +416,9 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Add detailed issue sections using new function
     out.append("\n")
-    out.append(render_issue_sections(langs, batch_root=batch_root))
+    out.append(
+        render_issue_sections(langs, batch_root=batch_root, source_lang_name=src_label)
+    )
     out.append("\n")
 
     # Per-language key metrics (brief)
