@@ -47,15 +47,6 @@ class Subtitle:
 # Utilities
 # ---------------------------
 
-SRT_BLOCK_RE = re.compile(
-    # index line
-    r"^\s*(\d+)\s*\r?\n"
-    # timing line
-    r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})\s*\r?\n"
-    # text (may be empty). Stop at: blank line, or next index line, or EOF.
-    r"(.*?)(?=\r?\n\r?\n|\r?\n\d+\s*\r?\n|\Z)",
-    re.DOTALL | re.MULTILINE,
-)
 
 TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
 
@@ -133,10 +124,6 @@ def render_srt(subs: Sequence[Subtitle]) -> str:
         parts.append(translated if translated else "")
         parts.append("")  # blank line
     return "\n".join(parts).rstrip() + "\n"
-
-
-def chunk(seq: Sequence[Any], n: int) -> List[List[Any]]:
-    return [list(seq[i : i + n]) for i in range(0, len(seq), n)]
 
 
 def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) -> str:
@@ -468,17 +455,14 @@ class SRTTranslator:
             # Stage 1: language-agnostic detector (observational logging only, once per batch)
             seen = False
 
-            def _snip(s: str, n: int = 120) -> str:
-                return s if len(s) <= n else s[: n - 3] + "..."
-
             for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
                 if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                     batch_logger.info(
                         "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
                         i,
                         target_lang,
-                        _snip(s_i),
-                        _snip(t_i),
+                        snip(s_i),
+                        snip(t_i),
                     )
                     seen = True
                     break
@@ -539,7 +523,6 @@ class SRTTranslator:
         tgt_texts: List[str],
         target_lang: str,
         cps_cap: Optional[int],
-        file_logger: logging.LoggerAdapter,
     ) -> List[Subtitle]:
         """Format subtitles with CPS and append to global list."""
         formatted_subs = []
@@ -614,45 +597,6 @@ class SRTTranslator:
                     sid,
                 )
         return tgt_texts
-
-    def _manage_deferred_retry_state(
-        self,
-        deferred_retry_state: Optional[Dict[str, Any]],
-        batch: List[Subtitle],
-        file_logger: logging.LoggerAdapter,
-    ) -> Optional[Dict[str, Any]]:
-        """Manage deferred retry state lifecycle."""
-        # This method should receive the current state as parameters
-        # For now, return the existing state unchanged
-        return deferred_retry_state
-
-    def _handle_cross_batch_empty_retry(
-        self,
-        deferred_retry_state: Optional[Dict[str, Any]],
-        batch: List[Subtitle],
-        target_lang: str,
-        file_logger: logging.LoggerAdapter,
-    ) -> None:
-        """Handle cross-batch empty translation retry."""
-        # This method should handle cross-batch empty retry
-        # For now, return None as specified in the signature
-        return None
-
-    def _handle_probe_budget_management(
-        self,
-        target_lang: str,
-        batch_ids: List[int],
-        file_logger: logging.LoggerAdapter,
-    ) -> None:
-        """Centralize probe budget management."""
-        # Probe budget: only ask the "why was it oversized?" question once per target language
-        if target_lang not in self._probe_budget_langs:
-            self._probe_budget_langs.add(target_lang)
-            file_logger.debug(
-                "Probe budget: added %s to tracked languages (batch_ids=%s)",
-                target_lang,
-                batch_ids,
-            )
 
     # ---------- Public API ----------
 
@@ -812,30 +756,14 @@ class SRTTranslator:
                 batch_logger=batch_logger,
             )
 
-            # 3b) Manage deferred retry state
-            deferred_tail_retry = self._manage_deferred_retry_state(
-                deferred_retry_state=deferred_tail_retry,
-                batch=batch,
-                file_logger=file_logger,
-            )
-
             # 4) Format and append subtitles
             formatted_subs = self._format_and_append_subtitles(
                 batch=batch,
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 cps_cap=cps_cap,
-                file_logger=file_logger,
             )
             all_tgt_subs.extend(formatted_subs)
-
-            # 3c) Handle cross-batch empty retry
-            self._handle_cross_batch_empty_retry(
-                deferred_retry_state=deferred_tail_retry,
-                batch=batch,
-                target_lang=target_lang,
-                file_logger=file_logger,
-            )
 
         # 3) Render and write
         out_text = render_srt(all_tgt_subs)
@@ -1257,93 +1185,6 @@ TARGET ITEMS (TO FIX):
             clean = t.replace("\n", " ").strip()
             rows.append(f"{i}) {clean}")
         return "\n".join(rows)
-
-    @staticmethod
-    def debug_log_config(
-        cfg,
-        logger: logging.Logger,
-        *,
-        full_termbase=False,
-        max_langs=12,
-        max_terms_per_lang=8,
-    ):
-        """
-        Emit a redacted, human-friendly config snapshot at DEBUG level.
-        - full_termbase=False prints a per-language summary with samples.
-        - Set full_termbase=True to pretty-print the entire termbase.
-        """
-        if logger is None:
-            raise ValueError(
-                "Logger is required for debug_log_config; no fallback allowed."
-            )
-        log = logger
-        if not log.isEnabledFor(logging.DEBUG):
-            return
-
-        def _mask_tail(s: str, n: int = 4) -> str:
-            if not s:
-                return ""
-            return "…" + s[-n:]
-
-        # Header
-        lines = []
-        lines.append("=== TranslationConfig (DEBUG) ===")
-
-        # Basics
-        tgt = getattr(cfg, "target_languages", {}) or {}
-        dnt = getattr(cfg, "dnt_terms", []) or []
-        tb = getattr(cfg, "termbase", {}) or {}
-
-        lines.append(
-            f"Output directory  : {getattr(cfg, 'output_directory', 'translated_srt_files')}"
-        )
-        lines.append(
-            f"Model / batch     : {getattr(cfg, 'model_name', 'gpt-4o-mini')} / {getattr(cfg, 'batch_size', 5)}"
-        )
-        lines.append(f"API key (tail)    : {_mask_tail(getattr(cfg, 'api_key', ''))}")
-
-        # Targets
-        codes = list(tgt.values())
-        lines.append(
-            f"Targets ({len(codes)}): {', '.join(codes) if codes else '(none)'}"
-        )
-
-        # DNT
-        lines.append(f"DNT terms ({len(dnt)}):")
-        if dnt:
-            for term in dnt:
-                lines.append(f"  - {term}")
-        else:
-            lines.append("  (none)")
-
-        # Termbase
-        lines.append(
-            f"Termbase languages ({len(tb)}): {', '.join(sorted(tb.keys())) if tb else '(none)'}"
-        )
-
-        if full_termbase and tb:
-            # Pretty-print the entire termbase
-            lines.append("Termbase (full):")
-            lines.append(json.dumps(tb, ensure_ascii=False, indent=2, sort_keys=True))
-        elif tb:
-            # Summarize per language with samples
-            lines.append("Termbase (summary with samples):")
-            lang_items = sorted(tb.items())[:max_langs]
-            for lang, mapping in lang_items:
-                terms = list(mapping.items())
-                shown = terms[:max_terms_per_lang]
-                extra = len(terms) - len(shown)
-                lines.append(f"  [{lang}] {len(terms)} terms")
-                for k, v in shown:
-                    lines.append(f"  • {k}  →  {v}")
-                if extra > 0:
-                    lines.append(f"    … (+{extra} more)")
-            if len(tb) > max_langs:
-                lines.append(f"  … (+{len(tb) - max_langs} more languages)")
-        else:
-            lines.append("Termbase: (none)")
-
-        log.debug("\n".join(lines))
 
     # ---------- Adjacent placeholder drift repair ----------
     def _repair_adjacent_placeholder_drift(
