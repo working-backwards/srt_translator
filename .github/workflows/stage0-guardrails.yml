@@ -1,0 +1,60 @@
+name: Stage 0 Guardrails
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  stage0-guardrails:
+    name: Stage 0 Tests + Prompt Integrity Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for diff check
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest
+    
+    - name: Run Stage 0 Prompt Snapshot Tests
+      run: |
+        pytest tests/test_prompts_snapshot.py -q
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+    
+    - name: Run Stage 0 Parity Tests
+      run: |
+        pytest tests/test_parity_io.py -q
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+    
+    - name: Check for Prompt String Changes (Belt & Suspenders)
+      run: |
+        # Get the base commit (usually the target branch)
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+        else
+          # For pushes, compare with previous commit
+          BASE_SHA="${{ github.event.before }}"
+        fi
+        
+        # Check if translator.py has any changes to prompt strings
+        if git diff --exit-code -w -- srt_translator/core/translator/translator.py $BASE_SHA; then
+          echo "✅ No changes detected in translator.py"
+        else
+          echo "❌ Changes detected in translator.py - please review for prompt modifications"
+          echo "Stage 0 tests must pass unchanged to ensure behavior preservation"
+          exit 1
+        fi

@@ -29,13 +29,6 @@ from srt_translator.core.translator.diagnostics import (
 # OpenAI client
 from openai import OpenAI
 
-# ---------------------------
-# Fallback functions (if imports fail)
-# ---------------------------
-
-
-# Fallback function removed - no longer needed with simplified CPS system
-
 
 # ---------------------------
 # Data models
@@ -218,7 +211,7 @@ class SRTTranslator:
         model_name: str = "gpt-4o-mini",
         batch_size: int,
         error_policy: str = "STRICT",
-        language_config: Optional[LanguageConfig] = None,
+        language_config: LanguageConfig,
     ) -> None:
         if logger is None:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
@@ -240,7 +233,9 @@ class SRTTranslator:
         if isinstance(logger, logging.LoggerAdapter):
             self.logger = logging.LoggerAdapter(self.logger, logger.extra)
 
-        self.language_config = language_config or LanguageConfig({"languages": {}})
+        if language_config is None:
+            raise ValueError("SRTTranslator requires a LanguageConfig (non-None).")
+        self.language_config = language_config
 
         # Initialize TermHandler for DNT and termbase management
         self.term_handler = TermHandler(

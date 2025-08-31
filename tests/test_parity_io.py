@@ -2,14 +2,21 @@
 import logging
 from pathlib import Path
 from srt_translator.core.translator.translator import SRTTranslator
+from srt_translator.core.config.language_config import LanguageConfig
+
 
 class _DummyClient:
-    class _Msg: 
-        def __init__(self, content): self.content = content
+    class _Msg:
+        def __init__(self, content):
+            self.content = content
+
     class _Choice:
-        def __init__(self, content): self.message = _DummyClient._Msg(content)
+        def __init__(self, content):
+            self.message = _DummyClient._Msg(content)
+
     class _Resp:
-        def __init__(self, content): self.choices = [_DummyClient._Choice(content)]
+        def __init__(self, content):
+            self.choices = [_DummyClient._Choice(content)]
 
     def __init__(self):
         pass
@@ -18,7 +25,10 @@ class _DummyClient:
         class completions:
             @staticmethod
             def create(**kwargs):
-                return _DummyClient._Resp(content='{"items":[{"id":1,"tgt":"__DNT_TERM_1__ Hello"}, {"id":2,"tgt":""}, {"id":3,"tgt":"World __DNT_TERM_2__"}]}')
+                return _DummyClient._Resp(
+                    content='{"items":[{"id":1,"tgt":"__DNT_TERM_1__ Hello"}, {"id":2,"tgt":""}, {"id":3,"tgt":"World __DNT_TERM_2__"}]}'
+                )
+
 
 def test_translate_file_parity(tmp_path: Path):
     input_srt = """1
@@ -48,10 +58,13 @@ World __DNT_TERM_2__
         logger=logger,
         batch_size=2,
         error_policy="BOUNDED",
+        language_config=LanguageConfig({"languages": {}}),
     )
     t.client = _DummyClient()
 
-    t.translate_file(input_filepath=str(inp), output_filepath=str(outp), target_lang="fr")
+    t.translate_file(
+        input_filepath=str(inp), output_filepath=str(outp), target_lang="fr"
+    )
 
     out_text = outp.read_text(encoding="utf-8")
     blocks = [b for b in out_text.strip().split("\n\n") if b.strip()]

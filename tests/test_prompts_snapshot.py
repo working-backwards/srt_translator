@@ -3,7 +3,12 @@
 import json
 import logging
 import types
-from srt_translator.core.translator.translator import SRTTranslator, build_termbase_block  # noqa: E402
+from srt_translator.core.translator.translator import (
+    SRTTranslator,
+    build_termbase_block,
+)  # noqa: E402
+from srt_translator.core.config.language_config import LanguageConfig
+
 
 class _DummyClient:
     def __init__(self):
@@ -21,6 +26,7 @@ class _DummyClient:
         def __init__(self, content):
             self.choices = [_DummyClient._Choice(content)]
 
+
 def _mk_translator():
     # Minimal config; we will stub .client afterwards
     logger = logging.getLogger("test")
@@ -32,23 +38,29 @@ def _mk_translator():
         logger=logger,
         batch_size=5,
         error_policy="STRICT",
+        language_config=LanguageConfig({"languages": {}}),
     )
     # Inject dummy client
     dc = _DummyClient()
+
     def _create(**kwargs):
         dc.last_kwargs = kwargs
-        return _DummyClient._Resp(content=json.dumps({"items":[{"id":1,"tgt":"x"},{"id":2,"tgt":"y"}]}))
-    t.client = types.SimpleNamespace(
-        chat=types.SimpleNamespace(
-            completions=types.SimpleNamespace(create=_create)
+        return _DummyClient._Resp(
+            content=json.dumps(
+                {"items": [{"id": 1, "tgt": "x"}, {"id": 2, "tgt": "y"}]}
+            )
         )
+
+    t.client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=_create))
     )
     return t, dc
+
 
 def test_prompts_non_strict_snapshot():
     t, dc = _mk_translator()
     src_items = ["Hello Amazon", "World"]
-    batch_ids = [1,2]
+    batch_ids = [1, 2]
     _ = t._translate_batch_json(
         src_items=src_items,
         target_lang="fr",
@@ -67,15 +79,15 @@ def test_prompts_non_strict_snapshot():
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        "Use these business term mappings when present (source \u2192 target). If \"(none)\", ignore:\n"
+        'Use these business term mappings when present (source \u2192 target). If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"
         "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
         "- Do not invent or drop placeholders.\n"
         "- Never invent __DNT_TERM_n__ placeholders. Only preserve those already present in the input.\n\n"
         "STRUCTURE:\n"
-        "- Return JSON ONLY as: {\"items\":[{\"id\":<int>,\"tgt\":\"...\"}, ...]}\n"
-        "- The \"items\" array MUST have exactly 2 objects.\n"
+        '- Return JSON ONLY as: {"items":[{"id":<int>,"tgt":"..."}, ...]}\n'
+        '- The "items" array MUST have exactly 2 objects.\n'
         "- Use the provided ids 1:1 with the inputs below. Do not merge or split.\n"
         "- Do not include SRT timestamps in the output. Only JSON.\n\n"
         "STYLE:\n"
@@ -88,10 +100,11 @@ def test_prompts_non_strict_snapshot():
     )
     assert user == expected_user
 
+
 def test_prompts_strict_snapshot():
     t, dc = _mk_translator()
     src_items = ["Hello Amazon", "World"]
-    batch_ids = [1,2]
+    batch_ids = [1, 2]
     _ = t._translate_batch_json(
         src_items=src_items,
         target_lang="fr",
@@ -114,15 +127,15 @@ def test_prompts_strict_snapshot():
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        "Use these business term mappings when present (source \u2192 target). If \"(none)\", ignore:\n"
+        'Use these business term mappings when present (source \u2192 target). If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"
         "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
         "- Do not invent or drop placeholders.\n"
         "- Never invent __DNT_TERM_n__ placeholders. Only preserve those already present in the input.\n\n"
         "STRUCTURE:\n"
-        "- Return JSON ONLY as: {\"items\":[{\"id\":<int>,\"tgt\":\"...\"}, ...]}\n"
-        "- The \"items\" array MUST have exactly 2 objects.\n"
+        '- Return JSON ONLY as: {"items":[{"id":<int>,"tgt":"..."}, ...]}\n'
+        '- The "items" array MUST have exactly 2 objects.\n'
         "- Use the provided ids 1:1 with the inputs below. Do not merge or split.\n"
         "- Do not include SRT timestamps in the output. Only JSON.\n\n"
         "STYLE:\n"
