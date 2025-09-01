@@ -184,6 +184,7 @@ def strip_invented_placeholders(
 # Stage 1A Helper Methods (stay in translator.py)
 # ---------------------------
 
+
 def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
     with open(input_filepath, "r", encoding="utf-8") as f:
@@ -194,7 +195,9 @@ def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
     return src_subs
 
 
-def _setup_file_logging(self, input_filepath: str, target_lang: str) -> logging.LoggerAdapter:
+def _setup_file_logging(
+    self, input_filepath: str, target_lang: str
+) -> logging.LoggerAdapter:
     """Setup file-scoped logging with file/lang context."""
     file_logger = logging.LoggerAdapter(
         self.logger,
@@ -493,10 +496,6 @@ class SRTTranslator:
         return batches
 
     # ---------- Stage 1A Helper Methods ----------
-
-
-
-
 
     # ---------- Public API ----------
 
