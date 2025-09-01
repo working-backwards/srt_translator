@@ -218,7 +218,7 @@ class DNTTermsEditor(QWidget):
         """Set the list of DNT terms."""
         self.terms_list = terms.copy()
         self.refresh_display()
-        self.terms_changed.emit(self.terms_list)
+        # Don't emit signal during initialization - only emit when user makes changes
 
     def get_terms(self) -> List[str]:
         """Get the current list of DNT terms."""

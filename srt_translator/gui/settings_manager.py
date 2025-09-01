@@ -7,8 +7,6 @@ Handles persistent storage of user preferences and configuration.
 import hashlib
 import logging
 import os
-import threading
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -17,143 +15,16 @@ from PySide6.QtCore import QSettings
 from srt_translator.core.config.language_config import LanguageConfig
 
 
-@dataclass
-class ConfigState:
-    """Immutable configuration state with validation"""
-
-    target_languages: Dict[str, str]  # language_name -> language_code
-    dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]  # language_code -> term mapping
-    output_directory: Optional[str] = None
-    api_key: Optional[str] = None
-
-    def __post_init__(self):
-        """Validate state after initialization"""
-        if not isinstance(self.target_languages, dict):
-            raise ValueError("target_languages must be a dictionary")
-        if not isinstance(self.dnt_terms, list):
-            raise ValueError("dnt_terms must be a list")
-        if not isinstance(self.termbase, dict):
-            raise ValueError("termbase must be a dictionary")
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary for serialization"""
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "ConfigState":
-        """Create from dictionary with validation"""
-        return cls(**data)
-
-    def copy(self) -> "ConfigState":
-        """Create a deep copy of the state"""
-        return ConfigState(
-            target_languages=self.target_languages.copy(),
-            dnt_terms=self.dnt_terms.copy(),
-            termbase={k: v.copy() for k, v in self.termbase.items()},
-            output_directory=self.output_directory,
-            api_key=self.api_key,
-        )
-
-
 class SettingsManager:
-    """Manages persistent settings for the SRT Translator GUI"""
+    """Manages persistent settings for the SRT Translator GUI (AI Config is SSOT)"""
 
     def __init__(self, language_config: LanguageConfig):
         self.settings = QSettings("SRTTranslator", "SRTTranslator")
-        self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
-        self._lock = threading.Lock()
         self.logger = logging.getLogger(__name__)
         self.language_config = language_config
 
-    # === CENTRALIZED STATE MANAGEMENT ===
-
-    def get_current_state(self) -> ConfigState:
-        """Get current state (thread-safe)"""
-        with self._lock:
-            # If current state is empty, try to load AI configuration
-            if not self._state.dnt_terms and not self._state.termbase:
-                try:
-                    ai_dnt_terms, ai_termbase, _ = self.load_ai_config()
-                    if ai_dnt_terms or ai_termbase:
-                        self.logger.info("Loading AI configuration into current state")
-                        new_state = self._state.copy()
-                        new_state.dnt_terms = ai_dnt_terms.copy()
-                        new_state.termbase = {
-                            k: v.copy() for k, v in ai_termbase.items()
-                        }
-                        self._state = new_state
-                except Exception as e:
-                    self.logger.warning(f"Failed to load AI configuration: {e}")
-
-            return self._state.copy()
-
-    def update_state(self, new_state: ConfigState):
-        """Update state (thread-safe)"""
-        with self._lock:
-            self._state = new_state
-        self._persist_state(new_state)
-
-    def get_current_target_languages(self) -> Dict[str, str]:
-        """Get current language selection from UI state (thread-safe)"""
-        with self._lock:
-            return self._state.target_languages.copy()
-
-    def update_target_languages(self, languages: Dict[str, str]):
-        """Update both UI state and persistent storage (thread-safe)"""
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.target_languages = languages.copy()
-            self._state = new_state
-        self._persist_state(self._state)
-
-    def get_current_dnt_terms(self) -> List[str]:
-        """Get current DNT terms (thread-safe)"""
-        with self._lock:
-            return self._state.dnt_terms.copy()
-
-    def update_dnt_terms(self, dnt_terms: List[str]):
-        """Update DNT terms (thread-safe)"""
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.dnt_terms = dnt_terms.copy()
-            self._state = new_state
-        self._persist_state(self._state)
-
-    def get_current_termbase(self) -> Dict[str, Dict[str, str]]:
-        """Get current termbase (thread-safe)"""
-        with self._lock:
-            return {k: v.copy() for k, v in self._state.termbase.items()}
-
-    def update_termbase(self, termbase: Dict[str, Dict[str, str]]):
-        """Update termbase (thread-safe)"""
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
-            self._state = new_state
-        self._persist_state(self._state)
-
-    def _persist_state(self, state: ConfigState):
-        """Persist state to storage"""
-        try:
-            state_dict = state.to_dict()
-            # Remove sensitive data before persistence
-            if "api_key" in state_dict:
-                del state_dict["api_key"]
-            # Save to QSettings
-            self.settings.setValue("current_state", state_dict)
-        except Exception as e:
-            self.logger.error(f"Failed to persist state: {e}")
-
-    def _load_state_from_storage(self) -> ConfigState:
-        """Load state from storage"""
-        try:
-            data = self.settings.value("current_state", {})
-            if data and isinstance(data, dict):
-                return ConfigState.from_dict(data)
-        except Exception as e:
-            self.logger.warning(f"Failed to load state, using defaults: {e}")
-        return ConfigState(target_languages={}, dnt_terms=[], termbase={})
+    # NOTE: All former 'current_state' APIs have been removed.
+    # AI Config stored in QSettings is the single source of truth.
 
     def load_last_input_directory(self) -> str:
         """Load last used input directory"""
@@ -186,9 +57,6 @@ class SettingsManager:
     def clear_all_settings(self) -> None:
         """Clear all settings"""
         self.settings.clear()
-        # Reset current state
-        with self._lock:
-            self._state = ConfigState(target_languages={}, dnt_terms=[], termbase={})
 
     def save_ai_config(
         self,
@@ -202,13 +70,6 @@ class SettingsManager:
         self.settings.setValue("ai_termbase", termbase)
         self.settings.setValue("ai_source_language", source_language or {})
         self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
-
-        # Also update current state
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.dnt_terms = dnt_terms.copy()
-            new_state.termbase = {k: v.copy() for k, v in termbase.items()}
-            self._state = new_state
 
         # Calculate and store file hash for change detection
         file_hash = self._calculate_file_hash()
@@ -249,13 +110,6 @@ class SettingsManager:
         self.settings.remove("ai_config_timestamp")
         self.settings.remove("ai_config_file_hash")
 
-        # Also clear from current state
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.dnt_terms = []
-            new_state.termbase = {}
-            self._state = new_state
-
     def get_ai_config_age_days(self) -> Optional[int]:
         """Get age of AI configuration in days"""
         timestamp_str = self.settings.value("ai_config_timestamp", "")
@@ -272,11 +126,6 @@ class SettingsManager:
     def save_api_key(self, api_key: str) -> None:
         """Save API key to settings"""
         self.settings.setValue("api_key", api_key)
-        # Also update current state
-        with self._lock:
-            new_state = self._state.copy()
-            new_state.api_key = api_key
-            self._state = new_state
 
     def load_api_key(self) -> str:
         """Load API key from settings"""
@@ -286,6 +135,10 @@ class SettingsManager:
     def save_target_languages(self, languages: Dict[str, str]) -> None:
         """Save target languages dictionary"""
         self.settings.setValue("target_languages", languages)
+
+    def update_target_languages(self, languages: Dict[str, str]) -> None:
+        """Update target languages (alias for save_target_languages for UI compatibility)"""
+        self.save_target_languages(languages)
 
     def load_target_languages(self) -> Dict[str, str]:
         """Load target languages dictionary"""
@@ -347,8 +200,21 @@ class SettingsManager:
         return user_preferences[:popular_limit]
 
     def save_user_popular_languages(self, language_codes: List[str]) -> None:
-        """Save user's preferred popular languages"""
-        self.settings.setValue("user_popular_languages", language_codes)
+        """Save user's preferred popular languages (deduped, capped to limit)"""
+        try:
+            # Ensure uniqueness while preserving order
+            seen = set()
+            deduped = []
+            for code in language_codes or []:
+                if code not in seen:
+                    seen.add(code)
+                    deduped.append(code)
+            # Cap to configured limit
+            limit = self.language_config.get_popular_limit()
+            capped = deduped[:limit]
+            self.settings.setValue("user_popular_languages", capped)
+        except Exception as e:
+            self.logger.warning(f"Failed to save user popular languages: {e}")
 
     def load_user_popular_languages(self) -> List[str]:
         """Load user's preferred popular languages"""
@@ -397,7 +263,7 @@ class SettingsManager:
         popular_limit = self.language_config.get_popular_limit()
         top_languages = [lang_code for lang_code, _ in sorted_languages[:popular_limit]]
 
-        # Save as user's preferred popular languages
+        # Save as user's preferred popular languages (will dedupe/cap)
         self.save_user_popular_languages(top_languages)
 
     def get_all_languages(self) -> Dict[str, str]:

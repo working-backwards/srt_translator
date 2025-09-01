@@ -341,6 +341,21 @@ class TranslationWorker(QObject):
 
             # (Fixer runs in core automatically; nothing to do here)
 
+            # Learn from this run: update adaptive popular languages
+            try:
+                if self.settings_manager and self.target_languages:
+                    # Track usage for each selected target language code
+                    for code in (self.target_languages or {}).values():
+                        try:
+                            self.settings_manager.track_language_usage(code)
+                        except Exception as e:
+                            self.logger.warning(
+                                f"Failed to track usage for language '{code}': {e}"
+                            )
+            except Exception:
+                # Never fail the run due to usage tracking
+                self.logger.exception("Adaptive language usage tracking failed")
+
             # Post-translation evaluation (config-gated)
             try:
                 eval_logger = self.logger.getChild("eval")
@@ -424,23 +439,25 @@ class TranslationWorker(QObject):
             self._stop_logging_bridge()
 
     def setup_ai_configuration(self):
-        """Set up AI configuration from settings manager (if available)"""
+        """Log AI configuration snapshot from settings (if available)."""
         if not self.settings_manager:
             self.logger.warning("No settings manager available for AI configuration")
             return
 
         try:
-            # Get current state from settings manager (thread-safe)
-            config_state = self.settings_manager.get_current_state()
-
-            self.logger.info("Using AI configuration from settings manager")
-            self.logger.info(f"DNT terms count: {len(config_state.dnt_terms)}")
-            self.logger.info(
-                f"Termbase languages: {list(config_state.termbase.keys())}"
+            dnt_terms, termbase, source_language = (
+                self.settings_manager.load_ai_config()
             )
+            self.logger.info("AI configuration (snapshot) loaded from settings")
+            self.logger.info(f"DNT terms count: {len(dnt_terms)}")
+            if termbase:
+                self.logger.info(f"Termbase languages: {list(termbase.keys())}")
+            if source_language:
+                code = source_language.get("code")
+                name = source_language.get("name")
+                self.logger.info(f"Source language: {name} ({code})")
 
-            # Note: We don't set environment variables anymore
-            # The translation functions will receive this configuration directly as parameters
+            # Note: The translation run receives the config directly; this is logging only.
 
         except Exception as e:
             self.logger.error(f"Error setting up AI configuration: {e}")

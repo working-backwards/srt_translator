@@ -271,8 +271,10 @@ Notes:
 - Test the connection to verify it works
 
 ### 2. Target Languages
-To choose the languages for translation, click the checkboxes under Popular Languages for quick access to common options.
-If your desired language isn’t listed there, scroll through or use the Search Languages box in the list below to find and select it.
+Choose languages via checkboxes. The **Popular Languages** row is **adaptive**:
+it learns from your recent runs (and your manual picks), so your most commonly
+used languages (e.g., **az**) stay easy to access. If a language isn't shown,
+use the search to find and select it.
 
 ### 3. Translation Quality Tools (Optional but Recommended)
 
@@ -527,7 +529,7 @@ The SRT Translator requires these parameters to function:
 ### Parameter Sources by Mode
 
 #### **GUI Mode (New Architecture)**
-- **Settings Storage**: Uses Qt's QSettings with `ConfigState` dataclass for thread-safe access
+- **Settings Storage**: Uses Qt's QSettings; AI Config is the single source of truth (no duplicate GUI state)
 - **Language Selection**: Real-time UI updates with centralized `SettingsManager` state
 - **File Selection**: UI file browser and output directory picker
 - **AI Configuration**: Automatic generation of DNT terms and termbase
