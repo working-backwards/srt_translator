@@ -5,9 +5,12 @@ from pathlib import Path
 import pytest
 
 from srt_translator.core.translator.translator import SRTTranslator
-from srt_translator.core.config.language_config import LanguageConfig  # required (fail-fast enabled)
+from srt_translator.core.config.language_config import (
+    LanguageConfig,
+)  # required (fail-fast enabled)
 
 # --- Utilities ---
+
 
 def _read_srt_blocks(text: str):
     """
@@ -28,18 +31,25 @@ def _read_srt_blocks(text: str):
         blocks.append({"idx": idx, "ts": ts, "text": txt})
     return blocks
 
+
 class _DummyClient:
     """
     Minimal stand-in for the OpenAI client. It parses the user prompt to reconstruct
     the INPUT ITEMS section and returns a JSON payload that echoes those items as targets.
     This keeps tests deterministic and model-agnostic.
     """
+
     class _Msg:
-        def __init__(self, content): self.content = content
+        def __init__(self, content):
+            self.content = content
+
     class _Choice:
-        def __init__(self, content): self.message = _DummyClient._Msg(content)
+        def __init__(self, content):
+            self.message = _DummyClient._Msg(content)
+
     class _Resp:
-        def __init__(self, content): self.choices = [_DummyClient._Choice(content)]
+        def __init__(self, content):
+            self.choices = [_DummyClient._Choice(content)]
 
     class chat:
         class completions:
@@ -69,6 +79,7 @@ class _DummyClient:
                 payload = {"items": items}
                 return _DummyClient._Resp(content=json.dumps(payload))
 
+
 # Global defaults for goldens
 GOLDEN_INPUT_DIR = Path("tests/fixtures/golden/inputs")
 GLOBAL_DNT = ["API", "CEO"]
@@ -78,14 +89,25 @@ TERMS_ES = {"Hello": "Hola", "test": "prueba"}  # only used where relevant
 CASES = [
     ("golden_dnt_acronyms.srt", ["es", "zh-Hans", "fr"], {"dnt_terms": GLOBAL_DNT}),
     ("golden_numbers_currency.srt", ["es", "zh-Hans", "fr"], {"dnt_terms": []}),
-    ("golden_empty_block.srt", ["es", "zh-Hans", "fr"], {"dnt_terms": [], "error_policy": "BOUNDED"}),
+    (
+        "golden_empty_block.srt",
+        ["es", "zh-Hans", "fr"],
+        {"dnt_terms": [], "error_policy": "BOUNDED"},
+    ),
     ("golden_cps_warn_only.srt", ["es", "zh-Hans", "fr"], {"dnt_terms": []}),
-    ("golden_multi_batch.srt", ["es", "zh-Hans", "fr"], {"dnt_terms": [], "batch_size": 4}),
+    (
+        "golden_multi_batch.srt",
+        ["es", "zh-Hans", "fr"],
+        {"dnt_terms": [], "batch_size": 4},
+    ),
     ("golden_placeholder_apostrophe.srt", ["fr"], {"dnt_terms": ["API"]}),
 ]
 
+
 @pytest.mark.parametrize("filename,languages,overrides", CASES)
-def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, languages, overrides):
+def test_golden_structure_and_invariants(
+    tmp_path: Path, caplog, filename, languages, overrides
+):
     # Read input and basic structure
     input_path = GOLDEN_INPUT_DIR / filename
     src_text = input_path.read_text(encoding="utf-8")
@@ -93,7 +115,9 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
     assert src_blocks, f"Invalid SRT fixture: {filename}"
 
     # Common config
-    language_config = LanguageConfig({"languages": {}})  # use your real config loader in app; tests use minimal stub
+    language_config = LanguageConfig(
+        {"languages": {}}
+    )  # use your real config loader in app; tests use minimal stub
     termbase = {"es": TERMS_ES}  # non-ES languages may have empty mappings
 
     for target_lang in languages:
@@ -112,7 +136,11 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
 
         # Translate to temp output
         out_path = tmp_path / f"{filename}.{target_lang}.out.srt"
-        t.translate_file(input_filepath=str(input_path), output_filepath=str(out_path), target_lang=target_lang)
+        t.translate_file(
+            input_filepath=str(input_path),
+            output_filepath=str(out_path),
+            target_lang=target_lang,
+        )
 
         # Read output and compare structure
         out_text = out_path.read_text(encoding="utf-8")
@@ -139,3 +167,53 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
         # Apostrophe-after-placeholder: covered structurally by integrity + literal 'API's'
         if filename == "golden_placeholder_apostrophe.srt":
             assert "API's" in out_text
+
+    # --- Fixer golden guard: Fixer must be a no-op on goldens (dry-run) ---
+    from srt_translator.core.translator.fixer import SRTFixer
+
+    # Create a temporary batch directory structure for the fixer test
+    batch_dir = tmp_path / "golden_batch_test"
+    batch_dir.mkdir(exist_ok=True)
+
+    # Create ai_config.json with the DNT terms used in this test
+    ai_config = {
+        "version": "1.0.0",
+        "dnt_terms": overrides.get("dnt_terms", []),
+    }
+    (batch_dir / "ai_config.json").write_text(
+        json.dumps(ai_config, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    # Copy the translated outputs to the batch structure (simulating what main.py does)
+    for target_lang in languages:
+        lang_dir = batch_dir / target_lang
+        lang_dir.mkdir(exist_ok=True)
+        out_path = tmp_path / f"{filename}.{target_lang}.out.srt"
+        if out_path.exists():
+            (lang_dir / f"{filename}.{target_lang}.srt").write_text(
+                out_path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+
+    # Run fixer in dry-run mode
+    fixer = SRTFixer(
+        log_file=str(batch_dir / "fixer_golden.log"), translations_dir=str(batch_dir)
+    )
+    summary = fixer.scan_and_fix_placeholders(
+        batch_dir=batch_dir, dnt_terms=ai_config["dnt_terms"], dry_run=True
+    )
+
+    # No backups on dry-run
+    assert not list(batch_dir.rglob("*.srt.bak"))
+
+    # No placeholder tokens should remain in any translated SRT
+    for p in batch_dir.rglob("*.srt"):
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        assert "__DNT_TERM_" not in text, f"Placeholder token leaked in {p}"
+
+    # If summary includes counters, assert zero changes
+    changes = sum(
+        summary.get(k, 0)
+        for k in ("tokens_replaced", "tokens_removed", "files_changed")
+    )
+    assert changes == 0
+    # --- end Fixer golden guard ---

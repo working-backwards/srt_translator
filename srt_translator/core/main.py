@@ -255,46 +255,27 @@ def translate_srt_files(
     # Remove file handler to avoid duplicate logging
     logger.removeHandler(file_handler)
 
-    # Run automatic fixes
-    for lang_name, lang_code in config.target_languages.items():
-        if not lang_code:
-            continue
+    # Run SRT fixer (post-eval, batch-wide)
+    logger.info("Running SRT fixer (post-eval, batch-wide)...")
+    try:
+        from srt_translator.core.translator.fixer import SRTFixer
+        from pathlib import Path
 
-        logger.info(f"Running automatic fixes for {os.path.basename(file_paths[0])}...")
-        try:
-            from srt_translator.core.translator.fixer import SRTFixer
+        # Temporarily attach file handler to fixer's logger
+        fixer_logger = logging.getLogger("srt_translator.core.translator.fixer")
+        fixer_logger.addHandler(file_handler)
 
-            fixer = SRTFixer(log_file, batch_dir)
-            fixer.parse_log_file()
-            fixer.fix_srt_files(aggressiveness=config.aggressiveness)
-            fixer.report_status()
-        except Exception as e:
-            logger.error(f"Failed to run automatic fixes for {lang_code}: {e}")
+        fixer = SRTFixer(log_file, batch_dir)
+        fixer.scan_and_fix_placeholders(
+            batch_dir=Path(batch_dir), dnt_terms=config.dnt_terms, dry_run=False
+        )
 
-    logger.info("Automatic SRT fixes completed.")
+        # Remove file handler from fixer's logger
+        fixer_logger.removeHandler(file_handler)
+    except Exception as e:
+        logger.error(f"Failed to run SRT fixer: {e}")
 
-    # Evaluation artifacts are written per-language above
-
-    # Run automatic fixes again after evaluation
-    logger.info(f"Batch folder: {batch_dir}")
-    logger.info(f"Artifacts directory: {os.path.relpath(artifacts_dir, batch_dir)}")
-
-    for lang_name, lang_code in config.target_languages.items():
-        if not lang_code:
-            continue
-
-        logger.info(f"Running automatic SRT fixer on translated files...")
-        try:
-            from srt_translator.core.translator.fixer import SRTFixer
-
-            fixer = SRTFixer(log_file, batch_dir)
-            fixer.parse_log_file()
-            fixer.fix_srt_files(aggressiveness=config.aggressiveness)
-            fixer.report_status()
-        except Exception as e:
-            logger.error(f"Failed to run automatic fixes for {lang_code}: {e}")
-
-    logger.info("Automatic SRT fixes completed.")
+    logger.info("SRT fixer completed.")
 
     # Return summary of translation results with batch directory
     return {
