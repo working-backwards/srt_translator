@@ -22,7 +22,9 @@ def test_consolidated_punchlist_includes_only_errors(tmp_path: Path):
             ]
         }
     }
-    md = render_consolidated_punchlist(languages, batch_root=tmp_path)
+    md = render_consolidated_punchlist(
+        languages, batch_root=tmp_path, source_lang_name="English"
+    )
     assert "Some files need attention" in md
     assert "cue 104" in md
     assert "Everything looks great" not in md

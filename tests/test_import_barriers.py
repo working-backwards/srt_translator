@@ -23,9 +23,12 @@ def test_cli_imports_without_gui():
 def test_gui_imports_with_gui():
     """Test that GUI can import when PySide6 is available."""
     # This will only run when PySide6 is available
+    import srt_translator.gui.app
     import srt_translator.gui.main_window
 
-    assert hasattr(srt_translator.gui.main_window, "main")
+    # GUI app should have main function and main window should be importable
+    assert hasattr(srt_translator.gui.app, "main")
+    assert hasattr(srt_translator.gui.main_window, "SRTTranslatorMainWindow")
 
 
 def test_core_imports_independently():

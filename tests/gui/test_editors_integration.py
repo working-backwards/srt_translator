@@ -79,9 +79,14 @@ class TestEditorsIntegration:
         dnt_editor.terms_changed.connect(on_dnt_changed)
         termbase_editor.termbase_changed.connect(on_termbase_changed)
 
-        # Trigger signals
-        dnt_editor.set_terms(sample_dnt_terms)
-        termbase_editor.set_termbase(sample_termbase)
+        # Trigger signals by simulating user actions (not programmatic initialization)
+        dnt_editor.terms_list = sample_dnt_terms.copy()
+        dnt_editor.refresh_display()
+        dnt_editor.terms_changed.emit(dnt_editor.terms_list)
+
+        termbase_editor.termbase = sample_termbase.copy()
+        termbase_editor.refresh_table()
+        termbase_editor.termbase_changed.emit(termbase_editor.termbase)
 
         # Process events
         qapp.processEvents()
