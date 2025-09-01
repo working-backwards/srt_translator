@@ -357,7 +357,7 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
                 )
 
     man.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    log.info("Ensured manifest.json has all required fields", extra={"path": str(man)})
+    log.debug("Ensured manifest.json has all required fields", extra={"path": str(man)})
 
 
 def _write_manifest_if_missing(
@@ -435,7 +435,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
         )
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-        logger.info(f"Added batch log file handler: {log_file.name}")
+        logger.debug(f"Added batch log file handler: {log_file.name}")
     except Exception as e:
         logger.warning(f"Failed to add batch log file handler: {e}")
 
@@ -491,37 +491,56 @@ def run_batch_evaluation(
 
     # Friendly source language from TranslationConfig (if available)
     src_lang_info = {}
-    log.info("DEBUG: language_config type: %s", type(language_config))
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug("language_config type: %s", type(language_config))
     if language_config:
-        log.info("DEBUG: language_config attributes: %s", dir(language_config))
+        if log.isEnabledFor(logging.DEBUG):
+            try:
+                log.debug("language_config attributes: %s", dir(language_config))
+            except Exception:
+                log.debug("language_config attributes: <unavailable>")
         if hasattr(language_config, "source_language"):
             src_lang = language_config.source_language
-            log.info(
-                "DEBUG: source_language type: %s, value: %s", type(src_lang), src_lang
-            )
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "source_language type: %s, value: %s", type(src_lang), src_lang
+                )
             if src_lang and isinstance(src_lang, dict):
-                log.info("DEBUG: source_language keys: %s", list(src_lang.keys()))
+                if log.isEnabledFor(logging.DEBUG):
+                    try:
+                        log.debug("source_language keys: %s", list(src_lang.keys()))
+                    except Exception:
+                        log.debug("source_language keys: <unavailable>")
                 # Check for normalized_code first, then detected_code
                 code = src_lang.get("normalized_code") or src_lang.get("detected_code")
                 if code:
                     name = (
                         src_lang.get("normalized_name")
-                        or src_lang.get("detected_name")
+                        or src_lang.get("name")
                         or str(code)
                     )
                     src_lang_info = {"code": str(code), "name": str(name)}
-                    log.info("DEBUG: Using code: %s, name: %s", code, name)
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug("Using code: %s, name: %s", code, name)
                 else:
-                    log.info("DEBUG: No valid code found in source_language")
+                    if log.isEnabledFor(logging.DEBUG):
+                        log.debug("No valid code found in source_language")
             else:
-                log.info("DEBUG: source_language is not a dict or is empty")
+                if log.isEnabledFor(logging.DEBUG):
+                    log.debug("source_language is not a dict or is empty")
         else:
-            log.info("DEBUG: language_config has no source_language attribute")
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug("language_config has no source_language attribute")
     else:
-        log.info("DEBUG: No language_config provided")
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("No language_config provided")
 
     if src_lang_info:
-        log.info("Source language info from TranslationConfig: %s", src_lang_info)
+        log.info(
+            "Source language: %s (%s)",
+            src_lang_info.get("name"),
+            src_lang_info.get("code"),
+        )
 
     # ensure manifest is complete (source name, versions)
     _ensure_manifest_fields(batch_root, log)
@@ -541,16 +560,18 @@ def run_batch_evaluation(
     # Log coverage information for optional inputs
     dnt_terms = batch_config.get("dnt_terms", [])
     if not dnt_terms:
-        log.info("No DNT terms provided; continuing without DNT coverage")
+        log.debug("No DNT terms provided; continuing without DNT coverage")
     else:
-        log.info(f"DNT terms loaded: {len(dnt_terms)} terms")
+        log.debug(f"DNT terms loaded: {len(dnt_terms)} terms")
 
     termbase = batch_config.get("termbase", {})
     if not termbase:
-        log.info("No termbase provided; continuing without termbase coverage")
+        log.debug("No termbase provided; continuing without termbase coverage")
     else:
         covered_langs = [lang for lang, entries in termbase.items() if entries]
-        log.info(f"Termbase coverage: {len(covered_langs)} languages with custom terms")
+        log.debug(
+            f"Termbase coverage: {len(covered_langs)} languages with custom terms"
+        )
 
     rollup: Dict[str, Any] = {
         "batch_label": batch_label,

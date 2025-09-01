@@ -197,18 +197,17 @@ def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
 
 def _setup_file_logging(
     self, input_filepath: str, target_lang: str
-) -> Tuple[logging.LoggerAdapter, str]:
+) -> logging.LoggerAdapter:
     """Setup file-scoped logging with file/lang context."""
-    file_tag = os.path.basename(input_filepath)
     file_logger = logging.LoggerAdapter(
         self.logger,
         {
             "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
-            "file": file_tag,
+            "file": os.path.basename(input_filepath),
             "lang": target_lang,
         },
     )
-    return file_logger, file_tag
+    return file_logger
 
 
 def _validate_and_repair_placeholders(
@@ -225,7 +224,7 @@ def _validate_and_repair_placeholders(
         src_placeholders = PH_RE.findall(src)
         tgt_placeholders = PH_RE.findall(tgt)
         if src_placeholders or tgt_placeholders:
-            batch_logger.info(
+            batch_logger.debug(
                 "Placeholder comparison (item=%d):\n"
                 "  Source: %s\n"
                 "  Target: %s\n"
@@ -248,11 +247,11 @@ def _validate_and_repair_placeholders(
         ph_issues = validate_placeholders_pair(
             src_items, norm_tgts, self.term_handler.placeholder_regex
         )
-        # Once-per-batch info (less noisy when allowed)
+        # Once-per-batch debug (observational only)
         seen = False
         for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                batch_logger.info(
+                batch_logger.debug(
                     "Apostrophe after placeholder observed (allowed for %s, item=%d).",
                     target_lang,
                     i,
@@ -268,7 +267,7 @@ def _validate_and_repair_placeholders(
 
         for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                batch_logger.info(
+                batch_logger.debug(
                     "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
                     i,
                     target_lang,
@@ -511,7 +510,7 @@ class SRTTranslator:
         self._consecutive_decode_failures = 0
 
         # 1) Setup file logging and load/parse SRT
-        file_logger, file_tag = _setup_file_logging(self, input_filepath, target_lang)
+        file_logger = _setup_file_logging(self, input_filepath, target_lang)
         file_logger.info(
             "Using subtitle-based translation system for %s → %s",
             os.path.basename(input_filepath),
@@ -561,7 +560,7 @@ class SRTTranslator:
                         self.term_handler.apply_dnt_placeholders(head.text),
                     ]
                     pair_ids = [deferred_tail_retry["cue_index"], head.idx]
-                    batch_logger.info(
+                    batch_logger.debug(
                         "Empty target at idx=%s; attempting pair retry with next cue across batch boundary (pair_ids=%s).",
                         deferred_tail_retry["cue_index"],
                         pair_ids,
@@ -573,14 +572,13 @@ class SRTTranslator:
                             self.termbase,
                             pair_ids,
                             logger=batch_logger,
-                            file_tag=file_tag,
                         )
                         fixed = self.term_handler.restore_dnt_placeholders(
                             pair_tgts[0] if pair_tgts else ""
                         )
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
-                            batch_logger.info(
+                            batch_logger.debug(
                                 "Pair retry filled idx=%s successfully.",
                                 deferred_tail_retry["cue_index"],
                             )
@@ -590,34 +588,32 @@ class SRTTranslator:
                                 deferred_tail_retry["cue_index"],
                             )
                     except Exception as ex:
-                        batch_logger.warning(
+                        batch_logger.debug(
                             "Pair retry failed for idx=%s: %s",
                             deferred_tail_retry["cue_index"],
                             ex,
                         )
-                        batch_logger.error(
+                        batch_logger.warning(
                             "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
                             deferred_tail_retry["cue_index"],
                         )
                     finally:
                         deferred_tail_retry = None
                 else:
-                    batch_logger.error(
+                    batch_logger.warning(
                         "Empty translation for subtitle idx=%s at end-of-file; leaving empty for evaluator.",
                         deferred_tail_retry["cue_index"],
                     )
                     deferred_tail_retry = None
 
-            # One-line context banner
+            # One-line heartbeat for creators (keep at INFO)
             batch_logger.info(
-                "Batch context: file=%s batch=%d/%d ids=%s",
-                os.path.basename(input_filepath),
+                "Batch %d/%d: processing %d subtitles (file=%s ids=%s)",
                 bi,
                 len(batches),
+                len(batch),
+                os.path.basename(input_filepath),
                 [s.idx for s in batch],
-            )
-            batch_logger.info(
-                "Processing %d subtitles in batch %d/%d", len(batch), bi, len(batches)
             )
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
@@ -641,7 +637,6 @@ class SRTTranslator:
                 batch_ids=[s.idx for s in batch],
                 target_lang=target_lang,
                 batch_logger=batch_logger,
-                file_tag=file_tag,
             )
 
             tgt_texts = _validate_and_repair_placeholders(
@@ -659,7 +654,6 @@ class SRTTranslator:
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 batch_logger=batch_logger,
-                file_tag=file_tag,
             )
 
             # 4) Format and append subtitles
@@ -702,7 +696,6 @@ class SRTTranslator:
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
         strict: bool = False,
-        file_tag: str | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
@@ -776,7 +769,7 @@ INPUT ITEMS:
         # Heuristic: response wildly larger than prompt (>= 4x), or loop detected
         oversize = response_token_est >= 4 * prompt_token_est
         if oversize or repetitive_loop:
-            self.logger.info(
+            self.logger.debug(
                 "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
                 prompt_token_est,
                 response_token_est,
@@ -830,14 +823,14 @@ INPUT ITEMS:
                         max_tokens=160,
                     )
                     diag_text = (diag_resp.choices[0].message.content or "").strip()
-                    self.logger.info(
+                    self.logger.debug(
                         "AI diagnostic explanation (lang=%s, ids=%s): %s",
                         target_lang,
                         batch_ids,
                         snip(diag_text, 400),
                     )
                 except Exception as probe_ex:
-                    self.logger.warning(
+                    self.logger.debug(
                         "AI diagnostic probe failed (lang=%s, ids=%s): %s",
                         target_lang,
                         batch_ids,
@@ -893,7 +886,7 @@ INPUT ITEMS:
                 if estimate_tokens(tgt) >= 2.8 * max(1, estimate_tokens(src or "")):
                     bad.append((i, "oversize_ratio"))
             if bad:
-                self.logger.warning(
+                self.logger.debug(
                     "Degenerate outputs detected (lang=%s, ids=%s, bad=%s)",
                     target_lang,
                     batch_ids,
@@ -904,26 +897,18 @@ INPUT ITEMS:
 
             return norm
         except Exception:
-            # Log the payload sent to translator and the response received when failure occurs
-            # SANCTIONED DIAGNOSTICS HOOK: main-batch failure
-            # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
-            self.logger.info(
-                "Translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: %s\nUser: %s",
-                target_lang,
-                len(src_items),
-                system_prompt,
-                user_prompt,
-            )
-            self.logger.info(
-                "Translation failure - Raw response received from translator:\n%s",
-                content,
-            )
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(
+                    "Translation failure - payload and raw response captured for DEBUG (lang=%s, items=%d).",
+                    target_lang,
+                    len(src_items),
+                )
             # Diagnostics: token estimates + repetition hint + one-time probe
             try:
                 payload_text = f"System: {system_prompt}\nUser: {user_prompt}"
                 prompt_tokens = estimate_tokens(payload_text)
                 response_tokens = estimate_tokens(content or "")
-                self.logger.info(
+                self.logger.debug(
                     "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
                     prompt_tokens,
                     response_tokens,
@@ -936,7 +921,12 @@ INPUT ITEMS:
                     if looks_like_repetitive_loop(content or "")
                     else "unknown"
                 )
-                file_base = file_tag or "?"
+                file_base = "?"
+                if isinstance(self.logger, logging.LoggerAdapter):
+                    try:
+                        file_base = self.logger.extra.get("file", "?")  # type: ignore[attr-defined]
+                    except Exception:
+                        file_base = "?"
                 # Call the AI probe to understand what went wrong
                 source_text = "\n".join(
                     [f"{i+1}) {src}" for i, src in enumerate(src_items)]
@@ -959,7 +949,7 @@ INPUT ITEMS:
             # ask once for a plain string and wrap it into the expected JSON structure.
             if len(src_items) == 1:
                 try:
-                    self.logger.info(
+                    self.logger.debug(
                         "Attempting plain-string fallback for single item (lang=%s, id=%s).",
                         target_lang,
                         (batch_ids[0] if batch_ids else "?"),
@@ -973,9 +963,7 @@ INPUT ITEMS:
                     ]
                     return wrapped
                 except Exception as _fallback_ex:
-                    self.logger.warning(
-                        "Plain-string fallback failed: %s", _fallback_ex
-                    )
+                    self.logger.debug("Plain-string fallback failed: %s", _fallback_ex)
 
             # Otherwise, let shape-lock handle it as before.
             self.logger.error(
@@ -1154,7 +1142,7 @@ TARGET ITEMS (TO FIX):
             out[i] = head
             out[i + 1] = tail
 
-            logger.info(
+            logger.debug(
                 "adjacent-repair: moved tail starting with %s from id=%s to id=%s",
                 token,
                 batch_ids[i] if i < len(batch_ids) else "?",
@@ -1173,7 +1161,6 @@ TARGET ITEMS (TO FIX):
         batch_ids: List[int],
         logger: logging.Logger,
         strict: bool = False,
-        file_tag: str | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Bounded, iterative shape-lock:
@@ -1230,7 +1217,6 @@ TARGET ITEMS (TO FIX):
                     termbase=termbase,
                     batch_ids=seg_ids,
                     strict=strict,
-                    file_tag=file_tag,
                 )
                 if len(items) != len(seg_src):
                     raise RuntimeError(

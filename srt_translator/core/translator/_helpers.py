@@ -49,7 +49,6 @@ def _translate_batch_and_extract(
     batch_ids: List[int],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
-    file_tag: str | None = None,
 ) -> List[str]:
     """Translate batch and extract target texts."""
     # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
@@ -60,16 +59,15 @@ def _translate_batch_and_extract(
             self.termbase,
             batch_ids,
             logger=batch_logger,
-            file_tag=file_tag,
         )
     except Exception as ex:
-        # Log the payload that was sent to the translator when failure occurs
-        self.logger.info(
-            "Main batch translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: You are a professional subtitle translator. Return valid JSON ONLY, never prose.\nUser: Translate each item to %s. Keep 1:1 count and order...",
-            target_lang,
-            len(src_items),
-            target_lang,
-        )
+        # Only log payload details at DEBUG to avoid alarming content creators
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                "Main batch translation failure - Payload sent (lang=%s, items=%d).",
+                target_lang,
+                len(src_items),
+            )
         raise  # Re-raise the exception to maintain the original behavior
 
     # Extract and validate placeholder usage
@@ -83,7 +81,6 @@ def _handle_mid_batch_empty_retries(
     tgt_texts: List[str],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
-    file_tag: str | None = None,
 ) -> List[str]:
     """Handle mid-batch empty translation retries."""
     # Empty guard — single pair-retry for mid-stream empty; no source fallback
@@ -95,7 +92,7 @@ def _handle_mid_batch_empty_retries(
         # Try exactly one pair retry with the next cue when available
         if i + 1 < len(batch):
             try:
-                batch_logger.info(
+                batch_logger.debug(
                     "Empty target at idx=%s; attempting pair retry with next cue.",
                     sid,
                 )
@@ -110,7 +107,6 @@ def _handle_mid_batch_empty_retries(
                     termbase=self.termbase,
                     batch_ids=pair_ids,
                     strict=True,
-                    file_tag=file_tag,
                 )
                 if isinstance(pair_items, list) and len(pair_items) >= 1:
                     candidate = pair_items[0].get("tgt", "")
@@ -118,17 +114,19 @@ def _handle_mid_batch_empty_retries(
                         tgt_texts[i] = self.term_handler.restore_dnt_placeholders(
                             candidate
                         )
-                        batch_logger.info("Pair retry filled idx=%s successfully.", sid)
+                        batch_logger.debug(
+                            "Pair retry filled idx=%s successfully.", sid
+                        )
                         filled = True
             except Exception as ex:
                 # SANCTIONED DIAGNOSTICS HOOK: strict pair-retry failure
                 # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
-                batch_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
+                batch_logger.debug("Pair retry failed for idx=%s: %s", sid, ex)
         if not filled:
             if self.error_policy == "STRICT":
                 raise RuntimeError(f"Empty translation for subtitle idx={sid}")
             # Leave empty in BOUNDED/DEV; evaluator will flag as Missing translation
-            batch_logger.error(
+            batch_logger.warning(
                 "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
                 sid,
             )

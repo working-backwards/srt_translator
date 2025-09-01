@@ -27,6 +27,16 @@ def setup_logging(debug: bool = False) -> None:
         ],
     )
 
+    # Always squelch noisy HTTP client logs for creator-facing runs
+    for name in (
+        "httpx",
+        "httpcore",
+        "httpcore.http11",
+        "openai",
+        "openai._base_client",
+    ):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
     # Ensure that all loggers inherit the DEBUG level when debug mode is enabled
     if debug:
         # Set the root logger to DEBUG
@@ -34,13 +44,10 @@ def setup_logging(debug: bool = False) -> None:
         # Also set our main application logger to DEBUG to ensure child loggers inherit it
         logging.getLogger("srt_translator").setLevel(logging.DEBUG)
 
-        # Filter out noisy third-party library debug messages
-        # Set httpcore to WARNING level to reduce noise from HTTP client internals
-        logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
-        logging.getLogger("httpcore").setLevel(logging.WARNING)
-        # Also filter other potentially noisy HTTP libraries
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+        # Optional: re-enable HTTP traces when debugging HTTP specifically
+        if os.getenv("SRTX_HTTP_DEBUG") == "1":
+            logging.getLogger("httpx").setLevel(logging.INFO)
+            logging.getLogger("httpcore").setLevel(logging.INFO)
 
 
 def main(argv: list[str] | None = None) -> int:
