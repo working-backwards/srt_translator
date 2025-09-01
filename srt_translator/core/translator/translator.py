@@ -587,6 +587,8 @@ class SRTTranslator:
                             )
                             filled = True
                 except Exception as ex:
+                    # SANCTIONED DIAGNOSTICS HOOK: strict pair-retry failure
+                    # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
                     batch_logger.warning("Pair retry failed for idx=%s: %s", sid, ex)
             if not filled:
                 if self.error_policy == "STRICT":
@@ -997,6 +999,8 @@ INPUT ITEMS:
             return norm
         except Exception:
             # Log the payload sent to translator and the response received when failure occurs
+            # SANCTIONED DIAGNOSTICS HOOK: main-batch failure
+            # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
             self.logger.info(
                 "Translation failure - Payload sent to translator (lang=%s, items=%d):\nSystem: %s\nUser: %s",
                 target_lang,
@@ -1258,6 +1262,8 @@ TARGET ITEMS (TO FIX):
 
         return out
 
+    # SANCTIONED DIAGNOSTICS HOOK: shape-lock degeneracy
+    # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
     def _translate_with_simple_shape_lock(
         self,
         src_items: List[str],
