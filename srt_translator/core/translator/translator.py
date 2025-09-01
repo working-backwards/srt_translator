@@ -197,17 +197,18 @@ def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
 
 def _setup_file_logging(
     self, input_filepath: str, target_lang: str
-) -> logging.LoggerAdapter:
+) -> Tuple[logging.LoggerAdapter, str]:
     """Setup file-scoped logging with file/lang context."""
+    file_tag = os.path.basename(input_filepath)
     file_logger = logging.LoggerAdapter(
         self.logger,
         {
             "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
-            "file": os.path.basename(input_filepath),
+            "file": file_tag,
             "lang": target_lang,
         },
     )
-    return file_logger
+    return file_logger, file_tag
 
 
 def _validate_and_repair_placeholders(
@@ -510,7 +511,7 @@ class SRTTranslator:
         self._consecutive_decode_failures = 0
 
         # 1) Setup file logging and load/parse SRT
-        file_logger = _setup_file_logging(self, input_filepath, target_lang)
+        file_logger, file_tag = _setup_file_logging(self, input_filepath, target_lang)
         file_logger.info(
             "Using subtitle-based translation system for %s → %s",
             os.path.basename(input_filepath),
@@ -572,6 +573,7 @@ class SRTTranslator:
                             self.termbase,
                             pair_ids,
                             logger=batch_logger,
+                            file_tag=file_tag,
                         )
                         fixed = self.term_handler.restore_dnt_placeholders(
                             pair_tgts[0] if pair_tgts else ""
@@ -639,6 +641,7 @@ class SRTTranslator:
                 batch_ids=[s.idx for s in batch],
                 target_lang=target_lang,
                 batch_logger=batch_logger,
+                file_tag=file_tag,
             )
 
             tgt_texts = _validate_and_repair_placeholders(
@@ -656,6 +659,7 @@ class SRTTranslator:
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 batch_logger=batch_logger,
+                file_tag=file_tag,
             )
 
             # 4) Format and append subtitles
@@ -698,6 +702,7 @@ class SRTTranslator:
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
         strict: bool = False,
+        file_tag: str | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
@@ -931,12 +936,7 @@ INPUT ITEMS:
                     if looks_like_repetitive_loop(content or "")
                     else "unknown"
                 )
-                file_base = "?"
-                if isinstance(self.logger, logging.LoggerAdapter):
-                    try:
-                        file_base = self.logger.extra.get("file", "?")  # type: ignore[attr-defined]
-                    except Exception:
-                        file_base = "?"
+                file_base = file_tag or "?"
                 # Call the AI probe to understand what went wrong
                 source_text = "\n".join(
                     [f"{i+1}) {src}" for i, src in enumerate(src_items)]
@@ -1173,6 +1173,7 @@ TARGET ITEMS (TO FIX):
         batch_ids: List[int],
         logger: logging.Logger,
         strict: bool = False,
+        file_tag: str | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Bounded, iterative shape-lock:
@@ -1229,6 +1230,7 @@ TARGET ITEMS (TO FIX):
                     termbase=termbase,
                     batch_ids=seg_ids,
                     strict=strict,
+                    file_tag=file_tag,
                 )
                 if len(items) != len(seg_src):
                     raise RuntimeError(

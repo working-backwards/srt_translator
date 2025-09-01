@@ -11,15 +11,8 @@ import os
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 
-
 if TYPE_CHECKING:
     from .translator import SRTTranslator  # type-only; no runtime import
-
-
-
-
-
-
 
 
 def _create_batches_with_logging(
@@ -56,6 +49,7 @@ def _translate_batch_and_extract(
     batch_ids: List[int],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
+    file_tag: str | None = None,
 ) -> List[str]:
     """Translate batch and extract target texts."""
     # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
@@ -66,6 +60,7 @@ def _translate_batch_and_extract(
             self.termbase,
             batch_ids,
             logger=batch_logger,
+            file_tag=file_tag,
         )
     except Exception as ex:
         # Log the payload that was sent to the translator when failure occurs
@@ -82,18 +77,13 @@ def _translate_batch_and_extract(
     return tgt_texts
 
 
-
-
-
-
-
-
 def _handle_mid_batch_empty_retries(
     self: "SRTTranslator",
     batch: List["Subtitle"],
     tgt_texts: List[str],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
+    file_tag: str | None = None,
 ) -> List[str]:
     """Handle mid-batch empty translation retries."""
     # Empty guard — single pair-retry for mid-stream empty; no source fallback
@@ -120,6 +110,7 @@ def _handle_mid_batch_empty_retries(
                     termbase=self.termbase,
                     batch_ids=pair_ids,
                     strict=True,
+                    file_tag=file_tag,
                 )
                 if isinstance(pair_items, list) and len(pair_items) >= 1:
                     candidate = pair_items[0].get("tgt", "")
