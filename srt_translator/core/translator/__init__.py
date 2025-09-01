@@ -8,7 +8,7 @@ This module provides the main translation functionality, including:
 - Translation utilities
 """
 
-from srt_translator.core.translator.models import InternalSubtitle, ErrorPolicy, TranslationConfig
+from srt_translator.core.translator.models import InternalSubtitle
 from srt_translator.core.translator.translator import SRTTranslator
 from srt_translator.core.translator.srt_parser import SRTParser
 from srt_translator.core.translator.term_handler import TermHandler
@@ -17,8 +17,6 @@ from srt_translator.core.translator.utils import TranslationUtils
 
 __all__ = [
     "InternalSubtitle",
-    "ErrorPolicy", 
-    "TranslationConfig",
     "SRTTranslator",
     "SRTParser",
     "TermHandler",
