@@ -19,8 +19,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from srt_translator.core.config.language_config import LanguageConfig
-
 
 class LanguageSection(QGroupBox):
     """Language selection section with popular languages and search"""
@@ -185,7 +183,7 @@ class LanguageSection(QGroupBox):
                 checkbox.setChecked(False)
 
             # Load saved languages
-            for name, code in saved_languages.items():
+            for _name, code in saved_languages.items():
                 if code in self.language_checkboxes:
                     self.language_checkboxes[code].setChecked(True)
                 else:

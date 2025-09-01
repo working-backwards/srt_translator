@@ -20,8 +20,8 @@ clear boundaries between external library functionality and our internal logic.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Optional
 
 
 @dataclass

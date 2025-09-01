@@ -4,7 +4,6 @@ Language configuration for the SRT Translator.
 """
 
 import logging
-import unicodedata
 from typing import Any, Dict, List
 
 

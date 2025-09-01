@@ -5,38 +5,35 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import time
-import random
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Set
-
-# Core imports
-from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
-from srt_translator.core.translator.diagnostics import snip
-from srt_translator.core.translator.term_handler import TermHandler
-from srt_translator.core.translator.diagnostics import (
-    estimate_tokens,
-    looks_like_repetitive_loop,
-    build_oversize_probe_question,
-    snip,
-    MalformedProbeBudget,
-    probe_malformed_json_with_translator,
-)
-
-# Helper imports
-from ._helpers import (
-    _create_batches_with_logging,
-    _translate_batch_and_extract,
-    _handle_mid_batch_empty_retries,
-)
-
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 # OpenAI client
 from openai import OpenAI
 
+# Core imports
+from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.translator.diagnostics import (
+    MalformedProbeBudget,
+    build_oversize_probe_question,
+    estimate_tokens,
+    looks_like_repetitive_loop,
+    probe_malformed_json_with_translator,
+    snip,
+)
+from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
+from srt_translator.core.translator.term_handler import TermHandler
+
+# Helper imports
+from ._helpers import (
+    _create_batches_with_logging,
+    _handle_mid_batch_empty_retries,
+    _translate_batch_and_extract,
+)
 
 # ---------------------------
 # Data models
@@ -249,7 +246,7 @@ def _validate_and_repair_placeholders(
         )
         # Once-per-batch debug (observational only)
         seen = False
-        for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+        for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                 batch_logger.debug(
                     "Apostrophe after placeholder observed (allowed for %s, item=%d).",
@@ -971,7 +968,7 @@ INPUT ITEMS:
             )
             raise RuntimeError(
                 "Translation failed: model did not return valid JSON format"
-            )
+            ) from None
 
     def _translate_single_string_fallback(
         self, *, src_text: str, target_lang: str

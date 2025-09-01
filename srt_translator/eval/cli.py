@@ -6,8 +6,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.eval.report import write_batch_report
+from srt_translator.eval.runner import run_batch_evaluation
 
 
 def _setup_logging(verbosity: int) -> logging.Logger:

@@ -1,9 +1,15 @@
 # srt_translator/eval/tools.py
 from __future__ import annotations
+
+import csv
+import math
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional, Literal
-import re, csv, json, math, yaml, unicodedata
+from typing import Any, Dict, List, Literal, Tuple
+
+import yaml
 
 # -----------------------------
 # Roll-up helpers (normalization & evidence)

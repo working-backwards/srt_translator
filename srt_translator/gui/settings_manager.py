@@ -8,8 +8,7 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-from typing import NamedTuple
+from typing import Any, Dict, List, NamedTuple, Optional
 
 from PySide6.QtCore import QSettings
 

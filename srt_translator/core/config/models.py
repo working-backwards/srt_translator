@@ -6,9 +6,7 @@ Typed configuration models for SRT Translator.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional
-
-from .language_config import LanguageConfig
+from typing import Any, Dict, Iterable, List, Literal, Optional
 
 
 class LogMode(str, Enum):

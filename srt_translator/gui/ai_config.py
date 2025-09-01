@@ -7,19 +7,19 @@ Generates DNT terms and termbase using OpenAI API.
 import json
 import logging
 import os
-import re
 import random
+import re
 import time
 import unicodedata
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
 from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.core.translator.srt_parser import SRTParser
-from srt_translator.core.terminology_utils import is_numeric_like, is_hard_preserve
 from srt_translator.core.services.language_detection import detect_source_language
+from srt_translator.core.terminology_utils import is_hard_preserve, is_numeric_like
+from srt_translator.core.translator.srt_parser import SRTParser
 
 # Batch-level AI config constants
 _CHARS_PER_TOKEN = 4  # rough heuristic: ~4 chars per token

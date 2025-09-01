@@ -5,7 +5,6 @@ Handles DNT filtering, hard-preserve detection, and effective DNT building.
 """
 
 import re
-import unicodedata
 from typing import Dict, List, Tuple
 
 

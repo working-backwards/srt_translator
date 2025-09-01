@@ -1,20 +1,26 @@
 # srt_translator/eval/runner.py
 from __future__ import annotations
-from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
-import re, json, datetime, yaml, shutil, csv
-import logging
 
+import csv
+import datetime
+import json
+import logging
+import re
+import shutil
+from importlib.metadata import version as _pkg_version
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import yaml
+
+from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.eval.tools import (
+    classify_empty_target_rollup,
     generate_eval,
+    normalize_for_empty_check,
     parse_srt,
     percentile,
-    should_emit_fragments,
-    normalize_for_empty_check,
-    classify_empty_target_rollup,
 )
-from srt_translator.core.config.language_config import LanguageConfig
-from importlib.metadata import version as _pkg_version
 
 BATCH_RE = re.compile(r"translation-batch-([^/\\]+)$")
 
@@ -227,7 +233,7 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except Exception as e:
         logger.error(f"Failed to parse ai_config.json: {e}")
-        raise ValueError(f"Invalid ai_config.json: {e}")
+        raise ValueError(f"Invalid ai_config.json: {e}") from e
 
     # Normalize the data structure
     normalized = {

@@ -11,9 +11,10 @@ import os
 import sys
 from pathlib import Path
 
+from srt_translator.eval.report import write_batch_report
+
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
-from srt_translator.eval.report import write_batch_report
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -87,9 +88,9 @@ Examples:
 
     # Collect raw configuration and build TranslationConfig
     try:
-        from srt_translator.core.config.models import TranslationConfig
         from srt_translator.api import Translator
         from srt_translator.cli.config_loader import collect_cli_raw
+        from srt_translator.core.config.models import TranslationConfig
 
         raw_config = collect_cli_raw()
         api_cfg = TranslationConfig(

@@ -1,7 +1,6 @@
-import json
 import re
 from collections import defaultdict
-from typing import List, Optional, Sequence
+from typing import List, Sequence
 
 
 # -- Token estimation (char-based, fast, deterministic) -----------------------

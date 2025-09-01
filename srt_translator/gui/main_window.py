@@ -5,7 +5,6 @@ Main window for the SRT Translator application.
 
 import logging
 import os
-import sys
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -54,6 +53,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Load language configuration once
         try:
             import json
+
             from srt_translator.core.config.language_config import LanguageConfig
 
             languages_path = "config/languages.json"
@@ -70,7 +70,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Configuration Error",
                 f"Failed to load language configuration: {e}\n\nPlease ensure config/languages.json exists and is valid.",
             )
-            raise RuntimeError(f"Language configuration load failed: {e}")
+            raise RuntimeError(f"Language configuration load failed: {e}") from e
 
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)

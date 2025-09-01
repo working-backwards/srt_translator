@@ -3,9 +3,9 @@ Translation utilities for SRT file processing.
 """
 
 import logging
-import os
+from typing import Any, List
+
 import srt
-from typing import List, Any
 
 from srt_translator.core.translator.models import InternalSubtitle
 

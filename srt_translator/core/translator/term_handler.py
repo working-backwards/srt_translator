@@ -9,7 +9,6 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
-
 # Public, stable placeholder regex — Fixer depends on this exact shape.
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__", re.UNICODE)
 

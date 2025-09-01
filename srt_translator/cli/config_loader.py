@@ -5,10 +5,10 @@ CLI configuration loader for SRT Translator.
 
 import json
 import os
+from json import JSONDecodeError
 from pathlib import Path
 
 from dotenv import dotenv_values, find_dotenv
-from json import JSONDecodeError
 
 DEFAULT_LANGS = {
     "Spanish": "es",

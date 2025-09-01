@@ -1,9 +1,11 @@
 # srt_translator/eval/report.py
 from __future__ import annotations
-from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+
 import json
 import re
+from pathlib import Path
+from typing import Any, Dict, List
+
 from srt_translator.core.config.language_config import LanguageConfig
 
 # v1.0: reporter is JSON-only. No SRT parsing/imports here.

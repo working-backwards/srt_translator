@@ -6,10 +6,10 @@ Do not modify function names, signatures, bodies, or logging text.
 """
 
 from __future__ import annotations
+
 import logging
 import os
-from typing import TYPE_CHECKING, List, Optional, Tuple
-
+from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
     from .translator import SRTTranslator  # type-only; no runtime import
@@ -60,7 +60,7 @@ def _translate_batch_and_extract(
             batch_ids,
             logger=batch_logger,
         )
-    except Exception as ex:
+    except Exception:
         # Only log payload details at DEBUG to avoid alarming content creators
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(
@@ -84,7 +84,7 @@ def _handle_mid_batch_empty_retries(
 ) -> List[str]:
     """Handle mid-batch empty translation retries."""
     # Empty guard — single pair-retry for mid-stream empty; no source fallback
-    for i, (src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
+    for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
         if tgt_raw.strip():
             continue
         sid = batch[i].idx

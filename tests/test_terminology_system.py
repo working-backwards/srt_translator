@@ -49,7 +49,7 @@ class TestTerminologyUtils:
         """Test partitioning of terms into hard/soft preserve."""
         terms = ["API", "machine learning", "GPU", "artificial intelligence"]
         hard, soft = partition_hard_preserve(terms)
-        
+
         assert set(hard) == {"API", "GPU"}
         assert set(soft) == {"machine learning", "artificial intelligence"}
 
@@ -57,13 +57,13 @@ class TestTerminologyUtils:
         """Test effective DNT building with precedence."""
         dnt_terms = ["API", "machine learning", "GPU", "artificial intelligence"]
         termbase = {"machine learning": "机器学习"}
-        
+
         effective = build_effective_dnt(dnt_terms, termbase)
-        
+
         # Hard-preserve terms should always be included
         assert "API" in effective
         assert "GPU" in effective
-        
+
         # Soft-preserve terms should be excluded if in termbase
         assert "machine learning" not in effective  # Overridden by termbase
         assert "artificial intelligence" in effective  # Not in termbase
@@ -77,20 +77,30 @@ class TestLanguageConfigScriptValidation:
         test_data = {
             "version": "1.1",
             "languages": {
-                "zh-Hans": {"name": "Chinese (Simplified)", "family": "cjk", "script": "cjk", "script_blocks": ["CJK"]},
-                "ja": {"name": "Japanese", "family": "cjk", "script": "japanese", "script_blocks": ["Hiragana", "Katakana", "CJK"]},
-                "en": {"name": "English", "family": "latin"}
-            }
+                "zh-Hans": {
+                    "name": "Chinese (Simplified)",
+                    "family": "cjk",
+                    "script": "cjk",
+                    "script_blocks": ["CJK"],
+                },
+                "ja": {
+                    "name": "Japanese",
+                    "family": "cjk",
+                    "script": "japanese",
+                    "script_blocks": ["Hiragana", "Katakana", "CJK"],
+                },
+                "en": {"name": "English", "family": "latin"},
+            },
         }
         config = LanguageConfig(test_data)
-        
+
         # Test Chinese with explicit script_blocks
         zh_spec = config.get_script_spec("zh-Hans")
         assert "script" in zh_spec
         assert "script_blocks" in zh_spec
         assert zh_spec["script"] == "cjk"
         assert "CJK" in zh_spec["script_blocks"]
-        
+
         # Test Japanese with multiple script_blocks
         ja_spec = config.get_script_spec("ja")
         assert "script" in ja_spec
@@ -99,7 +109,7 @@ class TestLanguageConfigScriptValidation:
         assert "Hiragana" in ja_spec["script_blocks"]
         assert "Katakana" in ja_spec["script_blocks"]
         assert "CJK" in ja_spec["script_blocks"]
-        
+
         # Test Latin language (no script restrictions)
         en_spec = config.get_script_spec("en")
         assert en_spec == {}  # Latin has no script restrictions
@@ -109,13 +119,23 @@ class TestLanguageConfigScriptValidation:
         test_data = {
             "version": "1.1",
             "languages": {
-                "zh-Hans": {"name": "Chinese (Simplified)", "family": "cjk", "script": "cjk", "script_blocks": ["CJK"]},
-                "ja": {"name": "Japanese", "family": "cjk", "script": "japanese", "script_blocks": ["Hiragana", "Katakana", "CJK"]},
-                "en": {"name": "English", "family": "latin"}
-            }
+                "zh-Hans": {
+                    "name": "Chinese (Simplified)",
+                    "family": "cjk",
+                    "script": "cjk",
+                    "script_blocks": ["CJK"],
+                },
+                "ja": {
+                    "name": "Japanese",
+                    "family": "cjk",
+                    "script": "japanese",
+                    "script_blocks": ["Hiragana", "Katakana", "CJK"],
+                },
+                "en": {"name": "English", "family": "latin"},
+            },
         }
         config = LanguageConfig(test_data)
-        
+
         # Test Chinese script validation
         zh_spec = config.get_script_spec("zh-Hans")
         assert config.text_matches_script("机器学习", zh_spec)
@@ -124,8 +144,8 @@ class TestLanguageConfigScriptValidation:
         # Test Japanese script validation
         ja_spec = config.get_script_spec("ja")
         assert config.text_matches_script("機械学習", ja_spec)  # CJK
-        assert config.text_matches_script("きかいがくしゅう", ja_spec)  # Hiragana 
-        assert config.text_matches_script("マシンラーニング", ja_spec)  # Katakana 
+        assert config.text_matches_script("きかいがくしゅう", ja_spec)  # Hiragana
+        assert config.text_matches_script("マシンラーニング", ja_spec)  # Katakana
         assert not config.text_matches_script("machine learning", ja_spec)
 
         # Test Latin language (no restrictions)

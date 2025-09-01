@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Unified GUI entry for SRT Translator (used by `srtx` and PyInstaller)."""
 from __future__ import annotations
-import argparse, logging, os, sys
+
+import argparse
+import logging
+import os
+import sys
 
 
 def _setup_logging(debug: bool) -> None:
@@ -58,8 +62,8 @@ def main(argv: list[str] | None = None) -> int:
             "GUI deps missing. Try: pip install 'srt-translator[gui]'"
         ) from e
 
-    from srt_translator.gui.main_window import SRTTranslatorMainWindow
     from srt_translator import __version__ as _ver
+    from srt_translator.gui.main_window import SRTTranslatorMainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName("SRT Translator")

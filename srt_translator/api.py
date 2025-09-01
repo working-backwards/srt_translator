@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict
 
 from srt_translator.core.config.models import TranslationConfig
 

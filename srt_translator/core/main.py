@@ -7,16 +7,14 @@ Provides the core translation functionality for both CLI and GUI interfaces.
 import json
 import logging
 import os
+from dataclasses import replace
 from datetime import datetime
 from typing import List, TypedDict
-from dataclasses import replace
 
 from srt_translator import __version__
-from srt_translator.core.config.models import TranslationConfig
 from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.core.translator.fixer import SRTFixer
+from srt_translator.core.config.models import TranslationConfig
 from srt_translator.core.translator.translator import SRTTranslator
-from srt_translator.core.utils.logging_setup import setup_logging
 
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().
@@ -188,7 +186,7 @@ def translate_srt_files(
 
         # Collect the actual batch sizes used for each language
         language_batch_sizes = {}
-        for lang_name, lang_code in config.target_languages.items():
+        for _lang_name, lang_code in config.target_languages.items():
             if lang_code:
                 try:
                     batch_size_for_lang = language_config.get_target_batch_size(
@@ -258,8 +256,9 @@ def translate_srt_files(
     # Run SRT fixer (post-eval, batch-wide)
     logger.info("Running SRT fixer (post-eval, batch-wide)...")
     try:
-        from srt_translator.core.translator.fixer import SRTFixer
         from pathlib import Path
+
+        from srt_translator.core.translator.fixer import SRTFixer
 
         # Temporarily attach file handler to fixer's logger
         fixer_logger = logging.getLogger("srt_translator.core.translator.fixer")

@@ -39,7 +39,7 @@ def main():
     logger.info("🔨 Building GUI executable...")
     try:
         # Run PyInstaller
-        result = subprocess.run(
+        subprocess.run(
             [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", spec_file],
             check=True,
             capture_output=True,

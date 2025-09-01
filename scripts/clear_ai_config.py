@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 def main():
     try:
-        from srt_translator.gui.settings_manager import SettingsManager
         from srt_translator.core.config.language_config import LanguageConfig
+        from srt_translator.gui.settings_manager import SettingsManager
 
         logger.info("Clearing AI-generated configuration...")
         language_config = LanguageConfig({"languages": {}})

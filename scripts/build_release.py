@@ -124,7 +124,7 @@ For issues and questions:
     # Create ZIP archive
     zip_path = f"{package_path}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(package_path):
+        for root, _dirs, files in os.walk(package_path):
             for file in files:
                 file_path = os.path.join(root, file)
                 arc_name = os.path.relpath(file_path, package_path)

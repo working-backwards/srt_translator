@@ -22,7 +22,7 @@ def parse_json_or_csv(val: str | None, *, expect_mapping: bool, field_name: str 
                 raise ValueError(f"Expected a JSON array in {field_name}")
             return obj
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in {field_name}: {e}")
+            raise ValueError(f"Invalid JSON in {field_name}: {e}") from e
 
     # Parse as CSV
     parts = [p.strip() for p in s.split(",") if p.strip()]
@@ -60,7 +60,7 @@ def load_termbase_from_file(path: Path) -> Dict[str, Dict[str, str]]:
         with path.open("r", encoding="utf-8") as f:
             data: Any = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to load termbase from {path}: {e}")
+        raise ValueError(f"Failed to load termbase from {path}: {e}") from e
 
     if not isinstance(data, dict):
         raise ValueError(f"Termbase must be a JSON object, got {type(data)}")
@@ -93,8 +93,8 @@ def validate_positive_int(value: Any, field_name: str, upper_bound: int = None) 
     """Validate and convert to positive integer."""
     try:
         int_val = int(value)
-    except (ValueError, TypeError):
-        raise ValueError(f"{field_name} must be an integer, got '{value}'")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"{field_name} must be an integer, got '{value}'") from e
 
     if int_val <= 0:
         raise ValueError(f"{field_name} must be positive, got {int_val}")
@@ -111,8 +111,8 @@ def validate_float_range(
     """Validate and convert to float within specified range."""
     try:
         float_val = float(value)
-    except (ValueError, TypeError):
-        raise ValueError(f"{field_name} must be a number, got '{value}'")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"{field_name} must be a number, got '{value}'") from e
 
     if float_val < min_val or float_val > max_val:
         raise ValueError(f"{field_name} must be between {min_val} and {max_val}, got {float_val}")

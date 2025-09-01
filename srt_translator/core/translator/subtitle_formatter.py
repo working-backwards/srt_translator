@@ -6,9 +6,8 @@ rules including CPS caps, wrapping, and orphan prevention.
 """
 
 import logging
-import math
 import re
-from typing import List, Tuple
+
 from srt_translator.core.config.language_config import LanguageConfig
 
 

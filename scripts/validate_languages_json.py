@@ -8,8 +8,8 @@ This script checks that:
 """
 
 import json
-import sys
 import pathlib
+import sys
 
 FORBIDDEN_KEYS = {
     "cps_soft",

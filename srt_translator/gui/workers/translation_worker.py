@@ -4,29 +4,29 @@ Translation Worker for the SRT Translator GUI.
 """
 
 import io
+import json
 import logging
 import threading
 import time
 import uuid
 from collections import deque
 from contextlib import redirect_stdout
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import json
-from json import JSONDecodeError
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
 from srt_translator.core.config.models import TranslationConfig
+from srt_translator.eval.report import write_batch_report
+
+# Evaluation imports (config-gated)
+from srt_translator.eval.runner import run_batch_evaluation
 
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
-
-# Evaluation imports (config-gated)
-from srt_translator.eval.runner import run_batch_evaluation
-from srt_translator.eval.report import write_batch_report
 
 
 def _resolve_languages_json_path() -> Path:
