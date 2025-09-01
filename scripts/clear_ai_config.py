@@ -23,12 +23,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 def main():
     try:
         from srt_translator.gui.settings_manager import SettingsManager
+        from srt_translator.core.config.language_config import LanguageConfig
 
         logger.info("Clearing AI-generated configuration...")
-        settings_manager = SettingsManager()
+        language_config = LanguageConfig({"languages": {}})
+        settings_manager = SettingsManager(language_config)
 
         # Check what's currently stored
-        dnt_terms, termbase = settings_manager.load_ai_config()
+        result = settings_manager.load_ai_config()
+        dnt_terms, termbase = result.dnt_terms, result.termbase
         logger.info(
             f"Current AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )
@@ -37,7 +40,8 @@ def main():
         settings_manager.clear_ai_config()
 
         # Verify it's cleared
-        dnt_terms, termbase = settings_manager.load_ai_config()
+        result = settings_manager.load_ai_config()
+        dnt_terms, termbase = result.dnt_terms, result.termbase
         logger.info(
             f"After clearing: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )

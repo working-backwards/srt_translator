@@ -8,11 +8,22 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Any
+from typing import NamedTuple
 
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
+
+
+class AIConfigTriple(NamedTuple):
+    """Runtime-typed contract for load_ai_config()."""
+
+    dnt_terms: List[str]
+    termbase: Dict[str, Dict[str, str]]
+    # Allow None at the type level for future-proofing, but we currently
+    # return {} when not present to avoid breaking existing callers.
+    source_language: Optional[Dict[str, Any]]
 
 
 class SettingsManager:
@@ -75,14 +86,24 @@ class SettingsManager:
         file_hash = self._calculate_file_hash()
         self.settings.setValue("ai_config_file_hash", file_hash)
 
-    def load_ai_config(
-        self,
-    ) -> Tuple[List[str], Dict[str, Dict[str, str]], Optional[Dict[str, object]]]:
-        """Load AI-generated configuration"""
+    def load_ai_config(self) -> AIConfigTriple:
+        """Load AI-generated configuration as a stable 3-tuple.
+        Returns:
+            AIConfigTriple(dnt_terms, termbase, source_language)
+        """
         dnt_terms = self.settings.value("ai_dnt_terms", [])
         termbase = self.settings.value("ai_termbase", {})
         source_language = self.settings.value("ai_source_language", {})
-        return dnt_terms, termbase, source_language
+
+        # Defensive normalization: QSettings may hand back unexpected types.
+        if not isinstance(dnt_terms, list):
+            dnt_terms = []
+        if not isinstance(termbase, dict):
+            termbase = {}
+        if not isinstance(source_language, dict):
+            source_language = {}
+
+        return AIConfigTriple(dnt_terms, termbase, source_language)
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
         """Check if AI configuration is recent"""
@@ -136,9 +157,12 @@ class SettingsManager:
         """Save target languages dictionary"""
         self.settings.setValue("target_languages", languages)
 
+    # --- UI compatibility shims (keep SSOT in QSettings) ---
     def update_target_languages(self, languages: Dict[str, str]) -> None:
-        """Update target languages (alias for save_target_languages for UI compatibility)"""
         self.save_target_languages(languages)
+
+    def get_current_target_languages(self) -> Dict[str, str]:
+        return self.load_target_languages()
 
     def load_target_languages(self) -> Dict[str, str]:
         """Load target languages dictionary"""

@@ -69,7 +69,8 @@ class GUIConfigManager:
             List of terms to exclude from translation
         """
         # Priority 1: GUI AI-generated config
-        ai_dnt_terms, _ = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        ai_dnt_terms = result.dnt_terms
         if ai_dnt_terms:
             self.logger.info("Using AI-generated DNT terms")
             return ai_dnt_terms
@@ -95,7 +96,8 @@ class GUIConfigManager:
             Dictionary of source language terms to translated terms
         """
         # Priority 1: GUI AI-generated config
-        _, ai_termbase = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        ai_termbase = result.termbase
 
         # Try direct lookup first
         if target_language in ai_termbase and ai_termbase[target_language]:
@@ -140,7 +142,8 @@ class GUIConfigManager:
             Dictionary with language keys and term-translation pairs
         """
         # Priority 1: GUI AI-generated config
-        _, ai_termbase = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        ai_termbase = result.termbase
         if ai_termbase:
             self.logger.info("Using AI-generated termbases")
             return ai_termbase
@@ -165,7 +168,8 @@ class GUIConfigManager:
         info = {}
 
         # Check DNT terms source
-        ai_dnt_terms, _ = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        ai_dnt_terms = result.dnt_terms
         if ai_dnt_terms:
             info["dnt_terms_source"] = "AI Generated"
         elif self._load_dnt_terms_from_env():
@@ -174,7 +178,8 @@ class GUIConfigManager:
             info["dnt_terms_source"] = "Default"
 
         # Check termbase source
-        _, ai_termbase = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        ai_termbase = result.termbase
         if ai_termbase:
             info["termbase_source"] = "AI Generated"
         elif self._load_termbase_from_file():
@@ -255,12 +260,14 @@ class GUIConfigManager:
             )
 
         # Validate DNT terms
-        dnt_terms, _ = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        dnt_terms = result.dnt_terms
         if not dnt_terms:
             issues.append("No DNT terms in AI configuration")
 
         # Validate termbase
-        _, termbase = self.settings_manager.load_ai_config()
+        result = self.settings_manager.load_ai_config()
+        termbase = result.termbase
         if not termbase:
             issues.append("No termbase in AI configuration")
 

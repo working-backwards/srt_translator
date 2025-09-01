@@ -4,7 +4,8 @@ import sys
 
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
-from srt_translator.gui.settings_manager import SettingsManager
+from srt_translator.gui.settings_manager import SettingsManager, AIConfigTriple
+from srt_translator.core.config.language_config import LanguageConfig
 
 #!/usr/bin/env python3
 """
@@ -26,7 +27,8 @@ def test_ai_config_system():
 
     # Test 1: Settings Manager
     logger.info("1. Testing Settings Manager...")
-    settings_manager = SettingsManager()
+    language_config = LanguageConfig({"languages": {}})
+    settings_manager = SettingsManager(language_config)
 
     # Test saving and loading AI config
     test_dnt_terms = ["API", "CEO", "CFO", "Amazon"]
@@ -42,7 +44,9 @@ def test_ai_config_system():
     }
 
     settings_manager.save_ai_config(test_dnt_terms, test_termbase)
-    loaded_terms, loaded_termbase = settings_manager.load_ai_config()
+    result = settings_manager.load_ai_config()
+    assert isinstance(result, AIConfigTriple)
+    loaded_terms, loaded_termbase, loaded_source_lang = result
 
     logger.info(f"Saved DNT terms: {test_dnt_terms}")
     logger.info(f"Loaded DNT terms: {loaded_terms}")
@@ -54,7 +58,7 @@ def test_ai_config_system():
 
     # Test 2: Config Manager
     logger.info("2. Testing Config Manager...")
-    config_manager = GUIConfigManager(settings_manager)
+    config_manager = GUIConfigManager(settings_manager, language_config)
 
     # Test getting DNT terms (should return AI-generated ones)
     dnt_terms = config_manager.get_dnt_terms()
@@ -75,7 +79,9 @@ def test_ai_config_system():
         ai_generator = AIConfigGenerator("test-key")
         logger.info("AI Config Generator created successfully")
         logger.info(f"Max content length: {ai_generator.MAX_CONTENT_LENGTH}")
-        logger.info(f"Supported languages: {len(ai_generator.get_supported_languages())}")
+        logger.info(
+            f"Supported languages: {len(ai_generator.get_supported_languages())}"
+        )
     except Exception as e:
         logger.info(f"AI Config Generator test (expected error): {e}")
 
