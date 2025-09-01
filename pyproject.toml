@@ -61,6 +61,7 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "TID"]
+ignore = ["E501"]  # Temporarily ignore line length for v1.0 release
 # E = pycodestyle errors, F = pyflakes, I = isort, B = flake8-bugbear, TID = flake8-tidy-imports
 
 [tool.ruff.lint.flake8-tidy-imports]

@@ -4,15 +4,12 @@ Tests for the evaluation system that focus on actual functionality.
 """
 
 import json
-import pytest
-import tempfile
-import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from srt_translator.eval.tools import generate_eval, evaluate_pair
-from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.eval.report import write_batch_report
+from srt_translator.eval.runner import run_batch_evaluation
+from srt_translator.eval.tools import evaluate_pair, generate_eval
 
 
 def create_test_batch_structure(temp_dir: Path, has_ai_config: bool = True, 
@@ -266,7 +263,9 @@ class TestV1EvaluationPolicy:
         mock_logger.info.assert_any_call("No DNT terms provided; continuing without DNT coverage")
 
     @patch("srt_translator.eval.runner._rubric_path")
-    def test_optional_inputs_termbase_missing_continues_evaluation(self, mock_rubric_path, tmp_path):
+    def test_optional_inputs_termbase_missing_continues_evaluation(
+        self, mock_rubric_path, tmp_path
+    ):
         """Test that missing termbase continues evaluation with INFO log."""
         mock_rubric_path.return_value = Path("config/translation_rubric.yaml")
         
@@ -290,7 +289,9 @@ class TestV1EvaluationPolicy:
         # Should continue (not return None)
         assert result is not None
         # Should log INFO about missing termbase
-        mock_logger.info.assert_any_call("No termbase provided; continuing without termbase coverage")
+        mock_logger.info.assert_any_call(
+            "No termbase provided; continuing without termbase coverage"
+        )
 
     @patch("srt_translator.eval.runner._rubric_path")
     def test_coverage_fields_present_in_rollup(self, mock_rubric_path, tmp_path):
@@ -412,7 +413,9 @@ class TestDataNormalization:
         
         # Check normalization
         assert result["dnt_terms"] == ["Operating Plan", "Module"]
-        assert result["termbase"]["es"] == [{"source": "Operating Plan", "target": "Plan Operativo"}]
+        assert result["termbase"]["es"] == [
+            {"source": "Operating Plan", "target": "Plan Operativo"}
+        ]
         assert result["termbase"]["fr"] == [{"source": "Module", "target": "Module"}]
 
     def test_termbase_coverage_calculation(self):

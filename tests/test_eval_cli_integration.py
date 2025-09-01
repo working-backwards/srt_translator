@@ -3,11 +3,11 @@
 Integration tests for the evaluation CLI that test actual functionality.
 """
 
-import pytest
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from srt_translator.eval.cli import main
 
@@ -142,10 +142,10 @@ class TestEvalCLIIntegration:
             expected_files = [
                 f"cps_{lang}_test.csv",
                 f"dnt_coverage_{lang}_test.csv",
-                f"dnt_summary.json",
+                "dnt_summary.json",
                 f"eval_summary_{lang}_test.md",
                 f"tb_coverage_{lang}_test.csv",
-                f"termbase_summary.json",
+                "termbase_summary.json",
                 f"timing_{lang}_test.csv",
                 f"untranslated_{lang}_test.csv",
             ]

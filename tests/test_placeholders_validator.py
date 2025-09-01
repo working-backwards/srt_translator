@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
 Regression tests for DNT placeholder validation.
-These tests ensure the validator maintains per-item validation and doesn't regress to global allowlists.
+These tests ensure the validator maintains per-item validation and doesn't regress to
+global allowlists.
 """
 
 import re
+
 import pytest
 
 from srt_translator.core.translator.translator import validate_placeholders_pair

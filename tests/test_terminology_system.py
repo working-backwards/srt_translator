@@ -4,13 +4,14 @@ Tests for the new terminology system.
 """
 
 import pytest
-from srt_translator.core.terminology_utils import (
-    is_numeric_like,
-    is_hard_preserve,
-    build_effective_dnt,
-    partition_hard_preserve
-)
+
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.terminology_utils import (
+    build_effective_dnt,
+    is_hard_preserve,
+    is_numeric_like,
+    partition_hard_preserve,
+)
 
 
 class TestTerminologyUtils:
@@ -19,30 +20,30 @@ class TestTerminologyUtils:
     def test_is_numeric_like(self):
         """Test numeric-like term detection."""
         # Should be filtered out
-        assert is_numeric_like("300") == True
-        assert is_numeric_like("6.7") == True
-        assert is_numeric_like("300ms") == True
-        assert is_numeric_like("$99.99") == True
-        assert is_numeric_like("2024") == True
-        
+        assert is_numeric_like("300")
+        assert is_numeric_like("6.7")
+        assert is_numeric_like("300ms")
+        assert is_numeric_like("$99.99")
+        assert is_numeric_like("2024")
+
         # Should not be filtered
-        assert is_numeric_like("API") == False
-        assert is_numeric_like("machine learning") == False
-        assert is_numeric_like("Adobe Premiere") == False
+        assert not is_numeric_like("API")
+        assert not is_numeric_like("machine learning")
+        assert not is_numeric_like("Adobe Premiere")
 
     def test_is_hard_preserve(self):
         """Test hard-preserve term detection."""
         # Should be hard-preserved
-        assert is_hard_preserve("API") == True
-        assert is_hard_preserve("GPU") == True
-        assert is_hard_preserve("NASA") == True
-        assert is_hard_preserve("MachineLearning") == True
-        assert is_hard_preserve("Adobe Premiere") == True
-        
+        assert is_hard_preserve("API")
+        assert is_hard_preserve("GPU")
+        assert is_hard_preserve("NASA")
+        assert is_hard_preserve("MachineLearning")
+        assert is_hard_preserve("Adobe Premiere")
+
         # Should not be hard-preserved
-        assert is_hard_preserve("machine learning") == False
-        assert is_hard_preserve("artificial intelligence") == False
-        assert is_hard_preserve("deep learning") == False
+        assert not is_hard_preserve("machine learning")
+        assert not is_hard_preserve("artificial intelligence")
+        assert not is_hard_preserve("deep learning")
 
     def test_partition_hard_preserve(self):
         """Test partitioning of terms into hard/soft preserve."""
@@ -117,21 +118,21 @@ class TestLanguageConfigScriptValidation:
         
         # Test Chinese script validation
         zh_spec = config.get_script_spec("zh-Hans")
-        assert config.text_matches_script("机器学习", zh_spec) == True
-        assert config.text_matches_script("machine learning", zh_spec) == False
-        
+        assert config.text_matches_script("机器学习", zh_spec)
+        assert not config.text_matches_script("machine learning", zh_spec)
+
         # Test Japanese script validation
         ja_spec = config.get_script_spec("ja")
-        assert config.text_matches_script("機械学習", ja_spec) == True  # CJK
-        assert config.text_matches_script("きかいがくしゅう", ja_spec) == True  # Hiragana
-        assert config.text_matches_script("マシンラーニング", ja_spec) == True  # Katakana
-        assert config.text_matches_script("machine learning", ja_spec) == False
-        
+        assert config.text_matches_script("機械学習", ja_spec)  # CJK
+        assert config.text_matches_script("きかいがくしゅう", ja_spec)  # Hiragana 
+        assert config.text_matches_script("マシンラーニング", ja_spec)  # Katakana 
+        assert not config.text_matches_script("machine learning", ja_spec)
+
         # Test Latin language (no restrictions)
         en_spec = config.get_script_spec("en")
-        assert config.text_matches_script("machine learning", en_spec) == True
-        assert config.text_matches_script("123", en_spec) == True
-        assert config.text_matches_script("", en_spec) == True
+        assert config.text_matches_script("machine learning", en_spec)
+        assert config.text_matches_script("123", en_spec)
+        assert config.text_matches_script("", en_spec)
 
 
 if __name__ == "__main__":

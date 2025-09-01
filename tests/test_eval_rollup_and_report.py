@@ -1,7 +1,7 @@
 # tests/test_eval_rollup_and_report.py
-from types import SimpleNamespace as NS
-from srt_translator.eval.tools import Cue, classify_empty_target_rollup, normalize_for_empty_check
 from srt_translator.eval.report import _status_label
+from srt_translator.eval.tools import Cue, classify_empty_target_rollup, normalize_for_empty_check
+
 
 def cue(i, txt):  # helper for brevity
     return Cue(index=i, start_ms=0, end_ms=1000, text=txt)
@@ -17,7 +17,7 @@ def test_benign_rollup_full_sentence_az():
               cue(24, "")]
     
     # Debug: Let's see what the classifier is calculating
-    from srt_translator.eval.tools import strip_terms, normalize_for_empty_check, median_expansion_ratio
+    from srt_translator.eval.tools import median_expansion_ratio, strip_terms
     
     src_after_all = [strip_terms(c.text, dnt) for c in source]
     tgt_norm_all = [normalize_for_empty_check(c.text) for c in target]
@@ -41,7 +41,9 @@ def test_benign_rollup_full_sentence_az():
     assert cls != "MISSING"  # treat as rolled-up (benign/suspect), hence not error
 
 def test_tiny_remainder_ar():
-    lang = "ar"; dnt=[]; tb_map={}
+    lang = "ar"
+    dnt = []
+    tb_map = {}
     source = [cue(45, "with results from the prior year,"), cue(46, "year.")]
     target = [cue(45, "مع نتائج من العام السابق،"), cue(46, "")]
     cls, _ = classify_empty_target_rollup(

@@ -3,11 +3,9 @@
 Tests for the evaluation CLI module.
 """
 
-import pytest
-import tempfile
 import json
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 from srt_translator.eval.cli import main
 

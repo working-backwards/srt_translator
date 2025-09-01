@@ -1,8 +1,9 @@
 # Stage 0: parity properties for translate_file (structure & placeholder integrity)
 import logging
 from pathlib import Path
-from srt_translator.core.translator.translator import SRTTranslator
+
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.translator.translator import SRTTranslator
 
 
 class _DummyClient:

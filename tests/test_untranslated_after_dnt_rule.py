@@ -1,5 +1,4 @@
 # tests/test_untranslated_after_dnt_rule.py
-import re
 from srt_translator.eval.tools import strip_terms, untranslated_after_dnt_check
 
 DNT = ["Amazon", "flywheel"]

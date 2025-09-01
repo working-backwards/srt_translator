@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from srt_translator.core.translator.translator import SRTTranslator
 from srt_translator.core.config.language_config import (
     LanguageConfig,
 )  # required (fail-fast enabled)
+from srt_translator.core.translator.translator import SRTTranslator
 
 # --- Utilities ---
 
@@ -19,7 +19,7 @@ def _read_srt_blocks(text: str):
     """
     blocks = []
     for raw_block in text.strip().split("\n\n"):
-        lines = [l for l in raw_block.splitlines()]
+        lines = [line for line in raw_block.splitlines()]
         if len(lines) < 2:
             continue
         try:

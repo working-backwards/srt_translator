@@ -3,11 +3,11 @@
 import json
 import logging
 import types
+
+from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.translator import (
     SRTTranslator,
-    build_termbase_block,
 )  # noqa: E402
-from srt_translator.core.config.language_config import LanguageConfig
 
 
 class _DummyClient:
@@ -72,14 +72,17 @@ def test_prompts_non_strict_snapshot():
     system = messages[0]["content"]
     user = messages[1]["content"]
 
-    expected_system = "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
+    expected_system = (
+        "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
+    )
     assert system == expected_system
 
     termbase_block = "- Amazon \u2192 Amazon"
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        'Use these business term mappings when present (source \u2192 target). If "(none)", ignore:\n'
+        'Use these business term mappings when present (source \u2192 target). '
+        'If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"
         "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
@@ -127,7 +130,8 @@ def test_prompts_strict_snapshot():
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        'Use these business term mappings when present (source \u2192 target). If "(none)", ignore:\n'
+        'Use these business term mappings when present (source \u2192 target). '
+        'If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"
         "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"

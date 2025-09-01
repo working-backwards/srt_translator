@@ -2,10 +2,10 @@ import logging
 import os
 import sys
 
+from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
-from srt_translator.gui.settings_manager import SettingsManager, AIConfigTriple
-from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.gui.settings_manager import AIConfigTriple, SettingsManager
 
 #!/usr/bin/env python3
 """
