@@ -28,12 +28,14 @@ class NonBlockingQueueHandler(QueueHandler):
             if record.levelno >= logging.ERROR:
                 try:
                     q.get_nowait()
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Queue operation failed, but don't break logging
+                    print(f"Warning: Queue get failed: {e}")  # noqa: T201
                 try:
                     q.put_nowait(record)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Queue operation failed, but don't break logging
+                    print(f"Warning: Queue put failed: {e}")  # noqa: T201
             # else drop
 
 
@@ -75,8 +77,9 @@ class CallbackHandler(logging.Handler):
                 }
             }
             self._cb(msg, record.levelno, extra)
-        except Exception:
-            pass
+        except Exception as e:
+            # Callback failed, but don't break logging
+            print(f"Warning: Logging callback failed: {e}")  # noqa: T201
 
 
 class SimpleFormatter(logging.Formatter):

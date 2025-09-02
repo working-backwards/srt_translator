@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 
 # -- Token estimation (char-based, fast, deterministic) -----------------------
@@ -110,7 +110,7 @@ def probe_malformed_json_with_translator(
     batch_ids: List[int],
     raw_excerpt: str,
     hint_class: str = "unknown",
-    source_text: str = None,
+    source_text: Optional[str] = None,
 ) -> None:
     """Actually ask the AI what went wrong when JSON is malformed. Uses translator's OpenAI client directly."""
     try:
@@ -153,9 +153,7 @@ def probe_malformed_json_with_translator(
 
         # Make direct AI call using the translator's OpenAI client
         try:
-            translator.logger.info(
-                "Making AI probe call via translator's OpenAI client"
-            )
+            translator.logger.info("Making AI probe call via translator's OpenAI client")
             diag_resp = translator.client.chat.completions.create(
                 model=translator.model_name,
                 messages=[
@@ -175,9 +173,7 @@ def probe_malformed_json_with_translator(
             ai_explanation = (diag_resp.choices[0].message.content or "").strip()
             translator.logger.info("AI probe successful via translator's OpenAI client")
         except Exception as ai_ex:
-            translator.logger.error(
-                "AI probe via translator's OpenAI client failed: %s", ai_ex
-            )
+            translator.logger.error("AI probe via translator's OpenAI client failed: %s", ai_ex)
             ai_explanation = None
 
         # Log the AI's explanation if we got one
@@ -186,12 +182,8 @@ def probe_malformed_json_with_translator(
                 "AI explanation for malformed JSON: %s", snip(ai_explanation, 400)
             )
         else:
-            translator.logger.warning(
-                "AI probe failed - logging question for manual review"
-            )
-            translator.logger.info(
-                "AI probe question (manual review needed): %s", probe_question
-            )
+            translator.logger.warning("AI probe failed - logging question for manual review")
+            translator.logger.info("AI probe question (manual review needed): %s", probe_question)
 
         # Always log the diagnostic summary
         diagnostic_summary = (
@@ -218,5 +210,6 @@ def probe_malformed_json_with_translator(
                 lang,
                 batch_ids[:6],
             )
-        except Exception:
-            pass
+        except Exception as e:
+            # Logging failed, but don't let it break the main flow
+            print(f"Warning: Failed to log probe failure context: {e}")  # noqa: T201

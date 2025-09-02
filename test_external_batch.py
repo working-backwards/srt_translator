@@ -7,7 +7,7 @@ outside the repository without adding external paths to the repo.
 
 Usage:
     python test_external_batch.py "C:\\Users\\cbrya\\Projects\\Op Cadence\\translation-batch-20250828_152100_"
-    
+
     Or use forward slashes:
     python test_external_batch.py "C:/Users/cbrya/Projects/Op Cadence/translation-batch-20250828_152100_"
 """
@@ -22,7 +22,7 @@ from typing import Any, Dict
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from srt_translator.eval.runner import run_batch_evaluation
+from srt_translator.eval.runner import run_batch_evaluation  # noqa: E402
 
 
 def setup_logging():
@@ -169,9 +169,7 @@ def test_evaluation_system(batch_dir: Path, logger: logging.Logger):
             if "termbase_coverage" in result:
                 logger.info(f"✓ Termbase coverage: {result['termbase_coverage']}")
             if "termbase_entry_counts" in result:
-                logger.info(
-                    f"✓ Termbase entry counts: {result['termbase_entry_counts']}"
-                )
+                logger.info(f"✓ Termbase entry counts: {result['termbase_entry_counts']}")
 
             return True
 

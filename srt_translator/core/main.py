@@ -9,32 +9,22 @@ import logging
 import os
 from dataclasses import replace
 from datetime import datetime
-from typing import List, TypedDict
+from typing import List, Optional
 
 from srt_translator import __version__
 from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.core.config.models import TranslationConfig
+from srt_translator.core.config.models import SummaryDict, TranslationConfig
 from srt_translator.core.translator.translator import SRTTranslator
 
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().
 
 
-class SummaryDict(TypedDict):
-    total_files: int
-    unique_languages: int
-    total_operations: int
-    successes: int
-    skipped: int
-    errors: int
-    error_details: List[str]
-
-
 def translate_srt_files(
     file_paths: List[str],
     config: TranslationConfig,
     *,
-    logger: logging.Logger = None,
+    logger: Optional[logging.Logger] = None,
 ) -> SummaryDict:
     """
     Translate SRT files to multiple target languages.
@@ -62,9 +52,7 @@ def translate_srt_files(
     log_file = os.path.join(batch_dir, f"translation_issues_{ts_str}.log")
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
@@ -93,9 +81,7 @@ def translate_srt_files(
     try:
         if isinstance(source_lang, dict):
             source_code = (
-                source_lang.get("normalized_code")
-                or source_lang.get("detected_code")
-                or ""
+                source_lang.get("normalized_code") or source_lang.get("detected_code") or ""
             ).strip()
     except Exception:
         source_code = None
@@ -114,9 +100,7 @@ def translate_srt_files(
             )
             config = replace(config, target_languages=keep)
     if isinstance(source_lang, dict) and source_lang.get("mixed"):
-        logger.warning(
-            "Detected mixed-language source; proceeding with dominant language."
-        )
+        logger.warning("Detected mixed-language source; proceeding with dominant language.")
 
     # Process each target language
     successful_translations = 0
@@ -139,8 +123,7 @@ def translate_srt_files(
                 dnt_terms=config.dnt_terms,
                 termbase=config.termbase.get(lang_code, {}),
                 api_key=config.api_key,
-                allow_global_termbase_fallback=config.mode
-                == "CLI",  # GUI: no fallback; CLI: allow
+                allow_global_termbase_fallback=config.mode == "CLI",  # GUI: no fallback; CLI: allow
                 model_name=config.model_name,
                 batch_size=batch_size_for_lang,
                 logger=logger,
@@ -183,18 +166,15 @@ def translate_srt_files(
 
     # Write AI config manifest
     try:
-
         # Collect the actual batch sizes used for each language
         language_batch_sizes = {}
         for _lang_name, lang_code in config.target_languages.items():
             if lang_code:
                 try:
-                    batch_size_for_lang = language_config.get_target_batch_size(
-                        lang_code
-                    )
+                    batch_size_for_lang = language_config.get_target_batch_size(lang_code)
                     language_batch_sizes[lang_code] = batch_size_for_lang
                 except Exception:
-                    language_batch_sizes[lang_code] = "unknown"
+                    language_batch_sizes[lang_code] = 5  # Default batch size
 
         manifest_data = {
             "version": __version__,

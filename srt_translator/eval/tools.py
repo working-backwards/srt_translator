@@ -103,9 +103,7 @@ def _parse_time(t: str) -> int:
 
 def parse_srt(path: Path) -> List[Cue]:
     txt = (
-        path.read_text(encoding="utf-8", errors="ignore")
-        .replace("\r\n", "\n")
-        .replace("\r", "\n")
+        path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
     )
     blocks = re.split(r"\n\s*\n", txt)
     cues: List[Cue] = []
@@ -127,9 +125,7 @@ def parse_srt(path: Path) -> List[Cue]:
         expected_idx += 1
         if ti >= len(lines) or "-->" not in lines[ti]:
             continue
-        m = re.match(
-            r"\s*(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[ti]
-        )
+        m = re.match(r"\s*(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[ti])
         if not m:
             continue
         start_ms = _parse_time(m.group(1))
@@ -160,9 +156,7 @@ def _nfkc_lower(s: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s or "")).strip().lower()
 
 
-def median_expansion_ratio(
-    source_after_dnt: List[str], target_norm: List[str]
-) -> float:
+def median_expansion_ratio(source_after_dnt: List[str], target_norm: List[str]) -> float:
     """
     Robust expansion ratio R = median(len(target)/len(source_after_dnt))
     over cues where both sides are non-empty.
@@ -210,11 +204,7 @@ def classify_empty_target_rollup(
 
     src_this_after = src_after_all[i] or ""
     # Tiny remainder: accept roll-up if a neighbor exists and is non-empty
-    if (
-        not src_this_after
-        or len(src_this_after) <= 5
-        or is_numbers_or_punct_only(src_this_after)
-    ):
+    if not src_this_after or len(src_this_after) <= 5 or is_numbers_or_punct_only(src_this_after):
         if i > 0 and tgt_norm_all[i - 1]:
             return "BENIGN_ROLLUP", "tiny remainder rolled up to previous cue"
         if i + 1 < len(target_cues) and tgt_norm_all[i + 1]:
@@ -345,8 +335,9 @@ def _load_frag_cfg(project_root: Path) -> Dict[str, Any]:
                     mode = "auto_non_latin"
                 cfg["mode"] = mode
                 cfg["min_ascii_run"] = int(f.get("min_ascii_run", 6))
-        except Exception:
-            pass
+        except Exception as e:
+            # Fallback to defaults if YAML loading fails
+            print(f"Warning: Failed to load YAML config: {e}")  # noqa: T201
     return cfg
 
 
@@ -383,7 +374,7 @@ def evaluate_pair(
     tb_map: dict[str, str],
     cps_soft_hard: tuple[int, int] | None = None,
     rubric: dict | None = None,
-) -> dict[str, any]:
+) -> dict[str, Any]:
     """
     Evaluate one (source,target) pair and write artifacts into out_dir.
     Returns verdict + fail reasons + path to per-file MD summary.
@@ -396,9 +387,7 @@ def evaluate_pair(
     if cps_soft_hard:
         cps_soft_cap, cps_hard_cap = cps_soft_hard
     else:
-        cps_soft_cap, cps_hard_cap = (
-            (12, 15) if lang.lower().startswith("zh") else (15, 20)
-        )
+        cps_soft_cap, cps_hard_cap = (12, 15) if lang.lower().startswith("zh") else (15, 20)
 
     # Load rubric if not provided
     if rubric is None:
@@ -441,9 +430,7 @@ def evaluate_pair(
                 delta_end_ms,
             ]
         )
-    with (out_dir / f"timing_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
+    with (out_dir / f"timing_{lang}_{batch}.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [
@@ -477,9 +464,7 @@ def evaluate_pair(
                 f"{cps:.2f}",
             ]
         )
-    with (out_dir / f"cps_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
+    with (out_dir / f"cps_{lang}_{batch}.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["index", "chars", "duration_s", "cps"])
         w.writerows(cps_rows)
@@ -543,9 +528,7 @@ def evaluate_pair(
                     term_hits[:3],
                 ]
             )
-    with (out_dir / f"tb_coverage_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
+    with (out_dir / f"tb_coverage_{lang}_{batch}.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [
@@ -606,9 +589,7 @@ def evaluate_pair(
         w.writerows(untranslated_after_dnt_rows)
 
     # Fragments: only emit when rubric says so AND there is at least one row
-    if should_emit_fragments(
-        lang, {"fragments": {"mode": mode}}, len(source_fragment_rows)
-    ):
+    if should_emit_fragments(lang, {"fragments": {"mode": mode}}, len(source_fragment_rows)):
         with (out_dir / f"source_fragments_{lang}_{batch}.csv").open(
             "w", encoding="utf-8", newline=""
         ) as f:
@@ -619,22 +600,21 @@ def evaluate_pair(
     # --- Verdict (structural + integrity gates only) ---
     timing_delta_start_ms = timing_delta_start_ms or [0.0]
     timing_delta_end_ms = timing_delta_end_ms or [0.0]
-    med_ds = percentile(timing_delta_start_ms, 0.5)
-    p95_ds = percentile(timing_delta_start_ms, 0.95)
-    med_de = percentile(timing_delta_end_ms, 0.5)
-    p95_de = percentile(timing_delta_end_ms, 0.95)
+    # Convert to float lists for percentile function
+    start_floats = [float(x) for x in timing_delta_start_ms]
+    end_floats = [float(x) for x in timing_delta_end_ms]
+    med_ds = percentile(start_floats, 0.5)
+    p95_ds = percentile(start_floats, 0.95)
+    med_de = percentile(end_floats, 0.5)
+    p95_de = percentile(end_floats, 0.95)
 
     fail_reasons: List[str] = []
     if len(source_cues) != len(target_cues):
-        fail_reasons.append(
-            f"Cue parity mismatch: src={len(source_cues)} tgt={len(target_cues)}"
-        )
+        fail_reasons.append(f"Cue parity mismatch: src={len(source_cues)} tgt={len(target_cues)}")
     if med_ds > 200 or med_de > 200 or p95_ds > 500 or p95_de > 500:
         fail_reasons.append("Timing drift too high (median or p95)")
     if untranslated_after_dnt_rows:
-        fail_reasons.append(
-            f"Untranslated after DNT: {len(untranslated_after_dnt_rows)}"
-        )
+        fail_reasons.append(f"Untranslated after DNT: {len(untranslated_after_dnt_rows)}")
 
     verdict = "PASS" if not fail_reasons else "FAIL"
 
@@ -672,11 +652,7 @@ def generate_eval(
     """
     v1.0: accepts in-memory DNT and termbase map; no file-path inputs.
     """
-    cps = (
-        (cps_soft, cps_hard)
-        if (cps_soft is not None and cps_hard is not None)
-        else None
-    )
+    cps = (cps_soft, cps_hard) if (cps_soft is not None and cps_hard is not None) else None
 
     return evaluate_pair(
         Path(source_path),

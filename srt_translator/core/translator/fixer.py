@@ -83,9 +83,7 @@ class SRTFixer:
 
         return srt_files
 
-    def _process_single_file(
-        self, file_path: Path, dnt_terms: List[str], dry_run: bool
-    ) -> Dict:
+    def _process_single_file(self, file_path: Path, dnt_terms: List[str], dry_run: bool) -> Dict:
         """Process a single SRT file for placeholder issues."""
         try:
             # Read the file
@@ -103,9 +101,7 @@ class SRTFixer:
 
             # Process each subtitle
             for subtitle in subtitles:
-                subtitle_changes = self._process_subtitle_content(
-                    subtitle.content, dnt_terms
-                )
+                subtitle_changes = self._process_subtitle_content(subtitle.content, dnt_terms)
 
                 if subtitle_changes["new_content"] != subtitle.content:
                     changes.append(
@@ -190,18 +186,14 @@ class SRTFixer:
                 if 0 <= index < len(dnt_terms):
                     replacement = dnt_terms[index] + tail
                     new_content = (
-                        new_content[: match.start()]
-                        + replacement
-                        + new_content[match.end() :]
+                        new_content[: match.start()] + replacement + new_content[match.end() :]
                     )
                     tokens_replaced += 1
                 else:
                     # Remove the placeholder but keep punctuation
                     replacement = tail
                     new_content = (
-                        new_content[: match.start()]
-                        + replacement
-                        + new_content[match.end() :]
+                        new_content[: match.start()] + replacement + new_content[match.end() :]
                     )
                     tokens_removed += 1
                     unknown_indices += 1
@@ -210,9 +202,7 @@ class SRTFixer:
                 # Invalid index, remove the placeholder but keep punctuation
                 replacement = tail
                 new_content = (
-                    new_content[: match.start()]
-                    + replacement
-                    + new_content[match.end() :]
+                    new_content[: match.start()] + replacement + new_content[match.end() :]
                 )
                 tokens_removed += 1
                 unknown_indices += 1
@@ -224,9 +214,7 @@ class SRTFixer:
             "unknown_indices": unknown_indices,
         }
 
-    def _apply_changes(
-        self, file_path: Path, subtitles: List[srt.Subtitle], changes: List[Dict]
-    ):
+    def _apply_changes(self, file_path: Path, subtitles: List[srt.Subtitle], changes: List[Dict]):
         """Apply changes to the SRT file with backup."""
         # Create backup
         backup_path = file_path.with_suffix(file_path.suffix + ".bak")
@@ -276,17 +264,11 @@ class SRTFixer:
 
     def fix_srt_files(self, aggressiveness: float = 0.75):
         """Deprecated: Use scan_and_fix_placeholders() instead."""
-        logger.warning(
-            "fix_srt_files() is deprecated - use scan_and_fix_placeholders()"
-        )
+        logger.warning("fix_srt_files() is deprecated - use scan_and_fix_placeholders()")
 
-    def fix_specific_srt_files(
-        self, file_paths: List[str], aggressiveness: float = 0.75
-    ):
+    def fix_specific_srt_files(self, file_paths: List[str], aggressiveness: float = 0.75):
         """Deprecated: Use scan_and_fix_placeholders() instead."""
-        logger.warning(
-            "fix_specific_srt_files() is deprecated - use scan_and_fix_placeholders()"
-        )
+        logger.warning("fix_specific_srt_files() is deprecated - use scan_and_fix_placeholders()")
 
     def report_status(self):
         """Deprecated: Status is now reported by scan_and_fix_placeholders()."""

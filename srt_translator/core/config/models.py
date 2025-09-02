@@ -6,7 +6,7 @@ Typed configuration models for SRT Translator.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional, TypedDict
 
 
 class LogMode(str, Enum):
@@ -17,14 +17,25 @@ class LogMode(str, Enum):
     DEBUG = "Debug"
 
 
+class SummaryDict(TypedDict):
+    """Summary of translation results."""
+
+    total_files: int
+    unique_languages: int
+    total_operations: int
+    successes: int
+    skipped: int
+    errors: int
+    error_details: List[str]
+    batch_directory: str
+
+
 @dataclass(frozen=True)
 class TranslationConfig:
     # Core translation parameters
     target_languages: Dict[str, str]  # e.g., {"Spanish": "es", ...}
     dnt_terms: List[str]
-    termbase: Dict[
-        str, Dict[str, str]
-    ]  # target_lang_code -> {canonical_term -> translation}
+    termbase: Dict[str, Dict[str, str]]  # target_lang_code -> {canonical_term -> translation}
     output_directory: Path
     api_key: str
     model_name: str
@@ -41,7 +52,7 @@ class TranslationConfig:
     # NEW: language policies injected by GUI/CLI loaders
     language_policies: Optional[Dict[str, Dict[str, Any]]] = None
 
-    def run(self) -> Dict[str, Any]:
+    def run(self) -> SummaryDict:
         """Run the translation with this configuration and return summary."""
         from srt_translator.core.main import translate_srt_files
 
@@ -54,7 +65,9 @@ class TranslationConfig:
         )
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any], mode: str = "GUI") -> "TranslationConfig":
+    def from_raw(
+        cls, raw: Dict[str, Any], mode: Literal["CLI", "GUI"] = "GUI"
+    ) -> "TranslationConfig":
         """Create a TranslationConfig from raw configuration data."""
         errors = []
 

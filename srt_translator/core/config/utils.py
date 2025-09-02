@@ -4,10 +4,10 @@ Pure utility functions for configuration parsing and normalization.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 
-def parse_json_or_csv(val: str | None, *, expect_mapping: bool, field_name: str = "value"):
+def parse_json_or_csv(val: Optional[str], *, expect_mapping: bool, field_name: str = "value"):
     """Parse JSON or CSV string into appropriate data structure."""
     if not val or not val.strip():
         return {} if expect_mapping else []
@@ -89,7 +89,7 @@ def load_termbase_from_file(path: Path) -> Dict[str, Dict[str, str]]:
         return normalized
 
 
-def validate_positive_int(value: Any, field_name: str, upper_bound: int = None) -> int:
+def validate_positive_int(value: Any, field_name: str, upper_bound: Optional[int] = None) -> int:
     """Validate and convert to positive integer."""
     try:
         int_val = int(value)

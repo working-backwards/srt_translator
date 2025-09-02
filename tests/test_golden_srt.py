@@ -105,9 +105,7 @@ CASES = [
 
 
 @pytest.mark.parametrize("filename,languages,overrides", CASES)
-def test_golden_structure_and_invariants(
-    tmp_path: Path, caplog, filename, languages, overrides
-):
+def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, languages, overrides):
     # Read input and basic structure
     input_path = GOLDEN_INPUT_DIR / filename
     src_text = input_path.read_text(encoding="utf-8")
@@ -195,9 +193,7 @@ def test_golden_structure_and_invariants(
             )
 
     # Run fixer in dry-run mode
-    fixer = SRTFixer(
-        log_file=str(batch_dir / "fixer_golden.log"), translations_dir=str(batch_dir)
-    )
+    fixer = SRTFixer(log_file=str(batch_dir / "fixer_golden.log"), translations_dir=str(batch_dir))
     summary = fixer.scan_and_fix_placeholders(
         batch_dir=batch_dir, dnt_terms=ai_config["dnt_terms"], dry_run=True
     )
@@ -211,9 +207,6 @@ def test_golden_structure_and_invariants(
         assert "__DNT_TERM_" not in text, f"Placeholder token leaked in {p}"
 
     # If summary includes counters, assert zero changes
-    changes = sum(
-        summary.get(k, 0)
-        for k in ("tokens_replaced", "tokens_removed", "files_changed")
-    )
+    changes = sum(summary.get(k, 0) for k in ("tokens_replaced", "tokens_removed", "files_changed"))
     assert changes == 0
     # --- end Fixer golden guard ---

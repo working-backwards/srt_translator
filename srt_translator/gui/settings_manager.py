@@ -210,13 +210,9 @@ class SettingsManager:
         # fill the remaining slots with default popular languages
         if len(user_preferences) < popular_limit:
             # Get default languages that aren't already in user preferences
-            remaining_defaults = [
-                code for code in default_popular if code not in user_preferences
-            ]
+            remaining_defaults = [code for code in default_popular if code not in user_preferences]
             # Fill up to the limit
-            additional_languages = remaining_defaults[
-                : popular_limit - len(user_preferences)
-            ]
+            additional_languages = remaining_defaults[: popular_limit - len(user_preferences)]
             return user_preferences + additional_languages
 
         # If user has enough preferences, use them (up to the limit)
@@ -311,7 +307,7 @@ class SettingsManager:
                     stat = os.stat(file_path)
                     hash_input += f"{file_path}:{stat.st_mtime}:{stat.st_size}\n"
 
-            return hashlib.md5(hash_input.encode()).hexdigest()
+            return hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()
         except Exception as e:
             self.logger.error(f"Error calculating file hash: {e}")
             return ""

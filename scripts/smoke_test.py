@@ -87,7 +87,14 @@ def test_cli_entry_point():
     logger.info("🔧 Testing CLI entry point...")
 
     try:
-        from srt_translator.core.main import translate_srt_files
+        import importlib.util
+
+        spec = importlib.util.find_spec("srt_translator.core.main")
+        if spec is None:
+            raise ImportError("Module not found")
+
+        # Import to verify it's actually importable
+        from srt_translator.core.main import translate_srt_files  # noqa: F401
 
         logger.info("✅ CLI main function found and importable")
         return True

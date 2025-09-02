@@ -65,28 +65,20 @@ TEXT:
         if language_config and detected:
             try:
                 if hasattr(language_config, "closest_supported_code"):
-                    norm = language_config.closest_supported_code(detected)
+                    norm = language_config.closest_supported_code(detected)  # type: ignore
                 else:
-                    supported = set(language_config.get_language_codes())
+                    supported = set(language_config.get_language_codes())  # type: ignore
                     if detected in supported:
                         norm = detected
                     else:
                         lowered = {c.lower(): c for c in supported}
                         norm = lowered.get(detected.lower())
                         if not norm and detected.lower().startswith("zh"):
-                            norm = (
-                                "zh-Hans"
-                                if "zh-Hans" in supported
-                                else lowered.get("zh-hans")
-                            )
+                            norm = "zh-Hans" if "zh-Hans" in supported else lowered.get("zh-hans")
                         if not norm and detected.lower().startswith("pt"):
-                            norm = (
-                                "pt-BR"
-                                if "pt-BR" in supported
-                                else lowered.get("pt-br")
-                            )
+                            norm = "pt-BR" if "pt-BR" in supported else lowered.get("pt-br")
                 if norm:
-                    name = language_config.get_language_name(norm)
+                    name = language_config.get_language_name(norm)  # type: ignore
             except Exception:
                 norm, name = None, None
 

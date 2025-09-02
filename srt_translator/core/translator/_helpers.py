@@ -12,7 +12,10 @@ import os
 from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
-    from .translator import SRTTranslator  # type-only; no runtime import
+    from srt_translator.core.translator.models import Subtitle
+    from srt_translator.core.translator.translator import (
+        SRTTranslator,  # type-only; no runtime import
+    )
 
 
 def _create_batches_with_logging(
@@ -111,12 +114,8 @@ def _handle_mid_batch_empty_retries(
                 if isinstance(pair_items, list) and len(pair_items) >= 1:
                     candidate = pair_items[0].get("tgt", "")
                     if candidate and candidate.strip():
-                        tgt_texts[i] = self.term_handler.restore_dnt_placeholders(
-                            candidate
-                        )
-                        batch_logger.debug(
-                            "Pair retry filled idx=%s successfully.", sid
-                        )
+                        tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
+                        batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                         filled = True
             except Exception as ex:
                 # SANCTIONED DIAGNOSTICS HOOK: strict pair-retry failure

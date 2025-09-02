@@ -76,7 +76,7 @@ The system automatically detects script requirements from `languages.json`:
     "script_blocks": ["CJK"]
   },
   "ja": {
-    "script": "japanese", 
+    "script": "japanese",
     "script_blocks": ["Hiragana", "Katakana", "CJK"]
   }
 }

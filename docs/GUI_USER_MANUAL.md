@@ -186,7 +186,7 @@ Translation time depends on your content length and the number of target languag
 
 **For a single language:**
 - **5 minutes of content:** 1-2 minutes to translate
-- **15 minutes of content:** 6-8 minutes to translate  
+- **15 minutes of content:** 6-8 minutes to translate
 - **30 minutes of content:** 12-16 minutes to translate
 - **60 minutes of content:** 24-32 minutes to translate
 

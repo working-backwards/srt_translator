@@ -64,9 +64,9 @@ def __init__(self, *, logger: logging.Logger, ...):
 ## 3) Style & Patterns
 
 ### Imports (order)
-1) Standard library  
-2) Third‑party  
-3) Local package imports  
+1) Standard library
+2) Third‑party
+3) Local package imports
 (no imports after code execution)
 
 ### Type hints & docstrings
@@ -139,11 +139,11 @@ bandit -r srt_translator
 
 ## 7) Before You Submit (Checklist)
 
-- [ ] Imports organized; none after code execution  
-- [ ] Type hints & docstrings updated  
-- [ ] Specific exceptions (no bare `Exception`)  
-- [ ] Logging used; no `print()`  
-- [ ] Inputs validated; no secrets logged  
-- [ ] `ruff check .` and `ruff format .` clean  
-- [ ] `mypy srt_translator` passes (or justified ignores)  
+- [ ] Imports organized; none after code execution
+- [ ] Type hints & docstrings updated
+- [ ] Specific exceptions (no bare `Exception`)
+- [ ] Logging used; no `print()`
+- [ ] Inputs validated; no secrets logged
+- [ ] `ruff check .` and `ruff format .` clean
+- [ ] `mypy srt_translator` passes (or justified ignores)
 - [ ] `pytest -q` passes (incl. single‑file test)

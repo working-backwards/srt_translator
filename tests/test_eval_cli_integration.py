@@ -28,9 +28,7 @@ def create_real_batch_structure(temp_dir: Path) -> Path:
             "fr": {"Module": "Module"},
         },
     }
-    (batch_dir / "ai_config.json").write_text(
-        json.dumps(ai_config, indent=2), encoding="utf-8"
-    )
+    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Create originals directory with realistic SRT files
     originals_dir = batch_dir / "originals"
@@ -163,9 +161,7 @@ class TestEvalCLIIntegration:
         # Verify batch manifest contains expected data
         manifest_data = json.loads(batch_manifest.read_text(encoding="utf-8"))
         assert "app_version" in manifest_data, "Manifest should contain app_version"
-        assert (
-            "evaluator_version" in manifest_data
-        ), "Manifest should contain evaluator_version"
+        assert "evaluator_version" in manifest_data, "Manifest should contain evaluator_version"
 
         # Check for top-level evaluation report
         eval_report = batch_dir / "eval_report.md"
@@ -177,9 +173,7 @@ class TestEvalCLIIntegration:
         assert (
             "Spanish" in report_content or "es" in report_content
         ), "Report should mention Spanish"
-        assert (
-            "French" in report_content or "fr" in report_content
-        ), "Report should mention French"
+        assert "French" in report_content or "fr" in report_content, "Report should mention French"
 
     def test_evaluation_with_issues(self, tmp_path):
         """Test evaluation with files that have actual issues (missing translations, etc.)."""
@@ -243,9 +237,7 @@ Otro subtítulo para pruebas."""
         batch_dir = create_real_batch_structure(tmp_path)
 
         # Remove the rubric file to test fallback behavior
-        rubric_file = (
-            Path(__file__).resolve().parents[2] / "config" / "translation_rubric.yaml"
-        )
+        rubric_file = Path(__file__).resolve().parents[2] / "config" / "translation_rubric.yaml"
         if rubric_file.exists():
             # Temporarily rename it
             backup_name = rubric_file.with_suffix(".yaml.backup")

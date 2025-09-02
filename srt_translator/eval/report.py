@@ -128,9 +128,7 @@ def render_consolidated_punchlist(
         tgt = issue.get("target") or issue.get("tgt") or ""
         out.append(f"### {_lang_label(lang)}\n")
         out.append(f"#### {file_name}")
-        out.append(
-            f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
-        )
+        out.append(f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n")
 
         # Context window (prev2/current/next2), boundary-safe
         try:
@@ -155,17 +153,15 @@ def render_consolidated_punchlist(
                 out.append("```")
                 out.append(src_block)
                 out.append("```")
-        except Exception:
+        except Exception as e:
             # Never let context rendering break the report
-            pass
+            out.append(f"[Warning: Failed to render context blocks: {e}]")
 
         out.append("")  # spacing
     return "\n".join(out)
 
 
-def render_issue_sections(
-    languages: Dict, *, batch_root: Path, source_lang_name: str
-) -> str:
+def render_issue_sections(languages: Dict, *, batch_root: Path, source_lang_name: str) -> str:
     """
     Render ERROR issues grouped by language/file with contextual "Suggested check".
     INFO/WARN are intentionally omitted from Markdown.
@@ -182,17 +178,13 @@ def render_issue_sections(
             if not errs:
                 continue
             file_name = f.get("target_file", f.get("file_name", "—"))
-            src_rel = f.get("source_rel", "")
-            tgt_rel = f.get("target_rel", "")
             out.append(f"### {file_name}")
             out.append("**Blocking issues**\n")
             for issue in errs:
                 cue = issue.get("cue") or issue.get("idx")
                 orig = issue.get("original") or issue.get("src") or ""
                 tgt = issue.get("target") or issue.get("tgt") or ""
-                out.append(
-                    f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n"
-                )
+                out.append(f"- cue {cue}:\n  `Original: {orig}`\n  `{_lang_label(lang)}: {tgt}`\n")
                 try:
                     tgt_block, src_block, notice = _context_blocks_for_issue(
                         batch_root=batch_root,
@@ -214,8 +206,8 @@ def render_issue_sections(
                         out.append("```")
                         out.append(src_block)
                         out.append("```")
-                except Exception:
-                    pass
+                except Exception as e:
+                    out.append(f"[Warning: Failed to render context blocks: {e}]")
             out.append("")  # spacing
     return "\n".join(out)
 
@@ -233,8 +225,9 @@ def _get_language_info(code: str) -> Dict[str, str]:
             lang_info = languages.get(code, {})
             name = lang_info.get("name")
             return {"name": name if name else code, "code": code}
-    except Exception:
-        pass
+    except Exception as e:
+        # Fallback to code if language lookup fails
+        print(f"Warning: Failed to load language info for {code}: {e}")  # noqa: T201
     return {"name": code, "code": code}
 
 
@@ -249,8 +242,9 @@ def _lang_label(code: str) -> str:
             config = LanguageConfig(data)
             name = config.get_language_name(code)
             return name if name else code
-    except Exception:
-        pass
+    except Exception as e:
+        # Fallback to code if language lookup fails
+        print(f"Warning: Failed to load language name for {code}: {e}")  # noqa: T201
     return code or "Original"
 
 
@@ -356,9 +350,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     """
     log = logger.getChild("report")
     batch_root = Path(batch_root)
-    batch = rollup.get("batch_label", batch_root.name)
     langs = rollup.get("languages", {})
-    src = rollup.get("original_language") or {}
 
     out = []
     src_label = _resolve_source_label(batch_root, rollup)
@@ -388,24 +380,18 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Add consolidated punch list using new function
     out.append(
-        render_consolidated_punchlist(
-            langs, batch_root=batch_root, source_lang_name=src_label
-        )
+        render_consolidated_punchlist(langs, batch_root=batch_root, source_lang_name=src_label)
     )
     out.append("\n")
 
     # Roll-up table
     out.append("\n---\n")
-    out.append(
-        "## Language Roll-Up\n\n| Language | File | Ready? | Notes |\n|---|---|---|---|"
-    )
+    out.append("## Language Roll-Up\n\n| Language | File | Ready? | Notes |\n|---|---|---|---|")
     for lang, entry in langs.items():
         for f in entry.get("files", []):
             notes = []
             if f.get("issues", {}).get("untranslated_after_dnt"):
-                notes.append(
-                    f"untranslated:{len(f['issues']['untranslated_after_dnt'])}"
-                )
+                notes.append(f"untranslated:{len(f['issues']['untranslated_after_dnt'])}")
             if f.get("issues", {}).get("missing_translation"):
                 notes.append(f"missing:{len(f['issues']['missing_translation'])}")
             if f.get("issues", {}).get("timing_fail"):
@@ -418,9 +404,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # Add detailed issue sections using new function
     out.append("\n")
-    out.append(
-        render_issue_sections(langs, batch_root=batch_root, source_lang_name=src_label)
-    )
+    out.append(render_issue_sections(langs, batch_root=batch_root, source_lang_name=src_label))
     out.append("\n")
 
     # Per-language key metrics (brief)
@@ -429,30 +413,20 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         for f in entry.get("files", []):
             m = f.get("metrics", {})
             out.append(f"\n### {lang} — {f.get('target_file')}")
-            out.append(
-                f"- Cue parity: {'OK' if m.get('parity_ok', True) else 'Mismatch'}"
-            )
+            out.append(f"- Cue parity: {'OK' if m.get('parity_ok', True) else 'Mismatch'}")
             out.append(
                 f"- Timing Δstart median/p95={m.get('med_ds_ms',0):.0f}/{m.get('p95_ds_ms',0):.0f}ms; Δend median/p95={m.get('med_de_ms',0):.0f}/{m.get('p95_de_ms',0):.0f}ms"
             )
-            out.append(
-                f"- CPS caps used: soft={m.get('cps_soft')} hard={m.get('cps_hard')}\n"
-            )
+            out.append(f"- CPS caps used: soft={m.get('cps_soft')} hard={m.get('cps_hard')}\n")
 
     # Glossary
     out.append("\n---\n## Glossary")
     out.append("\n")
-    out.append(
-        "- **Cue (subtitle):** one numbered subtitle block with in/out times and text."
-    )
+    out.append("- **Cue (subtitle):** one numbered subtitle block with in/out times and text.")
     out.append('- **DNT:** "Do Not Translate" — protected names/codes to keep as-is.')
     out.append("- **Termbase:** approved glossary mapping original → target terms.")
-    out.append(
-        "- **Cue parity:** target must have the same number of cues as the original."
-    )
-    out.append(
-        "- **Timing drift:** how far target cue times deviate from the original."
-    )
+    out.append("- **Cue parity:** target must have the same number of cues as the original.")
+    out.append("- **Timing drift:** how far target cue times deviate from the original.")
     out.append(
         "- **CPS:** characters per second; readability guideline, not a hard fail unless rubric says so."
     )

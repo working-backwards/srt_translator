@@ -46,9 +46,7 @@ def _mk_translator():
     def _create(**kwargs):
         dc.last_kwargs = kwargs
         return _DummyClient._Resp(
-            content=json.dumps(
-                {"items": [{"id": 1, "tgt": "x"}, {"id": 2, "tgt": "y"}]}
-            )
+            content=json.dumps({"items": [{"id": 1, "tgt": "x"}, {"id": 2, "tgt": "y"}]})
         )
 
     t.client = types.SimpleNamespace(
@@ -81,7 +79,7 @@ def test_prompts_non_strict_snapshot():
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        'Use these business term mappings when present (source \u2192 target). '
+        "Use these business term mappings when present (source \u2192 target). "
         'If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"
@@ -130,7 +128,7 @@ def test_prompts_strict_snapshot():
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
         "TERMINOLOGY:\n"
-        'Use these business term mappings when present (source \u2192 target). '
+        "Use these business term mappings when present (source \u2192 target). "
         'If "(none)", ignore:\n'
         f"{termbase_block}\n\n"
         "DNT PLACEHOLDERS:\n"

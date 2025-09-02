@@ -115,7 +115,7 @@ class AIConfigSection(QGroupBox):
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 0)  # Indeterminate progress
-        
+
         # Progress text label (initially hidden)
         self.progress_label = QLabel("")
         self.progress_label.setVisible(False)

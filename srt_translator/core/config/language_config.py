@@ -110,12 +110,8 @@ class LanguageConfig:
         if "target_batch_size" in self._defaults:
             return int(self._defaults["target_batch_size"])
         # Log the error before raising
-        self.logger.error(
-            "Missing target_batch_size for language %s and no policy default", code
-        )
-        raise ValueError(
-            f"Missing target_batch_size for language {code} and no policy default"
-        )
+        self.logger.error("Missing target_batch_size for language %s and no policy default", code)
+        raise ValueError(f"Missing target_batch_size for language {code} and no policy default")
 
     def get_max_batch_size(self, code: str) -> int:
         """Get the maximum batch size for a language."""
@@ -128,12 +124,8 @@ class LanguageConfig:
         if "max_batch_size" in self._defaults:
             return int(self._defaults["max_batch_size"])
         # Log the error before raising
-        self.logger.error(
-            "Missing max_batch_size for language %s and no policy default", code
-        )
-        raise ValueError(
-            f"Missing max_batch_size for language {code} and no policy default"
-        )
+        self.logger.error("Missing max_batch_size for language %s and no policy default", code)
+        raise ValueError(f"Missing max_batch_size for language {code} and no policy default")
 
     def allows_placeholder_apostrophe(self, code: str) -> bool:
         """Check if a language allows apostrophes after DNT placeholders."""
@@ -199,28 +191,28 @@ class LanguageConfig:
 
     # ---------- Script helpers (unchanged design; now fed by JSON) ----------
     _UNICODE_BLOCKS = {
-        "CJK": [("\u4E00", "\u9FFF")],
-        "Hiragana": [("\u3040", "\u309F")],
-        "Katakana": [("\u30A0", "\u30FF")],
-        "Hangul": [("\uAC00", "\uD7A3")],
-        "Arabic": [("\u0600", "\u06FF")],
-        "Hebrew": [("\u0590", "\u05FF")],
-        "Cyrillic": [("\u0400", "\u04FF")],
-        "Greek": [("\u0370", "\u03FF")],
-        "Devanagari": [("\u0900", "\u097F")],
-        "Bengali": [("\u0980", "\u09FF")],
-        "Gurmukhi": [("\u0A00", "\u0A7F")],
-        "Gujarati": [("\u0A80", "\u0AFF")],
-        "Oriya": [("\u0B00", "\u0B7F")],
-        "Tamil": [("\u0B80", "\u0BFF")],
-        "Telugu": [("\u0C00", "\u0C7F")],
-        "Kannada": [("\u0C80", "\u0CFF")],
-        "Malayalam": [("\u0D00", "\u0D7F")],
-        "Sinhala": [("\u0D80", "\u0DFF")],
-        "Thai": [("\u0E00", "\u0E7F")],
-        "Lao": [("\u0E80", "\u0EFF")],
-        "Khmer": [("\u1780", "\u17FF")],
-        "Georgian": [("\u10A0", "\u10FF")],
+        "CJK": [("\u4e00", "\u9fff")],
+        "Hiragana": [("\u3040", "\u309f")],
+        "Katakana": [("\u30a0", "\u30ff")],
+        "Hangul": [("\uac00", "\ud7a3")],
+        "Arabic": [("\u0600", "\u06ff")],
+        "Hebrew": [("\u0590", "\u05ff")],
+        "Cyrillic": [("\u0400", "\u04ff")],
+        "Greek": [("\u0370", "\u03ff")],
+        "Devanagari": [("\u0900", "\u097f")],
+        "Bengali": [("\u0980", "\u09ff")],
+        "Gurmukhi": [("\u0a00", "\u0a7f")],
+        "Gujarati": [("\u0a80", "\u0aff")],
+        "Oriya": [("\u0b00", "\u0b7f")],
+        "Tamil": [("\u0b80", "\u0bff")],
+        "Telugu": [("\u0c00", "\u0c7f")],
+        "Kannada": [("\u0c80", "\u0cff")],
+        "Malayalam": [("\u0d00", "\u0d7f")],
+        "Sinhala": [("\u0d80", "\u0dff")],
+        "Thai": [("\u0e00", "\u0e7f")],
+        "Lao": [("\u0e80", "\u0eff")],
+        "Khmer": [("\u1780", "\u17ff")],
+        "Georgian": [("\u10a0", "\u10ff")],
     }
 
     def get_script_spec(self, code: str) -> dict:
@@ -300,12 +292,6 @@ class LanguageConfig:
         "latin": [],
         "no_space": [],
     }
-
-    def get_family_defaults(self, family: str) -> dict:
-        return (self._raw.get("family_defaults") or {}).get(family, {})
-
-    def family(self, code: str) -> str:
-        return (self.get_all_languages().get(code, {}) or {}).get("family", "")
 
     def no_orphan_end(self, code: str) -> list[str]:
         lang = self.get_all_languages().get(code, {})

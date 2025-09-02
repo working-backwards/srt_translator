@@ -38,7 +38,7 @@ __DNT_TERM_1__ Hello
 
 2
 00:00:03,000 --> 00:00:05,000
- 
+
 
 3
 00:00:05,000 --> 00:00:07,000
@@ -63,9 +63,7 @@ World __DNT_TERM_2__
     )
     t.client = _DummyClient()
 
-    t.translate_file(
-        input_filepath=str(inp), output_filepath=str(outp), target_lang="fr"
-    )
+    t.translate_file(input_filepath=str(inp), output_filepath=str(outp), target_lang="fr")
 
     out_text = outp.read_text(encoding="utf-8")
     blocks = [b for b in out_text.strip().split("\n\n") if b.strip()]

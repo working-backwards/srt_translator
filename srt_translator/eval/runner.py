@@ -59,9 +59,7 @@ def _collect_language_dirs(batch_root: Path) -> List[Path]:
     return sorted(out)
 
 
-def _pair_by_contract(
-    originals_dir: Path, lang_dir: Path, lang: str
-) -> List[Tuple[Path, Path]]:
+def _pair_by_contract(originals_dir: Path, lang_dir: Path, lang: str) -> List[Tuple[Path, Path]]:
     token = lang.replace("_", "-").upper()
     suffix = f" - {token}"
     source_map = {p.stem: p for p in originals_dir.rglob("*.srt")}
@@ -154,8 +152,9 @@ def _get_language_info(code: str) -> Dict[str, str]:
             config = LanguageConfig(data)
             name = config.get_language_name(code)
             return {"name": name, "code": code}
-    except Exception:
-        pass
+    except Exception as e:
+        # Fallback to code if language lookup fails
+        print(f"Warning: Failed to load language info for {code}: {e}")  # noqa: T201
     return {"name": code, "code": code}
 
 
@@ -225,9 +224,7 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     config_path = batch_root / "ai_config.json"
     if not config_path.exists():
         logger.error("Required ai_config.json not found - stopping evaluation")
-        raise FileNotFoundError(
-            f"ai_config.json required for evaluation: {config_path}"
-        )
+        raise FileNotFoundError(f"ai_config.json required for evaluation: {config_path}")
 
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -338,9 +335,7 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
             try:
                 ai = json.loads(ai_cfg.read_text(encoding="utf-8"))
                 info = ai.get("source_language") or {}
-                code = (
-                    info.get("normalized_code") or info.get("detected_code") or ""
-                ).strip()
+                code = (info.get("normalized_code") or info.get("detected_code") or "").strip()
                 name = (info.get("normalized_name") or "").strip()
                 if code and not name:
                     # Use LanguageConfig to get friendly name
@@ -348,19 +343,16 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
                         project_root = _project_root()
                         languages_file = project_root / "config" / "languages.json"
                         if languages_file.exists():
-                            data = json.loads(
-                                languages_file.read_text(encoding="utf-8")
-                            )
+                            data = json.loads(languages_file.read_text(encoding="utf-8"))
                             config = LanguageConfig(data)
                             name = config.get_language_name(code)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # Fallback to code if language lookup fails
+                        print(f"Warning: Failed to load language name for {code}: {e}")  # noqa: T201
                 if code or name:
                     manifest["original_language"] = {"code": code, "name": name}
             except Exception as ex:
-                log.warning(
-                    "Could not patch original_language from ai_config.json: %s", ex
-                )
+                log.warning("Could not patch original_language from ai_config.json: %s", ex)
 
     man.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     log.debug("Ensured manifest.json has all required fields", extra={"path": str(man)})
@@ -380,13 +372,10 @@ def _write_manifest_if_missing(
     try:
         data = {
             "batch_label": _discover_batch_label(batch_root),
-            "created_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-            + "Z",
+            "created_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
             "app_version": "unversioned",
             "evaluator_version": "unversioned",
-            "original_language": (
-                src_lang_info if src_lang_info else {"code": "", "name": ""}
-            ),
+            "original_language": (src_lang_info if src_lang_info else {"code": "", "name": ""}),
             "languages": languages,
             "files": files_per_lang,
             "rubric_snapshot": {
@@ -397,9 +386,7 @@ def _write_manifest_if_missing(
         mf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info("Wrote manifest.json", extra={"path": str(mf)})
     except Exception as e:
-        logger.warning(
-            "Failed to write manifest.json (continuing)", extra={"error": str(e)}
-        )
+        logger.warning("Failed to write manifest.json (continuing)", extra={"error": str(e)})
 
 
 def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
@@ -414,9 +401,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
     # Find the batch log file
     log_files = list(batch_root.glob("translation_issues_*.log"))
     if not log_files:
-        logger.warning(
-            "No batch log file found - evaluation logs will only go to console"
-        )
+        logger.warning("No batch log file found - evaluation logs will only go to console")
         return
 
     # Use the first (and should be only) log file
@@ -436,9 +421,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
     try:
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         logger.debug(f"Added batch log file handler: {log_file.name}")
@@ -493,7 +476,6 @@ def run_batch_evaluation(
     artifacts_root.mkdir(exist_ok=True)
 
     language_dirs = _collect_language_dirs(batch_root)
-    languages = [p.name for p in language_dirs]
 
     # Friendly source language from TranslationConfig (if available)
     src_lang_info = {}
@@ -508,9 +490,7 @@ def run_batch_evaluation(
         if hasattr(language_config, "source_language"):
             src_lang = language_config.source_language
             if log.isEnabledFor(logging.DEBUG):
-                log.debug(
-                    "source_language type: %s, value: %s", type(src_lang), src_lang
-                )
+                log.debug("source_language type: %s, value: %s", type(src_lang), src_lang)
             if src_lang and isinstance(src_lang, dict):
                 if log.isEnabledFor(logging.DEBUG):
                     try:
@@ -520,11 +500,7 @@ def run_batch_evaluation(
                 # Check for normalized_code first, then detected_code
                 code = src_lang.get("normalized_code") or src_lang.get("detected_code")
                 if code:
-                    name = (
-                        src_lang.get("normalized_name")
-                        or src_lang.get("name")
-                        or str(code)
-                    )
+                    name = src_lang.get("normalized_name") or src_lang.get("name") or str(code)
                     src_lang_info = {"code": str(code), "name": str(name)}
                     if log.isEnabledFor(logging.DEBUG):
                         log.debug("Using code: %s, name: %s", code, name)
@@ -575,9 +551,7 @@ def run_batch_evaluation(
         log.info("No termbase provided; continuing without termbase coverage")
     else:
         covered_langs = [lang for lang, entries in termbase.items() if entries]
-        log.debug(
-            f"Termbase coverage: {len(covered_langs)} languages with custom terms"
-        )
+        log.debug(f"Termbase coverage: {len(covered_langs)} languages with custom terms")
 
     rollup: Dict[str, Any] = {
         "batch_label": batch_label,
@@ -587,9 +561,7 @@ def run_batch_evaluation(
         "config_source": "ai_config.json",
         "dnt_coverage": "present" if dnt_terms else "none",
         "termbase_coverage": _calculate_termbase_coverage(termbase),
-        "termbase_entry_counts": {
-            lang: len(entries) for lang, entries in termbase.items()
-        },
+        "termbase_entry_counts": {lang: len(entries) for lang, entries in termbase.items()},
     }
 
     for lang_dir in language_dirs:
@@ -624,9 +596,7 @@ def run_batch_evaluation(
             try:
                 # Build termbase map for this language
                 tb_map = {}
-                raw_map = (
-                    tb_per_lang.get(lang) or tb_per_lang.get(lang.split("-")[0]) or {}
-                )
+                raw_map = tb_per_lang.get(lang) or tb_per_lang.get(lang.split("-")[0]) or {}
                 # raw_map is expected to be {source: target}
                 if isinstance(raw_map, dict):
                     tb_map = {str(k): str(v) for k, v in raw_map.items() if k}
@@ -663,9 +633,7 @@ def run_batch_evaluation(
             un_csv = out_dir / f"untranslated_{lang}_{batch_label}.csv"
             un_issues = []
             if un_csv.exists():
-                for row in csv.DictReader(
-                    un_csv.read_text(encoding="utf-8").splitlines()
-                ):
+                for row in csv.DictReader(un_csv.read_text(encoding="utf-8").splitlines()):
                     un_issues.append(
                         {
                             "cue": int(row["cue"]),
@@ -677,9 +645,7 @@ def run_batch_evaluation(
             # Missing translation with roll-up classification:
             # treat punctuation-only / placeholders as empty; exclude benign/suspect roll-ups.
             dnt_terms = _extract_dnt_terms({"terms": batch_dnt_terms})
-            tb_map = _extract_tb_map(
-                {"languages": {lang: tb_per_lang.get(lang, {})}}, lang
-            )
+            tb_map = _extract_tb_map({"languages": {lang: tb_per_lang.get(lang, {})}}, lang)
             missing_issues: List[Dict[str, Any]] = []
             for cue_idx, target_cue in enumerate(target_cues):
                 tgt_norm = normalize_for_empty_check(target_cue.text or "")
@@ -695,12 +661,8 @@ def run_batch_evaluation(
                     termbase_map_for_lang=tb_map,
                 )
                 if rollup_class == "MISSING":
-                    src_text = (
-                        source_cues[cue_idx].text if cue_idx < len(source_cues) else ""
-                    )
-                    missing_issues.append(
-                        {"idx": target_cue.index, "src": src_text, "tgt": ""}
-                    )
+                    src_text = source_cues[cue_idx].text if cue_idx < len(source_cues) else ""
+                    missing_issues.append({"idx": target_cue.index, "src": src_text, "tgt": ""})
 
                     # Timing stats (quick re-summarize)
             cue_count = min(len(source_cues), len(target_cues))
@@ -725,20 +687,15 @@ def run_batch_evaluation(
                     )
                     continue
 
-            med_ds = (
-                percentile(timing_delta_start_ms, 0.5) if timing_delta_start_ms else 0.0
+            # Convert to float lists for percentile function
+            start_floats = (
+                [float(x) for x in timing_delta_start_ms] if timing_delta_start_ms else []
             )
-            p95_ds = (
-                percentile(timing_delta_start_ms, 0.95)
-                if timing_delta_start_ms
-                else 0.0
-            )
-            med_de = (
-                percentile(timing_delta_end_ms, 0.5) if timing_delta_end_ms else 0.0
-            )
-            p95_de = (
-                percentile(timing_delta_end_ms, 0.95) if timing_delta_end_ms else 0.0
-            )
+            end_floats = [float(x) for x in timing_delta_end_ms] if timing_delta_end_ms else []
+            med_ds = percentile(start_floats, 0.5) if start_floats else 0.0
+            p95_ds = percentile(start_floats, 0.95) if start_floats else 0.0
+            med_de = percentile(end_floats, 0.5) if end_floats else 0.0
+            p95_de = percentile(end_floats, 0.95) if end_floats else 0.0
             timing_fail = med_ds > 200 or med_de > 200 or p95_ds > 500 or p95_de > 500
 
             verdict = res.get("verdict", "FAIL")
@@ -785,9 +742,7 @@ def run_batch_evaluation(
         artifacts_dir = batch_root / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         out_json = artifacts_dir / "eval_report.json"
-        out_json.write_text(
-            json.dumps(rollup, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        out_json.write_text(json.dumps(rollup, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info(f"Wrote evaluator JSON: {out_json}")
     except Exception as e:
         logger.error(f"Failed to write eval_report.json: {e}")

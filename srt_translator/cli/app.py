@@ -63,9 +63,7 @@ Examples:
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument(
-        "--version", action="store_true", help="Show version information"
-    )
+    parser.add_argument("--version", action="store_true", help="Show version information")
     args = parser.parse_args(argv)
 
     # Handle version flag first
@@ -95,16 +93,14 @@ Examples:
         raw_config = collect_cli_raw()
         api_cfg = TranslationConfig(
             files=None,  # set after enumeration
-            output_directory=Path(
-                raw_config.get("output_directory", "translated_srt_files")
-            ),
-            target_languages=raw_config.get("target_languages"),
-            dnt_terms=raw_config.get("dnt_terms"),
+            output_directory=Path(raw_config.get("output_directory", "translated_srt_files")),
+            target_languages=raw_config.get("target_languages") or {},
+            dnt_terms=raw_config.get("dnt_terms") or [],
             termbase=raw_config.get("termbase") or {},
             model_name=raw_config.get("openai_model", "gpt-4o-mini"),
             aggressiveness=float(raw_config.get("aggressiveness", 0.75)),
             log_mode=raw_config.get("log_mode", "Standard"),
-            api_key=raw_config.get("api_key"),
+            api_key=raw_config.get("api_key") or "",
             mode="CLI",
             source_language=raw_config.get("source_language"),
             language_policies=raw_config.get("language_policies"),
@@ -138,11 +134,7 @@ Examples:
         if not os.path.exists(input_dir):
             logger.error(f"INPUT_DIRECTORY not found: {input_dir}")
             return 1
-        files = [
-            Path(input_dir) / f
-            for f in sorted(os.listdir(input_dir))
-            if f.endswith(".srt")
-        ]
+        files = [Path(input_dir) / f for f in sorted(os.listdir(input_dir)) if f.endswith(".srt")]
         if not files:
             logger.info(f"No .srt files found in {input_dir}")
             return 0
@@ -157,9 +149,7 @@ Examples:
             eval_logger = logger.getChild("eval")
 
             # Prefer an explicit batch root if your translation returns it
-            batch_root = results.get(
-                "batch_directory"
-            )  # <— add this in your pipeline if possible
+            batch_root = results.get("batch_directory")  # <— add this in your pipeline if possible
             if batch_root:
                 latest_batch = Path(batch_root)
             else:
@@ -177,9 +167,7 @@ Examples:
                     ]
                     # Choose by modification time to avoid lexicographic surprises
                     latest_batch = (
-                        max(candidates, key=lambda d: d.stat().st_mtime)
-                        if candidates
-                        else None
+                        max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
                     )
 
             if latest_batch and latest_batch.exists():

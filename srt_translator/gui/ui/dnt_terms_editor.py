@@ -80,9 +80,7 @@ class DNTTermsEditor(QWidget):
         self.terms_list_widget.setMinimumHeight(150)
         self.terms_list_widget.setMaximumHeight(200)
         self.terms_list_widget.setAlternatingRowColors(True)
-        self.terms_list_widget.setSelectionMode(
-            QListWidget.SelectionMode.SingleSelection
-        )
+        self.terms_list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         layout.addWidget(self.terms_list_widget)
 
         # Buttons frame
@@ -230,9 +228,7 @@ class DNTTermsEditor(QWidget):
 
         for term in sorted(self.terms_list):
             item = QListWidgetItem(term)
-            item.setFlags(
-                item.flags() | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-            )
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
             self.terms_list_widget.addItem(item)
 
         self.update_count_label()
@@ -292,9 +288,7 @@ class DNTTermsEditor(QWidget):
             return
 
         old_term = selected_items[0].text()
-        new_term, ok = QInputDialog.getText(
-            self, "Edit DNT Term", "Edit the term:", text=old_term
-        )
+        new_term, ok = QInputDialog.getText(self, "Edit DNT Term", "Edit the term:", text=old_term)
 
         if ok and new_term.strip():
             new_term = new_term.strip()

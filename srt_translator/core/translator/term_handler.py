@@ -70,7 +70,9 @@ class TermHandler:
 
         self.logger.debug(
             "TermHandler initialized (lang=%s): %d DNT terms, %d TB entries",
-            self.lang_code, len(self._ordered_terms), sum(len(v) for v in self.termbase.values())
+            self.lang_code,
+            len(self._ordered_terms),
+            sum(len(v) for v in self.termbase.values()),
         )
 
     # Expose for Fixer & logs
@@ -89,7 +91,9 @@ class TermHandler:
         self.placeholder_map = {t: f"__DNT_TERM_{i}__" for i, t in enumerate(self._ordered_terms)}
         self._patterns.clear()
         for term in sorted(self._ordered_terms, key=len, reverse=True):
-            self._patterns.append((_compile_word_safe_pattern(term), term, self.placeholder_map[term]))
+            self._patterns.append(
+                (_compile_word_safe_pattern(term), term, self.placeholder_map[term])
+            )
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 

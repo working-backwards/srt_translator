@@ -38,9 +38,7 @@ class TermbaseEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.termbase: Dict[str, Dict[str, str]] = (
-            {}
-        )  # {language: {source_term: translation}}
+        self.termbase: Dict[str, Dict[str, str]] = {}  # {language: {source_term: translation}}
         self.languages: List[str] = []
         self.source_language_name: str = "Source"  # Will be updated dynamically
         self._updating_table = False  # Flag to prevent signal loops
@@ -159,16 +157,12 @@ class TermbaseEditor(QWidget):
             return
 
         # Set up table - terms in column 0, languages in columns 1-N
-        self.table.setColumnCount(
-            len(self.languages) + 1
-        )  # +1 for source language terms
+        self.table.setColumnCount(len(self.languages) + 1)  # +1 for source language terms
         headers = [f"{self.source_language_name} Term"] + self.languages
         self.table.setHorizontalHeaderLabels(headers)
 
         # Add rows - one row per unique source term (deduplicated and alphabetically sorted)
-        sorted_terms = sorted(
-            all_terms, key=str.lower
-        )  # Case-insensitive alphabetical sorting
+        sorted_terms = sorted(all_terms, key=str.lower)  # Case-insensitive alphabetical sorting
         self.table.setRowCount(len(sorted_terms))
 
         for row, source_term in enumerate(sorted_terms):
@@ -196,9 +190,7 @@ class TermbaseEditor(QWidget):
             total_terms += len(language_termbase)
 
         language_count = len(self.languages)
-        self.count_label.setText(
-            f"{total_terms} translations across {language_count} languages"
-        )
+        self.count_label.setText(f"{total_terms} translations across {language_count} languages")
 
     def update_button_states(self):
         """Update button enabled states based on selection."""
@@ -265,9 +257,7 @@ class TermbaseEditor(QWidget):
 
         # Count how many languages have this term
         term_count = sum(
-            1
-            for lang_termbase in self.termbase.values()
-            if source_term in lang_termbase
+            1 for lang_termbase in self.termbase.values() if source_term in lang_termbase
         )
 
         reply = QMessageBox.question(
@@ -288,9 +278,7 @@ class TermbaseEditor(QWidget):
 
     def clear_all_terms(self):
         """Clear all terms from the termbase."""
-        total_terms = sum(
-            len(lang_termbase) for lang_termbase in self.termbase.values()
-        )
+        total_terms = sum(len(lang_termbase) for lang_termbase in self.termbase.values())
 
         reply = QMessageBox.question(
             self,
@@ -324,9 +312,7 @@ class TermbaseEditor(QWidget):
             return
 
         source_term = source_term_item.text()
-        language = self.languages[
-            item.column() - 1
-        ]  # -1 because column 0 is source term
+        language = self.languages[item.column() - 1]  # -1 because column 0 is source term
         translation = item.text()
 
         # Update the termbase
@@ -412,9 +398,7 @@ class AddTermDialog(QDialog):
         for i, language in enumerate(self.languages):
             label = QLabel(f"{language}:")
             self.translations[language] = QLineEdit()
-            self.translations[language].setPlaceholderText(
-                f"Enter {language} translation..."
-            )
+            self.translations[language].setPlaceholderText(f"Enter {language} translation...")
             self.translations_layout.addWidget(label, i, 0)
             self.translations_layout.addWidget(self.translations[language], i, 1)
 
@@ -437,9 +421,7 @@ class AddTermDialog(QDialog):
     def validate_input(self):
         """Validate the input and enable/disable OK button."""
         source_term = self.source_input.text().strip()
-        has_translations = any(
-            self.translations[lang].text().strip() for lang in self.languages
-        )
+        has_translations = any(self.translations[lang].text().strip() for lang in self.languages)
 
         self.button_box.button(QDialogButtonBox.Ok).setEnabled(  # type: ignore[attr-defined]
             bool(source_term) and has_translations
@@ -449,8 +431,7 @@ class AddTermDialog(QDialog):
         """Get the entered data."""
         source_term = self.source_input.text().strip()
         translations = {
-            language: self.translations[language].text().strip()
-            for language in self.languages
+            language: self.translations[language].text().strip() for language in self.languages
         }
         return source_term, translations
 
@@ -504,9 +485,7 @@ class EditTermDialog(QDialog):
         for i, language in enumerate(self.languages):
             label = QLabel(f"{language}:")
             self.translations[language] = QLineEdit()
-            self.translations[language].setPlaceholderText(
-                f"Enter {language} translation..."
-            )
+            self.translations[language].setPlaceholderText(f"Enter {language} translation...")
             self.translations_layout.addWidget(label, i, 0)
             self.translations_layout.addWidget(self.translations[language], i, 1)
 
@@ -533,7 +512,4 @@ class EditTermDialog(QDialog):
 
     def get_translations(self) -> dict:
         """Get the current translations."""
-        return {
-            language: self.translations[language].text().strip()
-            for language in self.languages
-        }
+        return {language: self.translations[language].text().strip() for language in self.languages}

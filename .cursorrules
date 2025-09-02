@@ -80,7 +80,7 @@ class CoreModule:
         if logger is None:
             raise ValueError("Logger is required; no fallback allowed.")
         self.logger = logger.getChild("core.module")
-    
+
     def do_work(self):
         self.logger.info("Processing work...")
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Unified GUI entry for SRT Translator (used by `srtx` and PyInstaller)."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,9 +11,7 @@ import sys
 
 def _setup_logging(debug: bool) -> None:
     """Dev-only debug: ignore `--debug` when frozen (packaged app)."""
-    level = (
-        logging.DEBUG if (debug and not getattr(sys, "frozen", False)) else logging.INFO
-    )
+    level = logging.DEBUG if (debug and not getattr(sys, "frozen", False)) else logging.INFO
     logging.basicConfig(
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -44,9 +43,7 @@ def _setup_logging(debug: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="srtx", description="SRT Translator GUI")
-    p.add_argument(
-        "--debug", action="store_true", help="Enable debug logging (dev runs only)"
-    )
+    p.add_argument("--debug", action="store_true", help="Enable debug logging (dev runs only)")
     p.add_argument(
         "--version",
         action="version",
@@ -58,9 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError as e:
-        raise SystemExit(
-            "GUI deps missing. Try: pip install 'srt-translator[gui]'"
-        ) from e
+        raise SystemExit("GUI deps missing. Try: pip install 'srt-translator[gui]'") from e
 
     from srt_translator import __version__ as _ver
     from srt_translator.gui.main_window import SRTTranslatorMainWindow
@@ -70,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationVersion(_ver)
     win = SRTTranslatorMainWindow()
     win.show()
-    return app.exec()
+    return int(app.exec())
 
 
 if __name__ == "__main__":

@@ -2,13 +2,13 @@
 Custom validation error for configuration validation.
 """
 
-from typing import List
+from typing import List, Optional
 
 
 class ConfigValidationError(ValueError):
     """Raised when configuration validation fails with multiple errors."""
 
-    def __init__(self, errors: List[str], warnings: List[str] = None):
+    def __init__(self, errors: List[str], warnings: Optional[List[str]] = None):
         self.errors = errors
         self.warnings = warnings or []
 

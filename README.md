@@ -357,7 +357,7 @@ Your Selected Output Directory/
 ```
 
 **Enhanced Output Files:**
-- **`artifacts/<lang>/dnt_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file  
+- **`artifacts/<lang>/dnt_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file
 - **`artifacts/<lang>/termbase_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file
 - **`artifacts/<lang>/manifest.json`**: Language-specific manifest with complete metadata
 

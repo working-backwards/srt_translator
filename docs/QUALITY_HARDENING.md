@@ -10,7 +10,7 @@ The SRT Translator includes advanced quality hardening features that automatical
 
 **Problem**: Numeric and number-like terms in DNT lists can prevent proper localization.
 
-**Example**: 
+**Example**:
 - **Before**: "300 milliseconds" in DNT → stays as "300 milliseconds" in all languages
 - **After**: "300 milliseconds" filtered out → becomes "300毫秒" in Chinese, "300 milisegundos" in Spanish
 

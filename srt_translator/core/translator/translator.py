@@ -17,6 +17,13 @@ from openai import OpenAI
 
 # Core imports
 from srt_translator.core.config.language_config import LanguageConfig
+
+# Helper imports
+from srt_translator.core.translator._helpers import (
+    _create_batches_with_logging,
+    _handle_mid_batch_empty_retries,
+    _translate_batch_and_extract,
+)
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
     build_oversize_probe_question,
@@ -27,13 +34,6 @@ from srt_translator.core.translator.diagnostics import (
 )
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
-
-# Helper imports
-from ._helpers import (
-    _create_batches_with_logging,
-    _handle_mid_batch_empty_retries,
-    _translate_batch_and_extract,
-)
 
 # ---------------------------
 # Data models
@@ -107,8 +107,10 @@ def parse_srt(text: str) -> List[Subtitle]:
 
             subs.append(Subtitle(idx=idx, start=start, end=end, text=body))
 
-        except (ValueError, IndexError):
-            # Skip malformed blocks
+        except (ValueError, IndexError) as exc:
+            # Skip malformed blocks; log once per block for visibility at debug level.
+            # This preserves resiliency without hiding systematic formatting issues.
+            logging.getLogger(__name__).debug("Skipping malformed SRT block: %s", exc)
             continue
 
     return subs
@@ -164,9 +166,7 @@ def validate_placeholders_pair(
     return issues
 
 
-def strip_invented_placeholders(
-    text: str, invented_ids: Set[str], ph_regex: re.Pattern
-) -> str:
+def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.Pattern) -> str:
     if not invented_ids:
         return text
 
@@ -192,9 +192,7 @@ def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
     return src_subs
 
 
-def _setup_file_logging(
-    self, input_filepath: str, target_lang: str
-) -> logging.LoggerAdapter:
+def _setup_file_logging(self, input_filepath: str, target_lang: str) -> logging.LoggerAdapter:
     """Setup file-scoped logging with file/lang context."""
     file_logger = logging.LoggerAdapter(
         self.logger,
@@ -238,9 +236,7 @@ def _validate_and_repair_placeholders(
     target_lang = getattr(batch_logger, "extra", {}).get("lang", "unknown")
     if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
         # Normalize for detection only: treat "__...__'..." as "__...__"
-        norm_tgts = [
-            TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts
-        ]
+        norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
         ph_issues = validate_placeholders_pair(
             src_items, norm_tgts, self.term_handler.placeholder_regex
         )
@@ -303,9 +299,7 @@ def _validate_and_repair_placeholders(
                 allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
             )
             if fixed is None:
-                raise RuntimeError(
-                    "Reformat failed: phantom/missing placeholders unresolved."
-                )
+                raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
             tgt_texts = fixed
         elif self.error_policy in ("BOUNDED", "DEV"):
             # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
@@ -340,11 +334,9 @@ def _format_and_append_subtitles(
             text=tgt,
             start_ms=int(start_s * 1000),  # Convert seconds to milliseconds
             end_ms=int(end_s * 1000),  # Convert seconds to milliseconds
-            cps_cap=cps_cap,
+            cps_cap=cps_cap or 20,  # Default to 20 if None
         )
-        formatted_subs.append(
-            Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted)
-        )
+        formatted_subs.append(Subtitle(idx=s.idx, start=s.start, end=s.end, text=formatted))
     return formatted_subs
 
 
@@ -387,10 +379,10 @@ class SRTTranslator:
         self.error_policy = error_policy.upper()
 
         # Make a namespaced child for clarity in logs
-        self.logger = (
-            logger.logger if isinstance(logger, logging.LoggerAdapter) else logger
-        )
-        self.logger = self.logger.getChild("core.translator")
+        if isinstance(logger, logging.LoggerAdapter):
+            self.logger = logger.logger.getChild("core.translator")
+        else:
+            self.logger = logger.getChild("core.translator")
 
         # If caller gave an adapter, re-wrap child with the same extra
         if isinstance(logger, logging.LoggerAdapter):
@@ -409,9 +401,7 @@ class SRTTranslator:
         )
 
         if OpenAI is None:
-            raise RuntimeError(
-                "OpenAI client not available; install/openai and configure API key."
-            )
+            raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
 
         self.client = OpenAI(api_key=api_key)
 
@@ -467,9 +457,14 @@ class SRTTranslator:
                 rules = self.language_config.get_language_rules(target_lang) or {}
                 if isinstance(rules.get("sentence_endings"), list):
                     sentence_endings = tuple(rules["sentence_endings"])  # type: ignore[assignment]
-        except Exception:
-            # Be permissive; logging is handled by the caller
-            pass
+        except (AttributeError, TypeError, KeyError) as exc:
+            # Fallback to defaults; log at debug so we can diagnose config shape issues.
+            self.logger.debug(
+                "No language-specific sentence_endings for %s (%s: %s)",
+                target_lang,
+                type(exc).__name__,
+                exc,
+            )
 
         for sub in subtitles:
             current.append(sub)
@@ -571,7 +566,7 @@ class SRTTranslator:
                             logger=batch_logger,
                         )
                         fixed = self.term_handler.restore_dnt_placeholders(
-                            pair_tgts[0] if pair_tgts else ""
+                            pair_tgts[0].get("text", "") if pair_tgts else ""
                         )
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
@@ -614,9 +609,7 @@ class SRTTranslator:
             )
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
-            src_items = [
-                self.term_handler.apply_dnt_placeholders(s.text) for s in batch
-            ]
+            src_items = [self.term_handler.apply_dnt_placeholders(s.text) for s in batch]
 
             # Log source items being sent to AI for troubleshooting
             file_logger.debug(
@@ -681,7 +674,6 @@ class SRTTranslator:
             "Subtitle-based translation completed for %s",
             os.path.basename(input_filepath),
         )
-        return True
 
     # ---------- Core calls ----------
 
@@ -702,8 +694,7 @@ class SRTTranslator:
         mapped_target_lang = target_lang
 
         system_prompt = (
-            "You are a professional subtitle translator. "
-            "Return valid JSON ONLY, never prose."
+            "You are a professional subtitle translator. " "Return valid JSON ONLY, never prose."
         )
         if strict:
             system_prompt += (
@@ -781,9 +772,7 @@ INPUT ITEMS:
                 try:
                     # Build a concise source excerpt and response preview for the question
                     # Limit source items to the same number we asked the model to translate.
-                    src_excerpt: Sequence[str] = tuple(
-                        src_items[: min(len(src_items), 8)]
-                    )
+                    src_excerpt: Sequence[str] = tuple(src_items[: min(len(src_items), 8)])
                     response_preview = content or ""
                     if len(response_preview) > 500:
                         response_preview = response_preview[:500] + "…"
@@ -860,11 +849,7 @@ INPUT ITEMS:
                 [
                     {
                         "id": item["id"],
-                        "tgt": (
-                            item["tgt"][:50] + "..."
-                            if len(item["tgt"]) > 50
-                            else item["tgt"]
-                        ),
+                        "tgt": (item["tgt"][:50] + "..." if len(item["tgt"]) > 50 else item["tgt"]),
                     }
                     for item in norm
                 ],
@@ -925,9 +910,7 @@ INPUT ITEMS:
                     except Exception:
                         file_base = "?"
                 # Call the AI probe to understand what went wrong
-                source_text = "\n".join(
-                    [f"{i+1}) {src}" for i, src in enumerate(src_items)]
-                )
+                source_text = "\n".join([f"{i+1}) {src}" for i, src in enumerate(src_items)])
                 probe_malformed_json_with_translator(
                     translator=self,
                     budget=self._probe_budget,
@@ -955,24 +938,18 @@ INPUT ITEMS:
                         src_text=src_items[0],
                         target_lang=target_lang,
                     )
-                    wrapped = [
-                        {"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}
-                    ]
+                    wrapped = [{"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}]
                     return wrapped
                 except Exception as _fallback_ex:
                     self.logger.debug("Plain-string fallback failed: %s", _fallback_ex)
 
             # Otherwise, let shape-lock handle it as before.
-            self.logger.error(
-                "Model did not return JSON; cannot recover without shape lock."
-            )
+            self.logger.error("Model did not return JSON; cannot recover without shape lock.")
             raise RuntimeError(
                 "Translation failed: model did not return valid JSON format"
             ) from None
 
-    def _translate_single_string_fallback(
-        self, *, src_text: str, target_lang: str
-    ) -> str:
+    def _translate_single_string_fallback(self, *, src_text: str, target_lang: str) -> str:
         """
         Minimal escape hatch for repeated JSON truncation in size=1 strict retries.
         Returns ONLY a translated string; caller will wrap into JSON.
@@ -1176,15 +1153,12 @@ TARGET ITEMS (TO FIX):
         results: List[Optional[Dict[str, Any]]] = [None] * total
 
         # Queue holds (start, end, depth, retries)
-        work_q = deque()
+        work_q: deque[tuple[int, int, int, int]] = deque()
         work_q.append((0, total, 0, 0))
 
         # Guard maximum iterations to ensure termination
         max_iterations = (
-            total
-            * (self._MAX_SPLIT_DEPTH + 1)
-            * (self._MAX_JSON_RETRIES_PER_SEGMENT + 1)
-            + 10
+            total * (self._MAX_SPLIT_DEPTH + 1) * (self._MAX_JSON_RETRIES_PER_SEGMENT + 1) + 10
         )
         iterations = 0
 
@@ -1216,9 +1190,7 @@ TARGET ITEMS (TO FIX):
                     strict=strict,
                 )
                 if len(items) != len(seg_src):
-                    raise RuntimeError(
-                        f"Count mismatch: expected {len(seg_src)} got {len(items)}"
-                    )
+                    raise RuntimeError(f"Count mismatch: expected {len(seg_src)} got {len(items)}")
 
                 # Success: place into results
                 for offset, obj in enumerate(items):
@@ -1240,10 +1212,7 @@ TARGET ITEMS (TO FIX):
                 )
 
                 # Circuit breaker: too many failures in a row → emit empties and stop
-                if (
-                    self._consecutive_decode_failures
-                    >= self._MAX_CONSECUTIVE_DECODE_FAILURES
-                ):
+                if self._consecutive_decode_failures >= self._MAX_CONSECUTIVE_DECODE_FAILURES:
                     logger.error(
                         "Circuit breaker hit after %d consecutive failures; emitting empties for remaining segments.",
                         self._consecutive_decode_failures,
@@ -1267,7 +1236,9 @@ TARGET ITEMS (TO FIX):
                             self._MICRO_BACKOFF_BASE_S * (2**retries),
                         )
                         # jitter ±50ms
-                        time.sleep(max(0.0, backoff + random.uniform(-0.05, 0.05)))
+                        time.sleep(
+                            max(0.0, backoff + random.uniform(-0.05, 0.05))  # nosec B311
+                        )
                         work_q.appendleft((start, end, depth, retries + 1))
                     else:
                         logger.warning(

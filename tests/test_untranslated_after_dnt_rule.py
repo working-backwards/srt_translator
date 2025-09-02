@@ -1,8 +1,10 @@
 # tests/test_untranslated_after_dnt_rule.py
+from typing import Any
+
 from srt_translator.eval.tools import strip_terms, untranslated_after_dnt_check
 
 DNT = ["Amazon", "flywheel"]
-RUBRIC = {}  # use defaults (short-cognate ignore, acronym handling, etc.)
+RUBRIC: dict[str, Any] = {}  # use defaults (short-cognate ignore, acronym handling, etc.)
 
 
 def test_dnt_only_cue_passes():

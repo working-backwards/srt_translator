@@ -74,9 +74,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)
-        self.config_manager = GUIConfigManager(
-            self.settings_manager, self.language_config
-        )
+        self.config_manager = GUIConfigManager(self.settings_manager, self.language_config)
 
         self.ai_config_generator = None
         self.ai_config_thread = None
@@ -106,9 +104,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.setWindowTitle("SRT Translator")
         self.resize(800, 700)  # Initial size, but now resizable
         self.setMinimumSize(800, 700)  # Prevent window from becoming too small
-        self.setWindowFlags(
-            Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint
-        )
+        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
 
     def setup_ui(self):
         """Set up the user interface using modular components"""
@@ -131,17 +127,13 @@ class SRTTranslatorMainWindow(QMainWindow):
         content_container = QFrame()
         content_container.setObjectName("contentContainer")
         content_layout = QVBoxLayout(content_container)
-        content_layout.setContentsMargins(
-            30, 20, 30, 20
-        )  # 30px from left edge, 20px other margins
+        content_layout.setContentsMargins(30, 20, 30, 20)  # 30px from left edge, 20px other margins
         content_layout.setSpacing(20)  # 20px vertical spacing between sections
 
         # Create modular sections
         self.api_section = APISection(self.settings_manager)
         self.file_section = FileSection(self.settings_manager)
-        self.language_section = LanguageSection(
-            self.settings_manager, self.language_config
-        )
+        self.language_section = LanguageSection(self.settings_manager, self.language_config)
         self.ai_config_section = AIConfigSection()
         self.translation_section = TranslationSection()
 
@@ -376,9 +368,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             )
             return
 
-        self.logger.info(
-            f"Selected files: {[os.path.basename(f) for f in selected_files]}"
-        )
+        self.logger.info(f"Selected files: {[os.path.basename(f) for f in selected_files]}")
         self.logger.info(f"Target languages: {list(target_languages.values())}")
 
         # Initialize AI config generator if not already done
@@ -410,9 +400,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                     self.progress.emit(
                         "AI Config Worker: Starting batch-level AI config generation"
                     )
-                    self.logger.info(
-                        "AI Config Worker: Starting batch-level AI config generation"
-                    )
+                    self.logger.info("AI Config Worker: Starting batch-level AI config generation")
 
                     # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
                     batch_config = self.ai_generator.generate_batch_ai_config(
@@ -450,8 +438,9 @@ class SRTTranslatorMainWindow(QMainWindow):
                             try:
                                 msg = self.format(record)
                                 self.worker.progress.emit(msg)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                # Progress emission failed, but don't break logging
+                                print(f"Warning: Progress emission failed: {e}")  # noqa: T201
 
                     # Set up the handler for AI config logs
                     progress_handler = ProgressLogHandler(self)
@@ -538,9 +527,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get detailed error information
         if self.ai_config_generator is not None:
             try:
-                error_details = self.ai_config_generator.get_error_details(
-                    Exception(error_message)
-                )
+                error_details = self.ai_config_generator.get_error_details(Exception(error_message))
                 title = error_details.get("title", "AI Configuration Failed")
                 message = error_details.get("message", error_message)
                 suggestion = error_details.get("suggestion", "")
@@ -550,9 +537,9 @@ class SRTTranslatorMainWindow(QMainWindow):
                     self, title, f"{message}\n\n{suggestion}" if suggestion else message
                 )
                 return
-            except Exception:
+            except Exception as e:
                 # Fallback to simple error message
-                pass
+                print(f"Warning: Failed to show detailed error message: {e}")  # noqa: T201
 
         # Fallback to simple error message
         QMessageBox.warning(
@@ -587,9 +574,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             if dialog.has_changes():
                 # Save the modified configuration (preserve existing source language)
-                dnt_terms, termbase, source_language = (
-                    self.settings_manager.load_ai_config()
-                )
+                dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
                 self.settings_manager.save_ai_config(
                     modified_terms, modified_termbase, source_language
                 )
@@ -775,16 +760,12 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker.moveToThread(self.translation_thread)
 
         # Connect worker signals to handlers
-        self.translation_worker.progress_updated.connect(
-            self.translation_section.update_log_output
-        )
+        self.translation_worker.progress_updated.connect(self.translation_section.update_log_output)
         self.translation_worker.translation_completed.connect(self.translation_finished)
         self.translation_worker.translation_error.connect(self.translation_error)
 
         # Connect thread lifecycle signals for proper cleanup
-        self.translation_worker.translation_completed.connect(
-            self.translation_thread.quit
-        )
+        self.translation_worker.translation_completed.connect(self.translation_thread.quit)
         self.translation_worker.translation_error.connect(self.translation_thread.quit)
         self.translation_thread.finished.connect(self.translation_worker.deleteLater)
         self.translation_thread.finished.connect(self.translation_thread.deleteLater)
@@ -805,9 +786,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Log the results being processed
         logging.info(f"Processing translation results: {results}")
-        self.translation_section.update_log_output(
-            f"Processing translation results: {results}"
-        )
+        self.translation_section.update_log_output(f"Processing translation results: {results}")
 
         # Show results dialog
         show_translation_results(self, results)
@@ -850,9 +829,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Save current settings
         self.settings_manager.save_api_key(self.api_section.get_api_key())
         self.settings_manager.save_selected_files(self.file_section.selected_files)
-        self.settings_manager.save_target_languages(
-            self.language_section.target_languages
-        )
+        self.settings_manager.save_target_languages(self.language_section.target_languages)
 
         event.accept()
 
@@ -869,16 +846,12 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self._mem_sample_count = 1
 
             if self._mem_sample_count % 10 == 0:  # Every 5 minutes
-                self.logger.debug(
-                    f"Memory usage: {growth_mb:.1f} MB growth since start"
-                )
+                self.logger.debug(f"Memory usage: {growth_mb:.1f} MB growth since start")
 
             # Warn if memory growth exceeds 1GB
             if growth_mb > 1000 and not self._memory_warning_shown:
                 self._memory_warning_shown = True
-                self.logger.warning(
-                    f"High memory usage detected: {growth_mb:.1f} MB growth"
-                )
+                self.logger.warning(f"High memory usage detected: {growth_mb:.1f} MB growth")
 
                 # Show warning to user
                 QMessageBox.warning(

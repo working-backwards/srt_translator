@@ -37,17 +37,13 @@ def test_settings_manager():
 
     # Save AI config
     settings_manager.save_ai_config(test_terms, test_termbase)
-    logger.info(
-        f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages"
-    )
+    logger.info(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages")
 
     # Load AI config (returns 3 values)
     result = settings_manager.load_ai_config()
     assert isinstance(result, AIConfigTriple)
     loaded_terms, loaded_termbase, _ = result
-    logger.info(
-        f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_termbase)} languages"
-    )
+    logger.info(f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_termbase)} languages")
 
     # Verify data integrity
     assert loaded_terms == test_terms, f"Terms mismatch: {loaded_terms} != {test_terms}"
@@ -111,9 +107,7 @@ def test_ai_config_generator():
         logger.info("✓ AIConfigGenerator instantiated successfully")
 
         # Test supported languages
-        logger.info(
-            f"✓ Supported languages: {len(generator.get_supported_languages())}"
-        )
+        logger.info(f"✓ Supported languages: {len(generator.get_supported_languages())}")
 
     except Exception as e:
         logger.info(f"⚠ AIConfigGenerator test skipped: {e}")

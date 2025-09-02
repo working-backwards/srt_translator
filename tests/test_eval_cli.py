@@ -21,9 +21,7 @@ def create_minimal_batch(temp_dir: Path) -> Path:
         "timestamp": "2025-01-01T00:00:00Z",
         "target_languages": ["es"],
     }
-    (batch_dir / "ai_config.json").write_text(
-        json.dumps(ai_config, indent=2), encoding="utf-8"
-    )
+    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Create originals directory with a test SRT file
     originals_dir = batch_dir / "originals"
@@ -63,9 +61,7 @@ def create_incomplete_batch(temp_dir: Path) -> Path:
         "timestamp": "2025-01-01T00:00:00Z",
         "target_languages": ["es"],
     }
-    (batch_dir / "ai_config.json").write_text(
-        json.dumps(ai_config, indent=2), encoding="utf-8"
-    )
+    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Don't create originals or target directories - this will fail validation
     return batch_dir
@@ -198,13 +194,9 @@ class TestEvalCLI:
             }
             mock_run_eval.return_value = mock_rollup
 
-            with patch(
-                "srt_translator.eval.report.write_batch_report"
-            ) as mock_write_report:
+            with patch("srt_translator.eval.report.write_batch_report") as mock_write_report:
                 mock_write_report.return_value = batch_dir / "eval_report.md"
 
-                with patch(
-                    "sys.argv", ["st-eval", "--batch-root", str(batch_dir), "-v"]
-                ):
+                with patch("sys.argv", ["st-eval", "--batch-root", str(batch_dir), "-v"]):
                     result = main()
                     assert result == 3  # No rollup produced due to validation failure

@@ -37,7 +37,7 @@ class BatchAIConfig:
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
-    def __init__(self, api_key: str, language_config: LanguageConfig = None):
+    def __init__(self, api_key: str, language_config: Optional[LanguageConfig] = None):
         """Initialize the AI config generator with OpenAI API key and language configuration"""
         if language_config is None:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
@@ -59,9 +59,7 @@ class AIConfigGenerator:
         self.MAX_CONTENT_TOKENS = (
             100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
         )
-        self.MAX_CONTENT_LENGTH = (
-            400000  # Character limit as fallback (roughly 100K tokens)
-        )
+        self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
 
     def get_supported_languages(self) -> List[str]:
         """Get all supported languages from unified configuration"""
@@ -207,7 +205,7 @@ EXAMPLE FORMAT:
         self,
         content: str,
         target_languages: List[str],
-        dnt_terms: List[str] = None,
+        dnt_terms: Optional[List[str]] = None,
         source_language: Optional[Dict[str, object]] = None,
     ) -> Dict[str, Dict[str, str]]:
         """
@@ -223,16 +221,12 @@ EXAMPLE FORMAT:
             supported_languages = self.get_supported_languages()
             self.logger.info(f"Supported languages count: {len(supported_languages)}")
 
-            valid_languages = [
-                lang for lang in target_languages if lang in supported_languages
-            ]
+            valid_languages = [lang for lang in target_languages if lang in supported_languages]
             self.logger.info(f"Valid languages from input: {valid_languages}")
             if not valid_languages:
                 self.logger.warning("No valid target languages provided")
                 self.logger.warning(f"Input languages: {target_languages}")
-                self.logger.warning(
-                    f"Supported languages sample: {supported_languages[:10]}"
-                )
+                self.logger.warning(f"Supported languages sample: {supported_languages[:10]}")
                 return {}
 
             dnt_set = {term.lower().strip() for term in (dnt_terms or [])}
@@ -267,20 +261,14 @@ EXAMPLE FORMAT:
             for lang_code in valid_languages:
                 lang_name = self._lang_cfg.get_language_name(lang_code)
                 if not lang_name:
-                    self.logger.warning(
-                        f"Could not get language name for {lang_code}, skipping"
-                    )
+                    self.logger.warning(f"Could not get language name for {lang_code}, skipping")
                     continue
                 try:
                     # compute soft band (clamped to defaults)
                     if anchor_count:
                         tol = max(2, round(anchor_count * 0.15))
-                        soft_lo = max(
-                            default_lo, min(default_hi, max(8, anchor_count - tol))
-                        )
-                        soft_hi = max(
-                            soft_lo, min(default_hi, min(40, anchor_count + tol))
-                        )
+                        soft_lo = max(default_lo, min(default_hi, max(8, anchor_count - tol)))
+                        soft_hi = max(soft_lo, min(default_hi, min(40, anchor_count + tol)))
                     else:
                         soft_lo, soft_hi = default_lo, default_hi
                     if anchor_count is None:
@@ -297,7 +285,7 @@ EXAMPLE FORMAT:
                         import random
                         import time
 
-                        time.sleep(random.uniform(0.4, 1.1))
+                        time.sleep(random.uniform(0.4, 1.1))  # nosec B311
 
                     tb_dict, extracted_terms = self.generate_language_termbase_two_pass(
                         content=content,
@@ -316,9 +304,7 @@ EXAMPLE FORMAT:
                     if cleaned:
                         termbase[lang_code] = cleaned
                         size = len(cleaned)
-                        self.logger.info(
-                            f"TB[{lang_code}] {size} terms (after DNT filtering)"
-                        )
+                        self.logger.info(f"TB[{lang_code}] {size} terms (after DNT filtering)")
 
                         # anchor may rise later, but never drop below default_soft_lo
                         extracted_n = max(1, len(extracted_terms))
@@ -334,9 +320,7 @@ EXAMPLE FORMAT:
                                 f"(size_floor={size_floor}, coverage={coverage:.2f})"
                             )
                 except Exception as e:
-                    self.logger.error(
-                        f"Failed to generate termbase for {lang_code}: {e}"
-                    )
+                    self.logger.error(f"Failed to generate termbase for {lang_code}: {e}")
                     continue
 
             self.logger.info(
@@ -352,7 +336,7 @@ EXAMPLE FORMAT:
         content: str,
         lang_code: str,
         lang_name: str,
-        dnt_terms: List[str] | None = None,
+        dnt_terms: Optional[List[str]] = None,
         max_terms: int = 30,
         soft_lo: Optional[int] = None,
         soft_hi: Optional[int] = None,
@@ -366,17 +350,15 @@ EXAMPLE FORMAT:
         dnt_set = {t.lower().strip() for t in (dnt_terms or [])}
 
         # source-language hint (if GUI already detected it)
-        src_hint = ""
         if source_language:
-            src_code = (
-                source_language.get("normalized_code")
-                or source_language.get("detected_code")
-                or ""
+            src_code = str(
+                source_language.get("normalized_code") or source_language.get("detected_code") or ""
             ).strip()
-            src_name = (source_language.get("normalized_name") or "").strip()
+            # src_name = str(source_language.get("normalized_name") or "").strip()
             if src_code:
-                pretty = f"{src_code}" + (f" · {src_name}" if src_name else "")
-                src_hint = f"Source language: {pretty}. Use surface forms from this language for all extracted terms; do not convert them to another language."
+                # pretty = f"{src_code}" + (f" · {src_name}" if src_name else "")
+                # src_hint = f"Source language: {pretty}. Use surface forms from this language for all extracted terms; do not convert them to another language."
+                pass
 
         # soft alignment + concrete pass targets (optional)
         soft_block = ""
@@ -527,15 +509,11 @@ TEXT (Transcript):
                 terms_sorted = sorted(terms, key=lambda t: (-len(t), t.lower()))
                 keep: list[str] = []
                 for t in terms_sorted:
-                    if not any(
-                        t.lower() in k.lower() and t.lower() != k.lower() for k in keep
-                    ):
+                    if not any(t.lower() in k.lower() and t.lower() != k.lower() for k in keep):
                         keep.append(t)
                 return keep
 
-            def prune_generics(
-                terms: list[str], transcript: str, lines: list[str]
-            ) -> list[str]:
+            def prune_generics(terms: list[str], transcript: str, lines: list[str]) -> list[str]:
                 # 1) drop terms not in transcript at all
                 in_text = [t for t in terms if appears_in_transcript(t, transcript)]
                 # 2) substring collapse (prefer longer phrases)
@@ -547,13 +525,9 @@ TEXT (Transcript):
                         singles.append(t)
                     else:
                         others.append(t)
-                singles_keep = [
-                    t for t in singles if count_distinct_lines(t, lines) >= 3
-                ]
+                singles_keep = [t for t in singles if count_distinct_lines(t, lines) >= 3]
                 singles_budget = max(0, 2 - len(singles_keep))
-                singles_fill = [t for t in singles if t not in singles_keep][
-                    :singles_budget
-                ]
+                singles_fill = [t for t in singles if t not in singles_keep][:singles_budget]
                 return others + singles_keep + singles_fill
 
             # Basic validation + DNT filtering with pass analysis
@@ -611,9 +585,7 @@ TEXT (Transcript):
 
                 cleaned_terms.append({"term": term, "reason": reason})
                 # keep a sane upper bound but prefer the prompt band
-                effective_max = (
-                    min(max_terms, soft_hi) if (soft_hi and soft_hi > 0) else max_terms
-                )
+                effective_max = min(max_terms, soft_hi) if (soft_hi and soft_hi > 0) else max_terms
                 if len(cleaned_terms) >= effective_max:
                     break
 
@@ -715,24 +687,18 @@ TEXT (Transcript):
                 f"Total extracted: {len(cleaned_terms)}, "
                 f"Final TB entries: {len(tb_dict)}"
             )
-            self.logger.info(
-                f"[{lang_code}] exhausted={exhausted} reason={exhaustion_reason}"
-            )
+            self.logger.info(f"[{lang_code}] exhausted={exhausted} reason={exhaustion_reason}")
 
             # Log each term with its reason for detailed analysis
             if pass1_terms:
                 self.logger.info(f"Pass 1 terms for {lang_code}:")
                 for term_info in pass1_terms:
-                    self.logger.info(
-                        f"  Pass 1: '{term_info['term']}' - {term_info['reason']}"
-                    )
+                    self.logger.info(f"  Pass 1: '{term_info['term']}' - {term_info['reason']}")
 
             if pass2_terms:
                 self.logger.info(f"Pass 2 terms for {lang_code}:")
                 for term_info in pass2_terms:
-                    self.logger.info(
-                        f"  Pass 2: '{term_info['term']}' - {term_info['reason']}"
-                    )
+                    self.logger.info(f"  Pass 2: '{term_info['term']}' - {term_info['reason']}")
 
             if dnt_filtered_terms:
                 self.logger.info(
@@ -755,9 +721,7 @@ TEXT (Transcript):
             self.logger.error(f"Error generating termbase for {lang_code}: {e}")
             return {}, []
 
-    def _drop_dnt_from_termbase(
-        self, tb: Dict[str, str], dnt_set: set[str]
-    ) -> Dict[str, str]:
+    def _drop_dnt_from_termbase(self, tb: Dict[str, str], dnt_set: set[str]) -> Dict[str, str]:
         """Remove any entries whose source key collides with DNT (DNT > TB)."""
         if not tb:
             return {}
@@ -805,9 +769,7 @@ TEXT (Transcript):
 
         return filtered_terms
 
-    def filter_dnt_terms_with_metadata(
-        self, dnt_terms: List[str]
-    ) -> tuple[List[str], List[str]]:
+    def filter_dnt_terms_with_metadata(self, dnt_terms: List[str]) -> tuple[List[str], List[str]]:
         """
         Filter DNT terms and return both filtered terms and metadata about what was filtered out.
 
@@ -912,11 +874,7 @@ TEXT (Transcript):
 
             # Ensure it's a dict and all values are strings
             if isinstance(termbase, dict):
-                return {
-                    str(k).strip(): str(v).strip()
-                    for k, v in termbase.items()
-                    if k and v
-                }
+                return {str(k).strip(): str(v).strip() for k, v in termbase.items() if k and v}
             else:
                 self.logger.warning("AI response is not a dictionary format")
                 return {}
@@ -1009,9 +967,7 @@ Return valid JSON only. No explanations or markdown.
                         f"Missing {len(missing_terms)} terms in {lang_code}: {missing_terms}"
                     )
 
-                self.logger.info(
-                    f"Generated termbase for {lang_code}: {len(result)} terms"
-                )
+                self.logger.info(f"Generated termbase for {lang_code}: {len(result)} terms")
                 return result
 
             except json.JSONDecodeError as e:
@@ -1027,7 +983,7 @@ Return valid JSON only. No explanations or markdown.
         """Validate that the API key is working"""
         try:
             # Make a simple test call
-            response = self.client.chat.completions.create(
+            self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=5,
@@ -1036,19 +992,13 @@ Return valid JSON only. No explanations or markdown.
         except Exception as e:
             error_msg = str(e).lower()
             if "invalid" in error_msg or "authentication" in error_msg:
-                self.logger.error(
-                    "Invalid API key - please check your key at platform.openai.com"
-                )
-            elif (
-                "quota" in error_msg or "billing" in error_msg or "credits" in error_msg
-            ):
+                self.logger.error("Invalid API key - please check your key at platform.openai.com")
+            elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
                 self.logger.error(
                     "Insufficient API credits - please add credits to your OpenAI account"
                 )
             elif "rate" in error_msg:
-                self.logger.error(
-                    "Rate limit exceeded - please wait a moment and try again"
-                )
+                self.logger.error("Rate limit exceeded - please wait a moment and try again")
             elif "network" in error_msg or "connection" in error_msg:
                 self.logger.error(
                     "Network connection issue - please check your internet connection"
@@ -1101,9 +1051,7 @@ Return valid JSON only. No explanations or markdown.
                 "message": "Please check your internet connection",
                 "suggestion": "Check your internet connection and try again",
             }
-        elif "content" in error_msg and (
-            "too small" in error_msg or "insufficient" in error_msg
-        ):
+        elif "content" in error_msg and ("too small" in error_msg or "insufficient" in error_msg):
             return {
                 "type": "insufficient_content",
                 "title": "Insufficient Content for Analysis",
@@ -1191,9 +1139,7 @@ Return valid JSON only. No explanations or markdown.
             dnt_terms=dnt_terms,
             source_language=source_lang,
         )
-        self.logger.info(
-            f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)"
-        )
+        self.logger.info(f"Generated termbase for {len(termbase_by_lang)} languages (batch-level)")
 
         return BatchAIConfig(
             dnt_terms=dnt_terms, termbase=termbase_by_lang, source_language=source_lang
@@ -1203,19 +1149,15 @@ Return valid JSON only. No explanations or markdown.
     def _strip_srt_markup(raw: str) -> str:
         """Remove index/timestamps and keep visible text as a fallback sampler."""
         # kill timestamps 00:00:00,000 --> 00:00:00,000
-        raw = re.sub(
-            r"\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}", "", raw
-        )
+        raw = re.sub(r"\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}", "", raw)
         # kill pure index lines
         raw = re.sub(r"(?m)^\s*\d+\s*$", "", raw)
         return raw
 
     def _maybe_sleep_jitter(self, low: float = 0.5, high: float = 2.0) -> None:
         """Add a small random sleep to reduce AI fatigue."""
-        sleep_time = random.uniform(low, high)
-        self.logger.debug(
-            f"Sleeping for {sleep_time:.2f} seconds to reduce AI fatigue."
-        )
+        sleep_time = random.uniform(low, high)  # nosec B311
+        self.logger.debug(f"Sleeping for {sleep_time:.2f} seconds to reduce AI fatigue.")
         time.sleep(sleep_time)
 
     def _top_up_extracted_terms(
@@ -1225,8 +1167,8 @@ Return valid JSON only. No explanations or markdown.
         lang_name: str,
         existing_terms: List[str],
         needed: int,
-        needed_hi: int = None,
-        dnt_terms: List[str] | None = None,
+        needed_hi: Optional[int] = None,
+        dnt_terms: Optional[List[str]] = None,
     ) -> List[Dict[str, str]]:
         """
         One-shot request for EXACTLY `needed` NEW terms (not in existing_terms, not in DNT).

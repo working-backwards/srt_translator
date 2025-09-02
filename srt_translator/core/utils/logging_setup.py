@@ -20,7 +20,7 @@ def configure_logging(log_mode: LogMode) -> None:
             logging.StreamHandler(),
         ],
     )
-    
+
     # Filter out noisy third-party library debug messages
     if log_mode == LogMode.VERBOSE:
         # Set httpcore to WARNING level to reduce noise from HTTP client internals

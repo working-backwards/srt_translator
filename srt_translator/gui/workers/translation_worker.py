@@ -68,9 +68,7 @@ def _load_language_policies(selected_codes: list[str]) -> dict:
         if need:
             missing[code] = need
     if missing:
-        raise RuntimeError(
-            f"languages.json missing required keys for GUI run: {missing}"
-        )
+        raise RuntimeError(f"languages.json missing required keys for GUI run: {missing}")
     return raw
 
 
@@ -138,9 +136,7 @@ class TranslationWorker(QObject):
                 )
             )
         except Exception:
-            logging.getLogger("srt_translator").exception(
-                "Failed to start GUI logging bridge"
-            )
+            logging.getLogger("srt_translator").exception("Failed to start GUI logging bridge")
 
     def _stop_logging_bridge(self) -> None:
         try:
@@ -149,9 +145,7 @@ class TranslationWorker(QObject):
             if self._log_logger and self._log_queue_handler:
                 self._log_logger.removeHandler(self._log_queue_handler)
         except Exception:
-            logging.getLogger("srt_translator").exception(
-                "Failed to stop GUI logging bridge"
-            )
+            logging.getLogger("srt_translator").exception("Failed to stop GUI logging bridge")
         finally:
             self._log_listener = self._log_queue_handler = self._log_logger = None
 
@@ -177,15 +171,9 @@ class TranslationWorker(QObject):
             self.logger.info(
                 f"TranslationWorker received target_languages: {self.target_languages}"
             )
-            self.logger.info(
-                f"Number of target languages: {len(self.target_languages)}"
-            )
-            self.logger.info(
-                f"Target language names: {list(self.target_languages.keys())}"
-            )
-            self.logger.info(
-                f"Target language codes: {list(self.target_languages.values())}"
-            )
+            self.logger.info(f"Number of target languages: {len(self.target_languages)}")
+            self.logger.info(f"Target language names: {list(self.target_languages.keys())}")
+            self.logger.info(f"Target language codes: {list(self.target_languages.values())}")
 
             # Emit progress via signal (thread-safe, throttled)
             self._throttled_emit(
@@ -211,9 +199,7 @@ class TranslationWorker(QObject):
             # Build configuration from GUI settings manager
             if self.settings_manager:
                 # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
-                dnt_terms, termbase, source_language = (
-                    self.settings_manager.load_ai_config()
-                )
+                dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
 
                 # Load language policies for selected target languages
                 lang_policies = {}
@@ -222,17 +208,13 @@ class TranslationWorker(QObject):
                         list((self.target_languages or {}).values())
                     )
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to load language policies, using defaults: {e}"
-                    )
+                    self.logger.warning(f"Failed to load language policies, using defaults: {e}")
                     # Continue with empty policies - will use defaults
 
                 # Build config from settings manager with actual data
                 api_cfg = TranslationConfig(
                     files=[Path(p) for p in self.selected_files],
-                    output_directory=Path(
-                        self.output_directory or "translated_srt_files"
-                    ),
+                    output_directory=Path(self.output_directory or "translated_srt_files"),
                     target_languages=self.target_languages,
                     dnt_terms=dnt_terms,
                     termbase=termbase,
@@ -251,9 +233,7 @@ class TranslationWorker(QObject):
                 self.logger.info(f"DNT terms loaded: {len(api_cfg.dnt_terms)}")
                 self.logger.info(f"Termbase languages loaded: {len(api_cfg.termbase)}")
                 if api_cfg.termbase:
-                    self.logger.info(
-                        f"Termbase languages: {list(api_cfg.termbase.keys())}"
-                    )
+                    self.logger.info(f"Termbase languages: {list(api_cfg.termbase.keys())}")
             else:
                 # Load language policies for selected target languages
                 lang_policies = {}
@@ -262,17 +242,13 @@ class TranslationWorker(QObject):
                         list((self.target_languages or {}).values())
                     )
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to load language policies, using defaults: {e}"
-                    )
+                    self.logger.warning(f"Failed to load language policies, using defaults: {e}")
                     # Continue with empty policies - will use defaults
 
                 # Fallback to direct parameters
                 api_cfg = TranslationConfig(
                     files=[Path(p) for p in self.selected_files],
-                    output_directory=Path(
-                        self.output_directory or "translated_srt_files"
-                    ),
+                    output_directory=Path(self.output_directory or "translated_srt_files"),
                     target_languages=self.target_languages,
                     dnt_terms=[],
                     termbase={},
@@ -312,9 +288,7 @@ class TranslationWorker(QObject):
 
             # Check for cooperative stop before completion
             if self.is_stopped():
-                self.logger.info(
-                    "Translation stopped by user request before completion"
-                )
+                self.logger.info("Translation stopped by user request before completion")
                 return
 
             # Capture any stdout output and chunk it if large
@@ -327,8 +301,7 @@ class TranslationWorker(QObject):
                         chunk = output_lines[i : i + 10]
                         self._throttled_emit(
                             self.progress_updated,
-                            f"Translation output (part {i // 10 + 1}): "
-                            + "\n".join(chunk),
+                            f"Translation output (part {i // 10 + 1}): " + "\n".join(chunk),
                         )
                 else:
                     self._throttled_emit(
@@ -349,9 +322,7 @@ class TranslationWorker(QObject):
                         try:
                             self.settings_manager.track_language_usage(code)
                         except Exception as e:
-                            self.logger.warning(
-                                f"Failed to track usage for language '{code}': {e}"
-                            )
+                            self.logger.warning(f"Failed to track usage for language '{code}': {e}")
             except Exception:
                 # Never fail the run due to usage tracking
                 self.logger.exception("Adaptive language usage tracking failed")
@@ -381,15 +352,11 @@ class TranslationWorker(QObject):
                         ]
                         # Choose by modification time to avoid lexicographic surprises
                         latest_batch = (
-                            max(candidates, key=lambda d: d.stat().st_mtime)
-                            if candidates
-                            else None
+                            max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
                         )
 
                 if latest_batch and latest_batch.exists():
-                    self.logger.info(
-                        "Running evaluation", extra={"batch": latest_batch.name}
-                    )
+                    self.logger.info("Running evaluation", extra={"batch": latest_batch.name})
                     rollup = run_batch_evaluation(
                         batch_root=latest_batch,
                         logger=eval_logger,
@@ -418,9 +385,7 @@ class TranslationWorker(QObject):
                     self.logger.warning("No batch directory found for evaluation")
 
             except Exception as e:
-                self.logger.error(
-                    "Evaluation failed", extra={"error": str(e)}, exc_info=True
-                )
+                self.logger.error("Evaluation failed", extra={"error": str(e)}, exc_info=True)
                 # Don't fail the translation - evaluation is optional
                 self._throttled_emit(
                     self.progress_updated,
@@ -445,9 +410,7 @@ class TranslationWorker(QObject):
             return
 
         try:
-            dnt_terms, termbase, source_language = (
-                self.settings_manager.load_ai_config()
-            )
+            dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
             self.logger.info("AI configuration (snapshot) loaded from settings")
             self.logger.info(f"DNT terms count: {len(dnt_terms)}")
             if termbase:

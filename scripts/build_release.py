@@ -17,13 +17,13 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-# Get logger for this module
-logger = logging.getLogger(__name__)
-
-# Add project root to path
+# Add project root to path before imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from build import main as build_executables
+from build_gui import main as build_executables  # noqa: E402
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 def create_release_package():

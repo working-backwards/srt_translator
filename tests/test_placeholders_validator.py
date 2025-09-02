@@ -45,21 +45,13 @@ def test_per_item_placeholder_validation_detects_real_errors():
 
     # Check first item: invented=2, missing=1
     assert 0 in issues, "Expected issues for item 0"
-    assert issues[0]["invented"] == {
-        "2"
-    }, f"Expected invented={{'2'}}, got {issues[0]['invented']}"
-    assert issues[0]["missing"] == {
-        "1"
-    }, f"Expected missing={{'1'}}, got {issues[0]['missing']}"
+    assert issues[0]["invented"] == {"2"}, f"Expected invented={{'2'}}, got {issues[0]['invented']}"
+    assert issues[0]["missing"] == {"1"}, f"Expected missing={{'1'}}, got {issues[0]['missing']}"
 
     # Check second item: missing=2
     assert 1 in issues, "Expected issues for item 1"
-    assert (
-        issues[1]["invented"] == set()
-    ), f"Expected invented=set(), got {issues[1]['invented']}"
-    assert issues[1]["missing"] == {
-        "2"
-    }, f"Expected missing={{'2'}}, got {issues[1]['missing']}"
+    assert issues[1]["invented"] == set(), f"Expected invented=set(), got {issues[1]['invented']}"
+    assert issues[1]["missing"] == {"2"}, f"Expected missing={{'2'}}, got {issues[1]['missing']}"
 
 
 def test_per_item_placeholder_validation_function_signature():
@@ -87,9 +79,7 @@ def test_per_item_placeholder_validation_empty_placeholders():
     tgt = ["Hola mundo", "Adiós"]
 
     issues = validate_placeholders_pair(src, tgt, PH_RE)
-    assert (
-        issues == {}
-    ), f"Expected no issues for items without placeholders, got {issues}"
+    assert issues == {}, f"Expected no issues for items without placeholders, got {issues}"
 
 
 def test_per_item_placeholder_validation_mixed_content():
@@ -110,12 +100,8 @@ def test_per_item_placeholder_validation_mixed_content():
     # Only item 2 should have issues (missing placeholder)
     assert len(issues) == 1, f"Expected 1 item with issues, got {len(issues)}"
     assert 2 in issues, "Expected issues for item 2"
-    assert issues[2]["missing"] == {
-        "2"
-    }, f"Expected missing={{'2'}}, got {issues[2]['missing']}"
-    assert (
-        issues[2]["invented"] == set()
-    ), f"Expected invented=set(), got {issues[2]['invented']}"
+    assert issues[2]["missing"] == {"2"}, f"Expected missing={{'2'}}, got {issues[2]['missing']}"
+    assert issues[2]["invented"] == set(), f"Expected invented=set(), got {issues[2]['invented']}"
 
 
 if __name__ == "__main__":

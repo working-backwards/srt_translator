@@ -33,7 +33,7 @@ This document describes the refactoring of the `LanguageConfig` class from a fil
 # Before
 config = LanguageConfig()  # Auto-searched for file
 
-# After  
+# After
 with open("config/languages.json", "r") as f:
     data = json.load(f)
 config = LanguageConfig(data)  # Explicit data injection

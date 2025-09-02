@@ -55,9 +55,7 @@ def test_fixer_srt_first_dry_run_then_apply(tmp_path: Path):
     dnt = read_json_utf8(batch / "ai_config.json")["dnt_terms"]
 
     # Dry-run: no .bak created, file contents unchanged
-    fixer = SRTFixer(
-        log_file=str(batch / "fixer_dry_run.log"), translations_dir=str(batch)
-    )
+    fixer = SRTFixer(log_file=str(batch / "fixer_dry_run.log"), translations_dir=str(batch))
     fixer.scan_and_fix_placeholders(batch_dir=batch, dnt_terms=dnt, dry_run=True)
     assert find_files(batch, "*.srt.bak") == []
     # Placeholders still present before apply
@@ -65,9 +63,7 @@ def test_fixer_srt_first_dry_run_then_apply(tmp_path: Path):
     assert len(hits) >= 2  # at least two straightforward "__DNT_TERM_" occurrences
 
     # Apply: backups created for changed files; placeholders gone; replacements/removals correct
-    fixer = SRTFixer(
-        log_file=str(batch / "fixer_apply.log"), translations_dir=str(batch)
-    )
+    fixer = SRTFixer(log_file=str(batch / "fixer_apply.log"), translations_dir=str(batch))
     fixer.scan_and_fix_placeholders(batch_dir=batch, dnt_terms=dnt, dry_run=False)
 
     # Expect .bak backups for the 4 files
