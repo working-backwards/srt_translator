@@ -30,6 +30,7 @@ jobs:
         python-version: ${{ matrix.python }}
 
     - name: Install dependencies
+      shell: bash
       run: |
         python -m pip install --upgrade pip
         python -m pip install -e ".[dev,gui]"
@@ -68,16 +69,22 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install security tools
+    - name: Install tools
+      shell: bash
       run: |
         python -m pip install --upgrade pip
-        python -m pip install safety bandit
+        python -m pip install bandit pip-audit
+        python -m pip install -e ".[dev]"
 
-    - name: Run Safety
-      run: safety scan --full-report
+    - name: Bandit (SAST)
+      shell: bash
+      run: bandit -q -r srt_translator -x tests
 
-    - name: Run Bandit
-      run: bandit -r srt_translator -x tests
+    - name: pip-audit (vulns; no API key)
+      shell: bash
+      run: |
+        # audit installed environment (no auth required)
+        pip-audit -v
 
   dependency-update-check:
     name: Dependency Update Check
