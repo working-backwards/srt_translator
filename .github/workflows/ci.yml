@@ -43,7 +43,7 @@ jobs:
         with: { python-version: '3.11' }
       - run: python -m pip install -U pip build
       - run: python -m build
-      - run: pip install dist/*.whl[gui]
+      - run: pip install -e ".[gui]"
       - shell: python
         run: |
           try:
