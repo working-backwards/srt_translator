@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m pip install -U pip build
           python -m build
-          python -m pip install dist/*.whl
+          python -m pip install dist/srt_translator-*.whl
       - name: Test CLI import
         run: |
           python -c "import srt_translator, srt_translator.cli.app; print('CLI import ok')"
