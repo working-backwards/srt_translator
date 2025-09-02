@@ -66,7 +66,7 @@ def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
             missing[code] = need
     if missing:
         raise RuntimeError(f"languages.json missing required keys: {missing}")
-    return raw  # type: ignore[return-value]
+    return raw  # type: ignore[no-any-return]
 
 
 def collect_cli_raw() -> Dict[str, Any]:

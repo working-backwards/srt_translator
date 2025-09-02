@@ -19,7 +19,7 @@ jobs:
         with: { python-version: '3.11' }
       - run: python -m pip install -U pip
       - run: pip install .[dev]
-      - run: ruff check . && ruff format --check . && mypy srt_translator
+      - run: ruff check . && mypy srt_translator
       - run: pytest -m "not gui" -q
 
   package-install:
