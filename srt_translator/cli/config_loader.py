@@ -66,7 +66,7 @@ def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
             missing[code] = need
     if missing:
         raise RuntimeError(f"languages.json missing required keys: {missing}")
-    return raw
+    return raw  # type: ignore[return-value]
 
 
 def collect_cli_raw() -> Dict[str, Any]:
@@ -94,7 +94,7 @@ def collect_cli_raw() -> Dict[str, Any]:
 
     # Load termbase data directly from file
     termbase_data: Dict[str, Any] = {}
-    termbase_path: str = env_file.get("TERMBASE_PATH", "termbase.json")
+    termbase_path: str = env_file.get("TERMBASE_PATH") or "termbase.json"
 
     if not os.path.isabs(termbase_path):
         # Find project root by looking for pyproject.toml or setup.py
@@ -128,7 +128,7 @@ def collect_cli_raw() -> Dict[str, Any]:
     # Load per-language policy (batch size, apostrophe flag, cps cap)
     target_map: Dict[str, str] = {}
     try:
-        target_langs_str = env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS))
+        target_langs_str = env_file.get("TARGET_LANGUAGES") or json.dumps(DEFAULT_LANGS)
         target_map = json.loads(target_langs_str)
     except Exception as e:
         print(f"Warning: Failed to parse TARGET_LANGUAGES, using defaults: {e}")
