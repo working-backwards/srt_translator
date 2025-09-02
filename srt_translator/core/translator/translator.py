@@ -10,7 +10,18 @@ import re
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Match,
+    Optional,
+    Pattern,
+    Sequence,
+    Set,
+    cast,
+)
 
 # OpenAI client
 from openai import OpenAI
@@ -34,6 +45,7 @@ from srt_translator.core.translator.diagnostics import (
 )
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
+from srt_translator.core.utils.log_types import LoggerLike
 
 # ---------------------------
 # Data models
@@ -53,11 +65,11 @@ class Subtitle:
 # ---------------------------
 
 
-TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
+TIME_RE: Pattern[str] = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<ms>\d{3})")
 
-PH_RE = re.compile(r"__DNT_TERM_(\d+)__")
+PH_RE: Pattern[str] = re.compile(r"__DNT_TERM_(\d+)__")
 # Detector (Stage 1): placeholder immediately followed by apostrophe (straight or curly)
-TR_PLACEHOLDER_APOS_RE = re.compile(r"__DNT_TERM_\d+__['']")
+TR_PLACEHOLDER_APOS_RE: Pattern[str] = re.compile(r"__DNT_TERM_\d+__['']")
 
 
 def _parse_time_to_seconds(ts: str) -> float:
@@ -146,14 +158,14 @@ def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) ->
 
 
 # DNT placeholder validation helpers
-def _extract_ph_ids(text: str, ph_regex: re.Pattern) -> Set[str]:
+def _extract_ph_ids(text: str, ph_regex: Pattern[str]) -> Set[str]:
     return set(ph_regex.findall(text or ""))
 
 
 def validate_placeholders_pair(
     src_items: List[str],
     tgt_items: List[str],
-    ph_regex: re.Pattern,
+    ph_regex: Pattern[str],
 ) -> Dict[int, Dict[str, Set[str]]]:
     issues: Dict[int, Dict[str, Set[str]]] = {}
     for i, (src, tgt) in enumerate(zip(src_items, tgt_items)):
@@ -166,11 +178,11 @@ def validate_placeholders_pair(
     return issues
 
 
-def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.Pattern) -> str:
+def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: Pattern[str]) -> str:
     if not invented_ids:
         return text
 
-    def _sub(m):
+    def _sub(m: Match[str]) -> str:
         pid = m.group(1)
         return "" if pid in invented_ids else m.group(0)
 
@@ -182,7 +194,7 @@ def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: re.
 # ---------------------------
 
 
-def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
+def _load_and_parse_file(self: "SRTTranslator", input_filepath: str) -> List[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
     with open(input_filepath, "r", encoding="utf-8") as f:
         src_text = f.read()
@@ -192,25 +204,36 @@ def _load_and_parse_file(self, input_filepath: str) -> List[Subtitle]:
     return src_subs
 
 
-def _setup_file_logging(self, input_filepath: str, target_lang: str) -> logging.LoggerAdapter:
+def _setup_file_logging(
+    self: "SRTTranslator", input_filepath: str, target_lang: str
+) -> logging.LoggerAdapter[logging.Logger]:
     """Setup file-scoped logging with file/lang context."""
-    file_logger = logging.LoggerAdapter(
-        self.logger,
-        {
-            "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
-            "file": os.path.basename(input_filepath),
-            "lang": target_lang,
-        },
-    )
+
+    # Ensure we pass a real `logging.Logger` to LoggerAdapter (not a LoggerAdapter / Protocol)
+    if isinstance(self.logger, logging.LoggerAdapter):
+        base_logger: logging.Logger = self.logger.logger
+    else:
+        base_logger = cast(logging.Logger, self.logger)
+
+    extra: Mapping[str, object] = {
+        "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")(
+            "run_id", "n/a"
+        ),
+        "file": os.path.basename(input_filepath),
+        "lang": target_lang,
+    }
+
+    # Parameterize the adapter so MyPy knows its type argument
+    file_logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(base_logger, extra)
     return file_logger
 
 
 def _validate_and_repair_placeholders(
-    self,
+    self: "SRTTranslator",
     src_items: List[str],
     tgt_texts: List[str],
     batch_ids: List[int],
-    batch_logger: logging.LoggerAdapter,
+    batch_logger: LoggerLike,
 ) -> List[str]:
     """Validate and repair placeholder integrity."""
     # Log input/output for troubleshooting placeholder issues
@@ -233,7 +256,9 @@ def _validate_and_repair_placeholders(
             )
 
     # Policy-aware placeholder validation for apostrophes after placeholders
-    target_lang = getattr(batch_logger, "extra", {}).get("lang", "unknown")
+    target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")(
+        "lang", "unknown"
+    )
     if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
         # Normalize for detection only: treat "__...__'..." as "__...__"
         norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
@@ -318,11 +343,12 @@ def _validate_and_repair_placeholders(
 
 
 def _format_and_append_subtitles(
-    self,
+    self: "SRTTranslator",
     batch: List[Subtitle],
     tgt_texts: List[str],
     target_lang: str,
     cps_cap: Optional[int],
+    file_logger: LoggerLike,
 ) -> List[Subtitle]:
     """Format subtitles with CPS and append to global list."""
     formatted_subs = []
@@ -346,6 +372,10 @@ def _format_and_append_subtitles(
 
 
 class SRTTranslator:
+    # Explicit attribute types to avoid "Cannot determine type of X"
+    logger: LoggerLike
+    term_handler: TermHandler
+
     # Expert configuration - modify these values as needed
     MAX_BATCH_SIZE = 8  # Maximum subtitles per batch (safety cap)
     # Internal bounded shape-lock caps (not user-configurable)
@@ -412,7 +442,7 @@ class SRTTranslator:
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
 
-    def _strict_retry_kwargs(self, src_items: list[str]) -> dict:
+    def _strict_retry_kwargs(self, src_items: list[str]) -> Dict[str, Any]:
         """
         Strict decoding for retries: cools repetition and caps length conservatively,
         but guarantees enough budget to close the JSON wrapper even for tiny inputs.
@@ -456,7 +486,7 @@ class SRTTranslator:
             if self.language_config:
                 rules = self.language_config.get_language_rules(target_lang) or {}
                 if isinstance(rules.get("sentence_endings"), list):
-                    sentence_endings = tuple(rules["sentence_endings"])  # type: ignore[assignment]
+                    sentence_endings = tuple(rules["sentence_endings"])
         except (AttributeError, TypeError, KeyError) as exc:
             # Fallback to defaults; log at debug so we can diagnose config shape issues.
             self.logger.debug(
@@ -653,6 +683,7 @@ class SRTTranslator:
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 cps_cap=cps_cap,
+                file_logger=file_logger,
             )
             all_tgt_subs.extend(formatted_subs)
 
@@ -906,7 +937,8 @@ INPUT ITEMS:
                 file_base = "?"
                 if isinstance(self.logger, logging.LoggerAdapter):
                     try:
-                        file_base = self.logger.extra.get("file", "?")  # type: ignore[attr-defined]
+                        extra_map = cast(Mapping[str, object], getattr(self.logger, "extra", {}))
+                        file_base = str(extra_map.get("file", "?"))
                     except Exception:
                         file_base = "?"
                 # Call the AI probe to understand what went wrong
@@ -1061,7 +1093,7 @@ TARGET ITEMS (TO FIX):
         tgt_items: List[str],
         ph_issues: Dict[int, Dict[str, Set[str]]],
         batch_ids: List[int],
-        logger: logging.Logger,
+        logger: LoggerLike,
     ) -> List[str]:
         """
         If item i 'invented' a placeholder that item i+1 'missed', and i+1 is empty,
@@ -1133,7 +1165,7 @@ TARGET ITEMS (TO FIX):
         target_lang: str,
         termbase: Dict[str, Dict[str, str]],
         batch_ids: List[int],
-        logger: logging.Logger,
+        logger: LoggerLike,
         strict: bool = False,
     ) -> List[Dict[str, Any]]:
         """

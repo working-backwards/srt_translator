@@ -1,6 +1,11 @@
 import re
 from collections import defaultdict
-from typing import List, Optional, Sequence
+from typing import TYPE_CHECKING, DefaultDict, List, Optional, Pattern, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from srt_translator.core.translator.translator import (
+        SRTTranslator,
+    )  # TID252 absolute import
 
 
 # -- Token estimation (char-based, fast, deterministic) -----------------------
@@ -15,7 +20,7 @@ def estimate_tokens(text: str) -> int:
 
 
 # -- Repetition detector (catches "ek ek ek ..." and similar loops) -----------
-_REPETITION_RE = re.compile(
+_REPETITION_RE: Pattern[str] = re.compile(
     r"\b(\w{2,})\b(?:[\s,.;:!?]+?\1\b){20,}",
     re.IGNORECASE | re.UNICODE,
 )
@@ -87,8 +92,8 @@ def build_oversize_probe_question(
 class MalformedProbeBudget:
     """Allow at most one probe per (file, lang)."""
 
-    def __init__(self):
-        self._seen = defaultdict(int)
+    def __init__(self) -> None:
+        self._seen: DefaultDict[Tuple[str, str], int] = defaultdict(int)
 
     def allow(self, file_base: str, lang: str) -> bool:
         key = (file_base, lang)
@@ -103,7 +108,7 @@ class MalformedProbeBudget:
 
 def probe_malformed_json_with_translator(
     *,
-    translator,
+    translator: "SRTTranslator",
     budget: MalformedProbeBudget,
     file_base: str,
     lang: str,

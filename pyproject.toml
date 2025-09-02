@@ -75,37 +75,10 @@ line-ending = "auto"
 
 # Note: Pylint and Flake8 configurations removed - now handled by Ruff
 
-# MyPy configuration (optional but recommended)
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false  # Relaxed for existing codebase
-disallow_incomplete_defs = false  # Relaxed for existing codebase
-
 # Safety configuration for dependency vulnerability scanning
 [tool.safety]
 # Safety will scan requirements and installed packages for known vulnerabilities
 # Run with: safety check --full-report
-check_untyped_defs = true
-disallow_untyped_decorators = false  # Relaxed for existing codebase
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-
-[[tool.mypy.overrides]]
-module = [
-    "srt.*",
-    "openai.*",
-    "PySide6.*",
-    "PySide6.QtCore.*",
-    "PySide6.QtWidgets.*",
-    "PySide6.QtGui.*",
-]
-ignore_missing_imports = true
 
 # Pytest configuration
 [tool.pytest.ini_options]

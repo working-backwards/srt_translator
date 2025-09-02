@@ -5,8 +5,19 @@ Logging configuration for entry points only.
 
 import logging
 import os
+from typing import Protocol
 
 from srt_translator.core.config.models import LogMode
+
+
+class LoggerLike(Protocol):
+    """Protocol for logger-like objects to help with type checking."""
+
+    def debug(self, msg: str, *args, **kwargs) -> None: ...
+    def info(self, msg: str, *args, **kwargs) -> None: ...
+    def warning(self, msg: str, *args, **kwargs) -> None: ...
+    def error(self, msg: str, *args, **kwargs) -> None: ...
+    def critical(self, msg: str, *args, **kwargs) -> None: ...
 
 
 def configure_logging(log_mode: LogMode) -> None:
