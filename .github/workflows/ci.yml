@@ -18,6 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - run: python -m pip install -U pip
+      - run: |
+          # Install system dependencies for PySide6
+          sudo apt-get update
+          sudo apt-get install -y libegl1-mesa libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
       - run: pip install .[dev,gui]
       - run: ruff check . && mypy srt_translator
       - run: pytest -m "not gui" -q
