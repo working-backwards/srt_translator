@@ -33,9 +33,7 @@ def _create_batches_with_logging(
     )
 
     file_logger.info(
-        "Using sentence-aware batching for %s → %s "
-        "(%d subtitles → %d batches; "
-        "target=%d, max=%d)",
+        "Using sentence-aware batching for %s → %s (%d subtitles → %d batches; target=%d, max=%d)",
         os.path.basename(getattr(file_logger, "extra", {}).get("file", "unknown")),
         target_lang,
         len(src_subs),

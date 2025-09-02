@@ -683,7 +683,7 @@ def run_batch_evaluation(
                 except Exception as e:
                     # Log any errors and skip this cue in drift stats
                     log.warning(
-                        f"Error calculating timing drift for cue {cue_idx+1}, skipping: {e}"
+                        f"Error calculating timing drift for cue {cue_idx + 1}, skipping: {e}"
                     )
                     continue
 

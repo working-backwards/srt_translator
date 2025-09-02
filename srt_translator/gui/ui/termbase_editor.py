@@ -283,8 +283,7 @@ class TermbaseEditor(QWidget):
         reply = QMessageBox.question(
             self,
             "Clear All Terms",
-            f"Remove all {total_terms} terms from the termbase?\n\n"
-            "This action cannot be undone.",
+            f"Remove all {total_terms} terms from the termbase?\n\nThis action cannot be undone.",
             QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
             QMessageBox.No,  # type: ignore[attr-defined]
         )

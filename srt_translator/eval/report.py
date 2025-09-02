@@ -415,7 +415,7 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
             out.append(f"\n### {lang} — {f.get('target_file')}")
             out.append(f"- Cue parity: {'OK' if m.get('parity_ok', True) else 'Mismatch'}")
             out.append(
-                f"- Timing Δstart median/p95={m.get('med_ds_ms',0):.0f}/{m.get('p95_ds_ms',0):.0f}ms; Δend median/p95={m.get('med_de_ms',0):.0f}/{m.get('p95_de_ms',0):.0f}ms"
+                f"- Timing Δstart median/p95={m.get('med_ds_ms', 0):.0f}/{m.get('p95_ds_ms', 0):.0f}ms; Δend median/p95={m.get('med_de_ms', 0):.0f}/{m.get('p95_de_ms', 0):.0f}ms"
             )
             out.append(f"- CPS caps used: soft={m.get('cps_soft')} hard={m.get('cps_hard')}\n")
 

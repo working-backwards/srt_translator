@@ -557,8 +557,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "No Translation Settings",
-                "No Translation Settings have been generated yet.\n"
-                "Please generate settings first.",
+                "No Translation Settings have been generated yet.\nPlease generate settings first.",
             )
             return
 

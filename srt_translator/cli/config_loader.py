@@ -3,10 +3,13 @@
 CLI configuration loader for SRT Translator.
 """
 
+from __future__ import annotations
+
 import json
 import os
 from json import JSONDecodeError
 from pathlib import Path
+from typing import Any, Dict
 
 from dotenv import dotenv_values, find_dotenv
 
@@ -32,7 +35,7 @@ def _resolve_languages_json_path() -> Path:
     )
 
 
-def _load_language_policies(selected_codes: list[str]) -> dict:
+def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
     path = _resolve_languages_json_path()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -66,7 +69,7 @@ def _load_language_policies(selected_codes: list[str]) -> dict:
     return raw
 
 
-def collect_cli_raw() -> dict:
+def collect_cli_raw() -> Dict[str, Any]:
     """
     Collect raw configuration for CLI mode.
 
@@ -79,7 +82,7 @@ def collect_cli_raw() -> dict:
     env_file = dotenv_values(env_path) if env_path else {}
 
     # API key: OS env wins
-    api_key = (
+    api_key: str | None = (
         os.getenv("OPENAI_API_KEY")
         or os.getenv("OPEN_AI_KEY")  # optional legacy alias
         or env_file.get("OPENAI_API_KEY")
@@ -90,13 +93,13 @@ def collect_cli_raw() -> dict:
         raise ValueError("OPENAI_API_KEY is required (set via OS env or .env).")
 
     # Load termbase data directly from file
-    termbase_data = {}
-    termbase_path = env_file.get("TERMBASE_PATH", "termbase.json")
+    termbase_data: Dict[str, Any] = {}
+    termbase_path: str = env_file.get("TERMBASE_PATH", "termbase.json")
 
     if not os.path.isabs(termbase_path):
         # Find project root by looking for pyproject.toml or setup.py
         current_dir = Path.cwd()
-        project_root = None
+        project_root: Path | None = None
 
         # Walk up directories to find project root
         for parent in [current_dir] + list(current_dir.parents):
@@ -123,7 +126,7 @@ def collect_cli_raw() -> dict:
         print(f"Warning: Termbase file not found at {termbase_path}")
 
     # Load per-language policy (batch size, apostrophe flag, cps cap)
-    target_map = {}
+    target_map: Dict[str, str] = {}
     try:
         target_langs_str = env_file.get("TARGET_LANGUAGES", json.dumps(DEFAULT_LANGS))
         target_map = json.loads(target_langs_str)
@@ -131,7 +134,7 @@ def collect_cli_raw() -> dict:
         print(f"Warning: Failed to parse TARGET_LANGUAGES, using defaults: {e}")
         target_map = DEFAULT_LANGS
 
-    language_policies = {}
+    language_policies: Dict[str, Any] = {}
     try:
         language_policies = _load_language_policies(list(target_map.values()))
     except Exception as e:

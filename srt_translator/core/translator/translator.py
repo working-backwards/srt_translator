@@ -20,11 +20,19 @@ from typing import (
     Pattern,
     Sequence,
     Set,
+    TypeAlias,
     cast,
 )
 
 # OpenAI client
 from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionDeveloperMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionUserMessageParam,
+)
 
 # Core imports
 from srt_translator.core.config.language_config import LanguageConfig
@@ -70,6 +78,15 @@ TIME_RE: Pattern[str] = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2}),(?P<
 PH_RE: Pattern[str] = re.compile(r"__DNT_TERM_(\d+)__")
 # Detector (Stage 1): placeholder immediately followed by apostrophe (straight or curly)
 TR_PLACEHOLDER_APOS_RE: Pattern[str] = re.compile(r"__DNT_TERM_\d+__['']")
+
+# Union type for OpenAI chat message params (for mypy)
+ChatMsg: TypeAlias = (
+    ChatCompletionDeveloperMessageParam
+    | ChatCompletionSystemMessageParam
+    | ChatCompletionUserMessageParam
+    | ChatCompletionAssistantMessageParam
+    | ChatCompletionToolMessageParam
+)
 
 
 def _parse_time_to_seconds(ts: str) -> float:
@@ -725,7 +742,7 @@ class SRTTranslator:
         mapped_target_lang = target_lang
 
         system_prompt = (
-            "You are a professional subtitle translator. " "Return valid JSON ONLY, never prose."
+            "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
         )
         if strict:
             system_prompt += (
@@ -760,11 +777,12 @@ INPUT ITEMS:
 {self._render_items_for_prompt(batch_ids, src_items)}
 """
 
-        # Prepare the messages payload for logging
-        messages_payload = [
+        # Prepare the messages payload for logging (typed for mypy)
+        messages_payload: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        messages_typed = cast(Sequence[ChatMsg], messages_payload)
 
         # Use JSON mode if available; otherwise rely on instruction.
         kwargs = (
@@ -774,7 +792,7 @@ INPUT ITEMS:
         )
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=messages_payload,
+            messages=messages_typed,
             **kwargs,
         )
         content = (resp.choices[0].message.content or "").strip()
@@ -825,17 +843,20 @@ INPUT ITEMS:
                     )
                     diag_resp = self.client.chat.completions.create(
                         model=self.model_name,
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": (
-                                    "You are a concise diagnostic assistant. "
-                                    "Explain the likely reason for the prior translation model's oversized "
-                                    "or repetitive output in 1–2 sentences. Do not produce translations."
-                                ),
-                            },
-                            {"role": "user", "content": question},
-                        ],
+                        messages=cast(
+                            Sequence[ChatMsg],
+                            [
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You are a concise diagnostic assistant. "
+                                        "Explain the likely reason for the prior translation model's oversized "
+                                        "or repetitive output in 1–2 sentences. Do not produce translations."
+                                    ),
+                                },
+                                {"role": "user", "content": question},
+                            ],
+                        ),
                         temperature=0,
                         max_tokens=160,
                     )
@@ -942,7 +963,7 @@ INPUT ITEMS:
                     except Exception:
                         file_base = "?"
                 # Call the AI probe to understand what went wrong
-                source_text = "\n".join([f"{i+1}) {src}" for i, src in enumerate(src_items)])
+                source_text = "\n".join([f"{i + 1}) {src}" for i, src in enumerate(src_items)])
                 probe_malformed_json_with_translator(
                     translator=self,
                     budget=self._probe_budget,
@@ -999,10 +1020,13 @@ INPUT ITEMS:
         )
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": sys},
-                {"role": "user", "content": usr},
-            ],
+            messages=cast(
+                Sequence[ChatMsg],
+                [
+                    {"role": "system", "content": sys},
+                    {"role": "user", "content": usr},
+                ],
+            ),
             temperature=0.0,
             max_tokens=256,
         )
@@ -1048,7 +1072,7 @@ TARGET ITEMS (TO FIX):
 
         resp = self.client.chat.completions.create(
             model=self.model_name,
-            messages=messages_payload,
+            messages=cast(Sequence[ChatMsg], messages_payload),
             temperature=0.0,
             response_format={"type": "json_object"},
         )

@@ -90,8 +90,8 @@ class TranslationUtils:
             from srt import Subtitle
 
             # Convert ms back to time objects
-            start_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.start_ms/1000:06.3f}")
-            end_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.end_ms/1000:06.3f}")
+            start_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.start_ms / 1000:06.3f}")
+            end_time = srt.srt_timestamp_to_timedelta(f"00:00:{subtitle.end_ms / 1000:06.3f}")
 
             return Subtitle(
                 index=subtitle.index,
@@ -123,7 +123,7 @@ class TranslationUtils:
         if any(s is None for s in tgt_subs):
             missing = [i + 1 for i, s in enumerate(tgt_subs) if s is None]
             errors.append(
-                f"Missing subtitles in target: {missing[:8]}{'...' if len(missing)>8 else ''}"
+                f"Missing subtitles in target: {missing[:8]}{'...' if len(missing) > 8 else ''}"
             )
 
         # Check timing consistency
@@ -133,14 +133,16 @@ class TranslationUtils:
 
             if tgt.start_ms != src.start_ms:
                 errors.append(
-                    f"Start time mismatch at subtitle {i+1}: {src.start_ms} != {tgt.start_ms}"
+                    f"Start time mismatch at subtitle {i + 1}: {src.start_ms} != {tgt.start_ms}"
                 )
 
             if tgt.end_ms != src.end_ms:
-                errors.append(f"End time mismatch at subtitle {i+1}: {src.end_ms} != {tgt.end_ms}")
+                errors.append(
+                    f"End time mismatch at subtitle {i + 1}: {src.end_ms} != {tgt.end_ms}"
+                )
 
             if tgt.index != src.index:
-                errors.append(f"Index mismatch at subtitle {i+1}: {src.index} != {tgt.index}")
+                errors.append(f"Index mismatch at subtitle {i + 1}: {src.index} != {tgt.index}")
 
         return errors
 
