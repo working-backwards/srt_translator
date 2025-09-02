@@ -17,15 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.10', '3.11', '3.12']
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        exclude:
-          # Exclude Python 3.12 on older macOS runners for compatibility
-          - python: '3.12'
-            os: macos-latest
-          # Exclude Python 3.9 on Windows for better compatibility
-          - python: '3.9'
-            os: windows-latest
+        python: ['3.11']
+        os: [macos-latest, windows-latest]
 
     steps:
     - name: Checkout code
@@ -39,7 +32,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+        python -m pip install -e ".[dev]"
 
     - name: Ruff (lint)
       run: ruff check .
@@ -61,7 +54,11 @@ jobs:
 
   security-scan:
     name: Security Scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -69,40 +66,26 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install security tools
       run: |
         python -m pip install --upgrade pip
-        pip install safety bandit pip-audit
+        python -m pip install safety bandit
 
-    - name: Run Safety (dependency vulnerability scan)
-      run: |
-        safety check --json --output safety-report.json || true
-        echo "Safety scan completed"
+    - name: Run Safety
+      run: safety scan --full-report
 
-    - name: Run Bandit (security linting)
-      run: |
-        bandit -r srt_translator/ -f json -o bandit-report.json || true
-        echo "Bandit scan completed"
-
-    - name: Run pip-audit
-      run: |
-        pip-audit --json --output pip-audit-report.json || true
-        echo "pip-audit completed"
-
-    - name: Upload security reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: security-reports
-        path: |
-          safety-report.json
-          bandit-report.json
-          pip-audit-report.json
+    - name: Run Bandit
+      run: bandit -r srt_translator -x tests
 
   dependency-update-check:
     name: Dependency Update Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     if: github.event_name == 'schedule'
     steps:
     - name: Checkout code
@@ -111,25 +94,29 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install pip-tools
-      run: pip install pip-tools
+      run: python -m pip install pip-tools
 
     - name: Check for outdated dependencies
       run: |
-        pip list --outdated --format=json > outdated-deps.json
+        python -m pip list --outdated --format=json > outdated-deps.json
         echo "Dependency check completed"
 
     - name: Upload dependency report
       uses: actions/upload-artifact@v4
       with:
-        name: dependency-reports
+        name: dependency-reports-${{ matrix.os }}
         path: outdated-deps.json
 
   build-release:
     name: Build Release Artifacts
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     if: github.event_name == 'release'
     needs: [test-matrix, security-scan]
     steps:
@@ -139,12 +126,12 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install build dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build twine
+        python -m pip install build twine
 
     - name: Build package
       run: |
@@ -157,5 +144,5 @@ jobs:
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: release-packages
+        name: release-packages-${{ matrix.os }}
         path: dist/

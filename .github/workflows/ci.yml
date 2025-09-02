@@ -12,43 +12,66 @@ concurrency:
 
 jobs:
   lint-type-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: python -m pip install -U pip
-      - run: |
-          # Install system dependencies for PySide6
-          sudo apt-get update
-          sudo apt-get install -y libegl1-mesa libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
-      - run: pip install .[dev,gui]
-      - run: ruff check . && mypy srt_translator
-      - run: pytest -m "not gui" -q
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dev deps
+        run: |
+          python -m pip install -U pip
+          python -m pip install .[dev,gui]
+      - name: Ruff (lint)
+        run: ruff check .
+      - name: mypy
+        run: mypy srt_translator
+      - name: Run tests
+        run: pytest -m "not gui" -q
 
   package-install:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: python -m pip install -U pip build
-      - run: python -m build
-      - run: pip install dist/*.whl
-      - run: |
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build and install package
+        run: |
+          python -m pip install -U pip build
+          python -m build
+          python -m pip install dist/*.whl
+      - name: Test CLI import
+        run: |
           python -c "import srt_translator, srt_translator.cli.app; print('CLI import ok')"
           srtx --help
 
   gui-import:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: python -m pip install -U pip build
-      - run: python -m build
-      - run: pip install -e ".[gui]"
-      - shell: python
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install GUI deps
+        run: |
+          python -m pip install -U pip build
+          python -m build
+          python -m pip install -e ".[gui]"
+      - name: Test GUI import
+        shell: python
         run: |
           try:
               import srt_translator.gui.main_window as mw
@@ -57,19 +80,32 @@ jobs:
               raise SystemExit(1)
 
   security-scan:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: python -m pip install -U pip
-      - run: pip install safety bandit
-      - run: safety check
-      - run: bandit -r srt_translator
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install security tools
+        run: |
+          python -m pip install -U pip
+          python -m pip install safety bandit
+      - name: Safety
+        run: safety scan --full-report
+      - name: Bandit
+        run: bandit -r srt_translator -x tests
 
   golden-tests:
     name: Golden Structure & Invariants
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -78,26 +114,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Install dependencies
-        shell: bash
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements-dev.txt ]; then
-            pip install -r requirements-dev.txt
-          elif [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          elif [ -f pyproject.toml ]; then
-            pip install .[dev]
-          else
-            echo "No requirements file found. Please add requirements-dev.txt or requirements.txt." >&2
-            exit 1
-          fi
+          python -m pip install .[dev]
 
       - name: Run golden tests
-        shell: bash
         env:
           PYTHONWARNINGS: default
         run: |
@@ -107,5 +132,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golden-pytest-cache
+          name: golden-pytest-cache-${{ matrix.os }}
           path: ./.pytest_cache
