@@ -150,9 +150,9 @@ class TestEvalCLIIntegration:
 
             for expected_file in expected_files:
                 file_path = lang_artifacts / expected_file
-                assert (
-                    file_path.exists()
-                ), f"Expected file {expected_file} for {lang} should be created"
+                assert file_path.exists(), (
+                    f"Expected file {expected_file} for {lang} should be created"
+                )
 
         # Check for batch-level manifest.json
         batch_manifest = batch_dir / "manifest.json"
@@ -170,9 +170,9 @@ class TestEvalCLIIntegration:
         # Verify report contains expected content
         report_content = eval_report.read_text(encoding="utf-8")
         assert "Evaluation Report" in report_content, "Report should have proper header"
-        assert (
-            "Spanish" in report_content or "es" in report_content
-        ), "Report should mention Spanish"
+        assert "Spanish" in report_content or "es" in report_content, (
+            "Report should mention Spanish"
+        )
         assert "French" in report_content or "fr" in report_content, "Report should mention French"
 
     def test_evaluation_with_issues(self, tmp_path):
@@ -208,9 +208,9 @@ Otro subtítulo para pruebas."""
 
         report_content = eval_report.read_text(encoding="utf-8")
         # The report should mention issues (though exact text depends on evaluation logic)
-        assert (
-            "missing" in report_content.lower() or "issue" in report_content.lower()
-        ), "Report should mention issues"
+        assert "missing" in report_content.lower() or "issue" in report_content.lower(), (
+            "Report should mention issues"
+        )
 
     def test_evaluation_with_verbose_logging(self, tmp_path):
         """Test evaluation with verbose logging enabled."""

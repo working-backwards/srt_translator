@@ -1,0 +1,35 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Force LF line endings for specific file types
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.md   text eol=lf
+
+# Additional common file types that should use LF
+*.json text eol=lf
+*.txt  text eol=lf
+*.cfg  text eol=lf
+*.ini  text eol=lf
+*.sh   text eol=lf
+*.ps1  text eol=lf
+*.bat  text eol=lf
+*.cmd  text eol=lf
+
+# Ensure these files are always treated as text
+*.gitignore text
+*.gitattributes text
+*.editorconfig text
+
+# Binary files (should not be normalized)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.whl binary
