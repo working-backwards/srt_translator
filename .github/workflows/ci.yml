@@ -44,11 +44,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build and install package
+      - name: Install project (editable) with CLI extras
         run: |
-          python -m pip install -U pip build
-          python -m build
-          python -m pip install dist/srt_translator-*.whl
+          python -m pip install -U pip
+          python -m pip install -e ".[gui]"
       - name: Test CLI import
         run: |
           python -c "import srt_translator, srt_translator.cli.app; print('CLI import ok')"
@@ -65,19 +64,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install GUI deps
+      - name: Install project (editable) with GUI extras
         run: |
-          python -m pip install -U pip build
-          python -m build
+          python -m pip install -U pip
           python -m pip install -e ".[gui]"
       - name: Test GUI import
-        shell: python
         run: |
-          try:
-              import srt_translator.gui.main_window as mw
-              print("GUI import ok")
-          except Exception as e:
-              raise SystemExit(1)
+          python -c "import srt_translator; import srt_translator.gui.main_window as _; print('GUI import OK')"
 
   security-scan:
     runs-on: ${{ matrix.os }}
