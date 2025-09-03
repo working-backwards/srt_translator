@@ -871,9 +871,25 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.error(f"Error sampling memory: {e}")
 
     def _after_eval_finished(self, json_path: str) -> None:
-        """Handle evaluation completion - store JSON path for HTML generation"""
+        """Handle evaluation completion - store JSON path and generate HTML"""
         self._last_eval_json = Path(json_path)
         self.logger.info(f"Eval report ready: {json_path}")
+
+        try:
+            from srt_translator.presenters.eval_html.build import build_eval_html
+
+            html_path = build_eval_html(
+                self._last_eval_json, self._last_eval_json.with_suffix(".html")
+            )
+            self._last_eval_html = html_path
+            self.translation_section.open_html_btn.setEnabled(True)
+            self.logger.info(f"HTML report generated: {html_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to generate HTML report: {e}", exc_info=True)
+            QMessageBox.critical(
+                self, "HTML Report Error", f"Could not generate eval_report.html:\n{e}"
+            )
+            self.translation_section.open_html_btn.setEnabled(False)
 
     def on_open_html_clicked(self):
         """Handle Open HTML Report button click"""
