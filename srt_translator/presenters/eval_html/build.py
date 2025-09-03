@@ -7,6 +7,16 @@ from pathlib import Path
 from typing import Any
 
 
+def _format_number(value: int | float) -> str:
+    """Format numeric values consistently, avoiding locale dependence."""
+    if isinstance(value, float):
+        # Format floating point numbers to 1 decimal place
+        return f"{value:.1f}"
+    else:
+        # Format integers as-is
+        return str(value)
+
+
 def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
     """Minimal HTML presenter implementation.
 
@@ -103,11 +113,11 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
 
                     languages_section.append("<tr>")
                     languages_section.append(f"<td>{file_path}</td>")
-                    languages_section.append(f"<td>{total_issues}</td>")
-                    languages_section.append(f"<td>{missing_translation}</td>")
-                    languages_section.append(f"<td>{untranslated_after_dnt}</td>")
-                    languages_section.append(f"<td>{timing_fail}</td>")
-                    languages_section.append(f"<td>{parity_issue}</td>")
+                    languages_section.append(f"<td>{_format_number(total_issues)}</td>")
+                    languages_section.append(f"<td>{_format_number(missing_translation)}</td>")
+                    languages_section.append(f"<td>{_format_number(untranslated_after_dnt)}</td>")
+                    languages_section.append(f"<td>{_format_number(timing_fail)}</td>")
+                    languages_section.append(f"<td>{_format_number(parity_issue)}</td>")
                     languages_section.append("</tr>")
 
                 languages_section.append("</tbody>")
@@ -163,7 +173,7 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
                 occurrences = dnt_terms[term]
                 dnt_section.append("<tr>")
                 dnt_section.append(f"<td>{term}</td>")
-                dnt_section.append(f"<td>{len(occurrences)}</td>")
+                dnt_section.append(f"<td>{_format_number(len(occurrences))}</td>")
                 dnt_section.append("</tr>")
 
             dnt_section.append("</tbody>")
@@ -172,13 +182,15 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
             # Add drill-down details for each term
             for term in sorted_dnt_terms:
                 occurrences = dnt_terms[term]
+                # Sort occurrences by language, then by file for deterministic display
+                sorted_occurrences = sorted(occurrences, key=lambda x: (x["language"], x["file"]))
                 dnt_section.append('<details class="dnt-details">')
                 dnt_section.append(
-                    f'<summary>Details for "{term}" ({len(occurrences)} occurrences)</summary>'
+                    f'<summary>Details for "{term}" ({_format_number(len(occurrences))} occurrences)</summary>'
                 )
                 dnt_section.append('<div class="dnt-occurrences">')
 
-                for occurrence in occurrences:
+                for occurrence in sorted_occurrences:
                     dnt_section.append('<div class="dnt-occurrence">')
                     dnt_section.append(f"<strong>Language:</strong> {occurrence['language']}<br>")
                     dnt_section.append(f"<strong>File:</strong> {occurrence['file']}<br>")
@@ -233,13 +245,15 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         else:
             for lang_code in sorted(termbase_violations.keys()):
                 violations = termbase_violations[lang_code]
+                # Sort violations by file, then by original text for deterministic display
+                sorted_violations = sorted(violations, key=lambda x: (x["file"], x["original"]))
                 termbase_section.append('<details class="termbase-details">')
                 termbase_section.append(
-                    f"<summary>{lang_code} ({len(violations)} violations)</summary>"
+                    f"<summary>{lang_code} ({_format_number(len(violations))} violations)</summary>"
                 )
                 termbase_section.append('<div class="termbase-violations">')
 
-                for violation in violations:
+                for violation in sorted_violations:
                     termbase_section.append('<div class="termbase-violation">')
                     termbase_section.append(f"<strong>File:</strong> {violation['file']}<br>")
                     termbase_section.append(
@@ -285,15 +299,15 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         <div class="kpi-grid">
             <div class="kpi-item">
                 <span class="kpi-label">Files Total:</span>
-                <span class="kpi-value">{files_total}</span>
+                <span class="kpi-value">{_format_number(files_total)}</span>
             </div>
             <div class="kpi-item">
                 <span class="kpi-label">Languages Total:</span>
-                <span class="kpi-value">{languages_total}</span>
+                <span class="kpi-value">{_format_number(languages_total)}</span>
             </div>
             <div class="kpi-item">
                 <span class="kpi-label">Issues Total:</span>
-                <span class="kpi-value">{issues_total}</span>
+                <span class="kpi-value">{_format_number(issues_total)}</span>
             </div>
         </div>
         <div class="languages-list">
