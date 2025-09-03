@@ -15,6 +15,7 @@ from srt_translator.eval.report import write_batch_report
 
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
+from srt_translator.presenters.eval_html.build import build_eval_html
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -64,6 +65,12 @@ Examples:
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--version", action="store_true", help="Show version information")
+    parser.add_argument(
+        "--report",
+        choices=["html", "md", "both", "none"],
+        default="none",
+        help="Generate report after evaluation: html (HTML only), md (Markdown only), both (HTML then MD), none (no reports)",
+    )
     args = parser.parse_args(argv)
 
     # Handle version flag first
@@ -183,6 +190,26 @@ Examples:
                         logger=eval_logger,
                     )
                     logger.info("Evaluation completed successfully")
+
+                    # Generate reports based on --report flag
+                    if args.report in ["html", "both"]:
+                        json_path = latest_batch / "artifacts" / "eval_report.json"
+                        if not json_path.exists():
+                            logger.error(f"eval_report.json not found: {json_path}")
+                            return 1
+
+                        try:
+                            html_path = build_eval_html(json_path, json_path.with_suffix(".html"))
+                            logger.info(f"HTML report generated: {html_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate HTML report: {e}")
+                            return 1
+
+                    if args.report in ["md", "both"]:
+                        # MD presenter not yet implemented
+                        logger.error("MD presenter not yet implemented")
+                        return 1
+
                 else:
                     logger.info("Evaluation skipped (no rubric found)")
             else:

@@ -64,6 +64,10 @@ Thumbs.db
 htmlcov/
 .tox/
 
+# Generated test artifacts (prevent CI failures)
+tests/fixtures/*.html
+tests/fixtures/**/*.html
+
 
 # Design documents (temporary)
 design_docs/
