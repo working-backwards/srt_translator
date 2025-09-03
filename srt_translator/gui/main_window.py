@@ -340,14 +340,14 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def generate_translation_settings(self):
         """Generate Translation Settings for the selected files"""
-        # Get selected files and target languages
+        # Get selected files and target languages from UI
         selected_files = self.file_section.get_selected_files()
-        target_languages = self.language_section.get_target_languages()
+        target_codes = self._get_target_codes_from_ui()
         api_key = self.settings_manager.load_api_key()
 
         self.logger.info(
             f"Starting AI configuration generation with {len(selected_files)} "
-            f"files and {len(target_languages)} languages"
+            f"files and {len(target_codes)} languages"
         )
 
         # Validate inputs
@@ -365,7 +365,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             )
             return
 
-        if not target_languages:
+        if not target_codes:
             show_validation_error(
                 self,
                 "No Target Languages",
@@ -374,7 +374,6 @@ class SRTTranslatorMainWindow(QMainWindow):
             return
 
         self.logger.info(f"Selected files: {[os.path.basename(f) for f in selected_files]}")
-        self.logger.info(f"Target languages: {list(target_languages.values())}")
 
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
@@ -470,7 +469,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create and start worker thread
         self.ai_config_thread = QThread()
         self.ai_config_worker = AIConfigWorker(
-            self.ai_config_generator, selected_files, list(target_languages.values())
+            self.ai_config_generator, selected_files, target_codes
         )
         self.ai_config_worker.moveToThread(self.ai_config_thread)
 
@@ -502,6 +501,12 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Save AI configuration
         self.settings_manager.save_ai_config(dnt_terms, termbase, source_language)
         self.logger.info("AI configuration saved to settings")
+
+        # Persist target languages to settings after successful generation
+        target_codes = self._get_target_codes_from_ui()
+        self.settings_manager.save_target_languages(
+            {self.language_config.get_language_name(code): code for code in target_codes}
+        )
 
         # Update displays
         self.ai_config_section.update_dnt_display(dnt_terms)
@@ -718,29 +723,19 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get currently selected files from the file section
         selected_files = self.file_section.get_selected_files()
 
-        # Update target languages from UI state to ensure synchronization
-        self.language_section.update_target_languages_from_ui()
-        # DO NOT call check_for_adaptive_updates() here as it can override current selections
-
-        # Get target languages from the language section
-        target_languages = self.language_section.get_target_languages()
-
-        # Update SettingsManager with current state (single source of truth)
-        self.settings_manager.update_target_languages(target_languages)
+        # Get target languages from UI
+        target_codes = self._get_target_codes_from_ui()
 
         # Debug logging to track language selection
-        self.logger.info(f"Translation requested with languages: {target_languages}")
-        self.logger.info(f"Language names: {list(target_languages.keys())}")
-        self.logger.info(f"Language codes: {list(target_languages.values())}")
-        self.logger.info(f"Number of languages selected: {len(target_languages)}")
+        self.logger.info(
+            f"Translation requested with {len(target_codes)} languages: {target_codes}"
+        )
 
         # Get API key from settings manager
         api_key = self.settings_manager.load_api_key()
 
         # Validate inputs
-        is_valid, error_message = validate_translation_inputs(
-            api_key, selected_files, target_languages
-        )
+        is_valid, error_message = validate_translation_inputs(api_key, selected_files, target_codes)
         if not is_valid:
             show_validation_error(self, "Validation Error", error_message)
             return
@@ -757,7 +752,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker = TranslationWorker(
             api_key,
             selected_files,
-            target_languages,
+            target_codes,
             self.settings_manager,  # Use settings_manager instead of config_manager
             output_directory,
         )
@@ -791,6 +786,12 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Pause memory sampling after run completes
         if self.mem_timer and self.mem_timer.isActive():
             self.mem_timer.stop()
+
+        # Persist target languages to settings after successful translation
+        target_codes = self._get_target_codes_from_ui()
+        self.settings_manager.save_target_languages(
+            {self.language_config.get_language_name(code): code for code in target_codes}
+        )
 
         # Log the results being processed
         logging.info(f"Processing translation results: {results}")
@@ -876,6 +877,15 @@ class SRTTranslatorMainWindow(QMainWindow):
                 )
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")
+
+    def _get_target_codes_from_ui(self) -> list[str]:
+        """Return all currently selected target codes, sorted deterministically."""
+        # Ensure internal dict reflects current UI state
+        self.language_section.update_target_languages_from_ui()
+        langs = self.language_section.get_target_languages()
+        codes = sorted(langs.values()) if isinstance(langs, dict) else sorted(langs)
+        self.logger.info("Target languages (UI): %s", codes)
+        return codes
 
     def _after_eval_finished(self, json_path: str) -> None:
         """Handle evaluation completion - store JSON path and generate HTML"""
