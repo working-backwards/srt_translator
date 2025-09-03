@@ -712,6 +712,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
             self.mem_timer.start(30000)
+
+        # Disable HTML report button when starting new translation
+        self.translation_section.open_html_btn.setEnabled(False)
         # Get currently selected files from the file section
         selected_files = self.file_section.get_selected_files()
 
@@ -804,6 +807,10 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Pause memory sampling on error as well
         if self.mem_timer and self.mem_timer.isActive():
             self.mem_timer.stop()
+
+        # Ensure HTML report button remains disabled on error
+        self.translation_section.open_html_btn.setEnabled(False)
+
         show_translation_error(self, error_message)
 
         # Qt deleteLater handles cleanup automatically
