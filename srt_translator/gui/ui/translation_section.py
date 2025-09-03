@@ -45,6 +45,12 @@ class TranslationSection(QGroupBox):
         self.translate_btn.setObjectName("mainActionButton")
         self.translate_btn.setFixedHeight(50)
 
+        # Open HTML Report button
+        self.open_html_btn = QPushButton("Open HTML Report")
+        self.open_html_btn.setObjectName("secondaryActionButton")
+        self.open_html_btn.setFixedHeight(50)
+        self.open_html_btn.setEnabled(False)  # Disabled by default
+
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -63,12 +69,15 @@ class TranslationSection(QGroupBox):
 
         layout.addLayout(cost_layout)
         layout.addWidget(self.translate_btn)
+        layout.addWidget(self.open_html_btn)
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.log_output)
 
-    def connect_signals(self, translate_callback):
+    def connect_signals(self, translate_callback, open_html_callback=None):
         """Connect button signals to callbacks"""
         self.translate_btn.clicked.connect(translate_callback)
+        if open_html_callback:
+            self.open_html_btn.clicked.connect(open_html_callback)
 
     def start_translation(self):
         """Start translation mode - disable UI and show progress"""

@@ -5,6 +5,7 @@ Main window for the SRT Translator application.
 
 import logging
 import os
+from pathlib import Path
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -87,6 +88,10 @@ class SRTTranslatorMainWindow(QMainWindow):
         self._rss0 = self._proc.memory_info().rss
         self._memory_warning_shown = False
         self._mem_sample_count = 0
+
+        # Initialize HTML report tracking
+        self._last_eval_json: Path | None = None
+        self._last_eval_html: Path | None = None
 
         # Set up the window
         self.setup_window()
@@ -197,7 +202,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         # Translation Section signals
-        self.translation_section.connect_signals(self.start_translation)
+        self.translation_section.connect_signals(self.start_translation, self.on_open_html_clicked)
 
     def load_previous_settings(self):
         """Load previous settings from storage"""
@@ -863,3 +868,13 @@ class SRTTranslatorMainWindow(QMainWindow):
                 )
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")
+
+    def on_open_html_clicked(self):
+        """Handle Open HTML Report button click"""
+        p = getattr(self, "_last_eval_html", None)
+        if not p or not Path(p).exists():
+            QMessageBox.warning(self, "HTML Report", "No HTML report available yet.")
+            return
+        import webbrowser
+
+        webbrowser.open(str(p))
