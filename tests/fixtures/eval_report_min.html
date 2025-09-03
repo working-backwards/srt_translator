@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eval Report</title>
+    <style>
+﻿/* eval.css (placeholder) — keep file tiny; inline in final render for V1 */
+:root { --fg:#111; --bg:#fff; --muted:#666; }
+body { font-family: system-ui, Arial, sans-serif; color: var(--fg); background: var(--bg); }
+h1 { font-size: 1.4rem; margin: 0.5rem 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 6px 8px; }
+tr:nth-child(even) { background: #fafafa; }
+summary { cursor: pointer; color: var(--muted); }
+
+    </style>
+</head>
+<body>
+    <h1>Eval Report</h1>
+
+    <div class="kpi-header">
+        <h2>Summary</h2>
+        <div class="kpi-grid">
+            <div class="kpi-item">
+                <span class="kpi-label">Files Total:</span>
+                <span class="kpi-value">2</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Languages Total:</span>
+                <span class="kpi-value">2</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Issues Total:</span>
+                <span class="kpi-value">4</span>
+            </div>
+        </div>
+        <div class="languages-list">
+            <span class="kpi-label">Target Languages:</span>
+            <span class="kpi-value">es, fr</span>
+        </div>
+    </div>
+
+    <div class="languages-section">
+<h2>Languages</h2>
+<div class="language-section">
+<h3>es</h3>
+<table class="files-table">
+<thead>
+<tr>
+<th>File Path</th>
+<th>Total Issues</th>
+<th>Missing Translation</th>
+<th>Untranslated After DNT</th>
+<th>Timing Fail</th>
+<th>Parity Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>test_es.srt</td>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="language-section">
+<h3>fr</h3>
+<table class="files-table">
+<thead>
+<tr>
+<th>File Path</th>
+<th>Total Issues</th>
+<th>Missing Translation</th>
+<th>Untranslated After DNT</th>
+<th>Timing Fail</th>
+<th>Parity Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>test_fr.srt</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+    <div class="dnt-section">
+<h2>DNT Terms</h2>
+<table class="dnt-table">
+<thead>
+<tr>
+<th>DNT Term</th>
+<th>Total Occurrences</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NASA</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<details class="dnt-details">
+<summary>Details for "NASA" (1 occurrences)</summary>
+<div class="dnt-occurrences">
+<div class="dnt-occurrence">
+<strong>Language:</strong> es<br>
+<strong>File:</strong> test_es.srt<br>
+<strong>Context:</strong><br>
+  3: NASA mission<br>
+  4: Space exploration<br>
+</div>
+</div>
+</details>
+</div>
+
+    <div class="termbase-section">
+<h2>Termbase Violations</h2>
+<details class="termbase-details">
+<summary>es (1 violations)</summary>
+<div class="termbase-violations">
+<div class="termbase-violation">
+<strong>File:</strong> test_es.srt<br>
+<strong>Original:</strong> Hello world<br>
+<strong>Target:</strong> Hola mundo<br>
+<strong>Context:</strong><br>
+  1: Hola mundo<br>
+  2: Buenos días<br>
+</div>
+</div>
+</details>
+</div>
+</body>
+</html>
