@@ -4,6 +4,7 @@ import importlib.resources
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 
 def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
@@ -117,7 +118,155 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         languages_section.append("</div>")
         languages_html = "\n".join(languages_section)
 
-        # Generate HTML with KPI header and languages section
+        # Generate DNT drill-down section
+        dnt_section = []
+        dnt_section.append('<div class="dnt-section">')
+        dnt_section.append("<h2>DNT Terms</h2>")
+
+        # Collect DNT terms and their occurrences
+        dnt_terms: dict[str, list[dict[str, str | dict[str, Any]]]] = {}
+        for lang_code in sorted_languages:
+            lang_data = languages[lang_code]
+            for file_data in lang_data.get("files", []):
+                issues = file_data.get("issues", {})
+                untranslated_after_dnt = issues.get("untranslated_after_dnt", [])
+                for issue in untranslated_after_dnt:
+                    term = issue.get("original", issue.get("src", ""))
+                    if term:
+                        if term not in dnt_terms:
+                            dnt_terms[term] = []
+                        dnt_terms[term].append(
+                            {
+                                "language": lang_code,
+                                "file": file_data.get(
+                                    "target_file", file_data.get("file_name", "")
+                                ),
+                                "context": issue.get("context", {}),
+                            }
+                        )
+
+        if not dnt_terms:
+            dnt_section.append('<p class="no-issues">No DNT issues</p>')
+        else:
+            # Sort terms for deterministic display
+            sorted_dnt_terms = sorted(dnt_terms.keys())
+            dnt_section.append('<table class="dnt-table">')
+            dnt_section.append("<thead>")
+            dnt_section.append("<tr>")
+            dnt_section.append("<th>DNT Term</th>")
+            dnt_section.append("<th>Total Occurrences</th>")
+            dnt_section.append("</tr>")
+            dnt_section.append("</thead>")
+            dnt_section.append("<tbody>")
+
+            for term in sorted_dnt_terms:
+                occurrences = dnt_terms[term]
+                dnt_section.append("<tr>")
+                dnt_section.append(f"<td>{term}</td>")
+                dnt_section.append(f"<td>{len(occurrences)}</td>")
+                dnt_section.append("</tr>")
+
+            dnt_section.append("</tbody>")
+            dnt_section.append("</table>")
+
+            # Add drill-down details for each term
+            for term in sorted_dnt_terms:
+                occurrences = dnt_terms[term]
+                dnt_section.append('<details class="dnt-details">')
+                dnt_section.append(
+                    f'<summary>Details for "{term}" ({len(occurrences)} occurrences)</summary>'
+                )
+                dnt_section.append('<div class="dnt-occurrences">')
+
+                for occurrence in occurrences:
+                    dnt_section.append('<div class="dnt-occurrence">')
+                    dnt_section.append(f"<strong>Language:</strong> {occurrence['language']}<br>")
+                    dnt_section.append(f"<strong>File:</strong> {occurrence['file']}<br>")
+
+                    # Add context if available
+                    context = occurrence.get("context", {})
+                    if isinstance(context, dict):
+                        target_context = context.get("target", [])
+                        if isinstance(target_context, list) and target_context:
+                            dnt_section.append("<strong>Context:</strong><br>")
+                            for item in target_context[:3]:  # Show first 3 context lines
+                                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                                    idx, text = item[0], item[1]
+                                    dnt_section.append(f"  {idx}: {text}<br>")
+
+                    dnt_section.append("</div>")
+
+                dnt_section.append("</div>")
+                dnt_section.append("</details>")
+
+        dnt_section.append("</div>")
+        dnt_html = "\n".join(dnt_section)
+
+        # Generate termbase violations drill-down section
+        termbase_section = []
+        termbase_section.append('<div class="termbase-section">')
+        termbase_section.append("<h2>Termbase Violations</h2>")
+
+        # Collect termbase violations per language
+        termbase_violations: dict[str, list[dict[str, str | dict[str, Any]]]] = {}
+        for lang_code in sorted_languages:
+            lang_data = languages[lang_code]
+            violations = []
+            for file_data in lang_data.get("files", []):
+                issues = file_data.get("issues", {})
+                missing_translation = issues.get("missing_translation", [])
+                for issue in missing_translation:
+                    violations.append(
+                        {
+                            "file": file_data.get("target_file", file_data.get("file_name", "")),
+                            "original": issue.get("original", issue.get("src", "")),
+                            "target": issue.get("target", issue.get("tgt", "")),
+                            "context": issue.get("context", {}),
+                        }
+                    )
+
+            if violations:
+                termbase_violations[lang_code] = violations
+
+        if not termbase_violations:
+            termbase_section.append('<p class="no-issues">No termbase issues</p>')
+        else:
+            for lang_code in sorted(termbase_violations.keys()):
+                violations = termbase_violations[lang_code]
+                termbase_section.append('<details class="termbase-details">')
+                termbase_section.append(
+                    f"<summary>{lang_code} ({len(violations)} violations)</summary>"
+                )
+                termbase_section.append('<div class="termbase-violations">')
+
+                for violation in violations:
+                    termbase_section.append('<div class="termbase-violation">')
+                    termbase_section.append(f"<strong>File:</strong> {violation['file']}<br>")
+                    termbase_section.append(
+                        f"<strong>Original:</strong> {violation['original']}<br>"
+                    )
+                    termbase_section.append(f"<strong>Target:</strong> {violation['target']}<br>")
+
+                    # Add context if available
+                    context = violation.get("context", {})
+                    if isinstance(context, dict):
+                        target_context = context.get("target", [])
+                        if isinstance(target_context, list) and target_context:
+                            termbase_section.append("<strong>Context:</strong><br>")
+                            for item in target_context[:3]:  # Show first 3 context lines
+                                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                                    idx, text = item[0], item[1]
+                                    termbase_section.append(f"  {idx}: {text}<br>")
+
+                    termbase_section.append("</div>")
+
+                termbase_section.append("</div>")
+                termbase_section.append("</details>")
+
+        termbase_section.append("</div>")
+        termbase_html = "\n".join(termbase_section)
+
+        # Generate HTML with KPI header, languages section, and drill-downs
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -154,6 +303,10 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
     </div>
 
     {languages_html}
+
+    {dnt_html}
+
+    {termbase_html}
 </body>
 </html>"""
 
