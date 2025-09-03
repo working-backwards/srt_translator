@@ -52,7 +52,72 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         # Sort target languages by code for deterministic display
         sorted_languages = sorted(languages.keys())
 
-        # Generate HTML with KPI header
+        # Generate per-language tables
+        languages_section = []
+        languages_section.append('<div class="languages-section">')
+        languages_section.append("<h2>Languages</h2>")
+
+        for lang_code in sorted_languages:
+            lang_data = languages[lang_code]
+            files = lang_data.get("files", [])
+
+            languages_section.append('<div class="language-section">')
+            languages_section.append(f"<h3>{lang_code}</h3>")
+
+            if not files:
+                languages_section.append('<p class="no-files">No files</p>')
+            else:
+                # Sort files by path for determinism
+                sorted_files = sorted(
+                    files, key=lambda f: f.get("target_file", f.get("file_name", ""))
+                )
+
+                languages_section.append('<table class="files-table">')
+                languages_section.append("<thead>")
+                languages_section.append("<tr>")
+                languages_section.append("<th>File Path</th>")
+                languages_section.append("<th>Total Issues</th>")
+                languages_section.append("<th>Missing Translation</th>")
+                languages_section.append("<th>Untranslated After DNT</th>")
+                languages_section.append("<th>Timing Fail</th>")
+                languages_section.append("<th>Parity Issue</th>")
+                languages_section.append("</tr>")
+                languages_section.append("</thead>")
+                languages_section.append("<tbody>")
+
+                for file_data in sorted_files:
+                    file_path = file_data.get("target_file", file_data.get("file_name", ""))
+                    issues = file_data.get("issues", {})
+
+                    # Count issues by type
+                    missing_translation = len(issues.get("missing_translation", []))
+                    untranslated_after_dnt = len(issues.get("untranslated_after_dnt", []))
+                    timing_fail = 1 if issues.get("timing_fail") else 0
+                    parity_issue = (
+                        1 if not file_data.get("metrics", {}).get("parity_ok", True) else 0
+                    )
+                    total_issues = (
+                        missing_translation + untranslated_after_dnt + timing_fail + parity_issue
+                    )
+
+                    languages_section.append("<tr>")
+                    languages_section.append(f"<td>{file_path}</td>")
+                    languages_section.append(f"<td>{total_issues}</td>")
+                    languages_section.append(f"<td>{missing_translation}</td>")
+                    languages_section.append(f"<td>{untranslated_after_dnt}</td>")
+                    languages_section.append(f"<td>{timing_fail}</td>")
+                    languages_section.append(f"<td>{parity_issue}</td>")
+                    languages_section.append("</tr>")
+
+                languages_section.append("</tbody>")
+                languages_section.append("</table>")
+
+            languages_section.append("</div>")
+
+        languages_section.append("</div>")
+        languages_html = "\n".join(languages_section)
+
+        # Generate HTML with KPI header and languages section
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,6 +152,8 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
             <span class="kpi-value">{", ".join(sorted_languages)}</span>
         </div>
     </div>
+
+    {languages_html}
 </body>
 </html>"""
 
