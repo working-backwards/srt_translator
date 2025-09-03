@@ -28,9 +28,31 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         )
 
         # Read and parse JSON (validate it exists and is valid)
-        json.loads(json_path.read_text(encoding="utf-8"))
+        json_data = json.loads(json_path.read_text(encoding="utf-8"))
 
-        # Generate minimal HTML
+        # Extract KPIs from JSON data
+        languages = json_data.get("languages", {})
+
+        # Calculate totals
+        files_total = sum(len(lang_data.get("files", [])) for lang_data in languages.values())
+        languages_total = len(languages)
+
+        # Count total issues across all files
+        issues_total = 0
+        for lang_data in languages.values():
+            for file_data in lang_data.get("files", []):
+                issues = file_data.get("issues", {})
+                issues_total += len(issues.get("missing_translation", []))
+                issues_total += len(issues.get("untranslated_after_dnt", []))
+                if issues.get("timing_fail"):
+                    issues_total += 1
+                if not file_data.get("metrics", {}).get("parity_ok", True):
+                    issues_total += 1
+
+        # Sort target languages by code for deterministic display
+        sorted_languages = sorted(languages.keys())
+
+        # Generate HTML with KPI header
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,6 +65,28 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
 </head>
 <body>
     <h1>Eval Report</h1>
+
+    <div class="kpi-header">
+        <h2>Summary</h2>
+        <div class="kpi-grid">
+            <div class="kpi-item">
+                <span class="kpi-label">Files Total:</span>
+                <span class="kpi-value">{files_total}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Languages Total:</span>
+                <span class="kpi-value">{languages_total}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Issues Total:</span>
+                <span class="kpi-value">{issues_total}</span>
+            </div>
+        </div>
+        <div class="languages-list">
+            <span class="kpi-label">Target Languages:</span>
+            <span class="kpi-value">{", ".join(sorted_languages)}</span>
+        </div>
+    </div>
 </body>
 </html>"""
 
