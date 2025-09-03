@@ -79,6 +79,7 @@ class TranslationWorker(QObject):
     translation_completed = pyqtSignal(dict)
     translation_error = pyqtSignal(str)
     log_message = pyqtSignal(str)
+    eval_report_ready = pyqtSignal(str)  # Path to eval_report.json
 
     def __init__(
         self,
@@ -375,6 +376,11 @@ class TranslationWorker(QObject):
                             self.progress_updated,
                             f"Evaluation completed successfully for batch: {latest_batch.name}",
                         )
+
+                        # Emit signal with eval_report.json path
+                        json_path = latest_batch / "artifacts" / "eval_report.json"
+                        if json_path.exists():
+                            self.eval_report_ready.emit(str(json_path))
                     else:
                         self.logger.info("Evaluation skipped (no rubric found)")
                         self._throttled_emit(

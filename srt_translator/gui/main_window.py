@@ -767,6 +767,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker.progress_updated.connect(self.translation_section.update_log_output)
         self.translation_worker.translation_completed.connect(self.translation_finished)
         self.translation_worker.translation_error.connect(self.translation_error)
+        self.translation_worker.eval_report_ready.connect(self._after_eval_finished)
 
         # Connect thread lifecycle signals for proper cleanup
         self.translation_worker.translation_completed.connect(self.translation_thread.quit)
@@ -868,6 +869,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                 )
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")
+
+    def _after_eval_finished(self, json_path: str) -> None:
+        """Handle evaluation completion - store JSON path for HTML generation"""
+        self._last_eval_json = Path(json_path)
+        self.logger.info(f"Eval report ready: {json_path}")
 
     def on_open_html_clicked(self):
         """Handle Open HTML Report button click"""
