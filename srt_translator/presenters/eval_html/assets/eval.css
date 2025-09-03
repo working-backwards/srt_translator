@@ -1,0 +1,8 @@
+﻿/* eval.css (placeholder) — keep file tiny; inline in final render for V1 */
+:root { --fg:#111; --bg:#fff; --muted:#666; }
+body { font-family: system-ui, Arial, sans-serif; color: var(--fg); background: var(--bg); }
+h1 { font-size: 1.4rem; margin: 0.5rem 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 6px 8px; }
+tr:nth-child(even) { background: #fafafa; }
+summary { cursor: pointer; color: var(--muted); }
