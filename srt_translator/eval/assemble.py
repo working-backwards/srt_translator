@@ -31,7 +31,7 @@ def build_eval_report_v1(
     # Deep copy and ensure all three keys exist per file with default 0 if missing
     languages = {}
     for lang_code, files_data in per_language_file_counts.items():
-        languages[lang_code] = {}
+        languages[lang_code] = {"files": {}}
         for file_path, file_counts in files_data.items():
             # Ensure all required categories exist with default 0
             normalized_counts = {
@@ -45,7 +45,7 @@ def build_eval_report_v1(
                     raise ValueError(
                         f"Category '{category}' count must be integer, got {type(count).__name__}"
                     )
-            languages[lang_code][file_path] = normalized_counts
+            languages[lang_code]["files"][file_path] = normalized_counts
 
     # Compute totals
     files_total = 0
@@ -53,13 +53,13 @@ def build_eval_report_v1(
 
     # Count unique files across all languages
     all_files = set()
-    for lang_files in languages.values():
-        all_files.update(lang_files.keys())
+    for lang_data in languages.values():
+        all_files.update(lang_data["files"].keys())
     files_total = len(all_files)
 
     # Count total issues across all languages/files
-    for lang_files in languages.values():
-        for file_counts in lang_files.values():
+    for lang_data in languages.values():
+        for file_counts in lang_data["files"].values():
             for count in file_counts.values():
                 issues_total += count
 
