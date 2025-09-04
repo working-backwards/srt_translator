@@ -1,0 +1,48 @@
+{
+  "files_total": 3,
+  "languages_total": 2,
+  "issues_total": 4,
+  "source_language": "en",
+  "languages": {
+    "fr": {
+      "files": [
+        {
+          "target_file": "Input1 - EN.srt",
+          "issues": {
+            "missing_translation": [{"original": "test"}],
+            "untranslated_after_dnt": [],
+            "timing_fail": false
+          }
+        },
+        {
+          "target_file": "Input2 - EN.srt",
+          "issues": {
+            "missing_translation": [],
+            "untranslated_after_dnt": [{"original": "test"}],
+            "timing_fail": false
+          }
+        }
+      ]
+    },
+    "ja": {
+      "files": [
+        {
+          "target_file": "Input1 - EN.srt",
+          "issues": {
+            "missing_translation": [],
+            "untranslated_after_dnt": [],
+            "timing_fail": true
+          }
+        },
+        {
+          "target_file": "Input3 - EN.srt",
+          "issues": {
+            "missing_translation": [],
+            "untranslated_after_dnt": [],
+            "timing_fail": true
+          }
+        }
+      ]
+    }
+  }
+}

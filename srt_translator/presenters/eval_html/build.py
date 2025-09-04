@@ -4,7 +4,6 @@ import importlib.resources
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 
 def _format_number(value: int | float) -> str:
@@ -18,9 +17,9 @@ def _format_number(value: int | float) -> str:
 
 
 def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
-    """Minimal HTML presenter implementation.
+    """Generate HTML report with decision banner, what to do next, and KPIs.
 
-    Reads eval_report.json and generates HTML with inline CSS.
+    Reads eval_report.json and ai_config.json with strict validation.
     Fails fast on missing/invalid inputs.
     """
     # Set up logging if available
@@ -31,256 +30,164 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         out_path = json_path.with_suffix(".html")
 
     try:
-        # Load resources using importlib.resources
+        # Load CSS resource
         css_text = (
             importlib.resources.files("srt_translator.presenters.eval_html.assets")
             .joinpath("eval.css")
             .read_text(encoding="utf-8")
         )
 
-        # Read and parse JSON (validate it exists and is valid)
-        json_data = json.loads(json_path.read_text(encoding="utf-8"))
+        # Read and validate eval_report.json
+        if not json_path.exists():
+            error_msg = f"eval_report.json not found: {json_path}"
+            if logger:
+                logger.error(error_msg)
+            raise ValueError(error_msg)
 
-        # Extract KPIs from JSON data
-        languages = json_data.get("languages", {})
+        eval_data = json.loads(json_path.read_text(encoding="utf-8"))
 
-        # Calculate totals
-        files_total = sum(len(lang_data.get("files", [])) for lang_data in languages.values())
-        languages_total = len(languages)
+        # Validate required fields in eval_report.json
+        required_eval_fields = ["files_total", "languages_total", "issues_total"]
+        missing_eval_fields = [field for field in required_eval_fields if field not in eval_data]
+        if missing_eval_fields:
+            error_msg = f"eval_report.json missing required keys: {', '.join(missing_eval_fields)}"
+            if logger:
+                logger.error(error_msg)
+            raise ValueError(error_msg)
 
-        # Count total issues across all files
-        issues_total = 0
-        for lang_data in languages.values():
+        # Validate field types
+        if not isinstance(eval_data["files_total"], int):
+            raise ValueError("eval_report.json files_total must be an integer")
+        if not isinstance(eval_data["languages_total"], int):
+            raise ValueError("eval_report.json languages_total must be an integer")
+        if not isinstance(eval_data["issues_total"], int):
+            raise ValueError("eval_report.json issues_total must be an integer")
+
+        # Read and validate ai_config.json (must be in same directory)
+        ai_config_path = json_path.parent / "ai_config.json"
+        if not ai_config_path.exists():
+            error_msg = f"ai_config.json must be located alongside eval_report.json; not found at: {ai_config_path}"
+            if logger:
+                logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        ai_config_data = json.loads(ai_config_path.read_text(encoding="utf-8"))
+
+        # Validate required fields in ai_config.json
+        if "dnt_terms" not in ai_config_data:
+            raise ValueError("ai_config.json missing required key: dnt_terms")
+        if "termbase" not in ai_config_data:
+            raise ValueError("ai_config.json missing required key: termbase")
+
+        if not isinstance(ai_config_data["dnt_terms"], list):
+            raise ValueError("ai_config.json dnt_terms must be a list")
+        if not isinstance(ai_config_data["termbase"], dict):
+            raise ValueError("ai_config.json termbase must be a dict")
+
+        # Extract values from eval_report.json
+        files_total = eval_data["files_total"]
+        languages_total = eval_data["languages_total"]
+        issues_total = eval_data["issues_total"]
+        source_language = eval_data.get("source_language", "")
+
+        # Handle source language display
+        source_display = source_language if source_language else "Unknown"
+
+        # Extract language structure to compute affected languages
+        languages = eval_data.get("languages", {})
+        if not isinstance(languages, dict):
+            raise ValueError("eval_report.json must contain languages dict")
+
+        # Compute affected languages (languages with any issues)
+        affected_languages = []
+        for lang_code, lang_data in languages.items():
+            if not isinstance(lang_data, dict):
+                continue
+
+            # Sum issue counts for this language
+            lang_issues = 0
             for file_data in lang_data.get("files", []):
+                if not isinstance(file_data, dict):
+                    continue
+
                 issues = file_data.get("issues", {})
-                issues_total += len(issues.get("missing_translation", []))
-                issues_total += len(issues.get("untranslated_after_dnt", []))
-                if issues.get("timing_fail"):
-                    issues_total += 1
-                if not file_data.get("metrics", {}).get("parity_ok", True):
-                    issues_total += 1
+                if not isinstance(issues, dict):
+                    continue
 
-        # Sort target languages by code for deterministic display
-        sorted_languages = sorted(languages.keys())
+                lang_issues += len(issues.get("missing_translation", []))
+                lang_issues += len(issues.get("untranslated_after_dnt", []))
+                lang_issues += 1 if issues.get("timing_fail") else 0
 
-        # Generate per-language tables
-        languages_section = []
-        languages_section.append('<div class="languages-section">')
-        languages_section.append("<h2>Languages</h2>")
+            if lang_issues > 0:
+                affected_languages.append(lang_code)
 
-        for lang_code in sorted_languages:
-            lang_data = languages[lang_code]
-            files = lang_data.get("files", [])
+        # Sort affected languages for deterministic display
+        affected_languages.sort()
+        affected_count = len(affected_languages)
 
-            languages_section.append('<div class="language-section">')
-            languages_section.append(f"<h3>{lang_code}</h3>")
+        # Extract values from ai_config.json
+        dnt_terms = ai_config_data["dnt_terms"]
+        termbase = ai_config_data["termbase"]
 
-            if not files:
-                languages_section.append('<p class="no-files">No files</p>')
-            else:
-                # Sort files by path for determinism
-                sorted_files = sorted(
-                    files, key=lambda f: f.get("target_file", f.get("file_name", ""))
-                )
+        # Compute DNT coverage
+        dnt_coverage = "Present" if len(dnt_terms) > 0 else "Absent"
 
-                languages_section.append('<table class="files-table">')
-                languages_section.append("<thead>")
-                languages_section.append("<tr>")
-                languages_section.append("<th>File Path</th>")
-                languages_section.append("<th>Total Issues</th>")
-                languages_section.append("<th>Missing Translation</th>")
-                languages_section.append("<th>Untranslated After DNT</th>")
-                languages_section.append("<th>Timing Fail</th>")
-                languages_section.append("<th>Parity Issue</th>")
-                languages_section.append("</tr>")
-                languages_section.append("</thead>")
-                languages_section.append("<tbody>")
+        # Compute termbase coverage
+        target_languages = list(languages.keys())
+        target_languages.sort()  # Deterministic ordering
 
-                for file_data in sorted_files:
-                    file_path = file_data.get("target_file", file_data.get("file_name", ""))
-                    issues = file_data.get("issues", {})
+        termbase_entries_by_lang = {}
+        languages_with_entries = 0
 
-                    # Count issues by type
-                    missing_translation = len(issues.get("missing_translation", []))
-                    untranslated_after_dnt = len(issues.get("untranslated_after_dnt", []))
-                    timing_fail = 1 if issues.get("timing_fail") else 0
-                    parity_issue = (
-                        1 if not file_data.get("metrics", {}).get("parity_ok", True) else 0
-                    )
-                    total_issues = (
-                        missing_translation + untranslated_after_dnt + timing_fail + parity_issue
-                    )
+        for lang_code in target_languages:
+            entries = termbase.get(lang_code, [])
+            if not isinstance(entries, list):
+                entries = []
+            count = len(entries)
+            termbase_entries_by_lang[lang_code] = count
+            if count > 0:
+                languages_with_entries += 1
 
-                    languages_section.append("<tr>")
-                    languages_section.append(f"<td>{file_path}</td>")
-                    languages_section.append(f"<td>{_format_number(total_issues)}</td>")
-                    languages_section.append(f"<td>{_format_number(missing_translation)}</td>")
-                    languages_section.append(f"<td>{_format_number(untranslated_after_dnt)}</td>")
-                    languages_section.append(f"<td>{_format_number(timing_fail)}</td>")
-                    languages_section.append(f"<td>{_format_number(parity_issue)}</td>")
-                    languages_section.append("</tr>")
-
-                languages_section.append("</tbody>")
-                languages_section.append("</table>")
-
-            languages_section.append("</div>")
-
-        languages_section.append("</div>")
-        languages_html = "\n".join(languages_section)
-
-        # Generate DNT drill-down section
-        dnt_section = []
-        dnt_section.append('<div class="dnt-section">')
-        dnt_section.append("<h2>DNT Terms</h2>")
-
-        # Collect DNT terms and their occurrences
-        dnt_terms: dict[str, list[dict[str, str | dict[str, Any]]]] = {}
-        for lang_code in sorted_languages:
-            lang_data = languages[lang_code]
-            for file_data in lang_data.get("files", []):
-                issues = file_data.get("issues", {})
-                untranslated_after_dnt = issues.get("untranslated_after_dnt", [])
-                for issue in untranslated_after_dnt:
-                    term = issue.get("original", issue.get("src", ""))
-                    if term:
-                        if term not in dnt_terms:
-                            dnt_terms[term] = []
-                        dnt_terms[term].append(
-                            {
-                                "language": lang_code,
-                                "file": file_data.get(
-                                    "target_file", file_data.get("file_name", "")
-                                ),
-                                "context": issue.get("context", {}),
-                            }
-                        )
-
-        if not dnt_terms:
-            dnt_section.append('<p class="no-issues">No DNT issues</p>')
+        # Determine termbase coverage
+        if languages_with_entries == 0:
+            termbase_coverage = "None"
+        elif languages_with_entries == len(target_languages):
+            termbase_coverage = "Full"
         else:
-            # Sort terms for deterministic display
-            sorted_dnt_terms = sorted(dnt_terms.keys())
-            dnt_section.append('<table class="dnt-table">')
-            dnt_section.append("<thead>")
-            dnt_section.append("<tr>")
-            dnt_section.append("<th>DNT Term</th>")
-            dnt_section.append("<th>Total Occurrences</th>")
-            dnt_section.append("</tr>")
-            dnt_section.append("</thead>")
-            dnt_section.append("<tbody>")
+            termbase_coverage = "Partial"
 
-            for term in sorted_dnt_terms:
-                occurrences = dnt_terms[term]
-                dnt_section.append("<tr>")
-                dnt_section.append(f"<td>{term}</td>")
-                dnt_section.append(f"<td>{_format_number(len(occurrences))}</td>")
-                dnt_section.append("</tr>")
+        # Generate termbase entries display
+        termbase_entries_display = []
+        for lang_code in target_languages:
+            count = termbase_entries_by_lang[lang_code]
+            if count > 0:
+                termbase_entries_display.append(f"{lang_code}: {count}")
 
-            dnt_section.append("</tbody>")
-            dnt_section.append("</table>")
-
-            # Add drill-down details for each term
-            for term in sorted_dnt_terms:
-                occurrences = dnt_terms[term]
-                # Sort occurrences by language, then by file for deterministic display
-                sorted_occurrences = sorted(occurrences, key=lambda x: (x["language"], x["file"]))
-                dnt_section.append('<details class="dnt-details">')
-                dnt_section.append(
-                    f'<summary>Details for "{term}" ({_format_number(len(occurrences))} occurrences)</summary>'
-                )
-                dnt_section.append('<div class="dnt-occurrences">')
-
-                for occurrence in sorted_occurrences:
-                    dnt_section.append('<div class="dnt-occurrence">')
-                    dnt_section.append(f"<strong>Language:</strong> {occurrence['language']}<br>")
-                    dnt_section.append(f"<strong>File:</strong> {occurrence['file']}<br>")
-
-                    # Add context if available
-                    context = occurrence.get("context", {})
-                    if isinstance(context, dict):
-                        target_context = context.get("target", [])
-                        if isinstance(target_context, list) and target_context:
-                            dnt_section.append("<strong>Context:</strong><br>")
-                            for item in target_context[:3]:  # Show first 3 context lines
-                                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                                    idx, text = item[0], item[1]
-                                    dnt_section.append(f"  {idx}: {text}<br>")
-
-                    dnt_section.append("</div>")
-
-                dnt_section.append("</div>")
-                dnt_section.append("</details>")
-
-        dnt_section.append("</div>")
-        dnt_html = "\n".join(dnt_section)
-
-        # Generate termbase violations drill-down section
-        termbase_section = []
-        termbase_section.append('<div class="termbase-section">')
-        termbase_section.append("<h2>Termbase Violations</h2>")
-
-        # Collect termbase violations per language
-        termbase_violations: dict[str, list[dict[str, str | dict[str, Any]]]] = {}
-        for lang_code in sorted_languages:
-            lang_data = languages[lang_code]
-            violations = []
-            for file_data in lang_data.get("files", []):
-                issues = file_data.get("issues", {})
-                missing_translation = issues.get("missing_translation", [])
-                for issue in missing_translation:
-                    violations.append(
-                        {
-                            "file": file_data.get("target_file", file_data.get("file_name", "")),
-                            "original": issue.get("original", issue.get("src", "")),
-                            "target": issue.get("target", issue.get("tgt", "")),
-                            "context": issue.get("context", {}),
-                        }
-                    )
-
-            if violations:
-                termbase_violations[lang_code] = violations
-
-        if not termbase_violations:
-            termbase_section.append('<p class="no-issues">No termbase issues</p>')
+        if termbase_entries_display:
+            termbase_entries_text = ", ".join(termbase_entries_display)
         else:
-            for lang_code in sorted(termbase_violations.keys()):
-                violations = termbase_violations[lang_code]
-                # Sort violations by file, then by original text for deterministic display
-                sorted_violations = sorted(violations, key=lambda x: (x["file"], x["original"]))
-                termbase_section.append('<details class="termbase-details">')
-                termbase_section.append(
-                    f"<summary>{lang_code} ({_format_number(len(violations))} violations)</summary>"
-                )
-                termbase_section.append('<div class="termbase-violations">')
+            termbase_entries_text = "None"
 
-                for violation in sorted_violations:
-                    termbase_section.append('<div class="termbase-violation">')
-                    termbase_section.append(f"<strong>File:</strong> {violation['file']}<br>")
-                    termbase_section.append(
-                        f"<strong>Original:</strong> {violation['original']}<br>"
-                    )
-                    termbase_section.append(f"<strong>Target:</strong> {violation['target']}<br>")
+        # Generate decision banner
+        if issues_total == 0:
+            banner_text = "✅ Publish readiness: Ready to publish"
+            summary_text = "No issues detected."
+        else:
+            banner_text = "❌ Publish readiness: Needs fixes"
+            affected_codes_str = ", ".join(affected_languages)
+            summary_text = f"{issues_total} items to fix across {affected_count} languages ({affected_codes_str})."
 
-                    # Add context if available
-                    context = violation.get("context", {})
-                    if isinstance(context, dict):
-                        target_context = context.get("target", [])
-                        if isinstance(target_context, list) and target_context:
-                            termbase_section.append("<strong>Context:</strong><br>")
-                            for item in target_context[:3]:  # Show first 3 context lines
-                                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                                    idx, text = item[0], item[1]
-                                    termbase_section.append(f"  {idx}: {text}<br>")
+        # Generate what to do next
+        if issues_total > 0:
+            what_to_do_next = [
+                f"Fix {issues_total} issues (see drill-downs below for exact captions).",
+                "Re-run Evaluate.",
+                "If all clear, export and publish.",
+            ]
+        else:
+            what_to_do_next = ["Spot-check a few captions for flow and brand terms, then publish."]
 
-                    termbase_section.append("</div>")
-
-                termbase_section.append("</div>")
-                termbase_section.append("</details>")
-
-        termbase_section.append("</div>")
-        termbase_html = "\n".join(termbase_section)
-
-        # Generate HTML with KPI header, languages section, and drill-downs
+        # Generate HTML content
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,33 +201,54 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
 <body>
     <h1>Eval Report</h1>
 
-    <div class="kpi-header">
-        <h2>Summary</h2>
-        <div class="kpi-grid">
-            <div class="kpi-item">
-                <span class="kpi-label">Files Total:</span>
-                <span class="kpi-value">{_format_number(files_total)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Languages Total:</span>
-                <span class="kpi-value">{_format_number(languages_total)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Issues Total:</span>
-                <span class="kpi-value">{_format_number(issues_total)}</span>
-            </div>
-        </div>
-        <div class="languages-list">
-            <span class="kpi-label">Target Languages:</span>
-            <span class="kpi-value">{", ".join(sorted_languages)}</span>
-        </div>
+    <!-- Decision Banner -->
+    <div class="decision-banner">
+        <h2>{banner_text}</h2>
+        <p>{summary_text}</p>
     </div>
 
-    {languages_html}
+    <!-- What to do next -->
+    <div class="what-to-do-next">
+        <h2>What to do next</h2>
+        <ol>
+{chr(10).join(f"            <li>{item}</li>" for item in what_to_do_next)}
+        </ol>
+    </div>
 
-    {dnt_html}
-
-    {termbase_html}
+    <!-- KPIs -->
+    <div class="kpi-section">
+        <h2>KPIs</h2>
+        <div class="kpi-grid">
+            <div class="kpi-item">
+                <span class="kpi-label">Files total:</span>
+                <span class="kpi-value">{files_total}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Languages:</span>
+                <span class="kpi-value">{languages_total}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Issues total:</span>
+                <span class="kpi-value">{issues_total}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Source language:</span>
+                <span class="kpi-value">{source_display}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">DNT coverage:</span>
+                <span class="kpi-value">{dnt_coverage}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Termbase coverage:</span>
+                <span class="kpi-value">{termbase_coverage}</span>
+            </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Termbase entries:</span>
+                <span class="kpi-value">{termbase_entries_text}</span>
+            </div>
+        </div>
+    </div>
 </body>
 </html>"""
 

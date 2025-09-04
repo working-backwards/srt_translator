@@ -1,6 +1,6 @@
 """Tests for the HTML presenter build module."""
 
-import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -11,38 +11,23 @@ from srt_translator.presenters.eval_html.build import build_eval_html
 class TestEvalHtmlBuild:
     """Test cases for the HTML presenter build functionality."""
 
-    def test_build_eval_html_smoke(self, tmp_path):
-        """Smoke test for build_eval_html function."""
-        # Load the fixture
-        fixture_path = Path(__file__).parent.parent / "fixtures" / "eval_report_min.json"
-        assert fixture_path.exists(), f"Fixture not found: {fixture_path}"
+    def test_build_eval_html_success_strict(self, tmp_path):
+        """Test successful HTML generation with strict fixtures."""
+        # Copy strict fixtures to temp directory
+        fixtures_dir = Path(__file__).parent.parent / "fixtures"
 
-        # Read the fixture to get expected values
-        with open(fixture_path, encoding="utf-8") as f:
-            fixture_data = json.load(f)
+        eval_report_src = fixtures_dir / "eval_report_strict.json"
+        ai_config_src = fixtures_dir / "ai_config_strict.json"
 
-        # Calculate expected KPI values
-        languages = fixture_data.get("languages", {})
-        expected_files_total = sum(
-            len(lang_data.get("files", [])) for lang_data in languages.values()
-        )
-        expected_languages_total = len(languages)
+        eval_report_dst = tmp_path / "eval_report.json"
+        ai_config_dst = tmp_path / "ai_config.json"
 
-        # Count total issues
-        expected_issues_total = 0
-        for lang_data in languages.values():
-            for file_data in lang_data.get("files", []):
-                issues = file_data.get("issues", {})
-                expected_issues_total += len(issues.get("missing_translation", []))
-                expected_issues_total += len(issues.get("untranslated_after_dnt", []))
-                if issues.get("timing_fail"):
-                    expected_issues_total += 1
-                if not file_data.get("metrics", {}).get("parity_ok", True):
-                    expected_issues_total += 1
+        shutil.copy2(eval_report_src, eval_report_dst)
+        shutil.copy2(ai_config_src, ai_config_dst)
 
         # Run the function
-        output_path = tmp_path / "out.html"
-        result_path = build_eval_html(fixture_path, output_path)
+        output_path = tmp_path / "eval_report.html"
+        result_path = build_eval_html(eval_report_dst, output_path)
 
         # Assertions
         assert result_path == output_path
@@ -51,40 +36,113 @@ class TestEvalHtmlBuild:
         # Read the generated HTML
         html_content = output_path.read_text(encoding="utf-8")
 
-        # Check for required content
-        assert "Eval Report" in html_content
-        assert f'<span class="kpi-value">{expected_files_total}</span>' in html_content
-        assert f'<span class="kpi-value">{expected_languages_total}</span>' in html_content
-        assert f'<span class="kpi-value">{expected_issues_total}</span>' in html_content
+        # Check decision banner
+        assert "❌ Publish readiness: Needs fixes" in html_content
+        assert "4 items to fix across 2 languages (fr, ja)." in html_content
 
-        # Check for language sections
-        assert "Languages" in html_content
-        assert "es" in html_content
-        assert "fr" in html_content
+        # Check what to do next
+        assert "What to do next" in html_content
+        assert "Fix 4 issues (see drill-downs below for exact captions)." in html_content
+        assert "Re-run Evaluate." in html_content
+        assert "If all clear, export and publish." in html_content
 
-        # Check for DNT and termbase sections
-        assert "DNT Terms" in html_content
-        assert "Termbase Violations" in html_content
+        # Check KPIs - the HTML has label and value in separate spans
+        assert "Files total:" in html_content
+        assert "Languages:" in html_content
+        assert "Issues total:" in html_content
+        assert "Source language:" in html_content
+        assert "DNT coverage:" in html_content
+        assert "Termbase coverage:" in html_content
+        assert "Termbase entries:" in html_content
+        # Check the actual values
+        assert '<span class="kpi-value">3</span>' in html_content
+        assert '<span class="kpi-value">2</span>' in html_content
+        assert '<span class="kpi-value">4</span>' in html_content
+        assert '<span class="kpi-value">en</span>' in html_content
+        assert '<span class="kpi-value">Present</span>' in html_content
+        assert '<span class="kpi-value">Partial</span>' in html_content
+        assert '<span class="kpi-value">fr: 1</span>' in html_content
 
         # Verify it's valid HTML structure
         assert "<!DOCTYPE html>" in html_content
         assert "<html" in html_content
         assert "</html>" in html_content
-        assert "<head>" in html_content
-        assert "<body>" in html_content
-        assert "</body>" in html_content
 
     def test_build_eval_html_default_output_path(self, tmp_path):
         """Test that default output path is used when not specified."""
-        fixture_path = Path(__file__).parent.parent / "fixtures" / "eval_report_min.json"
+        # Copy strict fixtures to temp directory
+        fixtures_dir = Path(__file__).parent.parent / "fixtures"
+
+        eval_report_src = fixtures_dir / "eval_report_strict.json"
+        ai_config_src = fixtures_dir / "ai_config_strict.json"
+
+        eval_report_dst = tmp_path / "eval_report.json"
+        ai_config_dst = tmp_path / "ai_config.json"
+
+        shutil.copy2(eval_report_src, eval_report_dst)
+        shutil.copy2(ai_config_src, ai_config_dst)
 
         # Run without specifying output path
-        result_path = build_eval_html(fixture_path)
+        result_path = build_eval_html(eval_report_dst)
 
         # Should create HTML file next to JSON file
-        expected_path = fixture_path.with_suffix(".html")
+        expected_path = eval_report_dst.with_suffix(".html")
         assert result_path == expected_path
         assert expected_path.exists()
+
+    def test_build_eval_html_missing_ai_config(self, tmp_path):
+        """Test fail-fast when ai_config.json is missing."""
+        # Copy only eval_report to temp directory (no ai_config.json)
+        fixtures_dir = Path(__file__).parent.parent / "fixtures"
+        eval_report_src = fixtures_dir / "eval_report_strict.json"
+        eval_report_dst = tmp_path / "eval_report.json"
+
+        shutil.copy2(eval_report_src, eval_report_dst)
+
+        # Should raise ValueError
+        with pytest.raises(
+            ValueError, match="ai_config.json must be located alongside eval_report.json; not found"
+        ):
+            build_eval_html(eval_report_dst)
+
+    def test_build_eval_html_missing_eval_fields(self, tmp_path):
+        """Test fail-fast when required eval_report.json fields are missing."""
+        # Copy fixtures with missing fields
+        fixtures_dir = Path(__file__).parent.parent / "fixtures"
+
+        eval_report_src = fixtures_dir / "eval_report_missing_fields.json"
+        ai_config_src = fixtures_dir / "ai_config_strict.json"
+
+        eval_report_dst = tmp_path / "eval_report.json"
+        ai_config_dst = tmp_path / "ai_config.json"
+
+        shutil.copy2(eval_report_src, eval_report_dst)
+        shutil.copy2(ai_config_src, ai_config_dst)
+
+        # Should raise ValueError
+        with pytest.raises(
+            ValueError,
+            match="eval_report.json missing required keys: issues_total",
+        ):
+            build_eval_html(eval_report_dst)
+
+    def test_build_eval_html_missing_ai_config_keys(self, tmp_path):
+        """Test fail-fast when required ai_config.json keys are missing."""
+        # Copy fixtures with missing keys
+        fixtures_dir = Path(__file__).parent.parent / "fixtures"
+
+        eval_report_src = fixtures_dir / "eval_report_strict.json"
+        ai_config_src = fixtures_dir / "ai_config_missing_keys.json"
+
+        eval_report_dst = tmp_path / "eval_report.json"
+        ai_config_dst = tmp_path / "ai_config.json"
+
+        shutil.copy2(eval_report_src, eval_report_dst)
+        shutil.copy2(ai_config_src, ai_config_dst)
+
+        # Should raise ValueError
+        with pytest.raises(ValueError, match="ai_config.json missing required key: termbase"):
+            build_eval_html(eval_report_dst)
 
     def test_build_eval_html_invalid_json(self, tmp_path):
         """Test error handling for invalid JSON."""
@@ -101,5 +159,5 @@ class TestEvalHtmlBuild:
         missing_file = tmp_path / "missing.json"
 
         # Should raise ValueError
-        with pytest.raises(ValueError, match="Required resource not found"):
+        with pytest.raises(ValueError, match="eval_report.json not found"):
             build_eval_html(missing_file)
