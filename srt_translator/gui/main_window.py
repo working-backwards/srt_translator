@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
@@ -503,10 +504,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.logger.info("AI configuration saved to settings")
 
         # Persist target languages to settings after successful generation
-        target_codes = self._get_target_codes_from_ui()
-        self.settings_manager.save_target_languages(
-            {self.language_config.get_language_name(code): code for code in target_codes}
-        )
+        target_languages = self._target_langs_from_ui()
+        self.settings_manager.save_target_languages(target_languages)
 
         # Update displays
         self.ai_config_section.update_dnt_display(dnt_terms)
@@ -723,10 +722,11 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Get currently selected files from the file section
         selected_files = self.file_section.get_selected_files()
 
-        # Get target languages from UI
-        target_codes = self._get_target_codes_from_ui()
+        # Get target languages from UI as dict[name->code]
+        target_languages = self._target_langs_from_ui()
 
         # Debug logging to track language selection
+        target_codes = list(target_languages.values())
         self.logger.info(
             f"Translation requested with {len(target_codes)} languages: {target_codes}"
         )
@@ -752,7 +752,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker = TranslationWorker(
             api_key,
             selected_files,
-            target_codes,
+            target_languages,  # Use dict for worker
             self.settings_manager,  # Use settings_manager instead of config_manager
             output_directory,
         )
@@ -788,10 +788,8 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.mem_timer.stop()
 
         # Persist target languages to settings after successful translation
-        target_codes = self._get_target_codes_from_ui()
-        self.settings_manager.save_target_languages(
-            {self.language_config.get_language_name(code): code for code in target_codes}
-        )
+        target_languages = self._target_langs_from_ui()
+        self.settings_manager.save_target_languages(target_languages)
 
         # Log the results being processed
         logging.info(f"Processing translation results: {results}")
@@ -842,7 +840,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Save current settings
         self.settings_manager.save_api_key(self.api_section.get_api_key())
         self.settings_manager.save_selected_files(self.file_section.selected_files)
-        self.settings_manager.save_target_languages(self.language_section.target_languages)
+        target_languages = self._target_langs_from_ui()
+        self.settings_manager.save_target_languages(target_languages)
 
         event.accept()
 
@@ -878,14 +877,20 @@ class SRTTranslatorMainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")
 
-    def _get_target_codes_from_ui(self) -> list[str]:
-        """Return all currently selected target codes, sorted deterministically."""
+    def _target_langs_from_ui(self) -> dict[str, str]:
+        """Return dict[name->code] for currently selected languages (deterministic)."""
         # Ensure internal dict reflects current UI state
         self.language_section.update_target_languages_from_ui()
         langs = self.language_section.get_target_languages()
-        codes = sorted(langs.values()) if isinstance(langs, dict) else sorted(langs)
-        self.logger.info("Target languages (UI): %s", codes)
-        return codes
+
+        # Normalize to dict[name->code] using existing utility
+        target_languages = normalize_target_languages(langs)
+
+        # Ensure deterministic ordering
+        target_languages = dict(sorted(target_languages.items(), key=lambda kv: kv[1]))
+
+        self.logger.info("Target languages (UI): %s", list(target_languages.values()))
+        return target_languages
 
     def _after_eval_finished(self, json_path: str) -> None:
         """Handle evaluation completion - store JSON path and generate HTML"""
