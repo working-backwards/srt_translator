@@ -737,14 +737,6 @@ def run_batch_evaluation(
             "files": per_files,
         }
 
-    # Persist evaluator output so reporting can be decoupled and never blocks JSON.
-    try:
-        artifacts_dir = batch_root / "artifacts"
-        artifacts_dir.mkdir(parents=True, exist_ok=True)
-        out_json = artifacts_dir / "eval_report.json"
-        out_json.write_text(json.dumps(rollup, ensure_ascii=False, indent=2), encoding="utf-8")
-        logger.info(f"Wrote evaluator JSON: {out_json}")
-    except Exception as e:
-        logger.error(f"Failed to write eval_report.json: {e}")
+    # Note: eval_report.json is now written by the report module with strict EvalReportV1 format
 
     return rollup
