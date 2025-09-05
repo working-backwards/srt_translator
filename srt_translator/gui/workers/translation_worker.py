@@ -370,6 +370,7 @@ class TranslationWorker(QObject):
                             rollup=rollup,
                             logger=eval_logger,
                         )
+
                         self.logger.info("Evaluation completed successfully")
                         # Update progress for GUI
                         self._throttled_emit(

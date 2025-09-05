@@ -877,6 +877,11 @@ class SRTTranslatorMainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Error sampling memory: {e}")
 
+    def _get_target_codes_from_ui(self) -> list[str]:
+        """Return the currently selected language codes from the UI, sorted deterministically."""
+        langs = self.language_section.get_target_languages()  # {"Japanese":"ja", ...}
+        return sorted(langs.values())
+
     def _target_langs_from_ui(self) -> dict[str, str]:
         """Return dict[name->code] for currently selected languages (deterministic)."""
         # Ensure internal dict reflects current UI state

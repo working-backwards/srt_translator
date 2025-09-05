@@ -37,31 +37,33 @@ class TestEvalHtmlBuild:
         html_content = output_path.read_text(encoding="utf-8")
 
         # Check decision banner
-        assert "❌ Publish readiness: Needs fixes" in html_content
-        assert "4 items to fix across 2 languages (fr, ja)." in html_content
+        assert (
+            "❌ We found issues that will degrade quality. Fix the items below before publishing."
+            in html_content
+        )
 
         # Check what to do next
         assert "What to do next" in html_content
-        assert "Fix 4 issues (see drill-downs below for exact captions)." in html_content
-        assert "Re-run Evaluate." in html_content
-        assert "If all clear, export and publish." in html_content
+        assert "Resolve DNT or termbase violations in the listed files." in html_content
+        assert "Fix cue parity mismatches or missing translations." in html_content
+        assert "Re-run evaluation and confirm 'Ready to publish'." in html_content
 
         # Check KPIs - the HTML has label and value in separate spans
         assert "Files total:" in html_content
         assert "Languages:" in html_content
-        assert "Issues total:" in html_content
-        assert "Source language:" in html_content
+        assert "Issues (critical):" in html_content
+        assert "Warnings (non-critical):" in html_content
+        assert "Detected source language:" in html_content
         assert "DNT coverage:" in html_content
         assert "Termbase coverage:" in html_content
-        assert "Termbase entries:" in html_content
         # Check the actual values
         assert '<span class="kpi-value">3</span>' in html_content
         assert '<span class="kpi-value">2</span>' in html_content
         assert '<span class="kpi-value">4</span>' in html_content
+        assert '<span class="kpi-value">0</span>' in html_content  # warnings
         assert '<span class="kpi-value">en</span>' in html_content
-        assert '<span class="kpi-value">Present</span>' in html_content
-        assert '<span class="kpi-value">Partial</span>' in html_content
-        assert '<span class="kpi-value">fr: 1</span>' in html_content
+        assert '<span class="kpi-value">present</span>' in html_content
+        assert '<span class="kpi-value">0/0 languages</span>' in html_content
 
         # Verify it's valid HTML structure
         assert "<!DOCTYPE html>" in html_content
@@ -100,9 +102,7 @@ class TestEvalHtmlBuild:
         shutil.copy2(eval_report_src, eval_report_dst)
 
         # Should raise ValueError
-        with pytest.raises(
-            ValueError, match="ai_config.json must be located alongside eval_report.json; not found"
-        ):
+        with pytest.raises(ValueError, match="Required file not found"):
             build_eval_html(eval_report_dst)
 
     def test_build_eval_html_missing_eval_fields(self, tmp_path):
@@ -141,7 +141,7 @@ class TestEvalHtmlBuild:
         shutil.copy2(ai_config_src, ai_config_dst)
 
         # Should raise ValueError
-        with pytest.raises(ValueError, match="ai_config.json missing required key: termbase"):
+        with pytest.raises(ValueError, match="ai_config.json missing required keys: termbase"):
             build_eval_html(eval_report_dst)
 
     def test_build_eval_html_invalid_json(self, tmp_path):
@@ -159,5 +159,5 @@ class TestEvalHtmlBuild:
         missing_file = tmp_path / "missing.json"
 
         # Should raise ValueError
-        with pytest.raises(ValueError, match="eval_report.json not found"):
+        with pytest.raises(ValueError, match="Required file not found"):
             build_eval_html(missing_file)

@@ -1,0 +1,375 @@
+1
+00:00:03,300 --> 00:00:05,800
+Writing is only part of the annual process.
+
+2
+00:00:05,800 --> 00:00:08,500
+Once the OP1 document has been completed,
+
+3
+00:00:08,500 --> 00:00:13,000
+the readers, typically senior leaders, now assume the primary role.
+
+4
+00:00:13,000 --> 00:00:17,800
+Their job is to critically read the plan, ask probing questions,
+
+5
+00:00:17,800 --> 00:00:22,300
+provide constructive feedback, discuss and debate controversial topics,
+
+6
+00:00:22,300 --> 00:00:27,000
+and ultimately make company-wide decisions on which initiatives to greenlight
+
+7
+00:00:27,000 --> 00:00:29,000
+at a given funding level.
+
+8
+00:00:29,000 --> 00:00:32,500
+As a senior leader, reading an OP1 document,
+
+9
+00:00:32,500 --> 00:00:35,300
+ask yourself these questions while reading,
+
+10
+00:00:35,300 --> 00:00:39,000
+and enter your answers in the document directly,
+
+11
+00:00:39,000 --> 00:00:42,000
+or ask them once the discussion begins.
+
+12
+00:00:42,000 --> 00:00:45,000
+The first question is, do I clearly understand
+
+13
+00:00:45,000 --> 00:00:49,000
+how this team will create additional customer value next year?
+
+14
+00:00:49,000 --> 00:00:52,500
+Am I looking at the right input and output metrics?
+
+15
+00:00:52,500 --> 00:00:56,000
+If not, which ones are missing or incorrect?
+
+16
+00:00:56,000 --> 00:01:00,500
+Is the detailed wording of each metric exactly what we want?
+
+17
+00:01:00,500 --> 00:01:04,000
+Do any of these initiatives or goals merit dedicated time
+
+18
+00:01:04,000 --> 00:01:07,000
+from the executive team to review throughout the year?
+
+19
+00:01:07,000 --> 00:01:12,000
+If so, these will become S-team goals, which we will cover in the next lesson.
+
+20
+00:01:12,000 --> 00:01:16,000
+Does the team have too many or too few resources
+
+21
+00:01:16,000 --> 00:01:21,000
+to accomplish each of the work streams and initiatives outlined in the plan?
+
+22
+00:01:21,000 --> 00:01:23,300
+Is the team thinking big enough?
+
+23
+00:01:23,300 --> 00:01:27,000
+Do they have the right mix of activities, including bold bets,
+
+24
+00:01:27,000 --> 00:01:31,000
+improving the core business, and fixing paper cuts?
+
+25
+00:01:31,000 --> 00:01:33,300
+Where are the risks with this plan?
+
+26
+00:01:33,300 --> 00:01:37,500
+Have they been identified and properly mitigated?
+
+27
+00:01:37,500 --> 00:01:40,300
+Are there any dependencies on my organization?
+
+28
+00:01:40,300 --> 00:01:44,000
+If so, has someone from my organization reviewed them,
+
+29
+00:01:44,000 --> 00:01:46,000
+and are they accurate?
+
+30
+00:01:46,000 --> 00:01:50,000
+For each initiative, are all of the dependencies called out and resolved?
+
+31
+00:01:50,000 --> 00:01:53,000
+Are these the most important initiatives that will move the needle
+
+32
+00:01:53,000 --> 00:01:56,000
+in a meaningful way for this business?
+
+33
+00:01:56,000 --> 00:01:59,000
+Are the team's key assumptions true?
+
+34
+00:01:59,000 --> 00:02:03,300
+A good technique to answer this question is to look at the inverse case.
+
+35
+00:02:03,300 --> 00:02:07,000
+Try to find any case where the assumption is not true.
+
+36
+00:02:07,000 --> 00:02:10,700
+And finally, you do not want to leave the room
+
+37
+00:02:10,700 --> 00:02:14,000
+until the answer to the following question is yes.
+
+38
+00:02:14,000 --> 00:02:17,700
+Do I believe that these initiatives and input goals
+
+39
+00:02:17,700 --> 00:02:20,700
+can be met with the requested investment of resources,
+
+40
+00:02:20,700 --> 00:02:24,700
+and if they are met, will we hit our output goals?
+
+41
+00:02:24,700 --> 00:02:28,300
+As you ask questions, be direct and constructive.
+
+42
+00:02:28,300 --> 00:02:31,500
+Ask questions that will drive deeper thinking.
+
+43
+00:02:31,500 --> 00:02:34,800
+The ultimate goal is to leave the room with a solid plan.
+
+44
+00:02:34,800 --> 00:02:36,300
+The Presenters:
+
+45
+00:02:36,300 --> 00:02:41,300
+At minimum, the presenters, who are the team that wrote the document,
+
+46
+00:02:41,300 --> 00:02:46,200
+needs to include the business unit leader, key team members,
+
+47
+00:02:46,200 --> 00:02:49,000
+one of whom is the designated note taker,
+
+48
+00:02:49,000 --> 00:02:53,200
+the finance counterpart, and representatives from any other team
+
+49
+00:02:53,200 --> 00:02:57,000
+that have big dependencies that will invest significant resources
+
+50
+00:02:57,000 --> 00:02:59,000
+in any part of the proposed initiatives.
+
+51
+00:02:59,000 --> 00:03:03,000
+And lastly, the HR lead for the group.
+
+52
+00:03:03,000 --> 00:03:06,700
+Make sure you have access to any supplemental data or documents,
+
+53
+00:03:06,700 --> 00:03:09,500
+not in the OP1 plan, that could be helpful.
+
+54
+00:03:09,500 --> 00:03:13,000
+Examples of this include last year's OP1 plan,
+
+55
+00:03:13,000 --> 00:03:16,000
+your latest QBR or MBR,
+
+56
+00:03:16,000 --> 00:03:19,000
+your latest weekly business review or WBR,
+
+57
+00:03:19,000 --> 00:03:23,500
+detailed customer demographic and usage data and so forth.
+
+58
+00:03:23,500 --> 00:03:26,000
+The note taker cannot be the primary person who answers questions
+
+59
+00:03:26,000 --> 00:03:30,000
+in a meeting, and they need to be a team member who is deeply
+
+60
+00:03:30,000 --> 00:03:33,700
+familiar with the details of the business, not an admin.
+
+61
+00:03:33,700 --> 00:03:37,000
+Make sure to answer all questions concisely and with data.
+
+62
+00:03:37,000 --> 00:03:40,700
+If you don't know the answer, and no one else from your team does either,
+
+63
+00:03:40,700 --> 00:03:44,000
+then say you don't know and I will get back to you.
+
+64
+00:03:44,000 --> 00:03:48,500
+This last tip is easier said than done, but is largely under your control.
+
+65
+00:03:48,500 --> 00:03:51,000
+Oh, and finally, make sure you get a good night's sleep
+
+66
+00:03:51,000 --> 00:03:53,500
+the night before the meeting.
+
+67
+00:03:53,500 --> 00:03:56,000
+The meeting should last 90 to 120 minutes.
+
+68
+00:03:56,000 --> 00:03:59,000
+If your business area is complex or large,
+
+69
+00:03:59,000 --> 00:04:02,000
+and you can't fit at all into that time,
+
+70
+00:04:02,000 --> 00:04:06,000
+make sure you create separate documents for those parts of your business
+
+71
+00:04:06,000 --> 00:04:08,500
+and allocate separate meeting slots for them.
+
+72
+00:04:08,500 --> 00:04:11,500
+In most cases, for an Amazon meeting,
+
+73
+00:04:11,500 --> 00:04:15,000
+the document is six pages long plus appendices.
+
+74
+00:04:15,000 --> 00:04:17,500
+We would allocate 60 minutes for the meeting,
+
+75
+00:04:17,500 --> 00:04:19,500
+where 15 minutes could be reading time,
+
+76
+00:04:19,500 --> 00:04:22,500
+and the rest of the time was available for discussion.
+
+77
+00:04:22,500 --> 00:04:25,500
+OP1 meetings and documents are more complex.
+
+78
+00:04:25,500 --> 00:04:29,000
+We would still have the limit of six pages and appendices,
+
+79
+00:04:29,000 --> 00:04:32,500
+but the difference is that we would allow more time for the meeting itself
+
+80
+00:04:32,500 --> 00:04:34,500
+because the discussion would be longer,
+
+81
+00:04:34,500 --> 00:04:37,500
+hence the 90 to 120 minute timing.
+
+82
+00:04:37,500 --> 00:04:40,500
+We would also have time to leave slack time between meetings.
+
+83
+00:04:41,500 --> 00:04:43,300
+Not only can the meetings get spirited
+
+84
+00:04:43,300 --> 00:04:45,300
+and downtime is necessary in between,
+
+85
+00:04:45,300 --> 00:04:49,500
+but more importantly, new issues would surface during the OP1 review,
+
+86
+00:04:49,500 --> 00:04:53,000
+and it would take longer than expected to resolve those issues.
+
+87
+00:04:53,000 --> 00:04:57,000
+At Amazon, we favored letting the meeting run over its allocated time
+
+88
+00:04:57,000 --> 00:04:59,600
+because we had all the right people in the room,
+
+89
+00:04:59,600 --> 00:05:02,200
+and it was much easier to keep the meeting going
+
+90
+00:05:02,200 --> 00:05:04,200
+than to schedule a second meeting.
+
+91
+00:05:04,200 --> 00:05:09,000
+The OP1 plan is not going to be approved at the end of the meeting
+
+92
+00:05:09,000 --> 00:05:12,300
+because the company has a constrained set of resources
+
+93
+00:05:12,300 --> 00:05:15,300
+and the executive team needs to review all OP1 plans
+
+94
+00:05:15,300 --> 00:05:19,000
+before deciding how to allocate those scarce resources.
