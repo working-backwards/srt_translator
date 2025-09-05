@@ -104,6 +104,9 @@ def compile_report(artifacts_dir: Path) -> Path:
     # Extract lexicons
     lexicons = _extract_lexicons(ai_data)
 
+    # Extract punch list (errors and warnings)
+    punch_list = _extract_punch_list(eval_data)
+
     # Build the compiled report
     report_v1 = {
         "version": "1.0",
@@ -124,8 +127,8 @@ def compile_report(artifacts_dir: Path) -> Path:
         "file_status": file_status,
         "lexicons": lexicons,
         "sections": {
-            "errors": [],  # Will be populated in Packet 6
-            "warnings": [],  # Will be populated in Packet 6
+            "errors": punch_list["errors"],
+            "warnings": punch_list["warnings"],
         },
     }
 
@@ -242,6 +245,62 @@ def _compute_file_status(eval_data: Dict[str, Any]) -> List[Dict[str, str]]:
     # Sort by file_path for deterministic ordering
     file_statuses.sort(key=lambda x: x["file_path"])
     return file_statuses
+
+
+def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Extract errors and warnings from evaluation data for punch list."""
+    errors = []
+    warnings = []
+
+    for lang_code, lang_data in eval_data["languages"].items():
+        for file_path, file_data in lang_data.get("files", {}).items():
+            issues = file_data.get("issues", {})
+
+            # Extract missing translation issues (WARNINGS)
+            missing_issues = issues.get("missing_translation", [])
+            for issue in missing_issues:
+                warnings.append(
+                    {
+                        "filename": file_path,
+                        "title": f"Missing translation in {file_path}",
+                        "why_it_matters": "This subtitle may be incomplete or missing context.",
+                        "suggested_fix": "Check if the translation was cut off or if context was lost.",
+                        "ask_ai_prompt": f"Please translate this subtitle from {lang_code} to English: '{issue.get('src', '')}'",
+                        "context": issue.get("context", {}),
+                    }
+                )
+
+            # Extract DNT violations (ERRORS)
+            untrans_dnt_issues = issues.get("untranslated_after_dnt", [])
+            for issue in untrans_dnt_issues:
+                errors.append(
+                    {
+                        "filename": file_path,
+                        "title": f"DNT violation in {file_path}",
+                        "why_it_matters": "This term should not be translated according to your DNT list.",
+                        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
+                        "ask_ai_prompt": f"Please keep this term untranslated: '{issue}'",
+                        "context": {},
+                    }
+                )
+
+            # Extract timing failures (ERRORS)
+            if issues.get("timing_fail", False):
+                errors.append(
+                    {
+                        "filename": file_path,
+                        "title": f"Timing failure in {file_path}",
+                        "why_it_matters": "The subtitle timing doesn't match the source file.",
+                        "suggested_fix": "Check subtitle timing and duration settings.",
+                        "ask_ai_prompt": f"Please check the timing for this subtitle in {file_path}",
+                        "context": {},
+                    }
+                )
+
+    return {
+        "errors": errors,
+        "warnings": warnings,
+    }
 
 
 def _extract_lexicons(ai_data: Dict[str, Any]) -> Dict[str, Any]:

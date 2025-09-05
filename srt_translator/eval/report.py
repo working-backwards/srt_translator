@@ -419,12 +419,55 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     else:
         out.append("No files processed.\n")
 
-    # TODO: Punch List will be added in Packet 6 when we populate sections.errors and sections.warnings
-    # src_label = _resolve_source_label(batch_root, rollup)
-    # out.append(
-    #     render_consolidated_punchlist(langs, batch_root=batch_root, source_lang_name=src_label)
-    # )
-    out.append("\n")
+    # Punch List
+    sections = report_data.get("sections", {})
+    errors = sections.get("errors", [])
+    warnings = sections.get("warnings", [])
+
+    if errors:
+        out.append("## ❌ Critical Issues\n")
+        for error in errors:
+            out.append(f"### {error.get('filename', 'Unknown')}: {error.get('title', 'Error')}")
+            out.append(f"**Why it matters:** {error.get('why_it_matters', '')}")
+            out.append(f"**Suggested fix:** {error.get('suggested_fix', '')}")
+            out.append(f"**Ask an AI:** {error.get('ask_ai_prompt', '')}")
+            out.append("")
+
+    if warnings:
+        out.append("## ⚠️ Warnings\n")
+        for warning in warnings:
+            out.append(
+                f"### {warning.get('filename', 'Unknown')}: {warning.get('title', 'Warning')}"
+            )
+            out.append(f"**Why it matters:** {warning.get('why_it_matters', '')}")
+            out.append(f"**Suggested fix:** {warning.get('suggested_fix', '')}")
+            out.append(f"**Ask an AI:** {warning.get('ask_ai_prompt', '')}")
+            out.append("")
+
+    if not errors and not warnings:
+        out.append("## ✅ No Issues Found\n")
+        out.append("All files passed evaluation with no errors or warnings.\n")
+
+    # DNT Terms
+    dnt_terms = report_data.get("lexicons", {}).get("dnt_terms", [])
+    if dnt_terms:
+        out.append("## Do-Not-Translate Terms\n")
+        for term in dnt_terms:
+            out.append(f"- `{term}`")
+        out.append("")
+
+    # Termbase
+    termbase = report_data.get("lexicons", {}).get("termbase", {})
+    if termbase:
+        out.append("## Termbase\n")
+        for lang_name, terms in termbase.items():
+            if terms:
+                out.append(f"### {lang_name}\n")
+                for term in terms:
+                    source = term.get("source", "")
+                    preferred = term.get("preferred", "")
+                    out.append(f"- `{source}` → `{preferred}`")
+                out.append("")
 
     # TODO: Language Roll-Up will be added in Packet 6
     # out.append("\n---\n")

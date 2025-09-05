@@ -163,6 +163,15 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
             {_render_file_status(file_status)}
         </div>
     </div>
+
+    <!-- Punch List -->
+    {_render_punch_list(report_data.get("sections", {}))}
+
+    <!-- DNT Terms -->
+    {_render_dnt_terms(report_data.get("lexicons", {}).get("dnt_terms", []))}
+
+    <!-- Termbase -->
+    {_render_termbase(report_data.get("lexicons", {}).get("termbase", {}))}
 </body>
 </html>"""
 
@@ -219,5 +228,109 @@ def _render_file_status(file_status: list[dict[str, str]]) -> str:
         html.append(f'  <span class="file-status-emoji">{emoji}</span>')
         html.append(f'  <span class="file-status-path">{file_path}</span>')
         html.append("</div>")
+
+    return "\n".join(html)
+
+
+def _render_punch_list(sections: dict[str, list]) -> str:
+    """Render punch list (errors and warnings) as HTML."""
+    errors = sections.get("errors", [])
+    warnings = sections.get("warnings", [])
+
+    html = []
+
+    if errors:
+        html.append('<div class="punch-list-section">')
+        html.append("<h2>❌ Critical Issues</h2>")
+        html.append('<div class="punch-list">')
+        for error in errors:
+            html.append('<div class="punch-item error">')
+            html.append(
+                f"  <h3>{error.get('filename', 'Unknown')}: {error.get('title', 'Error')}</h3>"
+            )
+            html.append(
+                f"  <p><strong>Why it matters:</strong> {error.get('why_it_matters', '')}</p>"
+            )
+            html.append(
+                f"  <p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>"
+            )
+            html.append(f"  <p><strong>Ask an AI:</strong> {error.get('ask_ai_prompt', '')}</p>")
+            html.append("</div>")
+        html.append("</div>")
+        html.append("</div>")
+
+    if warnings:
+        html.append('<div class="punch-list-section">')
+        html.append("<h2>⚠️ Warnings</h2>")
+        html.append('<div class="punch-list">')
+        for warning in warnings:
+            html.append('<div class="punch-item warning">')
+            html.append(
+                f"  <h3>{warning.get('filename', 'Unknown')}: {warning.get('title', 'Warning')}</h3>"
+            )
+            html.append(
+                f"  <p><strong>Why it matters:</strong> {warning.get('why_it_matters', '')}</p>"
+            )
+            html.append(
+                f"  <p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>"
+            )
+            html.append(f"  <p><strong>Ask an AI:</strong> {warning.get('ask_ai_prompt', '')}</p>")
+            html.append("</div>")
+        html.append("</div>")
+        html.append("</div>")
+
+    if not errors and not warnings:
+        html.append('<div class="punch-list-section">')
+        html.append("<h2>✅ No Issues Found</h2>")
+        html.append("<p>All files passed evaluation with no errors or warnings.</p>")
+        html.append("</div>")
+
+    return "\n".join(html)
+
+
+def _render_dnt_terms(dnt_terms: list[str]) -> str:
+    """Render DNT terms as HTML."""
+    if not dnt_terms:
+        return ""
+
+    html = []
+    html.append('<div class="dnt-section">')
+    html.append("<h2>Do-Not-Translate Terms</h2>")
+    html.append('<div class="dnt-list">')
+    for term in dnt_terms:
+        html.append(f'<span class="dnt-term">{term}</span>')
+    html.append("</div>")
+    html.append("</div>")
+
+    return "\n".join(html)
+
+
+def _render_termbase(termbase: dict[str, list[dict[str, str]]]) -> str:
+    """Render termbase as HTML."""
+    if not termbase:
+        return ""
+
+    html = []
+    html.append('<div class="termbase-section">')
+    html.append("<h2>Termbase</h2>")
+
+    for lang_name, terms in termbase.items():
+        if not terms:
+            continue
+        html.append('<div class="termbase-language">')
+        html.append(f"  <h3>{lang_name}</h3>")
+        html.append('  <div class="termbase-terms">')
+        for term in terms:
+            source = term.get("source", "")
+            preferred = term.get("preferred", "")
+            html.append('    <div class="termbase-item">')
+            html.append(
+                f'      <span class="term-source">{source}</span> → <span class="term-preferred">{preferred}</span>'
+            )
+            html.append("    </div>")
+        html.append("  </div>")
+        html.append("</div>")
+
+    html.append("</div>")
 
     return "\n".join(html)
