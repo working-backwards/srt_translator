@@ -17,6 +17,14 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 - An OpenAI API key (costs ~$0.01-0.05 per minute of video)
 - Subtitle files in .srt format
 
+## Creator workflow (recommended)
+
+1) **Create AI Config** — generate DNT & Termbase from the start of your material (put intros and term-dense files first).
+2) **Translate** — choose target languages.
+3) **Evaluate** — open `eval_report.html` and follow the "What to do next".
+
+See `/docs/ai-config.md` for the creator-first workflow and plain-language guidance.
+
 ---
 
 ## Quick Start (5 minutes)

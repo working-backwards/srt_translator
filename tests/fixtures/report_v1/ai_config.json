@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "timestamp": "2025-09-05T14:30:00Z",
+  "target_languages": ["fr", "ja"],
+  "source_language": "en",
+  "dnt_terms": ["Amazon", "operating plan", "cadence"],
+  "termbase": {
+    "French": {
+      "operating plan": "plan opérationnel",
+      "cadence": "rythme"
+    },
+    "Japanese": {
+      "operating plan": "operating plan",
+      "cadence": "cadence"
+    }
+  }
+}
