@@ -19,8 +19,10 @@ def create_test_batch_structure(
     batch_dir = temp_dir / "translation-batch-test"
     batch_dir.mkdir()
 
-    # Create ai_config.json if requested
+    # Create ai_config.json in artifacts directory if requested
     if has_ai_config:
+        artifacts_dir = batch_dir / "artifacts"
+        artifacts_dir.mkdir()
         ai_config = {
             "version": "1.0.0",
             "timestamp": "2025-01-01T00:00:00Z",
@@ -28,7 +30,9 @@ def create_test_batch_structure(
             "dnt_terms": ["Operating Plan", "Module"],
             "termbase": {"es": {"Operating Plan": "Plan Operativo"}, "fr": {"Module": "Module"}},
         }
-        (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
+        (artifacts_dir / "ai_config.json").write_text(
+            json.dumps(ai_config, indent=2), encoding="utf-8"
+        )
 
     # Create originals directory if requested
     if has_originals:
@@ -185,7 +189,7 @@ class TestV1EvaluationPolicy:
 
         # Create batch structure with corrupted ai_config.json
         batch_dir = create_test_batch_structure(tmp_path)
-        corrupted_config = batch_dir / "ai_config.json"
+        corrupted_config = batch_dir / "artifacts" / "ai_config.json"
         corrupted_config.write_text("invalid json content", encoding="utf-8")
 
         mock_logger = Mock()
@@ -238,7 +242,7 @@ class TestV1EvaluationPolicy:
         batch_dir = create_test_batch_structure(tmp_path)
 
         # Modify ai_config.json to have no DNT terms
-        ai_config_path = batch_dir / "ai_config.json"
+        ai_config_path = batch_dir / "artifacts" / "ai_config.json"
         ai_config = json.loads(ai_config_path.read_text(encoding="utf-8"))
         ai_config["dnt_terms"] = []
         ai_config_path.write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
@@ -267,7 +271,7 @@ class TestV1EvaluationPolicy:
         batch_dir = create_test_batch_structure(tmp_path)
 
         # Modify ai_config.json to have no termbase
-        ai_config_path = batch_dir / "ai_config.json"
+        ai_config_path = batch_dir / "artifacts" / "ai_config.json"
         ai_config = json.loads(ai_config_path.read_text(encoding="utf-8"))
         ai_config["termbase"] = {}
         ai_config_path.write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
@@ -323,7 +327,7 @@ class TestV1EvaluationPolicy:
         batch_dir = create_test_batch_structure(tmp_path)
 
         # Modify ai_config.json to have partial termbase coverage
-        ai_config_path = batch_dir / "ai_config.json"
+        ai_config_path = batch_dir / "artifacts" / "ai_config.json"
         ai_config = json.loads(ai_config_path.read_text(encoding="utf-8"))
         ai_config["termbase"] = {
             "es": {"Operating Plan": "Plan Operativo"},
@@ -396,7 +400,9 @@ class TestDataNormalization:
             "termbase": {"es": {"Operating Plan": "Plan Operativo"}, "fr": {"Module": "Module"}},
         }
 
-        ai_config_path = batch_dir / "ai_config.json"
+        artifacts_dir = batch_dir / "artifacts"
+        artifacts_dir.mkdir()
+        ai_config_path = artifacts_dir / "ai_config.json"
         ai_config_path.write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
         mock_logger = Mock()

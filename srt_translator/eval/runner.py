@@ -221,7 +221,7 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
         FileNotFoundError: If ai_config.json is missing
         ValueError: If ai_config.json is invalid
     """
-    config_path = batch_root / "ai_config.json"
+    config_path = batch_root / "artifacts" / "ai_config.json"
     if not config_path.exists():
         logger.error("Required ai_config.json not found - stopping evaluation")
         raise FileNotFoundError(f"ai_config.json required for evaluation: {config_path}")
@@ -330,7 +330,7 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
     # source language (patch from ai_config.json if needed)
     ol = manifest.get("original_language") or {}
     if not ol.get("code") or not ol.get("name"):
-        ai_cfg = batch_root / "ai_config.json"
+        ai_cfg = batch_root / "artifacts" / "ai_config.json"
         if ai_cfg.exists():
             try:
                 ai = json.loads(ai_cfg.read_text(encoding="utf-8"))
@@ -389,26 +389,7 @@ def _write_manifest_if_missing(
         logger.warning("Failed to write manifest.json (continuing)", extra={"error": str(e)})
 
 
-def _copy_ai_config_to_artifacts(batch_dir: Path, artifacts_dir: Path, log) -> None:
-    """
-    Copy the batch root ai_config.json into the artifacts folder so that
-    presenters can rely on co-located files (eval_report.json + ai_config.json).
-    Fail fast if the source file is missing.
-    """
-    src = batch_dir / "ai_config.json"
-    dst = artifacts_dir / "ai_config.json"
-
-    if not src.exists():
-        msg = f"ai_config.json not found at batch root: {src}"
-        # Reuse the run-scoped logger (same lineage as translation.<runid>.eval.runner)
-        log.error(msg, extra={"src": str(src)})
-        raise FileNotFoundError(msg)
-
-    # Ensure artifacts dir exists (it should already, but be safe)
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
-
-    shutil.copy2(src, dst)
-    log.info("Copied ai_config.json to artifacts", extra={"dst": str(dst)})
+# ai_config.json is now written directly to artifacts by core/main.py
 
 
 def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
@@ -497,14 +478,7 @@ def run_batch_evaluation(
     artifacts_root = batch_root / "artifacts"
     artifacts_root.mkdir(exist_ok=True)
 
-    # Mirror ai_config.json into artifacts so presenters can rely on co-located inputs
-    # (eval_report.json + ai_config.json) without guessing paths.
-    try:
-        _copy_ai_config_to_artifacts(batch_root, artifacts_root, log)
-    except FileNotFoundError as _e:
-        # Evaluation can still proceed (MD + JSON are written), but HTML presenter will
-        # fail fast later with a clear error. We surface an error here for visibility.
-        log.error("Could not copy ai_config.json into artifacts; HTML report will be unavailable")
+    # ai_config.json is now written directly to artifacts by core/main.py
 
     language_dirs = _collect_language_dirs(batch_root)
 

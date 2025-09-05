@@ -54,8 +54,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not batch_root.exists():
         log.error("Batch root does not exist: %s", batch_root)
         return 2
-    if not (batch_root / "ai_config.json").exists():
-        log.error("No ai_config.json at batch root: %s", batch_root)
+    if not (batch_root / "artifacts" / "ai_config.json").exists():
+        log.error("No ai_config.json in artifacts directory: %s", batch_root / "artifacts")
         return 2
 
     try:

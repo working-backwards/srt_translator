@@ -188,16 +188,17 @@ def translate_srt_files(
             "aggressiveness": config.aggressiveness,
         }
 
-        manifest_path = os.path.join(batch_dir, "ai_config.json")
+        # Write ai_config.json directly to artifacts directory
+        artifacts_dir = os.path.join(batch_dir, "artifacts")
+        os.makedirs(artifacts_dir, exist_ok=True)
+        manifest_path = os.path.join(artifacts_dir, "ai_config.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f, ensure_ascii=False, indent=2)
-        logger.info("Wrote batch-level AI config: ai_config.json")
+        logger.info("Wrote AI config to artifacts: ai_config.json")
     except Exception as e:
         logger.warning(f"Failed to write AI config manifest: {e}")
 
-    # Create artifacts directory
-    artifacts_dir = os.path.join(batch_dir, "artifacts")
-    os.makedirs(artifacts_dir, exist_ok=True)
+    # Artifacts directory already created above
 
     # Create originals directory and copy source files for evaluation
     originals_dir = os.path.join(batch_dir, "originals")

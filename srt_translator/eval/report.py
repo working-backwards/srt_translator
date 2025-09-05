@@ -183,7 +183,7 @@ def _source_language_name(batch_root: Path) -> str:
     Resolve a friendly source language name from ai_config.json; fallback to 'English'.
     Uses _lang_label(code) if available, then strips trailing ' (xx)'.
     """
-    cfg_path = Path(batch_root) / "ai_config.json"
+    cfg_path = Path(batch_root) / "artifacts" / "ai_config.json"
     try:
         cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     except Exception:
