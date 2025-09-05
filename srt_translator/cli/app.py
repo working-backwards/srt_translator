@@ -11,12 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-from srt_translator.eval.report import write_batch_report
-
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
-from srt_translator.presenters.eval_html.build import build_eval_html
-from srt_translator.report.compiler import compile_report
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -185,42 +181,34 @@ Examples:
                 )
 
                 if rollup:
-                    # Compile the report first
+                    # Copy ai_config.json into artifacts/ (required by orchestrator)
                     artifacts_dir = latest_batch / "artifacts"
+                    src = latest_batch / "ai_config.json"
+                    dst = artifacts_dir / "ai_config.json"
+
+                    if not src.exists():
+                        logger.error(f"ai_config.json not found at batch root: {src}")
+                        return 1
+
+                    # Copy ai_config.json to artifacts/
+                    import shutil
+
+                    shutil.copy2(src, dst)
+                    logger.info("Copied ai_config.json → artifacts")
+
+                    # Call the orchestrator
+                    from srt_translator.eval.report import emit_all_reports
+
                     try:
-                        report_v1_path = compile_report(artifacts_dir)
-                        logger.info(f"Compiled report_v1.json: {report_v1_path}")
+                        paths = emit_all_reports(artifacts_dir, rollup)
+                        logger.info("Generated all reports:")
+                        for name, path in paths.items():
+                            logger.info(f"  {name}: {path.absolute()}")
                     except Exception as e:
-                        logger.error(f"Failed to compile report: {e}")
+                        logger.error(f"Failed to generate reports: {e}")
                         return 1
 
-                    write_batch_report(
-                        batch_root=latest_batch,
-                        rollup=rollup,
-                        logger=eval_logger,
-                    )
                     logger.info("Evaluation completed successfully")
-
-                    # Generate reports based on --report flag
-                    if args.report in ["html", "both"]:
-                        report_v1_path = latest_batch / "artifacts" / "report_v1.json"
-                        if not report_v1_path.exists():
-                            logger.error(f"report_v1.json not found: {report_v1_path}")
-                            return 1
-
-                        try:
-                            html_path = build_eval_html(
-                                report_v1_path, report_v1_path.with_suffix(".html")
-                            )
-                            logger.info(f"HTML report generated: {html_path}")
-                        except Exception as e:
-                            logger.error(f"Failed to generate HTML report: {e}")
-                            return 1
-
-                    if args.report in ["md", "both"]:
-                        # MD presenter not yet implemented
-                        logger.error("MD presenter not yet implemented")
-                        return 1
 
                 else:
                     logger.info("Evaluation skipped (no rubric found)")

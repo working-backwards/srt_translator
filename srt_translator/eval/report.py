@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List
@@ -527,3 +528,197 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         log.warning(f"Failed to write JSON report: {e}")
 
     return out_path
+
+
+def write_evaluator_json(artifacts_dir: Path, rollup: dict) -> Path:
+    """Write eval_report.json to artifacts directory."""
+    logger = logging.getLogger(__name__)
+
+    # Ensure artifacts directory exists
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write eval_report.json using existing function
+    json_path = _write_json_report(artifacts_dir.parent, rollup, logger)
+
+    logger.info(f"Wrote eval_report.json: {json_path}")
+    return json_path
+
+
+def render_markdown(artifacts_dir: Path, report_json: Path) -> Path:
+    """Render markdown report from report_v1.json."""
+    logger = logging.getLogger(__name__)
+
+    # Load report_v1.json
+    try:
+        with open(report_json, "r", encoding="utf-8") as f:
+            report_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise ValueError(f"Failed to load report_v1.json: {e}") from e
+
+    # Generate markdown content
+    out = []
+
+    # Extract data from compiled report
+    decision = report_data.get("decision", {})
+    kpis = report_data.get("kpis", {})
+    file_status = report_data.get("file_status", [])
+    what_to_do = decision.get("what_to_do_next", [])
+
+    # Extract banner from compiled report
+    banner_text = decision.get("banner_text", "")
+    # Extract emoji from banner text
+    if banner_text.startswith("✅"):
+        banner_emoji = "✅"
+        banner_text = banner_text[2:].strip()
+    elif banner_text.startswith("⚠️"):
+        banner_emoji = "⚠️"
+        banner_text = banner_text[2:].strip()
+    elif banner_text.startswith("❌"):
+        banner_emoji = "❌"
+        banner_text = banner_text[2:].strip()
+    else:
+        banner_emoji = "❓"
+
+    # Render header
+    out.append("# Evaluation Report\n")
+
+    # Publish readiness banner
+    out.append(f"## {banner_emoji} {banner_text}\n")
+
+    # What to do next
+    if what_to_do:
+        out.append("## What to do next\n")
+        for i, item in enumerate(what_to_do, 1):
+            out.append(f"{i}. {item}")
+        out.append("")
+
+    # KPIs
+    out.append("## KPIs\n")
+    for key, value in kpis.items():
+        out.append(f"- **{key}:** {value}")
+    out.append("")
+
+    # File Status
+    out.append("## File Status\n")
+    if file_status:
+        for file_info in file_status:
+            file_path = file_info.get("file_path", "Unknown")
+            status = file_info.get("status", "UNKNOWN")
+
+            # Map status to emoji
+            if status == "READY":
+                emoji = "✅"
+            elif status == "REVIEW":
+                emoji = "⚠️"
+            elif status == "FIX":
+                emoji = "❌"
+            else:
+                emoji = "❓"
+
+            out.append(f"- {emoji} **{file_path}** ({status})")
+        out.append("")
+    else:
+        out.append("No files processed.\n")
+
+    # Punch List
+    sections = report_data.get("sections", {})
+    errors = sections.get("errors", [])
+    warnings = sections.get("warnings", [])
+
+    if errors:
+        out.append("## ❌ Critical Issues\n")
+        for error in errors:
+            out.append(f"### {error.get('filename', 'Unknown')}: {error.get('title', 'Error')}")
+            out.append(f"**Why it matters:** {error.get('why_it_matters', '')}")
+            out.append(f"**Suggested fix:** {error.get('suggested_fix', '')}")
+            out.append(f"**Ask an AI:** {error.get('ask_ai_prompt', '')}")
+            out.append("")
+
+    if warnings:
+        out.append("## ⚠️ Warnings\n")
+        for warning in warnings:
+            out.append(
+                f"### {warning.get('filename', 'Unknown')}: {warning.get('title', 'Warning')}"
+            )
+            out.append(f"**Why it matters:** {warning.get('why_it_matters', '')}")
+            out.append(f"**Suggested fix:** {warning.get('suggested_fix', '')}")
+            out.append(f"**Ask an AI:** {warning.get('ask_ai_prompt', '')}")
+            out.append("")
+
+    if not errors and not warnings:
+        out.append("## ✅ No Issues Found\n")
+        out.append("All files passed evaluation with no errors or warnings.\n")
+
+    # DNT Terms
+    dnt_terms = report_data.get("lexicons", {}).get("dnt_terms", [])
+    if dnt_terms:
+        out.append("## Do-Not-Translate Terms\n")
+        for term in dnt_terms:
+            out.append(f"- `{term}`")
+        out.append("")
+
+    # Termbase
+    termbase = report_data.get("lexicons", {}).get("termbase", {})
+    if termbase:
+        out.append("## Termbase\n")
+        for lang_name, terms in termbase.items():
+            if terms:
+                out.append(f"### {lang_name}\n")
+                for term in terms:
+                    source = term.get("source", "")
+                    preferred = term.get("preferred", "")
+                    out.append(f"- `{source}` → `{preferred}`")
+                out.append("")
+
+    # Write markdown file
+    md_path = artifacts_dir / "eval_report.md"
+    md_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    logger.info(f"Wrote eval_report.md: {md_path}")
+
+    return md_path
+
+
+def render_html(artifacts_dir: Path, report_json: Path) -> Path:
+    """Render HTML report from report_v1.json."""
+    from srt_translator.presenters.eval_html.build import build_eval_html
+
+    logger = logging.getLogger(__name__)
+
+    # Use existing HTML builder
+    html_path = build_eval_html(report_json, artifacts_dir / "eval_report.html")
+    logger.info(f"Wrote eval_report.html: {html_path}")
+
+    return html_path
+
+
+def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
+    """Orchestrator: write eval_report.json, compile report_v1.json, render MD/HTML."""
+    logger = logging.getLogger(__name__)
+
+    # Ensure artifacts directory exists
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 1: Write eval_report.json
+    eval_json_path = write_evaluator_json(artifacts_dir, rollup)
+
+    # Step 2: Verify ai_config.json exists
+    ai_config_path = artifacts_dir / "ai_config.json"
+    if not ai_config_path.exists():
+        raise ValueError(f"ai_config.json not found in artifacts directory: {ai_config_path}")
+
+    # Step 3: Compile report_v1.json
+    from srt_translator.report.compiler import compile_report
+
+    report_v1_path = compile_report(artifacts_dir)
+    logger.info(f"Compiled report_v1.json: {report_v1_path}")
+
+    # Step 4: Render markdown and HTML
+    md_path = render_markdown(artifacts_dir, report_v1_path)
+    html_path = render_html(artifacts_dir, report_v1_path)
+
+    return {
+        "eval_report_json": eval_json_path,
+        "report_v1_json": report_v1_path,
+        "eval_report_md": md_path,
+        "eval_report_html": html_path,
+    }

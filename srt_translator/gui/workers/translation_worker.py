@@ -19,7 +19,6 @@ from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
 from srt_translator.core.config.models import TranslationConfig
-from srt_translator.eval.report import write_batch_report
 
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
@@ -27,7 +26,6 @@ from srt_translator.eval.runner import run_batch_evaluation
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
-from srt_translator.report.compiler import compile_report
 
 
 def _resolve_languages_json_path() -> Path:
@@ -366,20 +364,34 @@ class TranslationWorker(QObject):
                     )
 
                     if rollup:
-                        # Compile the report first
+                        # Copy ai_config.json into artifacts/ (required by orchestrator)
                         artifacts_dir = latest_batch / "artifacts"
-                        try:
-                            report_v1_path = compile_report(artifacts_dir)
-                            self.logger.info(f"Compiled report_v1.json: {report_v1_path}")
-                        except Exception as e:
-                            self.logger.error(f"Failed to compile report: {e}")
-                            # Continue with evaluation but log the error
+                        src = latest_batch / "ai_config.json"
+                        dst = artifacts_dir / "ai_config.json"
 
-                        write_batch_report(
-                            batch_root=latest_batch,
-                            rollup=rollup,
-                            logger=eval_logger,
-                        )
+                        if not src.exists():
+                            self.logger.error(f"ai_config.json not found at batch root: {src}")
+                            raise FileNotFoundError(
+                                f"ai_config.json not found at batch root: {src}"
+                            )
+
+                        # Copy ai_config.json to artifacts/
+                        import shutil
+
+                        shutil.copy2(src, dst)
+                        self.logger.info("Copied ai_config.json → artifacts")
+
+                        # Call the orchestrator
+                        from srt_translator.eval.report import emit_all_reports
+
+                        try:
+                            paths = emit_all_reports(artifacts_dir, rollup)
+                            self.logger.info("Generated all reports:")
+                            for name, path in paths.items():
+                                self.logger.info(f"  {name}: {path.absolute()}")
+                        except Exception as e:
+                            self.logger.error(f"Failed to generate reports: {e}")
+                            raise
 
                         self.logger.info("Evaluation completed successfully")
                         # Update progress for GUI
