@@ -16,6 +16,7 @@ from srt_translator.eval.report import write_batch_report
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.presenters.eval_html.build import build_eval_html
+from srt_translator.report.compiler import compile_report
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -184,6 +185,15 @@ Examples:
                 )
 
                 if rollup:
+                    # Compile the report first
+                    artifacts_dir = latest_batch / "artifacts"
+                    try:
+                        report_v1_path = compile_report(artifacts_dir)
+                        logger.info(f"Compiled report_v1.json: {report_v1_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to compile report: {e}")
+                        return 1
+
                     write_batch_report(
                         batch_root=latest_batch,
                         rollup=rollup,
@@ -193,13 +203,15 @@ Examples:
 
                     # Generate reports based on --report flag
                     if args.report in ["html", "both"]:
-                        json_path = latest_batch / "artifacts" / "eval_report.json"
-                        if not json_path.exists():
-                            logger.error(f"eval_report.json not found: {json_path}")
+                        report_v1_path = latest_batch / "artifacts" / "report_v1.json"
+                        if not report_v1_path.exists():
+                            logger.error(f"report_v1.json not found: {report_v1_path}")
                             return 1
 
                         try:
-                            html_path = build_eval_html(json_path, json_path.with_suffix(".html"))
+                            html_path = build_eval_html(
+                                report_v1_path, report_v1_path.with_suffix(".html")
+                            )
                             logger.info(f"HTML report generated: {html_path}")
                         except Exception as e:
                             logger.error(f"Failed to generate HTML report: {e}")

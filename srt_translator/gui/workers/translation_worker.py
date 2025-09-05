@@ -27,6 +27,7 @@ from srt_translator.eval.runner import run_batch_evaluation
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
+from srt_translator.report.compiler import compile_report
 
 
 def _resolve_languages_json_path() -> Path:
@@ -365,6 +366,15 @@ class TranslationWorker(QObject):
                     )
 
                     if rollup:
+                        # Compile the report first
+                        artifacts_dir = latest_batch / "artifacts"
+                        try:
+                            report_v1_path = compile_report(artifacts_dir)
+                            self.logger.info(f"Compiled report_v1.json: {report_v1_path}")
+                        except Exception as e:
+                            self.logger.error(f"Failed to compile report: {e}")
+                            # Continue with evaluation but log the error
+
                         write_batch_report(
                             batch_root=latest_batch,
                             rollup=rollup,
