@@ -34,6 +34,9 @@ def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, 
     return data  # type: ignore[no-any-return]
 
 
+# Old helper functions removed - now using compiled report_v1.json data
+
+
 def _compute_status(eval_json: dict[str, Any]) -> str:
     """Compute status based on evaluation results: critical, warning, or ready."""
     # Check for critical issues
@@ -157,10 +160,10 @@ def _what_to_do_next(status: str) -> list[str]:
         ]
 
 
-def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
+def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
     """Generate HTML report with unified top sections: banner, next steps, and KPIs.
 
-    Reads eval_report.json and ai_config.json with strict validation.
+    Reads report_v1.json with strict validation.
     Fails fast on missing/invalid inputs.
     """
     # Set up logging if available
@@ -168,7 +171,7 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
 
     # Default output path
     if out_path is None:
-        out_path = json_path.with_suffix(".html")
+        out_path = report_v1_path.with_suffix(".html")
 
     try:
         # Load CSS resource
@@ -178,46 +181,41 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
             .read_text(encoding="utf-8")
         )
 
-        # Load and validate eval_report.json
-        eval_data = _load_json_or_raise(
-            json_path, ["files_total", "languages_total", "issues_total"]
+        # Load and validate report_v1.json
+        report_data = _load_json_or_raise(
+            report_v1_path, ["decision", "totals", "kpis", "file_status", "lexicons"]
         )
 
-        # Load and validate ai_config.json (must be in same directory)
-        ai_config_path = json_path.parent / "ai_config.json"
-        ai_config_data = _load_json_or_raise(ai_config_path, ["dnt_terms", "termbase"])
+        # Validate required structure
+        if not isinstance(report_data.get("decision"), dict):
+            raise ValueError("report_v1.json decision must be a dict")
+        if not isinstance(report_data.get("totals"), dict):
+            raise ValueError("report_v1.json totals must be a dict")
+        if not isinstance(report_data.get("kpis"), dict):
+            raise ValueError("report_v1.json kpis must be a dict")
+        if not isinstance(report_data.get("file_status"), list):
+            raise ValueError("report_v1.json file_status must be a list")
 
-        # Validate field types
-        if not isinstance(eval_data["files_total"], int):
-            raise ValueError("eval_report.json files_total must be an integer")
-        if not isinstance(eval_data["languages_total"], int):
-            raise ValueError("eval_report.json languages_total must be an integer")
-        if not isinstance(eval_data["issues_total"], int):
-            raise ValueError("eval_report.json issues_total must be an integer")
-        if not isinstance(ai_config_data["dnt_terms"], list):
-            raise ValueError("ai_config.json dnt_terms must be a list")
-        if not isinstance(ai_config_data["termbase"], dict):
-            raise ValueError("ai_config.json termbase must be a dict")
+        # Extract data from compiled report
+        decision = report_data["decision"]
+        kpis = report_data["kpis"]
+        file_status = report_data["file_status"]
+        what_to_do = decision.get("what_to_do_next", [])
 
-        # Compute status and KPIs
-        status = _compute_status(eval_data)
-        kpis = _kpis(eval_data, ai_config_data)
-        what_to_do = _what_to_do_next(status)
-
-        # Generate banner text based on status
-        if status == "ready":
+        # Extract banner from compiled report
+        banner_text = decision.get("banner_text", "")
+        # Extract emoji from banner text
+        if banner_text.startswith("✅"):
             banner_emoji = "✅"
-            banner_text = "Everything looks great. Your translated files are ready to use."
-        elif status == "warning":
+            banner_text = banner_text[2:].strip()
+        elif banner_text.startswith("⚠️"):
             banner_emoji = "⚠️"
-            banner_text = (
-                "Looks good overall. Address the items below to improve quality before publishing."
-            )
-        else:  # critical
+            banner_text = banner_text[2:].strip()
+        elif banner_text.startswith("❌"):
             banner_emoji = "❌"
-            banner_text = (
-                "We found issues that will degrade quality. Fix the items below before publishing."
-            )
+            banner_text = banner_text[2:].strip()
+        else:
+            banner_emoji = "❓"
 
         # Generate HTML content
         html_content = f"""<!DOCTYPE html>
@@ -251,33 +249,41 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         <h2>KPIs</h2>
         <div class="kpi-grid">
             <div class="kpi-item">
-                <span class="kpi-label">Files total:</span>
-                <span class="kpi-value">{kpis["files_total"]}</span>
+                <span class="kpi-label">Files:</span>
+                <span class="kpi-value">{kpis["Files"]}</span>
             </div>
             <div class="kpi-item">
                 <span class="kpi-label">Languages:</span>
-                <span class="kpi-value">{kpis["languages_total"]}</span>
+                <span class="kpi-value">{kpis["Languages"]}</span>
             </div>
             <div class="kpi-item">
-                <span class="kpi-label">Issues (critical):</span>
-                <span class="kpi-value">{kpis["issues_total"]}</span>
+                <span class="kpi-label">Errors:</span>
+                <span class="kpi-value">{kpis["Errors"]}</span>
             </div>
             <div class="kpi-item">
-                <span class="kpi-label">Warnings (non-critical):</span>
-                <span class="kpi-value">{kpis["warnings_total"]}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Detected source language:</span>
-                <span class="kpi-value">{kpis["source_language"]}</span>
+                <span class="kpi-label">Warnings:</span>
+                <span class="kpi-value">{kpis["Warnings"]}</span>
             </div>
             <div class="kpi-item">
                 <span class="kpi-label">DNT coverage:</span>
-                <span class="kpi-value">{kpis["dnt_coverage"]}</span>
+                <span class="kpi-value">{kpis["DNT coverage"]}</span>
             </div>
             <div class="kpi-item">
                 <span class="kpi-label">Termbase coverage:</span>
-                <span class="kpi-value">{kpis["termbase_coverage"]}</span>
+                <span class="kpi-value">{kpis["Termbase coverage"]}</span>
             </div>
+            <div class="kpi-item">
+                <span class="kpi-label">Parity:</span>
+                <span class="kpi-value">{kpis["Parity"]}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Status -->
+    <div class="file-status-section">
+        <h2>File Status</h2>
+        <div class="file-status-list">
+            {_render_file_status(file_status)}
         </div>
     </div>
 </body>
@@ -297,7 +303,7 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
             logger.error(error_msg)
         raise ValueError(error_msg) from e
     except json.JSONDecodeError as e:
-        error_msg = f"Invalid JSON in {json_path}: {e}"
+        error_msg = f"Invalid JSON in {report_v1_path}: {e}"
         if logger:
             logger.error(error_msg)
         raise ValueError(error_msg) from e
@@ -306,3 +312,35 @@ def build_eval_html(json_path: Path, out_path: Path | None = None) -> Path:
         if logger:
             logger.error(error_msg)
         raise ValueError(error_msg) from e
+
+
+def _render_file_status(file_status: list[dict[str, str]]) -> str:
+    """Render file status list as HTML."""
+    if not file_status:
+        return "<p>No files processed.</p>"
+
+    html = []
+    for file_info in file_status:
+        file_path = file_info.get("file_path", "Unknown")
+        status = file_info.get("status", "UNKNOWN")
+
+        # Map status to emoji and CSS class
+        if status == "READY":
+            emoji = "✅"
+            css_class = "status-ready"
+        elif status == "REVIEW":
+            emoji = "⚠️"
+            css_class = "status-review"
+        elif status == "FIX":
+            emoji = "❌"
+            css_class = "status-fix"
+        else:
+            emoji = "❓"
+            css_class = "status-unknown"
+
+        html.append(f'<div class="file-status-item {css_class}">')
+        html.append(f'  <span class="file-status-emoji">{emoji}</span>')
+        html.append(f'  <span class="file-status-path">{file_path}</span>')
+        html.append("</div>")
+
+    return "\n".join(html)

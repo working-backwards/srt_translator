@@ -508,39 +508,46 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path:
     """
     Write eval_report.md with unified top sections: banner, next steps, and KPIs.
+
+    This function now reads from report_v1.json instead of separate files.
     """
     log = logger.getChild("report")
     batch_root = Path(batch_root)
-    langs = rollup.get("languages", {})
 
     out = []
 
-    # Load ai_config.json from artifacts directory
+    # Load report_v1.json from artifacts directory
+    report_v1_path = batch_root / "artifacts" / "report_v1.json"
+    if not report_v1_path.exists():
+        log.error(f"report_v1.json not found at: {report_v1_path}")
+        raise FileNotFoundError(f"report_v1.json not found at: {report_v1_path}")
+
     try:
-        ai_config = _load_ai_config_from_artifacts(batch_root)
-    except ValueError as e:
-        log.error(f"Failed to load ai_config.json: {e}")
-        raise
+        report_data = json.loads(report_v1_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        log.error(f"Invalid JSON in {report_v1_path}: {e}")
+        raise ValueError(f"Invalid JSON in {report_v1_path}: {e}") from e
 
-    # Compute status and KPIs
-    status = _compute_status_from_rollup(rollup)
-    kpis = _kpis_from_rollup(rollup, ai_config)
-    what_to_do = _what_to_do_next_from_status(status)
+    # Extract data from compiled report
+    decision = report_data.get("decision", {})
+    kpis = report_data.get("kpis", {})
+    file_status = report_data.get("file_status", [])
+    what_to_do = decision.get("what_to_do_next", [])
 
-    # Generate banner text based on status
-    if status == "ready":
+    # Extract banner from compiled report
+    banner_text = decision.get("banner_text", "")
+    # Extract emoji from banner text
+    if banner_text.startswith("✅"):
         banner_emoji = "✅"
-        banner_text = "Everything looks great. Your translated files are ready to use."
-    elif status == "warning":
+        banner_text = banner_text[2:].strip()
+    elif banner_text.startswith("⚠️"):
         banner_emoji = "⚠️"
-        banner_text = (
-            "Looks good overall. Address the items below to improve quality before publishing."
-        )
-    else:  # critical
+        banner_text = banner_text[2:].strip()
+    elif banner_text.startswith("❌"):
         banner_emoji = "❌"
-        banner_text = (
-            "We found issues that will degrade quality. Fix the items below before publishing."
-        )
+        banner_text = banner_text[2:].strip()
+    else:
+        banner_emoji = "❓"
 
     # Render header
     out.append("# Evaluation Report\n")
@@ -556,56 +563,78 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     # KPIs
     out.append("## KPIs\n")
-    out.append(f"- **Files total:** {kpis['files_total']}")
-    out.append(f"- **Languages:** {kpis['languages_total']}")
-    out.append(f"- **Issues (critical):** {kpis['issues_total']}")
-    out.append(f"- **Warnings (non-critical):** {kpis['warnings_total']}")
-    out.append(f"- **Detected source language:** {kpis['source_language']}")
-    out.append(f"- **DNT coverage:** {kpis['dnt_coverage']}")
-    out.append(f"- **Termbase coverage:** {kpis['termbase_coverage']}")
+    out.append(f"- **Files:** {kpis.get('Files', 'N/A')}")
+    out.append(f"- **Languages:** {kpis.get('Languages', 'N/A')}")
+    out.append(f"- **Errors:** {kpis.get('Errors', 'N/A')}")
+    out.append(f"- **Warnings:** {kpis.get('Warnings', 'N/A')}")
+    out.append(f"- **DNT coverage:** {kpis.get('DNT coverage', 'N/A')}")
+    out.append(f"- **Termbase coverage:** {kpis.get('Termbase coverage', 'N/A')}")
+    out.append(f"- **Parity:** {kpis.get('Parity', 'N/A')}")
     out.append("")
 
-    # Add consolidated punch list using new function
-    src_label = _resolve_source_label(batch_root, rollup)
-    out.append(
-        render_consolidated_punchlist(langs, batch_root=batch_root, source_lang_name=src_label)
-    )
+    # File Status
+    out.append("## File Status\n")
+    if file_status:
+        for file_info in file_status:
+            file_path = file_info.get("file_path", "Unknown")
+            status = file_info.get("status", "UNKNOWN")
+
+            # Map status to emoji
+            if status == "READY":
+                emoji = "✅"
+            elif status == "REVIEW":
+                emoji = "⚠️"
+            elif status == "FIX":
+                emoji = "❌"
+            else:
+                emoji = "❓"
+
+            out.append(f"- {emoji} **{file_path}** ({status})")
+        out.append("")
+    else:
+        out.append("No files processed.\n")
+
+    # TODO: Punch List will be added in Packet 6 when we populate sections.errors and sections.warnings
+    # src_label = _resolve_source_label(batch_root, rollup)
+    # out.append(
+    #     render_consolidated_punchlist(langs, batch_root=batch_root, source_lang_name=src_label)
+    # )
     out.append("\n")
 
-    # Roll-up table
-    out.append("\n---\n")
-    out.append("## Language Roll-Up\n\n| Language | File | Ready? | Notes |\n|---|---|---|---|")
-    for lang, entry in langs.items():
-        for f in entry.get("files", []):
-            notes = []
-            if f.get("issues", {}).get("untranslated_after_dnt"):
-                notes.append(f"untranslated:{len(f['issues']['untranslated_after_dnt'])}")
-            if f.get("issues", {}).get("missing_translation"):
-                notes.append(f"missing:{len(f['issues']['missing_translation'])}")
-            if f.get("issues", {}).get("timing_fail"):
-                notes.append("timing")
-            if not f.get("metrics", {}).get("parity_ok", True):
-                notes.append("parity")
-            out.append(
-                f"| {lang} | {f.get('target_file')} | {_status_label(f)} | {', '.join(notes) or '—'} |"
-            )
+    # TODO: Language Roll-Up will be added in Packet 6
+    # out.append("\n---\n")
+    # out.append("## Language Roll-Up\n\n| Language | File | Ready? | Notes |\n|---|---|---|---|")
+    # for lang, entry in langs.items():
+    #     for f in entry.get("files", []):
+    #         notes = []
+    #         if f.get("issues", {}).get("untranslated_after_dnt"):
+    #             notes.append(f"untranslated:{len(f['issues']['untranslated_after_dnt'])}")
+    #         if f.get("issues", {}).get("missing_translation"):
+    #             notes.append(f"missing:{len(f['issues']['missing_translation'])}")
+    #         if f.get("issues", {}).get("timing_fail"):
+    #             notes.append("timing")
+    #         if not f.get("metrics", {}).get("parity_ok", True):
+    #             notes.append("parity")
+    #         out.append(
+    #             f"| {lang} | {f.get('target_file')} | {_status_label(f)} | {', '.join(notes) or '—'} |"
+    #         )
 
-    # Add detailed issue sections using new function
-    out.append("\n")
-    out.append(render_issue_sections(langs, batch_root=batch_root, source_lang_name=src_label))
-    out.append("\n")
+    # # Add detailed issue sections using new function
+    # out.append("\n")
+    # out.append(render_issue_sections(langs, batch_root=batch_root, source_lang_name=src_label))
+    # out.append("\n")
 
-    # Per-language key metrics (brief)
-    out.append("\n---\n## Per-Language Details (key metrics)")
-    for lang, entry in langs.items():
-        for f in entry.get("files", []):
-            m = f.get("metrics", {})
-            out.append(f"\n### {lang} — {f.get('target_file')}")
-            out.append(f"- Cue parity: {'OK' if m.get('parity_ok', True) else 'Mismatch'}")
-            out.append(
-                f"- Timing Δstart median/p95={m.get('med_ds_ms', 0):.0f}/{m.get('p95_ds_ms', 0):.0f}ms; Δend median/p95={m.get('med_de_ms', 0):.0f}/{m.get('p95_de_ms', 0):.0f}ms"
-            )
-            out.append(f"- CPS caps used: soft={m.get('cps_soft')} hard={m.get('cps_hard')}\n")
+    # # Per-language key metrics (brief)
+    # out.append("\n---\n## Per-Language Details (key metrics)")
+    # for lang, entry in langs.items():
+    #     for f in entry.get("files", []):
+    #         m = f.get("metrics", {})
+    #         out.append(f"\n### {lang} — {f.get('target_file')}")
+    #         out.append(f"- Cue parity: {'OK' if m.get('parity_ok', True) else 'Mismatch'}")
+    #         out.append(
+    #             f"- Timing Δstart median/p95={m.get('med_ds_ms', 0):.0f}/{m.get('p95_ds_ms', 0):.0f}ms; Δend median/p95={m.get('med_de_ms', 0):.0f}/{m.get('p95_de_ms', 0):.0f}ms"
+    #         )
+    #         out.append(f"- CPS caps used: soft={m.get('cps_soft')} hard={m.get('cps_hard')}\n")
 
     # Glossary
     out.append("\n---\n## Glossary")
