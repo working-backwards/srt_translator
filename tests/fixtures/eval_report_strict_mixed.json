@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "timestamp": "2024-01-01T00:00:00Z",
+  "batch_label": "test-batch-mixed",
+  "source_language": "en",
+  "files_total": 2,
+  "languages_total": 1,
+  "issues_total": 3,
+  "languages": {
+    "es": {
+      "files": {
+        "test1.srt": {
+          "missing_translation": 1,
+          "untranslated_after_dnt": 1,
+          "timing_fail": false,
+          "issues": {
+            "missing_translation": [
+              {
+                "cue": 1,
+                "src": "Hello world",
+                "tgt": "",
+                "context": {
+                  "target": [[1, "Hello world"]],
+                  "source": [[1, "Hola mundo"]]
+                }
+              }
+            ],
+            "untranslated_after_dnt": [
+              {
+                "cue": 2,
+                "src": "API endpoint",
+                "tgt": "Punto final API",
+                "context": {
+                  "target": [[2, "API endpoint"]],
+                  "source": [[2, "Punto final API"]]
+                }
+              }
+            ]
+          }
+        },
+        "test2.srt": {
+          "missing_translation": 1,
+          "untranslated_after_dnt": 0,
+          "timing_fail": true,
+          "issues": {
+            "missing_translation": [
+              {
+                "cue": 3,
+                "src": "Goodbye world",
+                "tgt": "",
+                "context": {
+                  "target": [[3, "Goodbye world"]],
+                  "source": [[3, "Adiós mundo"]]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

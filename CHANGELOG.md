@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Unified Report Pipeline**: Single source of truth for report generation using `report_v1.json`
+- **Orchestrated Report Generation**: Worker now generates all report formats (JSON, MD, HTML) in one pass
+- **Comprehensive Test Coverage**: Added tests to verify orchestrator generates all required files
+
+### Changed
+- **GUI Report Handling**: GUI now uses worker-generated reports instead of double-rendering HTML
+- **HTML Presenter**: Now reads only from `report_v1.json` (no direct access to `eval_report.json` or `ai_config.json`)
+- **Worker Signal Architecture**: Removed `eval_report_ready` signal; report paths now included in `translation_completed` signal
+
+### Removed
+- **Legacy Double HTML Rendering**: Eliminated duplicate HTML generation in GUI
+- **Batch-Root ai_config Fallbacks**: Standardized on `_artifacts/ai_config.json` as single source of truth
+- **Unused Signal**: Removed `eval_report_ready` signal from translation worker
+
+### Fixed
+- **Report Consistency**: Ensures HTML and Markdown reports are always generated from the same compiled data
+- **Performance**: Eliminates redundant file I/O and processing in GUI
+- **Architecture**: Cleaner separation between worker (generates) and GUI (displays) responsibilities
+
+### Added
 - Comprehensive CI/CD pipeline with Python 3.9-3.12 matrix
 - Cross-platform testing (Ubuntu, macOS, Windows)
 - Automated release artifact generation

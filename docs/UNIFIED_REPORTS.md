@@ -69,7 +69,7 @@ Both presenters display the same KPIs in the same order:
 
 ## Input Requirements
 
-Both presenters require the following files in the `_artifacts/` directory:
+Both presenters require the following files in the `artifacts/` directory:
 
 - `eval_report.json` - Must contain: `files_total`, `languages_total`, `issues_total`
 - `ai_config.json` - Must contain: `dnt_terms`, `termbase`, and either `target_languages` or `target_language_codes`

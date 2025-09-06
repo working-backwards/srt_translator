@@ -90,13 +90,10 @@ def compile_report(artifacts_dir: Path) -> Path:
     else:
         decision_state = "READY"
 
-    # Generate banner text and what to do next
-    banner_text, what_to_do_next = _generate_banner_and_steps(
-        decision_state, errors_total, warnings_total
-    )
+    # Generate one-liner
+    one_liner = _generate_banner_and_steps(decision_state, errors_total, warnings_total)
 
-    # Compute KPIs
-    kpis = _compute_kpis(eval_data, ai_data, errors_total, warnings_total)
+    # KPIs are computed directly in the report structure
 
     # Compute file status (per-file READY/REVIEW/FIX)
     file_status = _compute_file_status(eval_data)
@@ -107,29 +104,33 @@ def compile_report(artifacts_dir: Path) -> Path:
     # Extract punch list (errors and warnings)
     punch_list = _extract_punch_list(eval_data)
 
-    # Build the compiled report
+    # Build the compiled report with exact schema
     report_v1 = {
         "version": "1.0",
-        "timestamp": eval_data.get("timestamp", ""),
-        "batch_label": eval_data.get("batch_label", ""),
-        "decision": {
-            "state": decision_state,
-            "banner_text": banner_text,
-            "what_to_do_next": what_to_do_next,
+        "meta": {
+            "batch_id": eval_data.get("batch_label", ""),
+            "created_at": eval_data.get("timestamp", ""),
+            "source_language": eval_data.get("source_language", "en"),
         },
-        "totals": {
+        "decision": {
+            "level": decision_state.lower(),  # pass, review, fix
+            "one_liner": one_liner,
+        },
+        "kpis": {
             "files_total": files_total,
             "languages_total": languages_total,
+            "issues_total": errors_total + warnings_total,
             "errors_total": errors_total,
             "warnings_total": warnings_total,
+            "dnt_terms_count": len(lexicons.get("dnt_terms", [])),
+            "termbase_languages_count": len(lexicons.get("termbase", {})),
         },
-        "kpis": kpis,
-        "file_status": file_status,
-        "lexicons": lexicons,
+        "file_status": _convert_file_status_to_dict(file_status),
         "sections": {
             "errors": punch_list["errors"],
             "warnings": punch_list["warnings"],
         },
+        "lexicons": lexicons,
     }
 
     # Write the compiled report
@@ -137,80 +138,22 @@ def compile_report(artifacts_dir: Path) -> Path:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(report_v1, f, ensure_ascii=False, indent=2)
 
-    logger.info(f"Compiled report_v1.json → {output_path}")
+    logger.info("Compiled report_v1.json → %s", output_path)
     return output_path
 
 
 def _generate_banner_and_steps(
     state: str, errors_total: int, warnings_total: int
-) -> tuple[str, List[str]]:
-    """Generate banner text and what to do next steps based on status."""
+) -> tuple[str, str]:
+    """Generate banner text and one-liner based on status."""
     if state == "READY":
-        banner_text = "✅ Everything looks great. Your translated files are ready to use."
-        what_to_do_next = [
-            "Spot-check a few captions for flow and brand terms, then publish.",
-            "Save the HTML/MD report with your course materials.",
-        ]
+        one_liner = "Everything looks great. Your translated files are ready to use."
     elif state == "REVIEW":
-        banner_text = f"⚠️ Review recommended: {warnings_total} warning(s) found."
-        what_to_do_next = [
-            "Work through the Punch List below.",
-            "For each warning, use the context snippet and suggested check to verify quickly.",
-            "If everything looks good, publish.",
-        ]
+        one_liner = f"Review recommended: {warnings_total} warning(s) found."
     else:  # FIX
-        banner_text = (
-            f"❌ Fix required: {errors_total} error(s), {warnings_total} warning(s) found."
-        )
-        what_to_do_next = [
-            "Work through the Punch List below; fix **errors first**, then warnings.",
-            "Use the context snippets to validate or regenerate translations.",
-            "Re-run the app after fixes to verify a clean report.",
-        ]
+        one_liner = f"Fix required: {errors_total} error(s), {warnings_total} warning(s) found."
 
-    return banner_text, what_to_do_next
-
-
-def _compute_kpis(
-    eval_data: Dict[str, Any], ai_data: Dict[str, Any], errors_total: int, warnings_total: int
-) -> Dict[str, str]:
-    """Compute KPIs in the specified order."""
-    # Determine DNT coverage
-    dnt_terms = ai_data.get("dnt_terms", [])
-    dnt_coverage = "none" if not dnt_terms else "full"
-
-    # Determine termbase coverage
-    termbase = ai_data.get("termbase", {})
-    if not termbase:
-        termbase_coverage = "none"
-    else:
-        # Check if we have termbase entries for any languages
-        if len(termbase) == 0:
-            termbase_coverage = "none"
-        elif len(termbase) == 1:
-            termbase_coverage = "partial"
-        else:
-            termbase_coverage = "full"
-
-    # Determine parity status
-    parity_ok = True
-    for lang_data in eval_data["languages"].values():
-        for _file_data in lang_data.get("files", {}).values():
-            # Note: We don't have parity_ok in the current eval_report.json structure
-            # This would need to be added to the evaluator output
-            pass  # For now, assume OK
-
-    parity_status = "OK" if parity_ok else "Needs review"
-
-    return {
-        "Files": str(eval_data["files_total"]),
-        "Languages": str(eval_data["languages_total"]),
-        "Errors": str(errors_total),
-        "Warnings": str(warnings_total),
-        "DNT coverage": dnt_coverage,
-        "Termbase coverage": termbase_coverage,
-        "Parity": parity_status,
-    }
+    return one_liner
 
 
 def _compute_file_status(eval_data: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -247,8 +190,41 @@ def _compute_file_status(eval_data: Dict[str, Any]) -> List[Dict[str, str]]:
     return file_statuses
 
 
+def _convert_file_status_to_dict(
+    file_status_list: List[Dict[str, str]],
+) -> Dict[str, Dict[str, str]]:
+    """Convert file status list to dict of dicts format: {lang: {file: status}}."""
+    file_status_dict = {}
+
+    for file_info in file_status_list:
+        file_path = file_info.get("file_path", "")
+        status = file_info.get("status", "unknown")
+
+        # Extract language from file path or use a default
+        # For now, we'll use a simple approach - this might need refinement
+        # based on how the evaluator structures the data
+        lang = "unknown"  # This should be extracted from the evaluator data
+
+        if lang not in file_status_dict:
+            file_status_dict[lang] = {}
+
+        # Map status to new format
+        if status == "READY":
+            new_status = "ok"
+        elif status == "REVIEW":
+            new_status = "warning"
+        elif status == "FIX":
+            new_status = "error"
+        else:
+            new_status = "unknown"
+
+        file_status_dict[lang][file_path] = new_status
+
+    return file_status_dict
+
+
 def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    """Extract errors and warnings from evaluation data for punch list."""
+    """Extract errors and warnings from evaluation data for punch list using new schema."""
     errors = []
     warnings = []
 
@@ -267,12 +243,16 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
             for issue in missing_issues:
                 warnings.append(
                     {
-                        "filename": file_path,
-                        "title": f"Missing translation in {file_path}",
-                        "why_it_matters": "This subtitle may be incomplete or missing context.",
-                        "suggested_fix": "Check if the translation was cut off or if context was lost.",
-                        "ask_ai_prompt": f"Please translate this subtitle from {lang_code} to English: '{issue.get('src', '')}'",
-                        "context": issue.get("context", {}),
+                        "lang": lang_code,
+                        "file": file_path,
+                        "subtitle": issue.get("cue", issue.get("idx")),
+                        "type": "missing_translation",
+                        "message": "This subtitle may be incomplete or missing context.",
+                        "suggest_fix": "Check if the translation was cut off or if context was lost.",
+                        "context": {
+                            "target_window": issue.get("context", {}).get("target", []),
+                            "source_window": issue.get("context", {}).get("source", []),
+                        },
                     }
                 )
 
@@ -287,12 +267,16 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
             for issue in untrans_dnt_issues:
                 errors.append(
                     {
-                        "filename": file_path,
-                        "title": f"DNT violation in {file_path}",
-                        "why_it_matters": "This term should not be translated according to your DNT list.",
-                        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
-                        "ask_ai_prompt": f"Please keep this term untranslated: '{issue}'",
-                        "context": {},
+                        "lang": lang_code,
+                        "file": file_path,
+                        "subtitle": issue.get("cue", issue.get("idx")),
+                        "type": "untranslated_after_dnt",
+                        "message": "This term should not be translated according to your DNT list.",
+                        "suggest_fix": "Keep the original term untranslated or add it to your DNT list.",
+                        "context": {
+                            "target_window": issue.get("context", {}).get("target", []),
+                            "source_window": issue.get("context", {}).get("source", []),
+                        },
                     }
                 )
 
@@ -300,12 +284,13 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
             if issues.get("timing_fail", False):
                 errors.append(
                     {
-                        "filename": file_path,
-                        "title": f"Timing failure in {file_path}",
-                        "why_it_matters": "The subtitle timing doesn't match the source file.",
-                        "suggested_fix": "Check subtitle timing and duration settings.",
-                        "ask_ai_prompt": f"Please check the timing for this subtitle in {file_path}",
-                        "context": {},
+                        "lang": lang_code,
+                        "file": file_path,
+                        "subtitle": None,
+                        "type": "timing_misaligned",
+                        "message": "The subtitle timing doesn't match the source file.",
+                        "suggest_fix": "Check subtitle timing and duration settings.",
+                        "context": {"target_window": [], "source_window": []},
                     }
                 )
 

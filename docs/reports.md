@@ -4,23 +4,29 @@ After each translation, the evaluator runs automatically and writes artifacts to
 
 > **Tip:** If reports show brand/term issues, go back to **AI Config**, put your most term-dense files first, **Regenerate**, then re-translate. See **Create AI Config** for the workflow.
 
-## Where config is discovered
+## Configuration and Pipeline
 
 - **Rubric:** `config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
-- **DNT / Termbase:** the **client writes** these to the **batch root**:
-  - `dnt_summary.json` — **audit mirror** of DNT terms (optional; not used by eval).
-  - `termbase_summary.json` — **audit mirror** of termbase (optional; not used by eval).
-
-> The evaluator **does not** fall back to `ai_config.json`. If you want DNT/TB coverage, ensure those two JSON files are written to the batch root.
+- **AI Config:** `_artifacts/ai_config.json` (single source of truth). Contains DNT terms, termbase, and target languages.
+- **Unified Pipeline:** The evaluator orchestrates all report generation in one pass:
+  1. **Evaluator** writes `eval_report.json` (raw evaluation data with issue details)
+  2. **Compiler** creates `report_v1.json` (single source of truth for presenters)
+  3. **Presenters** render `eval_report.md` and `eval_report.html` from compiled data only
+- **No Double Rendering:** GUI and CLI call the orchestrator; no direct presenter calls elsewhere.
 
 ## What the evaluator writes
 
-At the batch root:
+In the `_artifacts/` directory:
 
-- `eval_report.md` — creator-friendly, consolidated punch list (shows **all** issues).
-- `artifacts/<lang>/…` — per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
-  - DNT/TB snapshots **may** be copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for auditing. Evaluation does **not** read them.
-  - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
+- `eval_report.json` — Raw evaluation data (internal format)
+- `report_v1.json` — Compiled report data (single source of truth for presenters)
+- `eval_report.md` — Creator-friendly Markdown report
+- `eval_report.html` — Interactive HTML report
+- `ai_config.json` — Configuration snapshot used for evaluation
+
+In `_artifacts/<lang>/` directories:
+- Per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments)
+- **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`)
 
 ## Re-running evaluation
 
