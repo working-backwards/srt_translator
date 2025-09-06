@@ -101,8 +101,8 @@ class TestEvalCLI:
             assert result == 2
 
     @patch("srt_translator.eval.runner.run_batch_evaluation")
-    @patch("srt_translator.eval.report.write_batch_report")
-    def test_successful_evaluation(self, mock_write_report, mock_run_eval, tmp_path):
+    @patch("srt_translator.eval.report.emit_all_reports")
+    def test_successful_evaluation(self, mock_emit_reports, mock_run_eval, tmp_path):
         """Test successful evaluation run."""
         batch_dir = create_incomplete_batch(tmp_path)
 
@@ -120,14 +120,14 @@ class TestEvalCLI:
             },
         }
         mock_run_eval.return_value = mock_rollup
-        mock_write_report.return_value = batch_dir / "eval_report.md"
+        mock_emit_reports.return_value = None
 
         with patch("sys.argv", ["st-eval", "--batch-root", str(batch_dir)]):
             result = main()
             assert result == 3  # No rollup produced due to validation failure
             # Mocks should not be called since validation fails before evaluation
             mock_run_eval.assert_not_called()
-            mock_write_report.assert_not_called()
+            mock_emit_reports.assert_not_called()
 
     @patch("srt_translator.eval.runner.run_batch_evaluation")
     def test_no_rollup_produced(self, mock_run_eval, tmp_path):
@@ -142,8 +142,8 @@ class TestEvalCLI:
             assert result == 3
 
     @patch("srt_translator.eval.runner.run_batch_evaluation")
-    @patch("srt_translator.eval.report.write_batch_report")
-    def test_report_write_failure(self, mock_write_report, mock_run_eval, tmp_path):
+    @patch("srt_translator.eval.report.emit_all_reports")
+    def test_report_write_failure(self, mock_emit_reports, mock_run_eval, tmp_path):
         """Test handling when report writing fails."""
         batch_dir = create_incomplete_batch(tmp_path)
 
@@ -161,7 +161,7 @@ class TestEvalCLI:
             },
         }
         mock_run_eval.return_value = mock_rollup
-        mock_write_report.side_effect = Exception("Report write failed")
+        mock_emit_reports.side_effect = Exception("Report write failed")
 
         with patch("sys.argv", ["st-eval", "--batch-root", str(batch_dir)]):
             result = main()
@@ -198,8 +198,8 @@ class TestEvalCLI:
             }
             mock_run_eval.return_value = mock_rollup
 
-            with patch("srt_translator.eval.report.write_batch_report") as mock_write_report:
-                mock_write_report.return_value = batch_dir / "eval_report.md"
+            with patch("srt_translator.eval.report.emit_all_reports") as mock_emit_reports:
+                mock_emit_reports.return_value = None
 
                 with patch("sys.argv", ["st-eval", "--batch-root", str(batch_dir), "-v"]):
                     result = main()

@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from srt_translator.eval.report import write_batch_report
 from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.eval.tools import evaluate_pair, generate_eval
 
@@ -117,24 +116,6 @@ class TestEvaluationRunner:
 
         sig = inspect.signature(run_batch_evaluation)
         expected_params = ["batch_root", "logger", "language_config"]
-
-        for param in expected_params:
-            assert param in sig.parameters
-
-
-class TestEvaluationReport:
-    """Test the evaluation report module."""
-
-    def test_write_batch_report_import(self):
-        """Test that write_batch_report can be imported and called."""
-        assert callable(write_batch_report)
-
-    def test_write_batch_report_signature(self):
-        """Test that write_batch_report has the expected signature."""
-        import inspect
-
-        sig = inspect.signature(write_batch_report)
-        expected_params = ["batch_root", "rollup", "logger"]
 
         for param in expected_params:
             assert param in sig.parameters
