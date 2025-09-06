@@ -1,0 +1,10 @@
+{
+  "dnt_terms": ["API", "JSON", "HTTP"],
+  "termbase": {
+    "ja": {
+      "hello": "こんにちは",
+      "world": "世界",
+      "test": "テスト"
+    }
+  }
+}

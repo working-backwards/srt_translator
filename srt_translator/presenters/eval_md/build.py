@@ -6,7 +6,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-_REQUIRED = {"decision", "kpis", "file_status", "sections", "lexicons"}
+_REQUIRED = {"decision", "totals", "kpis", "file_status", "punch_list", "lexicons"}
 
 
 def _get_what_to_do_steps(decision_level: str, kpis: dict) -> list[str]:
@@ -50,9 +50,10 @@ def build_eval_md(report_v1_path: Path, out_path: Path | None = None) -> Path:
         out_path = report_v1_path.with_name("eval_report.md")
 
     decision = data["decision"]
+    totals = data["totals"]
     kpis = data["kpis"]
     file_status = data["file_status"]
-    sections = data["sections"]
+    punch_list = data["punch_list"]
     lexicons = data["lexicons"]
 
     # Extract decision level and one-liner
@@ -63,131 +64,174 @@ def build_eval_md(report_v1_path: Path, out_path: Path | None = None) -> Path:
     icon = {"pass": "✅", "review": "⚠️", "fix": "❌"}.get(decision_level, "⚠️")
 
     lines: list[str] = []
-    # Banner
+
+    # 1. Decision Banner + One-liner
     lines.append(f"# {icon} {one_liner}".rstrip())
     lines.append("")
-    lines.append("## What to do next")
-    steps = _get_what_to_do_steps(decision_level, kpis)
-    for step in steps:
-        lines.append(f"- {step}")
-    lines.append("")
 
-    # KPI strip
-    lines.append("## KPIs")
-    lines.append(f"- **Files:** {kpis.get('files_total', 0)}")
-    lines.append(f"- **Languages:** {kpis.get('languages_total', 0)}")
-    lines.append(f"- **Errors:** {kpis.get('errors_total', 0)}")
-    lines.append(f"- **Warnings:** {kpis.get('warnings_total', 0)}")
-    lines.append(f"- **DNT terms:** {kpis.get('dnt_terms_count', 0)}")
-    lines.append(f"- **Termbase languages:** {kpis.get('termbase_languages_count', 0)}")
-    lines.append("")
+    # 2. Punch List
+    errors = punch_list.get("errors", [])
+    warnings = punch_list.get("warnings", [])
 
-    # Per-file status
-    lines.append("## File Status")
-    if file_status:
-        for lang in sorted(file_status.keys()):
-            lang_files = file_status[lang]
-            for file_path in sorted(lang_files.keys()):
-                status = lang_files[file_path]
-                # Map status to emoji
-                if status == "ok":
-                    emoji = "✅"
-                elif status == "warning":
-                    emoji = "⚠️"
-                elif status == "error":
-                    emoji = "❌"
-                else:
-                    emoji = "❓"
-                lines.append(f"- {emoji} **{lang}/{file_path}** ({status})")
-    else:
-        lines.append("No files processed.")
-    lines.append("")
-
-    # Punch List
-    errors = sections.get("errors", [])
-    warnings = sections.get("warnings", [])
-
+    # Always show Critical Issues section
+    lines.append("## ❌ Critical Issues")
     if errors:
-        lines.append("## ❌ Critical Issues")
         for error in errors:
             lines.append(f"### {error.get('file', 'Unknown')}: {error.get('type', 'Error')}")
-            lines.append(f"**Message:** {error.get('message', '')}")
-            lines.append(f"**Suggested fix:** {error.get('suggest_fix', '')}")
+            lines.append(f"**Language:** {error.get('language', 'Unknown')}")
+            if error.get("cue_index") is not None:
+                lines.append(f"**Cue Index:** {error.get('cue_index')}")
+            lines.append(f"**Summary:** {error.get('human_summary', '')}")
+            lines.append(f"**Suggested fix:** {error.get('suggested_fix', '')}")
             # Render context if available
             context = error.get("context", {})
             if context:
-                target_window = context.get("target_window", [])
-                source_window = context.get("source_window", [])
-                if target_window or source_window:
+                source = context.get("source", {})
+                target = context.get("target", {})
+                if source or target:
                     lines.append("**Context:**")
-                    if target_window:
-                        lines.append("**Target context:**")
-                        lines.append("```")
-                        lines.extend(target_window)
-                        lines.append("```")
-                    if source_window:
+                    if source:
                         lines.append("**Source context:**")
                         lines.append("```")
-                        lines.extend(source_window)
+                        for k, v in source.items():
+                            if v:
+                                lines.append(f"{k}: {v}")
+                        lines.append("```")
+                    if target:
+                        lines.append("**Target context:**")
+                        lines.append("```")
+                        for k, v in target.items():
+                            if v:
+                                lines.append(f"{k}: {v}")
                         lines.append("```")
             lines.append("")
+    else:
+        lines.append("No critical issues found.")
+        lines.append("")
 
+    # Always show Warnings section
+    lines.append("## ⚠️ Warnings")
     if warnings:
-        lines.append("## ⚠️ Warnings")
         for warning in warnings:
             lines.append(f"### {warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}")
-            lines.append(f"**Message:** {warning.get('message', '')}")
-            lines.append(f"**Suggested fix:** {warning.get('suggest_fix', '')}")
+            lines.append(f"**Language:** {warning.get('language', 'Unknown')}")
+            if warning.get("cue_index") is not None:
+                lines.append(f"**Cue Index:** {warning.get('cue_index')}")
+            lines.append(f"**Summary:** {warning.get('human_summary', '')}")
+            lines.append(f"**Suggested fix:** {warning.get('suggested_fix', '')}")
             # Render context if available
             context = warning.get("context", {})
             if context:
-                target_window = context.get("target_window", [])
-                source_window = context.get("source_window", [])
-                if target_window or source_window:
+                source = context.get("source", {})
+                target = context.get("target", {})
+                if source or target:
                     lines.append("**Context:**")
-                    if target_window:
-                        lines.append("**Target context:**")
-                        lines.append("```")
-                        lines.extend(target_window)
-                        lines.append("```")
-                    if source_window:
+                    if source:
                         lines.append("**Source context:**")
                         lines.append("```")
-                        lines.extend(source_window)
+                        for k, v in source.items():
+                            if v:
+                                lines.append(f"{k}: {v}")
+                        lines.append("```")
+                    if target:
+                        lines.append("**Target context:**")
+                        lines.append("```")
+                        for k, v in target.items():
+                            if v:
+                                lines.append(f"{k}: {v}")
                         lines.append("```")
             lines.append("")
+    else:
+        lines.append("No warnings found.")
+        lines.append("")
 
     if not errors and not warnings:
         lines.append("## ✅ No Issues Found")
         lines.append("All files passed evaluation with no errors or warnings.")
         lines.append("")
 
-    # DNT + Termbase
-    lines.append("## Lexicons")
-    dnt_terms = lexicons.get("dnt_terms", [])
-    termbase = lexicons.get("termbase", {})
+    # 3. File Status by Language
+    lines.append("## File Status by Language")
+    if file_status:
+        for lang in sorted(file_status.keys()):
+            lang_files = file_status[lang]
+            ready_count = sum(1 for status in lang_files.values() if status == "ready")
+            review_count = sum(1 for status in lang_files.values() if status == "review")
+            error_count = sum(1 for status in lang_files.values() if status == "error")
 
+            lines.append(f"### {lang.upper()}")
+            lines.append(f"- ✅ Ready: {ready_count}")
+            lines.append(f"- ⚠️ Review: {review_count}")
+            lines.append(f"- ❌ Error: {error_count}")
+            lines.append("")
+
+            for file_path in sorted(lang_files.keys()):
+                status = lang_files[file_path]
+                # Map status to emoji
+                if status == "ready":
+                    emoji = "✅"
+                elif status == "review":
+                    emoji = "⚠️"
+                elif status == "error":
+                    emoji = "❌"
+                else:
+                    emoji = "❓"
+                lines.append(f"  - {emoji} **{file_path}** ({status})")
+            lines.append("")
+    else:
+        lines.append("No files processed.")
+        lines.append("")
+
+    # 4. KPI Summary
+    lines.append("## KPI Summary")
+    lines.append(f"- **Files:** {totals.get('files_total', 0)}")
+    lines.append(f"- **Languages:** {totals.get('languages_total', 0)}")
+    lines.append(f"- **Issues:** {totals.get('issues_total', 0)}")
+    lines.append(f"- **Errors:** {kpis.get('errors_total', 0)}")
+    lines.append(f"- **Warnings:** {kpis.get('warnings_total', 0)}")
+
+    # Per-type counts
+    per_type = kpis.get("per_type", {})
+    if per_type:
+        lines.append("")
+        lines.append("### Issues by Type")
+        for issue_type, count in per_type.items():
+            if count > 0:
+                lines.append(f"- **{issue_type.replace('_', ' ').title()}:** {count}")
+    lines.append("")
+
+    # 5. Lexicons
+    lines.append("## Lexicons")
+
+    # DNT Terms
+    dnt = lexicons.get("dnt", {})
     lines.append("### DNT Terms")
-    if dnt_terms:
-        for term in dnt_terms:
+    if dnt.get("count", 0) > 0:
+        lines.append(f"**Count:** {dnt.get('count', 0)}")
+        lines.append("**Sample:**")
+        for term in dnt.get("sample", []):
             lines.append(f"- `{term}`")
     else:
         lines.append("_None_")
     lines.append("")
 
+    # Termbases
+    termbases = lexicons.get("termbases", {})
     lines.append("### Termbases")
-    if termbase:
-        for lang in sorted(termbase.keys()):
-            terms = termbase[lang]
-            lines.append(f"#### {lang}")
-            for term in terms:
-                source = term.get("source", "")
-                preferred = term.get("preferred", "")
-                lines.append(f"- `{source}` → `{preferred}`")
+    if termbases:
+        for lang in sorted(termbases.keys()):
+            tb = termbases[lang]
+            lines.append(f"#### {lang.upper()}")
+            lines.append(f"**Count:** {tb.get('count', 0)}")
+            if tb.get("sample"):
+                lines.append("**Sample:**")
+                for entry in tb.get("sample", []):
+                    source = entry.get("source", "")
+                    target = entry.get("target", "")
+                    lines.append(f"- `{source}` → `{target}`")
             lines.append("")
     else:
         lines.append("_None_")
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    log.info("Wrote eval_report.md: %s", out_path)
     return out_path

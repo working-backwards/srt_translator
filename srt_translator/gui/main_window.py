@@ -814,6 +814,30 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Qt deleteLater handles cleanup automatically
 
+    def _after_eval_finished(self, report_paths: dict):
+        """Handle evaluation completion - consume paths only, no double rendering"""
+        self.logger.info("Evaluation completed - reports available:")
+        for name, path in report_paths.items():
+            self.logger.info(f"  {name}: {path}")
+
+        # Store paths for UI access (e.g., "Open HTML Report" button)
+        self._last_eval_json = Path(report_paths.get("eval_report_json", ""))
+        self._last_eval_html = Path(report_paths.get("eval_report_html", ""))
+
+        # Enable HTML report button if HTML report exists
+        if self._last_eval_html and self._last_eval_html.exists():
+            self.translation_section.open_html_btn.setEnabled(True)
+            self.translation_section.open_html_btn.clicked.connect(lambda: self._open_html_report())
+
+    def _open_html_report(self):
+        """Open the HTML report in the default browser"""
+        if self._last_eval_html and self._last_eval_html.exists():
+            import webbrowser
+
+            webbrowser.open(f"file://{self._last_eval_html.absolute()}")
+        else:
+            QMessageBox.warning(self, "Report Not Available", "HTML report not found.")
+
     def closeEvent(self, event):
         """Handle window close event"""
         # Request cooperative stop of translation worker

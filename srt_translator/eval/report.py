@@ -65,20 +65,33 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     for lang_code, lang_data in languages.items():
         per_language_file_counts[lang_code] = {}
-        for file_data in lang_data.get("files", []):
-            file_path = file_data.get("target_file", "")
-            issues = file_data.get("issues", {})
+        files = lang_data.get("files", {})
 
-            # Extract issue counts
-            missing_count = len(issues.get("missing_translation", []))
-            untrans_dnt_count = len(issues.get("untranslated_after_dnt", []))
-            timing_fail_count = 1 if issues.get("timing_fail") else 0
+        # Handle both list and dict formats
+        if isinstance(files, list):
+            # Full rollup format with files as list
+            for file_data in files:
+                file_path = file_data.get("target_file", "")
+                issues = file_data.get("issues", {})
 
-            per_language_file_counts[lang_code][file_path] = {
-                "missing_translation": missing_count,
-                "untranslated_after_dnt": untrans_dnt_count,
-                "timing_fail": timing_fail_count,
-            }
+                # Extract issue counts
+                missing_count = len(issues.get("missing_translation", []))
+                untrans_dnt_count = len(issues.get("untranslated_after_dnt", []))
+                timing_fail_count = 1 if issues.get("timing_fail") else 0
+
+                per_language_file_counts[lang_code][file_path] = {
+                    "missing_translation": missing_count,
+                    "untranslated_after_dnt": untrans_dnt_count,
+                    "timing_fail": timing_fail_count,
+                }
+        else:
+            # Simplified format with files as dict
+            for file_path, file_data in files.items():
+                per_language_file_counts[lang_code][file_path] = {
+                    "missing_translation": file_data.get("missing_translation", 0),
+                    "untranslated_after_dnt": file_data.get("untranslated_after_dnt", 0),
+                    "timing_fail": file_data.get("timing_fail", 0),
+                }
 
     # Get source language
     source_language = rollup.get("original_language", {}).get("detected", "")
@@ -121,23 +134,12 @@ def write_evaluator_json(artifacts_dir: Path, rollup: dict) -> Path:
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     # Write eval_report.json using existing function
+    # Note: _write_json_report expects batch_root and writes to batch_root/artifacts/
+    # Since we want to write directly to artifacts_dir, pass artifacts_dir.parent
     json_path = _write_json_report(artifacts_dir.parent, rollup, logger)
 
     logger.info("Wrote eval_report.json: %s", json_path)
     return json_path
-
-
-def render_html(artifacts_dir: Path, report_json: Path) -> Path:
-    """Render HTML report from report_v1.json."""
-    from srt_translator.presenters.eval_html.build import build_eval_html
-
-    logger = logging.getLogger(__name__)
-
-    # Use existing HTML builder
-    html_path = build_eval_html(report_json, artifacts_dir / "eval_report.html")
-    logger.info("Wrote eval_report.html: %s", html_path)
-
-    return html_path
 
 
 def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
@@ -150,22 +152,29 @@ def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
     # Step 1: Write eval_report.json
     eval_json_path = write_evaluator_json(artifacts_dir, rollup)
 
-    # Step 2: Verify ai_config.json exists
+    # Step 2: Verify ai_config.json exists in artifacts directory
     ai_config_path = artifacts_dir / "ai_config.json"
     if not ai_config_path.exists():
         raise ValueError(f"ai_config.json not found in artifacts directory: {ai_config_path}")
 
     # Step 3: Compile report_v1.json
-    from srt_translator.report.compiler import compile_report
+    from srt_translator.report import compile_report
 
     report_v1_path = compile_report(artifacts_dir)
     logger.info("Compiled report_v1.json: %s", report_v1_path)
 
     # Step 4: Render markdown and HTML
+    from srt_translator.presenters.eval_html.build import build_eval_html
     from srt_translator.presenters.eval_md.build import build_eval_md
 
     md_path = build_eval_md(report_v1_path, artifacts_dir / "eval_report.md")
-    html_path = render_html(artifacts_dir, report_v1_path)
+    html_path = build_eval_html(report_v1_path, artifacts_dir / "eval_report.html")
+
+    # Log all generated files
+    logger.info("Wrote eval_report.json: %s", eval_json_path)
+    logger.info("Compiled report_v1.json: %s", report_v1_path)
+    logger.info("Wrote eval_report.md: %s", md_path)
+    logger.info("Wrote eval_report.html: %s", html_path)
 
     return {
         "eval_report_json": eval_json_path,

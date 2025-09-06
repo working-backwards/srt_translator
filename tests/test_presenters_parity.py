@@ -1,300 +1,331 @@
-"""Tests for presenter parity between HTML and MD presenters."""
+"""Tests for presenter parity between HTML and Markdown."""
 
 import json
-import tempfile
-from pathlib import Path
 
 from srt_translator.presenters.eval_html.build import build_eval_html
 from srt_translator.presenters.eval_md.build import build_eval_md
 
 
 class TestPresentersParity:
-    """Test that HTML and MD presenters produce equivalent content."""
+    """Test cases for presenter parity between HTML and Markdown."""
 
-    def test_ready_case_parity(self):
-        """Test parity for READY case (no issues)."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            artifacts_dir = Path(temp_dir) / "artifacts"
-            artifacts_dir.mkdir()
+    def test_presenters_section_order(self, tmp_path):
+        """Test that both presenters render sections in the same order."""
+        # Create a test report_v1.json
+        report_data = {
+            "version": "1.0",
+            "meta": {
+                "batch_id": "test-batch",
+                "created_at": "2024-01-01T00:00:00Z",
+                "source_language": "en",
+            },
+            "decision": {
+                "level": "review",
+                "one_liner": "We found 2 warnings. Fix the items in the Punch List below.",
+            },
+            "totals": {
+                "files_total": 2,
+                "languages_total": 1,
+                "issues_total": 2,
+            },
+            "kpis": {
+                "errors_total": 0,
+                "warnings_total": 2,
+                "per_type": {
+                    "missing_translation": 2,
+                    "untranslated_after_dnt": 0,
+                    "timing_fail": 0,
+                },
+            },
+            "file_status": {
+                "ja": {
+                    "file1.srt": "review",
+                    "file2.srt": "ready",
+                }
+            },
+            "punch_list": {
+                "errors": [],
+                "warnings": [
+                    {
+                        "language": "ja",
+                        "file": "file1.srt",
+                        "cue_index": 5,
+                        "type": "missing_translation",
+                        "human_summary": "This subtitle may be incomplete.",
+                        "suggested_fix": "Copy ±2 target lines, back-translate to verify completeness.",
+                        "context": {
+                            "source": {"cur": "Hello world", "next1": "How are you?"},
+                            "target": {"cur": "こんにちは", "next1": "お元気ですか？"},
+                        },
+                    },
+                    {
+                        "language": "ja",
+                        "file": "file1.srt",
+                        "cue_index": 10,
+                        "type": "missing_translation",
+                        "human_summary": "This subtitle may be incomplete.",
+                        "suggested_fix": "Copy ±2 target lines, back-translate to verify completeness.",
+                        "context": {
+                            "source": {"cur": "Good morning", "next1": "Have a nice day"},
+                            "target": {"cur": "おはよう", "next1": "良い一日を"},
+                        },
+                    },
+                ],
+            },
+            "lexicons": {
+                "dnt": {
+                    "count": 2,
+                    "sample": ["API", "JSON"],
+                },
+                "termbases": {
+                    "ja": {
+                        "count": 2,
+                        "sample": [
+                            {"source": "hello", "target": "こんにちは"},
+                            {"source": "world", "target": "世界"},
+                        ],
+                    }
+                },
+            },
+        }
 
-            # Create realistic report_v1.json with READY status
-            report_v1_data = {
-                "version": "1.0.0",
+        # Write test file
+        report_path = tmp_path / "report_v1.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f)
+
+        # Generate both reports
+        html_path = build_eval_html(report_path, tmp_path / "test.html")
+        md_path = build_eval_md(report_path, tmp_path / "test.md")
+
+        # Read both outputs
+        html_content = html_path.read_text(encoding="utf-8")
+        md_content = md_path.read_text(encoding="utf-8")
+
+        # Test that both contain the same decision banner
+        assert "⚠️ We found 2 warnings" in html_content
+        assert "⚠️ We found 2 warnings" in md_content
+
+        # Test that both contain punch list sections
+        assert "❌ Critical Issues" in html_content
+        assert "❌ Critical Issues" in md_content
+        assert "⚠️ Warnings" in html_content
+        assert "⚠️ Warnings" in md_content
+
+        # Test that both contain file status sections
+        assert "File Status by Language" in html_content
+        assert "File Status by Language" in md_content
+
+        # Test that both contain KPI sections
+        assert "KPI Summary" in html_content
+        assert "KPI Summary" in md_content
+
+        # Test that both contain lexicons sections
+        assert "Lexicons" in html_content
+        assert "Lexicons" in md_content
+
+    def test_presenters_banner_consistency(self, tmp_path):
+        """Test that banner icon and text are consistent between presenters."""
+        test_cases = [
+            ("pass", "✅", "Everything looks great. Your translated files are ready to use."),
+            ("review", "⚠️", "We found 1 warnings. Fix the items in the Punch List below."),
+            ("fix", "❌", "We found 1 errors that must be fixed before publishing."),
+        ]
+
+        for decision_level, expected_icon, expected_text in test_cases:
+            # Create test report
+            report_data = {
+                "version": "1.0",
                 "meta": {
-                    "batch_id": "test-batch",
-                    "created_at": "2025-01-01T00:00:00Z",
+                    "batch_id": "test",
+                    "created_at": "2024-01-01T00:00:00Z",
                     "source_language": "en",
                 },
-                "decision": {
-                    "level": "ready",
-                    "one_liner": "Everything looks great. Your translated files are ready to use.",
-                },
-                "kpis": {
-                    "files_total": 1,
-                    "languages_total": 1,
-                    "errors_total": 0,
-                    "warnings_total": 0,
-                    "dnt_terms_count": 1,
-                    "termbase_languages_count": 1,
-                },
-                "file_status": {
-                    "test - FR.srt": {"language": "fr", "status": "ready", "issues": []}
-                },
-                "lexicons": {
-                    "dnt_terms": ["test"],
-                    "termbase": {"fr": [{"source": "test", "target": "test"}]},
-                },
-                "sections": {"errors": [], "warnings": []},
-            }
-
-            report_v1_path = artifacts_dir / "report_v1.json"
-            report_v1_path.write_text(json.dumps(report_v1_data, indent=2), encoding="utf-8")
-
-            # Generate both presentations
-            html_path = build_eval_html(report_v1_path)
-            md_path = build_eval_md(report_v1_path)
-
-            html_content = html_path.read_text(encoding="utf-8")
-            md_content = md_path.read_text(encoding="utf-8")
-
-            # Check decision one-liner parity
-            expected_banner = "Everything looks great. Your translated files are ready to use."
-            assert expected_banner in html_content
-            assert expected_banner in md_content
-
-            # Check that "No Issues Found" appears (no issues)
-            assert "No Issues Found" in html_content
-            assert "No Issues Found" in md_content
-
-            # Check KPI labels and values
-            expected_kpi_labels = ["Files:", "Languages:", "Errors:", "Warnings:"]
-            for label in expected_kpi_labels:
-                assert label in html_content
-                assert label in md_content
-
-            # Check DNT and Termbase headings
-            assert "DNT Terms" in html_content
-            assert "DNT Terms" in md_content
-            assert "Termbase" in html_content
-            assert "Termbase" in md_content
-
-    def test_review_case_parity(self):
-        """Test parity for REVIEW case (warnings only)."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            artifacts_dir = Path(temp_dir) / "artifacts"
-            artifacts_dir.mkdir()
-
-            # Create realistic report_v1.json with REVIEW status
-            report_v1_data = {
-                "version": "1.0.0",
-                "timestamp": "2025-01-01T00:00:00Z",
-                "batch_label": "test-batch",
-                "decision": {
-                    "state": "REVIEW",
-                    "banner_text": "Review recommended. Check warnings before publishing.",
-                },
+                "decision": {"level": decision_level, "one_liner": expected_text},
                 "totals": {
                     "files_total": 1,
                     "languages_total": 1,
-                    "errors_total": 0,
-                    "warnings_total": 1,
+                    "issues_total": 0 if decision_level == "pass" else 1,
                 },
                 "kpis": {
-                    "Files": "1",
-                    "Languages": "1",
-                    "Errors": "0",
-                    "Warnings": "1",
-                    "DNT coverage": "full",
-                    "Termbase coverage": "full",
-                    "Parity": "100%",
+                    "errors_total": 1 if decision_level == "fix" else 0,
+                    "warnings_total": 1 if decision_level == "review" else 0,
+                    "per_type": {},
                 },
-                "file_status": {
-                    "test - FR.srt": {
-                        "language": "fr",
-                        "status": "review",
-                        "issues": ["missing_translation"],
+                "file_status": {"ja": {"file1.srt": "ready"}},
+                "punch_list": {"errors": [], "warnings": []},
+                "lexicons": {"dnt": {"count": 0, "sample": []}, "termbases": {}},
+            }
+
+            # Write test file
+            report_path = tmp_path / f"report_{decision_level}.json"
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report_data, f)
+
+            # Generate both reports
+            html_path = build_eval_html(report_path, tmp_path / f"test_{decision_level}.html")
+            md_path = build_eval_md(report_path, tmp_path / f"test_{decision_level}.md")
+
+            # Read both outputs
+            html_content = html_path.read_text(encoding="utf-8")
+            md_content = md_path.read_text(encoding="utf-8")
+
+            # Test icon consistency
+            assert f"{expected_icon} {expected_text}" in html_content
+            assert f"{expected_icon} {expected_text}" in md_content
+
+    def test_presenters_no_issues_found_consistency(self, tmp_path):
+        """Test that 'No Issues Found' appears only when totals are zero."""
+        # Test case 1: No issues
+        report_data_no_issues = {
+            "version": "1.0",
+            "meta": {
+                "batch_id": "test",
+                "created_at": "2024-01-01T00:00:00Z",
+                "source_language": "en",
+            },
+            "decision": {
+                "level": "pass",
+                "one_liner": "Everything looks great. Your translated files are ready to use.",
+            },
+            "totals": {"files_total": 1, "languages_total": 1, "issues_total": 0},
+            "kpis": {"errors_total": 0, "warnings_total": 0, "per_type": {}},
+            "file_status": {"ja": {"file1.srt": "ready"}},
+            "punch_list": {"errors": [], "warnings": []},
+            "lexicons": {"dnt": {"count": 0, "sample": []}, "termbases": {}},
+        }
+
+        # Test case 2: With issues
+        report_data_with_issues = {
+            "version": "1.0",
+            "meta": {
+                "batch_id": "test",
+                "created_at": "2024-01-01T00:00:00Z",
+                "source_language": "en",
+            },
+            "decision": {
+                "level": "review",
+                "one_liner": "We found 1 warnings. Fix the items in the Punch List below.",
+            },
+            "totals": {"files_total": 1, "languages_total": 1, "issues_total": 1},
+            "kpis": {
+                "errors_total": 0,
+                "warnings_total": 1,
+                "per_type": {"missing_translation": 1},
+            },
+            "file_status": {"ja": {"file1.srt": "review"}},
+            "punch_list": {
+                "errors": [],
+                "warnings": [
+                    {
+                        "language": "ja",
+                        "file": "file1.srt",
+                        "cue_index": 5,
+                        "type": "missing_translation",
+                        "human_summary": "This subtitle may be incomplete.",
+                        "suggested_fix": "Copy ±2 target lines, back-translate to verify completeness.",
+                        "context": {"source": {}, "target": {}},
                     }
-                },
-                "lexicons": {
-                    "dnt_terms": ["test"],
-                    "termbase": {"fr": [{"source": "test", "target": "test"}]},
-                },
-                "sections": {
-                    "errors": [],
-                    "warnings": [
-                        {
-                            "file_path": "test - FR.srt",
-                            "language": "fr",
-                            "issue_type": "missing_translation",
-                            "cue": 1,
-                            "original": "hello",
-                            "target": "",
-                        }
-                    ],
-                },
-            }
+                ],
+            },
+            "lexicons": {"dnt": {"count": 0, "sample": []}, "termbases": {}},
+        }
 
-            report_v1_path = artifacts_dir / "report_v1.json"
-            report_v1_path.write_text(json.dumps(report_v1_data, indent=2), encoding="utf-8")
+        for test_name, report_data in [
+            ("no_issues", report_data_no_issues),
+            ("with_issues", report_data_with_issues),
+        ]:
+            # Write test file
+            report_path = tmp_path / f"report_{test_name}.json"
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report_data, f)
 
-            # Generate both presentations
-            html_path = build_eval_html(report_v1_path)
-            md_path = build_eval_md(report_v1_path)
+            # Generate both reports
+            html_path = build_eval_html(report_path, tmp_path / f"test_{test_name}.html")
+            md_path = build_eval_md(report_path, tmp_path / f"test_{test_name}.md")
 
+            # Read both outputs
             html_content = html_path.read_text(encoding="utf-8")
             md_content = md_path.read_text(encoding="utf-8")
 
-            # Check decision one-liner parity
-            assert "⚠️ Review recommended." in html_content
-            assert "⚠️" in md_content  # MD shows just the emoji
+            if test_name == "no_issues":
+                # Should show "No Issues Found"
+                assert "No Issues Found" in html_content
+                assert "No Issues Found" in md_content
+            else:
+                # Should NOT show "No Issues Found"
+                assert "No Issues Found" not in html_content
+                assert "No Issues Found" not in md_content
 
-            # Check that "Punch List" heading appears (has issues)
-            assert "Punch List" in html_content
-            assert "Punch List" in md_content
-
-            # Check that punch list contains at least one entry
-            assert "Unknown: Warning" in html_content
-            assert "Unknown: Warning" in md_content
-
-            # Check KPI labels and values
-            expected_kpi_labels = ["Files:", "Languages:", "Errors:", "Warnings:"]
-            for label in expected_kpi_labels:
-                assert label in html_content
-                assert label in md_content
-
-    def test_fix_case_parity(self):
-        """Test parity for FIX case (at least one error)."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            artifacts_dir = Path(temp_dir) / "artifacts"
-            artifacts_dir.mkdir()
-
-            # Create realistic report_v1.json with FIX status
-            report_v1_data = {
-                "version": "1.0.0",
-                "timestamp": "2025-01-01T00:00:00Z",
-                "batch_label": "test-batch",
-                "decision": {
-                    "state": "FIX",
-                    "banner_text": "Fix required. Address errors before publishing.",
-                },
-                "totals": {
-                    "files_total": 1,
-                    "languages_total": 1,
-                    "errors_total": 1,
-                    "warnings_total": 0,
-                },
-                "kpis": {
-                    "Files": "1",
-                    "Languages": "1",
-                    "Errors": "1",
-                    "Warnings": "0",
-                    "DNT coverage": "full",
-                    "Termbase coverage": "full",
-                    "Parity": "100%",
-                },
-                "file_status": {
-                    "test - FR.srt": {
-                        "language": "fr",
-                        "status": "fix",
-                        "issues": ["untranslated_after_dnt"],
+    def test_presenters_punch_list_structure(self, tmp_path):
+        """Test that punch list items have consistent structure between presenters."""
+        # Create test report with punch list items
+        report_data = {
+            "version": "1.0",
+            "meta": {
+                "batch_id": "test",
+                "created_at": "2024-01-01T00:00:00Z",
+                "source_language": "en",
+            },
+            "decision": {
+                "level": "fix",
+                "one_liner": "We found 1 errors that must be fixed before publishing.",
+            },
+            "totals": {"files_total": 1, "languages_total": 1, "issues_total": 1},
+            "kpis": {
+                "errors_total": 1,
+                "warnings_total": 0,
+                "per_type": {"untranslated_after_dnt": 1},
+            },
+            "file_status": {"ja": {"file1.srt": "error"}},
+            "punch_list": {
+                "errors": [
+                    {
+                        "language": "ja",
+                        "file": "file1.srt",
+                        "cue_index": 3,
+                        "type": "untranslated_after_dnt",
+                        "human_summary": "This term should not be translated according to your DNT list.",
+                        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
+                        "context": {
+                            "source": {"cur": "API call", "next1": "Response received"},
+                            "target": {"cur": "API呼び出し", "next1": "レスポンス受信"},
+                        },
                     }
-                },
-                "lexicons": {
-                    "dnt_terms": ["test"],
-                    "termbase": {"fr": [{"source": "test", "target": "test"}]},
-                },
-                "sections": {
-                    "errors": [
-                        {
-                            "file_path": "test - FR.srt",
-                            "language": "fr",
-                            "issue_type": "untranslated_after_dnt",
-                            "cue": 1,
-                            "original": "test",
-                            "target": "test",
-                        }
-                    ],
-                    "warnings": [],
-                },
-            }
+                ],
+                "warnings": [],
+            },
+            "lexicons": {"dnt": {"count": 0, "sample": []}, "termbases": {}},
+        }
 
-            report_v1_path = artifacts_dir / "report_v1.json"
-            report_v1_path.write_text(json.dumps(report_v1_data, indent=2), encoding="utf-8")
+        # Write test file
+        report_path = tmp_path / "report_punch_list.json"
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f)
 
-            # Generate both presentations
-            html_path = build_eval_html(report_v1_path)
-            md_path = build_eval_md(report_v1_path)
+        # Generate both reports
+        html_path = build_eval_html(report_path, tmp_path / "test_punch_list.html")
+        md_path = build_eval_md(report_path, tmp_path / "test_punch_list.md")
 
-            html_content = html_path.read_text(encoding="utf-8")
-            md_content = md_path.read_text(encoding="utf-8")
+        # Read both outputs
+        html_content = html_path.read_text(encoding="utf-8")
+        md_content = md_path.read_text(encoding="utf-8")
 
-            # Check decision one-liner parity
-            assert "⚠️ Review recommended." in html_content
-            assert "⚠️" in md_content  # MD shows just the emoji
+        # Test that both contain the punch list item details
+        assert "file1.srt" in html_content
+        assert "file1.srt" in md_content
+        # Test content presence (not specific markup)
+        assert "ja" in html_content  # Language code should be present
+        assert "ja" in md_content
+        assert "3" in html_content  # Cue index should be present
+        assert "3" in md_content
+        assert "This term should not be translated" in html_content
+        assert "This term should not be translated" in md_content
+        assert "Keep the original term untranslated" in html_content
+        assert "Keep the original term untranslated" in md_content
 
-            # Check that "Punch List" heading appears (has issues)
-            assert "Punch List" in html_content
-            assert "Punch List" in md_content
-
-            # Check that punch list contains at least one entry
-            assert "Unknown: Error" in html_content
-            assert "Unknown: Error" in md_content
-
-    def test_empty_lexicons_parity(self):
-        """Test parity when DNT and Termbase data is empty."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            artifacts_dir = Path(temp_dir) / "artifacts"
-            artifacts_dir.mkdir()
-
-            # Create realistic report_v1.json with empty lexicons
-            report_v1_data = {
-                "version": "1.0.0",
-                "timestamp": "2025-01-01T00:00:00Z",
-                "batch_label": "test-batch",
-                "decision": {
-                    "state": "READY",
-                    "banner_text": "Everything looks great. Your translated files are ready to use.",
-                },
-                "totals": {
-                    "files_total": 1,
-                    "languages_total": 1,
-                    "errors_total": 0,
-                    "warnings_total": 0,
-                },
-                "kpis": {
-                    "Files": "1",
-                    "Languages": "1",
-                    "Errors": "0",
-                    "Warnings": "0",
-                    "DNT coverage": "none",
-                    "Termbase coverage": "none",
-                    "Parity": "100%",
-                },
-                "file_status": {
-                    "test - FR.srt": {"language": "fr", "status": "ready", "issues": []}
-                },
-                "lexicons": {"dnt_terms": [], "termbase": {}},
-                "sections": {"errors": [], "warnings": []},
-            }
-
-            report_v1_path = artifacts_dir / "report_v1.json"
-            report_v1_path.write_text(json.dumps(report_v1_data, indent=2), encoding="utf-8")
-
-            # Generate both presentations
-            html_path = build_eval_html(report_v1_path)
-            md_path = build_eval_md(report_v1_path)
-
-            html_content = html_path.read_text(encoding="utf-8")
-            md_content = md_path.read_text(encoding="utf-8")
-
-            # Check that both explicitly say "None" for empty data
-            # Check that DNT and Termbase sections are present but empty
-            # HTML doesn't show empty sections, MD does
-            assert "DNT Terms" in md_content
-            assert "Termbases" in md_content
-
-            # Check DNT and Termbase headings still appear
-            assert "DNT Terms" in html_content
-            assert "DNT Terms" in md_content
-            assert "Termbase" in html_content
-            assert "Termbase" in md_content
+        # Test context rendering
+        assert "Source context:" in html_content
+        assert "Source context:" in md_content
+        assert "Target context:" in html_content
+        assert "Target context:" in md_content

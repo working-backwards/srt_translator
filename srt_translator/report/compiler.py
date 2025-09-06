@@ -82,18 +82,16 @@ def compile_report(artifacts_dir: Path) -> Path:
             timing_fail_count = file_data.get("timing_fail", 0)
             errors_total += untrans_dnt_count + timing_fail_count
 
-    # Determine overall status
-    if errors_total > 0:
-        decision_state = "FIX"
-    elif warnings_total > 0:
-        decision_state = "REVIEW"
-    else:
-        decision_state = "READY"
-
-    # Generate one-liner
-    one_liner = _generate_banner_and_steps(decision_state, errors_total, warnings_total)
-
-    # KPIs are computed directly in the report structure
+    # Determine overall status using exact specification
+    if errors_total == 0 and warnings_total == 0:
+        decision_level = "pass"
+        one_liner = "Everything looks great. Your translated files are ready to use."
+    elif errors_total > 0:
+        decision_level = "fix"
+        one_liner = f"We found {errors_total} errors that must be fixed before publishing."
+    else:  # only warnings
+        decision_level = "review"
+        one_liner = f"We found {warnings_total} warnings. Fix the items in the Punch List below."
 
     # Compute file status (per-file READY/REVIEW/FIX)
     file_status = _compute_file_status(eval_data)
@@ -101,7 +99,7 @@ def compile_report(artifacts_dir: Path) -> Path:
     # Extract lexicons
     lexicons = _extract_lexicons(ai_data)
 
-    # Extract punch list (errors and warnings)
+    # Extract punch list (errors and warnings) - this populates sections
     punch_list = _extract_punch_list(eval_data)
 
     # Build the compiled report with exact schema
@@ -113,25 +111,29 @@ def compile_report(artifacts_dir: Path) -> Path:
             "source_language": eval_data.get("source_language", "en"),
         },
         "decision": {
-            "level": decision_state.lower(),  # pass, review, fix
+            "level": decision_level,
             "one_liner": one_liner,
         },
-        "kpis": {
+        "totals": {
             "files_total": files_total,
             "languages_total": languages_total,
             "issues_total": errors_total + warnings_total,
+        },
+        "kpis": {
             "errors_total": errors_total,
             "warnings_total": warnings_total,
-            "dnt_terms_count": len(lexicons.get("dnt_terms", [])),
-            "termbase_languages_count": len(lexicons.get("termbase", {})),
+            "per_type": _compute_per_type_counts(eval_data),
         },
-        "file_status": _convert_file_status_to_dict(file_status),
-        "sections": {
+        "file_status": file_status,
+        "punch_list": {
             "errors": punch_list["errors"],
             "warnings": punch_list["warnings"],
         },
         "lexicons": lexicons,
     }
+
+    # Enforce invariants (fail fast)
+    _enforce_invariants(report_v1)
 
     # Write the compiled report
     output_path = artifacts_dir / "report_v1.json"
@@ -142,25 +144,13 @@ def compile_report(artifacts_dir: Path) -> Path:
     return output_path
 
 
-def _generate_banner_and_steps(
-    state: str, errors_total: int, warnings_total: int
-) -> tuple[str, str]:
-    """Generate banner text and one-liner based on status."""
-    if state == "READY":
-        one_liner = "Everything looks great. Your translated files are ready to use."
-    elif state == "REVIEW":
-        one_liner = f"Review recommended: {warnings_total} warning(s) found."
-    else:  # FIX
-        one_liner = f"Fix required: {errors_total} error(s), {warnings_total} warning(s) found."
+def _compute_file_status(eval_data: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """Compute per-file status (ready/review/error) in format {lang: {file: status}}."""
+    file_status = {}
 
-    return one_liner
+    for lang_code, lang_data in eval_data["languages"].items():
+        file_status[lang_code] = {}
 
-
-def _compute_file_status(eval_data: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Compute per-file status (READY/REVIEW/FIX) sorted by file_path."""
-    file_statuses = []
-
-    for _lang_code, lang_data in eval_data["languages"].items():
         for file_path, file_data in lang_data.get("files", {}).items():
             # Count errors and warnings for this file
             errors = 0
@@ -177,50 +167,68 @@ def _compute_file_status(eval_data: Dict[str, Any]) -> List[Dict[str, str]]:
 
             # Determine file status
             if errors > 0:
-                file_state = "FIX"
+                file_state = "error"
             elif warnings > 0:
-                file_state = "REVIEW"
+                file_state = "review"
             else:
-                file_state = "READY"
+                file_state = "ready"
 
-            file_statuses.append({"file_path": file_path, "status": file_state})
+            file_status[lang_code][file_path] = file_state
 
-    # Sort by file_path for deterministic ordering
-    file_statuses.sort(key=lambda x: x["file_path"])
-    return file_statuses
+    return file_status
 
 
-def _convert_file_status_to_dict(
-    file_status_list: List[Dict[str, str]],
-) -> Dict[str, Dict[str, str]]:
-    """Convert file status list to dict of dicts format: {lang: {file: status}}."""
-    file_status_dict = {}
+def _compute_per_type_counts(eval_data: Dict[str, Any]) -> Dict[str, int]:
+    """Compute per-type issue counts across all languages and files."""
+    per_type = {
+        "missing_translation": 0,
+        "untranslated_after_dnt": 0,
+        "timing_fail": 0,
+    }
 
-    for file_info in file_status_list:
-        file_path = file_info.get("file_path", "")
-        status = file_info.get("status", "unknown")
+    for _lang_code, lang_data in eval_data["languages"].items():
+        for _file_path, file_data in lang_data.get("files", {}).items():
+            per_type["missing_translation"] += file_data.get("missing_translation", 0)
+            per_type["untranslated_after_dnt"] += file_data.get("untranslated_after_dnt", 0)
+            per_type["timing_fail"] += file_data.get("timing_fail", 0)
 
-        # Extract language from file path or use a default
-        # For now, we'll use a simple approach - this might need refinement
-        # based on how the evaluator structures the data
-        lang = "unknown"  # This should be extracted from the evaluator data
+    return per_type
 
-        if lang not in file_status_dict:
-            file_status_dict[lang] = {}
 
-        # Map status to new format
-        if status == "READY":
-            new_status = "ok"
-        elif status == "REVIEW":
-            new_status = "warning"
-        elif status == "FIX":
-            new_status = "error"
-        else:
-            new_status = "unknown"
+def _enforce_invariants(report_v1: Dict[str, Any]) -> None:
+    """Enforce invariants and fail fast if violated."""
+    totals = report_v1["totals"]
+    kpis = report_v1["kpis"]
+    punch_list = report_v1["punch_list"]
+    file_status = report_v1["file_status"]
 
-        file_status_dict[lang][file_path] = new_status
+    # Invariant 1: issues_total == errors_total + warnings_total
+    if totals["issues_total"] != kpis["errors_total"] + kpis["warnings_total"]:
+        raise ValueError(
+            f"Invariant violated: issues_total ({totals['issues_total']}) != "
+            f"errors_total ({kpis['errors_total']}) + warnings_total ({kpis['warnings_total']})"
+        )
 
-    return file_status_dict
+    # Invariant 2: If errors/warnings > 0, punch_list must not be empty
+    if kpis["errors_total"] > 0 and len(punch_list["errors"]) == 0:
+        raise ValueError(
+            f"Invariant violated: errors_total ({kpis['errors_total']}) > 0 but punch_list.errors is empty"
+        )
+
+    if kpis["warnings_total"] > 0 and len(punch_list["warnings"]) == 0:
+        raise ValueError(
+            f"Invariant violated: warnings_total ({kpis['warnings_total']}) > 0 but punch_list.warnings is empty"
+        )
+
+    # Invariant 3: No "unknown" keys in file_status
+    for lang_code, files in file_status.items():
+        if lang_code == "unknown":
+            raise ValueError("Invariant violated: file_status contains 'unknown' language key")
+        for file_path, status in files.items():
+            if status == "unknown":
+                raise ValueError(
+                    f"Invariant violated: file_status contains 'unknown' status for {lang_code}/{file_path}"
+                )
 
 
 def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
@@ -230,67 +238,93 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
 
     for lang_code, lang_data in eval_data["languages"].items():
         for file_path, file_data in lang_data.get("files", {}).items():
-            issues = file_data.get("issues", {})
-
             # Extract missing translation issues (WARNINGS)
-            missing_issues = issues.get("missing_translation", [])
-            # Handle case where missing_translation is a count instead of a list
-            if isinstance(missing_issues, int):
-                missing_issues = [
-                    {"src": f"Missing translation {i + 1}", "tgt": "", "context": {}}
-                    for i in range(missing_issues)
-                ]
-            for issue in missing_issues:
+            missing_count = file_data.get("missing_translation", 0)
+            for i in range(missing_count):
                 warnings.append(
                     {
-                        "lang": lang_code,
+                        "language": lang_code,
                         "file": file_path,
-                        "subtitle": issue.get("cue", issue.get("idx")),
+                        "cue_index": i + 1,
                         "type": "missing_translation",
-                        "message": "This subtitle may be incomplete or missing context.",
-                        "suggest_fix": "Check if the translation was cut off or if context was lost.",
+                        "human_summary": "This subtitle may be incomplete or missing context.",
+                        "suggested_fix": "Copy ±2 target lines, back-translate to verify completeness, then regenerate if needed.",
                         "context": {
-                            "target_window": issue.get("context", {}).get("target", []),
-                            "source_window": issue.get("context", {}).get("source", []),
+                            "source": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
+                            "target": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
                         },
                     }
                 )
 
             # Extract DNT violations (ERRORS)
-            untrans_dnt_issues = issues.get("untranslated_after_dnt", [])
-            # Handle case where untranslated_after_dnt is a count instead of a list
-            if isinstance(untrans_dnt_issues, int):
-                untrans_dnt_issues = [
-                    {"src": f"DNT violation {i + 1}", "tgt": "", "context": {}}
-                    for i in range(untrans_dnt_issues)
-                ]
-            for issue in untrans_dnt_issues:
+            untrans_dnt_count = file_data.get("untranslated_after_dnt", 0)
+            for i in range(untrans_dnt_count):
                 errors.append(
                     {
-                        "lang": lang_code,
+                        "language": lang_code,
                         "file": file_path,
-                        "subtitle": issue.get("cue", issue.get("idx")),
+                        "cue_index": i + 1,
                         "type": "untranslated_after_dnt",
-                        "message": "This term should not be translated according to your DNT list.",
-                        "suggest_fix": "Keep the original term untranslated or add it to your DNT list.",
+                        "human_summary": "This term should not be translated according to your DNT list.",
+                        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
                         "context": {
-                            "target_window": issue.get("context", {}).get("target", []),
-                            "source_window": issue.get("context", {}).get("source", []),
+                            "source": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
+                            "target": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
                         },
                     }
                 )
 
             # Extract timing failures (ERRORS)
-            if issues.get("timing_fail", False):
+            timing_fail_count = file_data.get("timing_fail", 0)
+            if timing_fail_count > 0:
                 errors.append(
                     {
-                        "lang": lang_code,
+                        "language": lang_code,
                         "file": file_path,
-                        "subtitle": None,
-                        "type": "timing_misaligned",
-                        "message": "The subtitle timing doesn't match the source file.",
-                        "suggest_fix": "Check subtitle timing and duration settings.",
-                        "context": {"target_window": [], "source_window": []},
+                        "cue_index": None,
+                        "type": "timing_fail",
+                        "human_summary": "The subtitle timing doesn't match the source file.",
+                        "suggested_fix": "Check subtitle timing and duration settings.",
+                        "context": {
+                            "source": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
+                            "target": {
+                                "prev2": "",
+                                "prev1": "",
+                                "cur": "",
+                                "next1": "",
+                                "next2": "",
+                            },
+                        },
                     }
                 )
 
@@ -304,18 +338,26 @@ def _extract_lexicons(ai_data: Dict[str, Any]) -> Dict[str, Any]:
     """Extract DNT terms and termbase from ai_config.json."""
     dnt_terms = ai_data.get("dnt_terms", [])
 
-    # Convert termbase to the expected format: {lang: [{source, preferred}]}
-    termbase: Dict[str, List[Dict[str, str]]] = {}
+    # Convert termbase to the expected format: {lang: {count, sample: [...]}}
+    termbase: Dict[str, Dict[str, Any]] = {}
     raw_termbase = ai_data.get("termbase", {})
 
     for lang_name, lang_termbase in raw_termbase.items():
-        termbase[lang_name] = []
+        entries = []
         for source, preferred in lang_termbase.items():
-            termbase[lang_name].append({"source": source, "preferred": preferred})
+            entries.append({"source": source, "target": preferred})
         # Sort by source for deterministic ordering
-        termbase[lang_name].sort(key=lambda x: x["source"])
+        entries.sort(key=lambda x: x["source"])
+
+        termbase[lang_name] = {
+            "count": len(entries),
+            "sample": entries[:5] if len(entries) > 5 else entries,  # Show up to 5 examples
+        }
 
     return {
-        "dnt_terms": sorted(dnt_terms),  # Sort for deterministic ordering
-        "termbase": termbase,
+        "dnt": {
+            "count": len(dnt_terms),
+            "sample": sorted(dnt_terms)[:5] if len(dnt_terms) > 5 else sorted(dnt_terms),
+        },
+        "termbases": termbase,
     }
