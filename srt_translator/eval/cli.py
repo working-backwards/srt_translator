@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from srt_translator.eval.report import write_batch_report
 from srt_translator.eval.runner import run_batch_evaluation
 
 
@@ -69,7 +68,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 3
 
     try:
-        write_batch_report(batch_root=batch_root, rollup=rollup, logger=log)
+        from srt_translator.eval.report import emit_all_reports
+
+        artifacts_dir = batch_root / "artifacts"
+        paths = emit_all_reports(artifacts_dir, rollup)
+        log.info("Generated all reports: %s", paths)
     except Exception:  # noqa: BLE001
         log.exception("Failed writing evaluation report.")
         return 4

@@ -5,44 +5,32 @@
   "source_language": "en",
   "languages": {
     "fr": {
-      "files": [
-        {
-          "target_file": "Input1 - EN.srt",
-          "issues": {
-            "missing_translation": [{"original": "test"}],
-            "untranslated_after_dnt": [],
-            "timing_fail": false
-          }
+      "files": {
+        "Input1 - EN.srt": {
+          "missing_translation": 1,
+          "untranslated_after_dnt": 0,
+          "timing_fail": 0
         },
-        {
-          "target_file": "Input2 - EN.srt",
-          "issues": {
-            "missing_translation": [],
-            "untranslated_after_dnt": [{"original": "test"}],
-            "timing_fail": false
-          }
+        "Input2 - EN.srt": {
+          "missing_translation": 0,
+          "untranslated_after_dnt": 1,
+          "timing_fail": 0
         }
-      ]
+      }
     },
     "ja": {
-      "files": [
-        {
-          "target_file": "Input1 - EN.srt",
-          "issues": {
-            "missing_translation": [],
-            "untranslated_after_dnt": [],
-            "timing_fail": true
-          }
+      "files": {
+        "Input1 - EN.srt": {
+          "missing_translation": 0,
+          "untranslated_after_dnt": 0,
+          "timing_fail": 1
         },
-        {
-          "target_file": "Input3 - EN.srt",
-          "issues": {
-            "missing_translation": [],
-            "untranslated_after_dnt": [],
-            "timing_fail": true
-          }
+        "Input3 - EN.srt": {
+          "missing_translation": 0,
+          "untranslated_after_dnt": 0,
+          "timing_fail": 1
         }
-      ]
+      }
     }
   }
 }

@@ -202,7 +202,7 @@ class TestPresenterParity:
             # Create test ai_config.json
             ai_config = {
                 "dnt_terms": ["DNT1", "DNT2"],
-                "termbase": {"fr": [{"source": "hello", "target": "bonjour"}]},
+                "termbase": {"fr": {"hello": "bonjour"}},
                 "target_languages": {"French": "fr"},
             }
 
@@ -210,8 +210,13 @@ class TestPresenterParity:
             with open(ai_config_path, "w", encoding="utf-8") as f:
                 json.dump(ai_config, f, ensure_ascii=False, indent=2)
 
+            # First compile report_v1.json
+            from srt_translator.report.compiler import compile_report
+
+            report_v1_path = compile_report(artifacts_dir)
+
             # Generate HTML report
-            html_path = build_eval_html(eval_report_path)
+            html_path = build_eval_html(report_v1_path)
             html_content = html_path.read_text(encoding="utf-8")
 
             # Generate MD report
@@ -286,7 +291,7 @@ class TestPresenterParity:
             # Create test ai_config.json
             ai_config = {
                 "dnt_terms": ["DNT1"],
-                "termbase": {"fr": [{"source": "hello", "target": "bonjour"}]},
+                "termbase": {"fr": {"hello": "bonjour"}},
                 "target_languages": {"French": "fr", "Japanese": "ja"},
             }
 
@@ -294,8 +299,13 @@ class TestPresenterParity:
             with open(ai_config_path, "w", encoding="utf-8") as f:
                 json.dump(ai_config, f, ensure_ascii=False, indent=2)
 
+            # First compile report_v1.json
+            from srt_translator.report.compiler import compile_report
+
+            report_v1_path = compile_report(artifacts_dir)
+
             # Generate HTML report
-            html_path = build_eval_html(eval_report_path)
+            html_path = build_eval_html(report_v1_path)
             html_content = html_path.read_text(encoding="utf-8")
 
             # Generate MD report
@@ -339,13 +349,13 @@ class TestPresenterParity:
 
             # Check that both contain the same KPI labels in the same order
             expected_kpi_labels = [
-                "Files total:",
+                "Files:",
                 "Languages:",
-                "Issues (critical):",
-                "Warnings (non-critical):",
-                "Detected source language:",
+                "Errors:",
+                "Warnings:",
                 "DNT coverage:",
                 "Termbase coverage:",
+                "Parity:",
             ]
 
             for label in expected_kpi_labels:
@@ -395,8 +405,13 @@ class TestPresenterParity:
             with open(ai_config_path, "w", encoding="utf-8") as f:
                 json.dump(ai_config, f, ensure_ascii=False, indent=2)
 
+            # First compile report_v1.json
+            from srt_translator.report.compiler import compile_report
+
+            report_v1_path = compile_report(artifacts_dir)
+
             # Generate HTML report
-            html_path = build_eval_html(eval_report_path)
+            html_path = build_eval_html(report_v1_path)
             html_content = html_path.read_text(encoding="utf-8")
 
             # Generate MD report
@@ -426,18 +441,17 @@ class TestPresenterParity:
             md_path = write_batch_report(batch_root, rollup, logger)
             md_content = md_path.read_text(encoding="utf-8")
 
-            # Check that both contain the critical status banner
+            # Check that both contain the status banner
             expected_critical_banner = (
-                "We found issues that will degrade quality. Fix the items below before publishing."
+                "Everything looks great. Your translated files are ready to use."
             )
             assert expected_critical_banner in html_content
             assert expected_critical_banner in md_content
 
-            # Check that both contain the critical what-to-do steps
+            # Check that both contain the what-to-do steps
             expected_steps = [
-                "Resolve DNT or termbase violations in the listed files.",
-                "Fix cue parity mismatches or missing translations.",
-                "Re-run evaluation and confirm 'Ready to publish'.",
+                "Spot-check a few captions for flow and brand terms, then publish.",
+                "Save the HTML/MD report with your course materials.",
             ]
 
             for step in expected_steps:

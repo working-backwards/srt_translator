@@ -364,22 +364,15 @@ class TranslationWorker(QObject):
                     )
 
                     if rollup:
-                        # Copy ai_config.json into artifacts/ (required by orchestrator)
+                        # Resolve artifacts dir
                         artifacts_dir = latest_batch / "artifacts"
-                        src = latest_batch / "ai_config.json"
-                        dst = artifacts_dir / "ai_config.json"
+                        ai_config_path = artifacts_dir / "ai_config.json"
 
-                        if not src.exists():
-                            self.logger.error(f"ai_config.json not found at batch root: {src}")
+                        if not ai_config_path.exists():
+                            # Fail fast: a single source of truth
                             raise FileNotFoundError(
-                                f"ai_config.json not found at batch root: {src}"
+                                f"ai_config.json not found at: {ai_config_path}"
                             )
-
-                        # Copy ai_config.json to artifacts/
-                        import shutil
-
-                        shutil.copy2(src, dst)
-                        self.logger.info("Copied ai_config.json → artifacts")
 
                         # Call the orchestrator
                         from srt_translator.eval.report import emit_all_reports

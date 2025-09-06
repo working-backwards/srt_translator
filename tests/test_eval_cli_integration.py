@@ -28,7 +28,10 @@ def create_real_batch_structure(temp_dir: Path) -> Path:
             "fr": {"Module": "Module"},
         },
     }
-    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
+    # Create artifacts directory and ai_config.json
+    artifacts_dir = batch_dir / "artifacts"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Create originals directory with realistic SRT files
     originals_dir = batch_dir / "originals"
@@ -163,9 +166,9 @@ class TestEvalCLIIntegration:
         assert "app_version" in manifest_data, "Manifest should contain app_version"
         assert "evaluator_version" in manifest_data, "Manifest should contain evaluator_version"
 
-        # Check for top-level evaluation report
-        eval_report = batch_dir / "eval_report.md"
-        assert eval_report.exists(), "Evaluation report should be created"
+        # Check for evaluation report in artifacts directory
+        eval_report = batch_dir / "artifacts" / "eval_report.md"
+        assert eval_report.exists(), "Evaluation report should be created in artifacts/"
 
         # Verify report contains expected content
         report_content = eval_report.read_text(encoding="utf-8")
@@ -203,8 +206,8 @@ Otro subtítulo para pruebas."""
         assert result == 0
 
         # Check that issues are reported
-        eval_report = batch_dir / "eval_report.md"
-        assert eval_report.exists(), "Evaluation report should be created"
+        eval_report = batch_dir / "artifacts" / "eval_report.md"
+        assert eval_report.exists(), "Evaluation report should be created in artifacts/"
 
         report_content = eval_report.read_text(encoding="utf-8")
         # The report should mention issues (though exact text depends on evaluation logic)

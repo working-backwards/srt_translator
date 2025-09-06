@@ -258,6 +258,12 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
 
             # Extract missing translation issues (WARNINGS)
             missing_issues = issues.get("missing_translation", [])
+            # Handle case where missing_translation is a count instead of a list
+            if isinstance(missing_issues, int):
+                missing_issues = [
+                    {"src": f"Missing translation {i + 1}", "tgt": "", "context": {}}
+                    for i in range(missing_issues)
+                ]
             for issue in missing_issues:
                 warnings.append(
                     {
@@ -272,6 +278,12 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
 
             # Extract DNT violations (ERRORS)
             untrans_dnt_issues = issues.get("untranslated_after_dnt", [])
+            # Handle case where untranslated_after_dnt is a count instead of a list
+            if isinstance(untrans_dnt_issues, int):
+                untrans_dnt_issues = [
+                    {"src": f"DNT violation {i + 1}", "tgt": "", "context": {}}
+                    for i in range(untrans_dnt_issues)
+                ]
             for issue in untrans_dnt_issues:
                 errors.append(
                     {

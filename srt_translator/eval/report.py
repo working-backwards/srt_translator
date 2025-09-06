@@ -342,11 +342,12 @@ def write_batch_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
 
     out = []
 
-    # Load report_v1.json from artifacts directory
-    report_v1_path = batch_root / "artifacts" / "report_v1.json"
-    if not report_v1_path.exists():
-        log.error(f"report_v1.json not found at: {report_v1_path}")
-        raise FileNotFoundError(f"report_v1.json not found at: {report_v1_path}")
+    # First compile report_v1.json from eval_report.json and ai_config.json
+    artifacts_dir = batch_root / "artifacts"
+    from srt_translator.report.compiler import compile_report
+
+    report_v1_path = compile_report(artifacts_dir)
+    log.info(f"Compiled report_v1.json: {report_v1_path}")
 
     try:
         report_data = json.loads(report_v1_path.read_text(encoding="utf-8"))

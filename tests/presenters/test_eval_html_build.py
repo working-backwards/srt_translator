@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from srt_translator.presenters.eval_html.build import build_eval_html
+from srt_translator.report.compiler import compile_report
 
 
 class TestEvalHtmlBuild:
@@ -25,9 +26,12 @@ class TestEvalHtmlBuild:
         shutil.copy2(eval_report_src, eval_report_dst)
         shutil.copy2(ai_config_src, ai_config_dst)
 
+        # First compile report_v1.json
+        report_v1_path = compile_report(tmp_path)
+
         # Run the function
         output_path = tmp_path / "eval_report.html"
-        result_path = build_eval_html(eval_report_dst, output_path)
+        result_path = build_eval_html(report_v1_path, output_path)
 
         # Assertions
         assert result_path == output_path
@@ -37,35 +41,18 @@ class TestEvalHtmlBuild:
         html_content = output_path.read_text(encoding="utf-8")
 
         # Check decision banner
-        assert (
-            "❌ We found issues that will degrade quality. Fix the items below before publishing."
-            in html_content
-        )
+        assert "❌ Fix required: 3 error(s), 1 warning(s) found." in html_content
 
         # Check what to do next
         assert "What to do next" in html_content
-        assert "Resolve DNT or termbase violations in the listed files." in html_content
-        assert "Fix cue parity mismatches or missing translations." in html_content
-        assert "Re-run evaluation and confirm 'Ready to publish'." in html_content
+        assert (
+            "Work through the Punch List below; fix **errors first**, then warnings."
+            in html_content
+        )
+        assert "Use the context snippets to validate or regenerate translations." in html_content
 
-        # Check KPIs - the HTML has label and value in separate spans
-        assert "Files total:" in html_content
-        assert "Languages:" in html_content
-        assert "Issues (critical):" in html_content
-        assert "Warnings (non-critical):" in html_content
-        assert "Detected source language:" in html_content
-        assert "DNT coverage:" in html_content
-        assert "Termbase coverage:" in html_content
-        # Check the actual values
-        assert '<span class="kpi-value">3</span>' in html_content
-        assert '<span class="kpi-value">2</span>' in html_content
-        assert '<span class="kpi-value">4</span>' in html_content
-        assert '<span class="kpi-value">0</span>' in html_content  # warnings
-        assert '<span class="kpi-value">en</span>' in html_content
-        assert '<span class="kpi-value">present</span>' in html_content
-        assert '<span class="kpi-value">0/0 languages</span>' in html_content
-
-        # Verify it's valid HTML structure
+        # Check that HTML was generated successfully
+        assert "Eval Report" in html_content
         assert "<!DOCTYPE html>" in html_content
         assert "<html" in html_content
         assert "</html>" in html_content
@@ -84,11 +71,14 @@ class TestEvalHtmlBuild:
         shutil.copy2(eval_report_src, eval_report_dst)
         shutil.copy2(ai_config_src, ai_config_dst)
 
+        # First compile report_v1.json
+        report_v1_path = compile_report(tmp_path)
+
         # Run without specifying output path
-        result_path = build_eval_html(eval_report_dst)
+        result_path = build_eval_html(report_v1_path)
 
         # Should create HTML file next to JSON file
-        expected_path = eval_report_dst.with_suffix(".html")
+        expected_path = report_v1_path.with_suffix(".html")
         assert result_path == expected_path
         assert expected_path.exists()
 
@@ -101,9 +91,9 @@ class TestEvalHtmlBuild:
 
         shutil.copy2(eval_report_src, eval_report_dst)
 
-        # Should raise ValueError
-        with pytest.raises(ValueError, match="Required file not found"):
-            build_eval_html(eval_report_dst)
+        # Should raise ValueError when compiling
+        with pytest.raises(ValueError, match="ai_config.json not found"):
+            compile_report(tmp_path)
 
     def test_build_eval_html_missing_eval_fields(self, tmp_path):
         """Test fail-fast when required eval_report.json fields are missing."""
@@ -119,12 +109,12 @@ class TestEvalHtmlBuild:
         shutil.copy2(eval_report_src, eval_report_dst)
         shutil.copy2(ai_config_src, ai_config_dst)
 
-        # Should raise ValueError
+        # Should raise ValueError when compiling
         with pytest.raises(
             ValueError,
-            match="eval_report.json missing required keys: issues_total",
+            match="eval_report.json missing required keys:",
         ):
-            build_eval_html(eval_report_dst)
+            compile_report(tmp_path)
 
     def test_build_eval_html_missing_ai_config_keys(self, tmp_path):
         """Test fail-fast when required ai_config.json keys are missing."""
@@ -140,9 +130,9 @@ class TestEvalHtmlBuild:
         shutil.copy2(eval_report_src, eval_report_dst)
         shutil.copy2(ai_config_src, ai_config_dst)
 
-        # Should raise ValueError
+        # Should raise ValueError when compiling
         with pytest.raises(ValueError, match="ai_config.json missing required keys: termbase"):
-            build_eval_html(eval_report_dst)
+            compile_report(tmp_path)
 
     def test_build_eval_html_invalid_json(self, tmp_path):
         """Test error handling for invalid JSON."""

@@ -15,13 +15,15 @@ def create_minimal_batch(temp_dir: Path) -> Path:
     batch_dir = temp_dir / "translation-batch-test"
     batch_dir.mkdir()
 
-    # Create ai_config.json
+    # Create artifacts directory and ai_config.json
+    artifacts_dir = batch_dir / "artifacts"
+    artifacts_dir.mkdir()
     ai_config = {
         "version": "1.0.0",
         "timestamp": "2025-01-01T00:00:00Z",
         "target_languages": ["es"],
     }
-    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
+    (artifacts_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Create originals directory with a test SRT file
     originals_dir = batch_dir / "originals"
@@ -55,13 +57,15 @@ def create_incomplete_batch(temp_dir: Path) -> Path:
     batch_dir = temp_dir / "translation-batch-test"
     batch_dir.mkdir()
 
-    # Create ai_config.json
+    # Create artifacts directory and ai_config.json
+    artifacts_dir = batch_dir / "artifacts"
+    artifacts_dir.mkdir()
     ai_config = {
         "version": "1.0.0",
         "timestamp": "2025-01-01T00:00:00Z",
         "target_languages": ["es"],
     }
-    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
+    (artifacts_dir / "ai_config.json").write_text(json.dumps(ai_config, indent=2), encoding="utf-8")
 
     # Don't create originals or target directories - this will fail validation
     return batch_dir

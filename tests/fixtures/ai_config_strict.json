@@ -1,9 +1,9 @@
 {
   "dnt_terms": ["WBR", "COE"],
   "termbase": {
-    "fr": [
-      { "source": "Weekly Business Review", "target": "Revue commerciale hebdomadaire" }
-    ],
-    "ja": []
+    "fr": {
+      "Weekly Business Review": "Revue commerciale hebdomadaire"
+    },
+    "ja": {}
   }
 }

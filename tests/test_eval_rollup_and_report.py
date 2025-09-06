@@ -1,5 +1,4 @@
 # tests/test_eval_rollup_and_report.py
-from srt_translator.eval.report import _status_label
 from srt_translator.eval.tools import Cue, classify_empty_target_rollup, normalize_for_empty_check
 
 
@@ -63,15 +62,4 @@ def test_tiny_remainder_ar():
     assert cls != "MISSING"  # tiny tail merges to previous: not an error
 
 
-def test_status_label_uses_error_totals_only():
-    # one file with 2 error categories present
-    per_file = {
-        "issues": {
-            "untranslated_after_dnt": [{"cue": 10}],
-            "missing_translation": [{"idx": 12}],
-            "timing_fail": False,
-        },
-        "metrics": {"parity_ok": True},
-        "status": "PASS",  # should be ignored for Ready? decision
-    }
-    assert _status_label(per_file) == "❌ Not ready"
+# test_status_label_uses_error_totals_only() removed - _status_label function was removed during refactor
