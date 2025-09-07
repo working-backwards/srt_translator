@@ -1,0 +1,102 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2025-01-06T14:44:26Z",
+  "files_total": 1,
+  "languages_total": 1,
+  "issues_total": 3,
+  "per_language": {
+    "pt-BR": {
+      "files": {
+        "targets/pt-BR/InputMetrics10 - EN.srt": {
+          "issues_counts": {
+            "missing_translation": 1,
+            "untranslated_after_dnt": 1,
+            "timing_fail": 1,
+            "placeholder_mismatch": 0,
+            "parity_issue": 0
+          },
+          "issues_detail": {
+            "missing_translation": [
+              {
+                "cue_index": 294,
+                "source_text": "This is a missing translation example",
+                "target_text": "",
+                "context": {
+                  "source": {
+                    "prev2": "Previous line 2",
+                    "prev1": "Previous line 1",
+                    "cur": "This is a missing translation example",
+                    "next1": "Next line 1",
+                    "next2": "Next line 2"
+                  },
+                  "target": {
+                    "prev2": "",
+                    "prev1": "",
+                    "cur": "",
+                    "next1": "",
+                    "next2": ""
+                  }
+                }
+              }
+            ],
+            "untranslated_after_dnt": [
+              {
+                "cue_index": 168,
+                "source_text": "Amazon marketing campaign",
+                "target_text": "Amazon marketing campaign",
+                "context": {
+                  "source": {
+                    "prev2": "Previous line 2",
+                    "prev1": "Previous line 1",
+                    "cur": "Amazon marketing campaign",
+                    "next1": "Next line 1",
+                    "next2": "Next line 2"
+                  },
+                  "target": {
+                    "prev2": "Linha anterior 2",
+                    "prev1": "Linha anterior 1",
+                    "cur": "Amazon marketing campaign",
+                    "next1": "Linha seguinte 1",
+                    "next2": "Linha seguinte 2"
+                  }
+                }
+              }
+            ],
+            "timing_fail": [
+              {
+                "file_level": true,
+                "median_start_ms": 240,
+                "median_end_ms": 230,
+                "p95_start_ms": 540,
+                "p95_end_ms": 560
+              }
+            ],
+            "placeholder_mismatch": [],
+            "parity_issue": []
+          }
+        }
+      }
+    }
+  },
+  "lexicons": {
+    "dnt": {
+      "count": 3,
+      "sample": ["Amazon", "Google", "Microsoft"]
+    },
+    "termbase": {
+      "pt-BR": {
+        "count": 2,
+        "sample": [
+          {
+            "source": "marketing",
+            "target": "marketing"
+          },
+          {
+            "source": "campaign",
+            "target": "campanha"
+          }
+        ]
+      }
+    }
+  }
+}

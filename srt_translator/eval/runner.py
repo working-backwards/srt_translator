@@ -105,17 +105,42 @@ def _ctx_window(cues, idx1: int, k: int = 2) -> list[tuple[int, str]]:
 
 
 def _attach_context_to_issues(issue_list: list[dict], source_cues, target_cues) -> None:
-    # Mutates each issue dict in place, adding a "context" field:
-    # {"source":[(n,text)...], "target":[(n,text)...]}
+    # Mutates each issue dict in place, adding a "context" field in v2 format:
+    # {"source": {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""},
+    #  "target": {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""}}
     if not issue_list:
         return
     for it in issue_list:
-        idx = it.get("idx")
+        # Strict: only look for 'idx' key (no dual key handling)
+        if "idx" not in it:
+            raise ValueError(f"Per-cue issue missing required 'idx' key: {it}")
+        idx = it["idx"]
         if not isinstance(idx, int):
-            continue
+            raise ValueError(f"Per-cue issue 'idx' must be int, got {type(idx)}: {it}")
+
+        # Get context windows
+        source_ctx = _ctx_window(source_cues, idx, 2)
+        target_ctx = _ctx_window(target_cues, idx, 2)
+
+        # Convert to v2 format by mapping based on cue indices
+        def build_context_dict(ctx_list, target_idx):
+            ctx_dict = {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""}
+            for cue_idx, text in ctx_list:
+                if cue_idx == target_idx - 2:
+                    ctx_dict["prev2"] = text
+                elif cue_idx == target_idx - 1:
+                    ctx_dict["prev1"] = text
+                elif cue_idx == target_idx:
+                    ctx_dict["cur"] = text
+                elif cue_idx == target_idx + 1:
+                    ctx_dict["next1"] = text
+                elif cue_idx == target_idx + 2:
+                    ctx_dict["next2"] = text
+            return ctx_dict
+
         it["context"] = {
-            "source": _ctx_window(source_cues, idx, 2),
-            "target": _ctx_window(target_cues, idx, 2),
+            "source": build_context_dict(source_ctx, idx),
+            "target": build_context_dict(target_ctx, idx),
         }
 
 
@@ -641,9 +666,9 @@ def run_batch_evaluation(
                 for row in csv.DictReader(un_csv.read_text(encoding="utf-8").splitlines()):
                     un_issues.append(
                         {
-                            "cue": int(row["cue"]),
-                            "original": row["original_text"],
-                            "target": row["target_text"],
+                            "idx": int(row["cue"]),
+                            "src": row["original_text"],
+                            "tgt": row["target_text"],
                         }
                     )
 
@@ -705,9 +730,58 @@ def run_batch_evaluation(
 
             verdict = res.get("verdict", "FAIL")
 
+            # Validate per-cue issue schema before context attachment
+            for issue in un_issues:
+                if not {"idx", "src", "tgt"} <= issue.keys():
+                    raise ValueError("Per-cue DNT issue missing required keys: idx, src, tgt")
+
             # Attach ±2 context to issues (stored directly in the rollup JSON).
             _attach_context_to_issues(missing_issues, source_cues, target_cues)
             _attach_context_to_issues(un_issues, source_cues, target_cues)
+
+            # Create v2 issues structure with counts and details
+            issues_counts = {
+                "missing_translation": len(missing_issues),
+                "untranslated_after_dnt": len(un_issues),
+                "timing_fail": 1 if timing_fail else 0,
+                "placeholder_mismatch": 0,  # Not implemented yet
+                "parity_issue": 0,  # Not implemented yet
+            }
+
+            # Create v2 issues_detail structure
+            issues_detail = {
+                "missing_translation": [
+                    {
+                        "cue_index": issue["idx"],
+                        "source_text": issue["src"],
+                        "target_text": issue["tgt"],
+                        "context": issue.get("context", {}),
+                    }
+                    for issue in missing_issues
+                ],
+                "untranslated_after_dnt": [
+                    {
+                        "cue_index": issue["idx"],
+                        "source_text": issue["src"],
+                        "target_text": issue["tgt"],
+                        "context": issue.get("context", {}),
+                    }
+                    for issue in un_issues
+                ],
+                "timing_fail": [
+                    {
+                        "file_level": True,
+                        "median_start_ms": round(med_ds, 1),
+                        "median_end_ms": round(med_de, 1),
+                        "p95_start_ms": round(p95_ds, 1),
+                        "p95_end_ms": round(p95_de, 1),
+                    }
+                ]
+                if timing_fail
+                else [],
+                "placeholder_mismatch": [],
+                "parity_issue": [],
+            }
 
             per_files.append(
                 {
@@ -727,11 +801,8 @@ def run_batch_evaluation(
                         "cps_soft": cps_soft_cap,
                         "cps_hard": cps_hard_cap,
                     },
-                    "issues": {
-                        "untranslated_after_dnt": un_issues,
-                        "missing_translation": missing_issues,  # computed in memory
-                        "timing_fail": timing_fail,
-                    },
+                    "issues_counts": issues_counts,
+                    "issues_detail": issues_detail,
                     "artifacts_dir": f"artifacts/{lang}",
                 }
             )

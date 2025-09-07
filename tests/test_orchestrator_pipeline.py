@@ -15,19 +15,29 @@ class TestOrchestratorPipeline:
         """Test that emit_all_reports returns all 4 required paths."""
         # Create mock rollup data
         rollup = {
-            "files_total": 1,
-            "languages_total": 1,
             "issues_total": 0,
             "source_language": "en",
             "languages": {
                 "ja": {
-                    "files": {
-                        "file1.srt": {
-                            "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
-                            "timing_fail": 0,
+                    "files": [
+                        {
+                            "target_rel": "file1.srt",
+                            "issues_counts": {
+                                "missing_translation": 0,
+                                "untranslated_after_dnt": 0,
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [],
+                                "untranslated_after_dnt": [],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         }
-                    }
+                    ]
                 }
             },
         }
@@ -64,19 +74,29 @@ class TestOrchestratorPipeline:
         """Test that HTML is generated only once (no double-build)."""
         # Create mock rollup data
         rollup = {
-            "files_total": 1,
-            "languages_total": 1,
             "issues_total": 0,
             "source_language": "en",
             "languages": {
                 "ja": {
-                    "files": {
-                        "file1.srt": {
-                            "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
-                            "timing_fail": 0,
+                    "files": [
+                        {
+                            "target_rel": "file1.srt",
+                            "issues_counts": {
+                                "missing_translation": 0,
+                                "untranslated_after_dnt": 0,
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [],
+                                "untranslated_after_dnt": [],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         }
-                    }
+                    ]
                 }
             },
         }
@@ -113,19 +133,29 @@ class TestOrchestratorPipeline:
         """Test that logs show single HTML generation event."""
         # Create mock rollup data
         rollup = {
-            "files_total": 1,
-            "languages_total": 1,
             "issues_total": 0,
             "source_language": "en",
             "languages": {
                 "ja": {
-                    "files": {
-                        "file1.srt": {
-                            "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
-                            "timing_fail": 0,
+                    "files": [
+                        {
+                            "target_rel": "file1.srt",
+                            "issues_counts": {
+                                "missing_translation": 0,
+                                "untranslated_after_dnt": 0,
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [],
+                                "untranslated_after_dnt": [],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         }
-                    }
+                    ]
                 }
             },
         }
@@ -168,19 +198,29 @@ class TestOrchestratorPipeline:
         """Test that emit_all_reports fails fast when ai_config.json is missing."""
         # Create mock rollup data
         rollup = {
-            "files_total": 1,
-            "languages_total": 1,
             "issues_total": 0,
             "source_language": "en",
             "languages": {
                 "ja": {
-                    "files": {
-                        "file1.srt": {
-                            "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
-                            "timing_fail": 0,
+                    "files": [
+                        {
+                            "target_rel": "file1.srt",
+                            "issues_counts": {
+                                "missing_translation": 0,
+                                "untranslated_after_dnt": 0,
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [],
+                                "untranslated_after_dnt": [],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         }
-                    }
+                    ]
                 }
             },
         }
@@ -195,24 +235,60 @@ class TestOrchestratorPipeline:
         """Test that report_v1.json is compiled correctly by the orchestrator."""
         # Create mock rollup data with issues
         rollup = {
-            "files_total": 2,
-            "languages_total": 1,
             "issues_total": 2,
             "source_language": "en",
             "languages": {
                 "ja": {
-                    "files": {
-                        "file1.srt": {
-                            "missing_translation": 1,  # warning
-                            "untranslated_after_dnt": 0,
-                            "timing_fail": 0,
+                    "files": [
+                        {
+                            "target_rel": "file1.srt",
+                            "issues_counts": {
+                                "missing_translation": 1,  # warning
+                                "untranslated_after_dnt": 0,
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [
+                                    {
+                                        "cue_index": 1,
+                                        "source_text": "test",
+                                        "target_text": "",
+                                        "context": {"source": {}, "target": {}},
+                                    }
+                                ],
+                                "untranslated_after_dnt": [],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         },
-                        "file2.srt": {
-                            "missing_translation": 0,
-                            "untranslated_after_dnt": 1,  # error
-                            "timing_fail": 0,
+                        {
+                            "target_rel": "file2.srt",
+                            "issues_counts": {
+                                "missing_translation": 0,
+                                "untranslated_after_dnt": 1,  # error
+                                "timing_fail": 0,
+                                "placeholder_mismatch": 0,
+                                "parity_issue": 0,
+                            },
+                            "issues_detail": {
+                                "missing_translation": [],
+                                "untranslated_after_dnt": [
+                                    {
+                                        "cue_index": 1,
+                                        "source_text": "API",
+                                        "target_text": "API",
+                                        "context": {"source": {}, "target": {}},
+                                    }
+                                ],
+                                "timing_fail": [],
+                                "placeholder_mismatch": [],
+                                "parity_issue": [],
+                            },
                         },
-                    }
+                    ]
                 }
             },
         }
@@ -242,33 +318,29 @@ class TestOrchestratorPipeline:
         with open(paths["report_v1_json"], "r", encoding="utf-8") as f:
             report_v1 = json.load(f)
 
-        # Test structure
-        assert "version" in report_v1
-        assert "meta" in report_v1
+        # Test structure (according to rulebook)
         assert "decision" in report_v1
-        assert "totals" in report_v1
+        assert "one_liner" in report_v1
         assert "kpis" in report_v1
         assert "file_status" in report_v1
         assert "punch_list" in report_v1
         assert "lexicons" in report_v1
 
         # Test decision
-        assert report_v1["decision"]["level"] == "fix"
-        assert "errors that must be fixed" in report_v1["decision"]["one_liner"]
-
-        # Test totals
-        assert report_v1["totals"]["files_total"] == 2
-        assert report_v1["totals"]["languages_total"] == 1
-        assert report_v1["totals"]["issues_total"] == 2
+        assert report_v1["decision"] == "fail"
+        assert "errors that must be fixed" in report_v1["one_liner"]
 
         # Test KPIs
-        assert report_v1["kpis"]["errors_total"] == 1
-        assert report_v1["kpis"]["warnings_total"] == 1
+        assert report_v1["kpis"]["files_total"] == 2
+        assert report_v1["kpis"]["languages_total"] == 1
+        assert report_v1["kpis"]["issues_total"] == 2
+        assert report_v1["kpis"]["by_type"]["missing_translation"] == 1
+        assert report_v1["kpis"]["by_type"]["untranslated_after_dnt"] == 1
 
         # Test file status
         assert "ja" in report_v1["file_status"]
         assert report_v1["file_status"]["ja"]["file1.srt"] == "review"
-        assert report_v1["file_status"]["ja"]["file2.srt"] == "error"
+        assert report_v1["file_status"]["ja"]["file2.srt"] == "blocked"
 
         # Test punch_list
         assert len(report_v1["punch_list"]["errors"]) == 1
@@ -276,5 +348,5 @@ class TestOrchestratorPipeline:
 
         # Test lexicons
         assert report_v1["lexicons"]["dnt"]["count"] == 2
-        assert "ja" in report_v1["lexicons"]["termbases"]
-        assert report_v1["lexicons"]["termbases"]["ja"]["count"] == 2
+        assert "ja" in report_v1["lexicons"]["termbase"]
+        assert report_v1["lexicons"]["termbase"]["ja"]["count"] == 2

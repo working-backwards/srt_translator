@@ -47,7 +47,7 @@ def _render_context_pairs(pairs: list[tuple[int, str]]) -> str:
 
 def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path:
     """
-    Write eval_report.json with strict EvalReportV1 format.
+    Write eval_report.json with strict v2 format.
 
     Args:
         batch_root: Path to the batch directory
@@ -59,70 +59,75 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
     """
     log = logger.getChild("report.json")
 
-    # Extract per-language file counts from rollup
-    per_language_file_counts = {}
+    # Extract per-language data from rollup
+    per_language = {}
     languages = rollup.get("languages", {})
 
     for lang_code, lang_data in languages.items():
-        per_language_file_counts[lang_code] = {}
-        files = lang_data.get("files", {})
+        per_language[lang_code] = {"files": {}}
 
-        # Handle both list and dict formats
-        if isinstance(files, list):
-            # Full rollup format with files as list
-            for file_data in files:
-                file_path = file_data.get("target_file", "")
-                issues = file_data.get("issues", {})
+        files = lang_data.get("files", [])
 
-                # Extract issue counts
-                missing_count = len(issues.get("missing_translation", []))
-                untrans_dnt_count = len(issues.get("untranslated_after_dnt", []))
-                timing_fail_count = 1 if issues.get("timing_fail") else 0
+        # Process each file
+        for file_data in files:
+            file_path = file_data.get("target_rel", file_data.get("target_file", ""))
 
-                per_language_file_counts[lang_code][file_path] = {
-                    "missing_translation": missing_count,
-                    "untranslated_after_dnt": untrans_dnt_count,
-                    "timing_fail": timing_fail_count,
-                }
-        else:
-            # Simplified format with files as dict
-            for file_path, file_data in files.items():
-                per_language_file_counts[lang_code][file_path] = {
-                    "missing_translation": file_data.get("missing_translation", 0),
-                    "untranslated_after_dnt": file_data.get("untranslated_after_dnt", 0),
-                    "timing_fail": file_data.get("timing_fail", 0),
-                }
+            # Extract v2 issues structure
+            issues_counts = file_data.get("issues_counts", {})
+            issues_detail = file_data.get("issues_detail", {})
 
-    # Get source language
-    source_language = rollup.get("original_language", {}).get("detected", "")
+            per_language[lang_code]["files"][file_path] = {
+                "issues_counts": issues_counts,
+                "issues_detail": issues_detail,
+            }
 
-    # Build strict EvalReportV1
-    from srt_translator.eval.assemble import build_eval_report_v1
+    # Calculate totals
+    files_total = sum(
+        len(files) for lang_data in per_language.values() for files in [lang_data["files"]]
+    )
+    languages_total = len(per_language)
+
+    # Calculate total issues across all files and languages
+    issues_total = 0
+    for lang_data in per_language.values():
+        for file_data in lang_data["files"].values():
+            issues_counts = file_data.get("issues_counts", {})
+            issues_total += sum(issues_counts.values())
+
+    # Get lexicons from rollup
+    lexicons = rollup.get("lexicons", {"dnt": {"count": 0, "sample": []}, "termbase": {}})
+
+    # Build the v2 report according to rulebook structure
+    json_report = {
+        "version": "2.0.0",
+        "totals": {
+            "files_total": files_total,
+            "languages_total": languages_total,
+            "issues_total": issues_total,
+        },
+        "per_language": per_language,
+        "lexicons": lexicons,
+    }
+
+    # Write to artifacts directory
+    artifacts_dir = batch_root / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    json_path = artifacts_dir / "eval_report.json"
 
     try:
-        json_report = build_eval_report_v1(
-            per_language_file_counts=per_language_file_counts,
-            source_language=source_language,
-        )
-
-        # Write to artifacts directory
-        artifacts_dir = batch_root / "artifacts"
-        artifacts_dir.mkdir(exist_ok=True)
-
-        json_path = artifacts_dir / "eval_report.json"
-        with open(json_path, "w", encoding="utf-8") as f:
+        with json_path.open("w", encoding="utf-8") as f:
             json.dump(json_report, f, ensure_ascii=False, indent=2)
 
         log.info(
-            "Wrote strict eval_report.json (v1): files=%d, langs=%d, issues=%d",
-            json_report["files_total"],
-            json_report["languages_total"],
-            json_report["issues_total"],
+            "Wrote eval_report.json v2: files=%d, langs=%d, issues=%d",
+            json_report["totals"]["files_total"],
+            json_report["totals"]["languages_total"],
+            json_report["totals"]["issues_total"],
         )
         return json_path
 
     except Exception as e:
-        log.error(f"Failed to build strict eval_report.json: {e}")
+        log.error(f"Failed to build v2 eval_report.json: {e}")
         raise
 
 

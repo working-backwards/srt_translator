@@ -396,9 +396,9 @@ class TestReportV1Schema:
                     "file_path",
                     "language",
                     "issue_type",
-                    "cue",
-                    "original",
-                    "target",
+                    "idx",
+                    "src",
+                    "tgt",
                 }
                 assert set(item.keys()) == required_keys
 
@@ -406,9 +406,9 @@ class TestReportV1Schema:
                 assert isinstance(item["file_path"], str)
                 assert isinstance(item["language"], str)
                 assert isinstance(item["issue_type"], str)
-                assert isinstance(item["cue"], int)
-                assert isinstance(item["original"], str)
-                assert isinstance(item["target"], str)
+                assert isinstance(item["idx"], int)
+                assert isinstance(item["src"], str)
+                assert isinstance(item["tgt"], str)
 
     def test_version_and_timestamp_types(self):
         """Test that version and timestamp have correct types."""

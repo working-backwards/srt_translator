@@ -96,14 +96,14 @@ class TestOrchestratorV1:
                         {
                             "target_file": "test1.srt",
                             "issues": {
-                                "missing_translation": [{"cue": 1, "src": "Hello", "tgt": ""}],
-                                "untranslated_after_dnt": [{"cue": 2, "src": "API", "tgt": "API"}],
+                                "missing_translation": [{"idx": 1, "src": "Hello", "tgt": ""}],
+                                "untranslated_after_dnt": [{"idx": 2, "src": "API", "tgt": "API"}],
                             },
                         },
                         {
                             "target_file": "test2.srt",
                             "issues": {
-                                "missing_translation": [{"cue": 3, "src": "World", "tgt": ""}]
+                                "missing_translation": [{"idx": 3, "src": "World", "tgt": ""}]
                             },
                         },
                     ]

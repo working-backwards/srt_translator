@@ -1,0 +1,124 @@
+{
+  "decision": "fail",
+  "one_liner": "We found 2 errors that must be fixed before publishing.",
+  "punch_list": {
+    "errors": [
+      {
+        "language": "pt-BR",
+        "file": "targets/pt-BR/InputMetrics10 - EN.srt",
+        "cue_index": 168,
+        "type": "untranslated_after_dnt",
+        "desc": "This term should not be translated according to your DNT list.",
+        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
+        "context": {
+          "source": {
+            "prev2": "Previous line 2",
+            "prev1": "Previous line 1",
+            "cur": "Amazon marketing campaign",
+            "next1": "Next line 1",
+            "next2": "Next line 2"
+          },
+          "target": {
+            "prev2": "Linha anterior 2",
+            "prev1": "Linha anterior 1",
+            "cur": "Amazon marketing campaign",
+            "next1": "Linha seguinte 1",
+            "next2": "Linha seguinte 2"
+          }
+        }
+      },
+      {
+        "language": "pt-BR",
+        "file": "targets/pt-BR/InputMetrics10 - EN.srt",
+        "cue_index": null,
+        "type": "timing_fail",
+        "desc": "Timing drift too high (median or p95)",
+        "suggested_fix": "Check subtitle timing synchronization.",
+        "context": {
+          "source": {
+            "prev2": "",
+            "prev1": "",
+            "cur": "",
+            "next1": "",
+            "next2": ""
+          },
+          "target": {
+            "prev2": "",
+            "prev1": "",
+            "cur": "",
+            "next1": "",
+            "next2": ""
+          }
+        }
+      }
+    ],
+    "warnings": [
+      {
+        "language": "pt-BR",
+        "file": "targets/pt-BR/InputMetrics10 - EN.srt",
+        "cue_index": 294,
+        "type": "missing_translation",
+        "desc": "This cue has no translation.",
+        "suggested_fix": "Translate the source text to the target language.",
+        "context": {
+          "source": {
+            "prev2": "Previous line 2",
+            "prev1": "Previous line 1",
+            "cur": "This is a missing translation example",
+            "next1": "Next line 1",
+            "next2": "Next line 2"
+          },
+          "target": {
+            "prev2": "",
+            "prev1": "",
+            "cur": "",
+            "next1": "",
+            "next2": ""
+          }
+        }
+      }
+    ]
+  },
+  "file_status": {
+    "pt-BR": {
+      "targets/pt-BR/InputMetrics10 - EN.srt": "blocked"
+    }
+  },
+  "kpis": {
+    "files_total": 1,
+    "languages_total": 1,
+    "issues_total": 3,
+    "by_type": {
+      "missing_translation": 1,
+      "untranslated_after_dnt": 1,
+      "timing_fail": 1,
+      "placeholder_mismatch": 0,
+      "parity_issue": 0
+    }
+  },
+  "lexicons": {
+    "dnt": {
+      "count": 3,
+      "sample": [
+        "Amazon",
+        "Google",
+        "Microsoft"
+      ]
+    },
+    "termbase": {
+      "pt-BR": {
+        "count": 2,
+        "sample": [
+          {
+            "source": "marketing",
+            "target": "marketing"
+          },
+          {
+            "source": "campaign",
+            "target": "campanha"
+          }
+        ]
+      }
+    }
+  }
+}

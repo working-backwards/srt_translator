@@ -17,6 +17,20 @@ def _format_number(value: int | float) -> str:
         return str(value)
 
 
+def _validate_punch_list_context(punch_list: dict) -> None:
+    """Validate that punch list items have proper context structure."""
+    for category in ["errors", "warnings"]:
+        for item in punch_list.get(category, []):
+            context = item.get("context", {})
+            if context:
+                source_context = context.get("source", {})
+                target_context = context.get("target", {})
+                if not source_context.get("cur") and not target_context.get("cur"):
+                    logging.warning(
+                        "Punch list item missing context.cur: %s", item.get("issue_type", "unknown")
+                    )
+
+
 def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, Any]:
     """Load JSON file with strict validation, fail fast on missing keys."""
     if not file_path.exists():
@@ -34,11 +48,8 @@ def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, 
     return data  # type: ignore[no-any-return]
 
 
-# Old helper functions removed - now using compiled report_v1.json data
-
-
 def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
-    """Generate HTML report with unified top sections: banner, next steps, and KPIs.
+    """Generate HTML report from compiled report_v1.json.
 
     Reads report_v1.json with strict validation.
     Fails fast on missing/invalid inputs.
@@ -60,459 +71,264 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
 
         # Load and validate report_v1.json with strict schema
         report_data = _load_json_or_raise(
-            report_v1_path, ["decision", "totals", "kpis", "file_status", "punch_list", "lexicons"]
+            report_v1_path,
+            ["decision", "one_liner", "punch_list", "file_status", "kpis", "lexicons"],
         )
 
         # Validate required structure
-        if not isinstance(report_data.get("decision"), dict):
-            raise ValueError("report_v1.json decision must be a dict")
-        if not isinstance(report_data.get("totals"), dict):
-            raise ValueError("report_v1.json totals must be a dict")
-        if not isinstance(report_data.get("kpis"), dict):
-            raise ValueError("report_v1.json kpis must be a dict")
-        if not isinstance(report_data.get("file_status"), dict):
-            raise ValueError("report_v1.json file_status must be a dict")
+        if not isinstance(report_data.get("decision"), str):
+            raise ValueError("report_v1.json decision must be a string")
+        if not isinstance(report_data.get("one_liner"), str):
+            raise ValueError("report_v1.json one_liner must be a string")
         if not isinstance(report_data.get("punch_list"), dict):
             raise ValueError("report_v1.json punch_list must be a dict")
+        if not isinstance(report_data.get("file_status"), dict):
+            raise ValueError("report_v1.json file_status must be a dict")
+
+        # Validate context structure in punch list items
+        _validate_punch_list_context(report_data["punch_list"])
+        if not isinstance(report_data.get("kpis"), dict):
+            raise ValueError("report_v1.json kpis must be a dict")
         if not isinstance(report_data.get("lexicons"), dict):
             raise ValueError("report_v1.json lexicons must be a dict")
 
-        # Extract data from compiled report
+        # Extract data
         decision = report_data["decision"]
-        totals = report_data["totals"]
-        kpis = report_data["kpis"]
-        file_status = report_data["file_status"]
+        one_liner = report_data["one_liner"]
         punch_list = report_data["punch_list"]
+        file_status = report_data["file_status"]
+        kpis = report_data["kpis"]
         lexicons = report_data["lexicons"]
 
-        # Extract decision level and one-liner
-        decision_level = decision.get("level", "review")
-        one_liner = decision.get("one_liner", "")
+        # Map decision level to emoji
+        icon = {"pass": "✅", "review": "⚠️", "fail": "❌"}.get(decision, "⚠️")
 
-        # Map decision level to emoji - use exact one_liner from decision
-        if decision_level == "pass":
-            banner_emoji = "✅"
-        elif decision_level == "review":
-            banner_emoji = "⚠️"
-        else:  # fix
-            banner_emoji = "❌"
+        # Generate HTML
+        html_content = _generate_html(
+            icon, one_liner, punch_list, file_status, kpis, lexicons, css_text
+        )
 
-        # Generate HTML content in fixed order
-        html_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Eval Report</title>
-    <style>
-{css_text}
-    </style>
-</head>
-<body>
-    <h1>Eval Report</h1>
-
-    <!-- 1. Decision Banner + One-liner -->
-    <div class="decision-banner">
-        <h2>{banner_emoji} {one_liner}</h2>
-    </div>
-
-    <!-- 2. Punch List -->
-    {_render_punch_list_new(punch_list)}
-
-    <!-- 3. File Status by Language -->
-    <div class="file-status-section">
-        <h2>File Status by Language</h2>
-        {_render_file_status_by_language(file_status)}
-    </div>
-
-    <!-- 4. KPI Summary -->
-    <div class="kpi-section">
-        <h2>KPI Summary</h2>
-        <div class="kpi-grid">
-            <div class="kpi-item">
-                <span class="kpi-label">Files:</span>
-                <span class="kpi-value">{totals.get("files_total", 0)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Languages:</span>
-                <span class="kpi-value">{totals.get("languages_total", 0)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Issues:</span>
-                <span class="kpi-value">{totals.get("issues_total", 0)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Errors:</span>
-                <span class="kpi-value">{kpis.get("errors_total", 0)}</span>
-            </div>
-            <div class="kpi-item">
-                <span class="kpi-label">Warnings:</span>
-                <span class="kpi-value">{kpis.get("warnings_total", 0)}</span>
-            </div>
-        </div>
-        {_render_per_type_counts(kpis.get("per_type", {}))}
-    </div>
-
-    <!-- 5. Lexicons -->
-    {_render_lexicons(lexicons)}
-</body>
-</html>"""
-
-        # Write HTML file
+        # Write the file
         out_path.write_text(html_content, encoding="utf-8")
 
         return out_path
 
-    except FileNotFoundError as e:
-        error_msg = f"Required resource not found: {e}"
-        if logger:
-            logger.error(error_msg)
-        raise ValueError(error_msg) from e
-    except json.JSONDecodeError as e:
-        error_msg = f"Invalid JSON in {report_v1_path}: {e}"
-        if logger:
-            logger.error(error_msg)
-        raise ValueError(error_msg) from e
     except Exception as e:
-        error_msg = f"Failed to generate HTML report: {e}"
-        if logger:
-            logger.error(error_msg)
-        raise ValueError(error_msg) from e
+        logger.error("Failed to generate HTML report: %s", e)
+        raise
 
 
-def _get_what_to_do_steps(decision_level: str, kpis: dict) -> list[str]:
-    """Generate what to do next steps based on decision level and KPIs."""
-    # kpis parameter kept for future use but not currently needed
-    _ = kpis  # Suppress unused parameter warning
-
-    if decision_level == "pass":
-        return [
-            "Spot-check a few captions for flow and brand terms, then publish.",
-            "Save the HTML/MD report with your course materials.",
-        ]
-    elif decision_level == "review":
-        return [
-            "Work through the Punch List below.",
-            "For each warning, use the context snippet and suggested check to verify quickly.",
-            "If everything looks good, publish.",
-        ]
-    else:  # fix
-        return [
-            "Work through the Punch List below; fix **errors first**, then warnings.",
-            "Use the context snippets to validate or regenerate translations.",
-            "Re-run the app after fixes to verify a clean report.",
-        ]
-
-
-def _render_file_status_dict(file_status: dict[str, dict[str, str]]) -> str:
-    """Render file status dict as HTML."""
-    if not file_status:
-        return "<p>No files processed.</p>"
-
+def _generate_html(
+    icon: str,
+    one_liner: str,
+    punch_list: dict,
+    file_status: dict,
+    kpis: dict,
+    lexicons: dict,
+    css_text: str,
+) -> str:
+    """Generate the complete HTML content."""
     html = []
-    # Sort languages and files for deterministic output
-    for lang in sorted(file_status.keys()):
-        lang_files = file_status[lang]
-        for file_path in sorted(lang_files.keys()):
-            status = lang_files[file_path]
 
-            # Map status to emoji and CSS class
-            if status == "ok":
-                emoji = "✅"
-                css_class = "status-ready"
-            elif status == "warning":
-                emoji = "⚠️"
-                css_class = "status-review"
-            elif status == "error":
-                emoji = "❌"
-                css_class = "status-fix"
-            else:
-                emoji = "❓"
-                css_class = "status-unknown"
+    # HTML header
+    html.append("<!DOCTYPE html>")
+    html.append('<html lang="en">')
+    html.append("<head>")
+    html.append('<meta charset="utf-8">')
+    html.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
+    html.append("<title>Translation Evaluation Report</title>")
+    html.append("<style>")
+    html.append(css_text)
+    html.append("</style>")
+    html.append("</head>")
+    html.append("<body>")
 
-            html.append(f'<div class="file-status-item {css_class}">')
-            html.append(f'  <span class="file-status-emoji">{emoji}</span>')
-            html.append(f'  <span class="file-status-path">{lang}/{file_path}</span>')
-            html.append("</div>")
+    # 1. Decision Banner + One-liner
+    html.append('<div class="decision-banner">')
+    html.append(f"<h1>{icon} {one_liner}</h1>")
+    html.append("</div>")
 
-    return "\n".join(html)
-
-
-def _render_punch_list_new(punch_list: dict[str, list]) -> str:
-    """Render punch list (errors and warnings) as HTML using new schema."""
+    # 2. Punch List (Errors first, then Warnings)
     errors = punch_list.get("errors", [])
     warnings = punch_list.get("warnings", [])
 
-    html = []
-
-    # Always show Critical Issues section
-    html.append('<div class="punch-list-section">')
-    html.append("<h2>❌ Critical Issues</h2>")
-    html.append('<div class="punch-list">')
-    if errors:
-        for error in errors:
-            html.append('<div class="punch-item error">')
-            html.append(f"  <h3>{error.get('file', 'Unknown')}: {error.get('type', 'Error')}</h3>")
-            html.append(f"  <p><strong>Language:</strong> {error.get('language', 'Unknown')}</p>")
-            if error.get("cue_index") is not None:
-                html.append(f"  <p><strong>Cue Index:</strong> {error.get('cue_index')}</p>")
-            html.append(f"  <p><strong>Summary:</strong> {error.get('human_summary', '')}</p>")
-            html.append(
-                f"  <p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>"
-            )
-            # Render context if available
-            context = error.get("context", {})
-            if context:
-                source = context.get("source", {})
-                target = context.get("target", {})
-                if source or target:
-                    html.append("  <p><strong>Context:</strong></p>")
-                    if source:
-                        html.append("  <p><strong>Source context:</strong></p>")
-                        html.append(
-                            "  <pre>"
-                            + "\n".join([f"{k}: {v}" for k, v in source.items() if v])
-                            + "</pre>"
-                        )
-                    if target:
-                        html.append("  <p><strong>Target context:</strong></p>")
-                        html.append(
-                            "  <pre>"
-                            + "\n".join([f"{k}: {v}" for k, v in target.items() if v])
-                            + "</pre>"
-                        )
-            html.append("</div>")
-    else:
-        html.append("<p>No critical issues found.</p>")
-    html.append("</div>")
-    html.append("</div>")
-
-    # Always show Warnings section
-    html.append('<div class="punch-list-section">')
-    html.append("<h2>⚠️ Warnings</h2>")
-    html.append('<div class="punch-list">')
-    if warnings:
-        for warning in warnings:
-            html.append('<div class="punch-item warning">')
-            html.append(
-                f"  <h3>{warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}</h3>"
-            )
-            html.append(f"  <p><strong>Language:</strong> {warning.get('language', 'Unknown')}</p>")
-            if warning.get("cue_index") is not None:
-                html.append(f"  <p><strong>Cue Index:</strong> {warning.get('cue_index')}</p>")
-            html.append(f"  <p><strong>Summary:</strong> {warning.get('human_summary', '')}</p>")
-            html.append(
-                f"  <p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>"
-            )
-            # Render context if available
-            context = warning.get("context", {})
-            if context:
-                source = context.get("source", {})
-                target = context.get("target", {})
-                if source or target:
-                    html.append("  <p><strong>Context:</strong></p>")
-                    if source:
-                        html.append("  <p><strong>Source context:</strong></p>")
-                        html.append(
-                            "  <pre>"
-                            + "\n".join([f"{k}: {v}" for k, v in source.items() if v])
-                            + "</pre>"
-                        )
-                    if target:
-                        html.append("  <p><strong>Target context:</strong></p>")
-                        html.append(
-                            "  <pre>"
-                            + "\n".join([f"{k}: {v}" for k, v in target.items() if v])
-                            + "</pre>"
-                        )
-            html.append("</div>")
-    else:
-        html.append("<p>No warnings found.</p>")
-    html.append("</div>")
-    html.append("</div>")
-
-    if not errors and not warnings:
+    if errors or warnings:
         html.append('<div class="punch-list-section">')
-        html.append("<h2>✅ No Issues Found</h2>")
-        html.append("<p>All files passed evaluation with no errors or warnings.</p>")
+        html.append("<h2>❌ Critical Issues</h2>")
+        html.append('<div class="punch-list">')
+        if errors:
+            for error in errors:
+                html.append('<div class="punch-item error">')
+                html.append(
+                    f"<h3>{error.get('file', 'Unknown')}: {error.get('type', 'Error')}</h3>"
+                )
+                html.append(f"<p><strong>Language:</strong> {error.get('language', 'Unknown')}</p>")
+                if error.get("cue_index") is not None:
+                    html.append(f"<p><strong>Cue Index:</strong> {error.get('cue_index')}</p>")
+                html.append(f"<p><strong>Summary:</strong> {error.get('desc', '')}</p>")
+                html.append(
+                    f"<p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>"
+                )
+                # Render context if available
+                context = error.get("context", {})
+                if context:
+                    source = context.get("source", {})
+                    target = context.get("target", {})
+                    if source or target:
+                        html.append("<p><strong>Context:</strong></p>")
+                        if source:
+                            html.append("<p><strong>Source context:</strong></p>")
+                            html.append("<pre>")
+                            html.append("\n".join([f"{k}: {v}" for k, v in source.items() if v]))
+                            html.append("</pre>")
+                        if target:
+                            html.append("<p><strong>Target context:</strong></p>")
+                            html.append("<pre>")
+                            html.append("\n".join([f"{k}: {v}" for k, v in target.items() if v]))
+                            html.append("</pre>")
+                html.append("</div>")
+        else:
+            html.append("<p>No critical issues found.</p>")
+        html.append("</div>")
         html.append("</div>")
 
-    return "\n".join(html)
+        # Warnings section
+        html.append('<div class="punch-list-section">')
+        html.append("<h2>⚠️ Warnings</h2>")
+        html.append('<div class="punch-list">')
+        if warnings:
+            for warning in warnings:
+                html.append('<div class="punch-item warning">')
+                html.append(
+                    f"<h3>{warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}</h3>"
+                )
+                html.append(
+                    f"<p><strong>Language:</strong> {warning.get('language', 'Unknown')}</p>"
+                )
+                if warning.get("cue_index") is not None:
+                    html.append(f"<p><strong>Cue Index:</strong> {warning.get('cue_index')}</p>")
+                html.append(f"<p><strong>Summary:</strong> {warning.get('desc', '')}</p>")
+                html.append(
+                    f"<p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>"
+                )
+                # Render context if available
+                context = warning.get("context", {})
+                if context:
+                    source = context.get("source", {})
+                    target = context.get("target", {})
+                    if source or target:
+                        html.append("<p><strong>Context:</strong></p>")
+                        if source:
+                            html.append("<p><strong>Source context:</strong></p>")
+                            html.append("<pre>")
+                            html.append("\n".join([f"{k}: {v}" for k, v in source.items() if v]))
+                            html.append("</pre>")
+                        if target:
+                            html.append("<p><strong>Target context:</strong></p>")
+                            html.append("<pre>")
+                            html.append("\n".join([f"{k}: {v}" for k, v in target.items() if v]))
+                            html.append("</pre>")
+                html.append("</div>")
+        else:
+            html.append("<p>No warnings found.</p>")
+        html.append("</div>")
+        html.append("</div>")
+    else:
+        # No issues found
+        html.append('<div class="punch-list-section">')
+        html.append("<h2>✅ No Issues Found</h2>")
+        html.append("<p>Everything looks great! Your translated files are ready to use.</p>")
+        html.append("</div>")
 
-
-def _render_file_status_by_language(file_status: dict[str, dict[str, str]]) -> str:
-    """Render file status by language as HTML table."""
-    html = []
+    # 3. File Status by Language
+    html.append('<div class="file-status-section">')
+    html.append("<h2>📁 File Status by Language</h2>")
 
     for lang_code in sorted(file_status.keys()):
         files = file_status[lang_code]
         ready_count = sum(1 for status in files.values() if status == "ready")
         review_count = sum(1 for status in files.values() if status == "review")
-        error_count = sum(1 for status in files.values() if status == "error")
+        blocked_count = sum(1 for status in files.values() if status == "blocked")
 
-        html.append('<div class="language-status">')
-        html.append(f"  <h3>{lang_code.upper()}</h3>")
-        html.append('  <div class="status-summary">')
-        html.append(f'    <span class="status-ready">✅ Ready: {ready_count}</span>')
-        html.append(f'    <span class="status-review">⚠️ Review: {review_count}</span>')
-        html.append(f'    <span class="status-error">❌ Error: {error_count}</span>')
-        html.append("  </div>")
-        html.append('  <div class="file-list">')
+        html.append(f"<h3>{lang_code}</h3>")
+        html.append("<ul>")
+        html.append(f"<li>✅ Ready: {ready_count}</li>")
+        html.append(f"<li>⚠️ Review: {review_count}</li>")
+        html.append(f"<li>❌ Blocked: {blocked_count}</li>")
+        html.append("</ul>")
 
-        for file_path in sorted(files.keys()):
-            status = files[file_path]
-            if status == "ready":
-                emoji = "✅"
-                css_class = "status-ready"
-            elif status == "review":
-                emoji = "⚠️"
-                css_class = "status-review"
-            elif status == "error":
-                emoji = "❌"
-                css_class = "status-error"
-            else:
-                emoji = "❓"
-                css_class = "status-unknown"
+        # Show individual files
+        html.append("<ul>")
+        for file_path, status in sorted(files.items()):
+            status_icon = {"ready": "✅", "review": "⚠️", "blocked": "❌"}.get(status, "❓")
+            html.append(f"<li>{status_icon} {file_path}</li>")
+        html.append("</ul>")
 
-            html.append(f'    <div class="file-item {css_class}">')
-            html.append(f'      <span class="file-emoji">{emoji}</span>')
-            html.append(f'      <span class="file-name">{file_path}</span>')
-            html.append("    </div>")
-
-        html.append("  </div>")
-        html.append("</div>")
-
-    return "\n".join(html)
-
-
-def _render_per_type_counts(per_type: dict[str, int]) -> str:
-    """Render per-type issue counts as HTML."""
-    if not per_type:
-        return ""
-
-    html = []
-    html.append('<div class="per-type-counts">')
-    html.append("  <h3>Issues by Type</h3>")
-    html.append('  <div class="type-grid">')
-
-    for issue_type, count in per_type.items():
-        if count > 0:
-            html.append('    <div class="type-item">')
-            html.append(
-                f'      <span class="type-name">{issue_type.replace("_", " ").title()}</span>'
-            )
-            html.append(f'      <span class="type-count">{count}</span>')
-            html.append("    </div>")
-
-    html.append("  </div>")
     html.append("</div>")
 
-    return "\n".join(html)
+    # 4. KPI Summary
+    html.append('<div class="kpi-section">')
+    html.append("<h2>📊 KPI Summary</h2>")
+    html.append("<ul>")
+    html.append(f"<li><strong>Files Total:</strong> {kpis.get('files_total', 0)}</li>")
+    html.append(f"<li><strong>Languages Total:</strong> {kpis.get('languages_total', 0)}</li>")
+    html.append(f"<li><strong>Issues Total:</strong> {kpis.get('issues_total', 0)}</li>")
+    html.append("</ul>")
 
+    # Per-type breakdown
+    by_type = kpis.get("by_type", {})
+    if by_type:
+        html.append("<h3>Issues by Type</h3>")
+        html.append("<ul>")
+        for issue_type, count in sorted(by_type.items()):
+            if count > 0:
+                html.append(f"<li>{issue_type}: {count}</li>")
+        html.append("</ul>")
 
-def _render_lexicons(lexicons: dict[str, any]) -> str:
-    """Render DNT and termbases as HTML."""
-    html = []
-    html.append('<div class="lexicons-section">')
-    html.append("  <h2>Lexicons</h2>")
+    html.append("</div>")
 
-    # DNT Terms
+    # 5. Lexicons
+    html.append('<div class="lexicon-section">')
+    html.append("<h2>📚 Lexicons</h2>")
+
+    # DNT terms
     dnt = lexicons.get("dnt", {})
-    html.append('  <div class="dnt-section">')
-    html.append("    <h3>DNT Terms</h3>")
-    if dnt.get("count", 0) > 0:
-        html.append(f"    <p><strong>Count:</strong> {dnt.get('count', 0)}</p>")
-        html.append('    <div class="dnt-sample">')
-        html.append("      <p><strong>Sample:</strong></p>")
-        html.append("      <ul>")
-        for term in dnt.get("sample", []):
-            html.append(f"        <li><code>{term}</code></li>")
-        html.append("      </ul>")
-        html.append("    </div>")
+    dnt_count = dnt.get("count", 0)
+    dnt_sample = dnt.get("sample", [])
+    html.append(f"<h3>Do-Not-Translate Terms ({dnt_count} total)</h3>")
+    if dnt_sample:
+        html.append("<ul>")
+        for term in dnt_sample:
+            html.append(f"<li>{term}</li>")
+        html.append("</ul>")
     else:
-        html.append("    <p><em>None</em></p>")
-    html.append("  </div>")
+        html.append("<p>No DNT terms configured.</p>")
 
     # Termbases
-    termbases = lexicons.get("termbases", {})
-    html.append('  <div class="termbases-section">')
-    html.append("    <h3>Termbases</h3>")
-    if termbases:
-        for lang_code in sorted(termbases.keys()):
-            tb = termbases[lang_code]
-            html.append('    <div class="termbase-lang">')
-            html.append(f"      <h4>{lang_code.upper()}</h4>")
-            html.append(f"      <p><strong>Count:</strong> {tb.get('count', 0)}</p>")
-            if tb.get("sample"):
-                html.append('      <div class="termbase-sample">')
-                html.append("        <p><strong>Sample:</strong></p>")
-                html.append("        <ul>")
-                for entry in tb.get("sample", []):
-                    source = entry.get("source", "")
-                    target = entry.get("target", "")
-                    html.append(f"          <li><code>{source}</code> → <code>{target}</code></li>")
-                html.append("        </ul>")
-                html.append("      </div>")
-            html.append("    </div>")
+    termbase = lexicons.get("termbase", {})
+    if termbase:
+        html.append("<h3>Termbases</h3>")
+        for lang_code, terms in sorted(termbase.items()):
+            term_count = terms.get("count", 0)
+            term_sample = terms.get("sample", [])
+            html.append(f"<h4>{lang_code} ({term_count} terms)</h4>")
+            if term_sample:
+                html.append("<ul>")
+                for term in term_sample:
+                    source = term.get("source", "")
+                    target = term.get("target", "")
+                    html.append(f"<li>{source} → {target}</li>")
+                html.append("</ul>")
+            else:
+                html.append("<p>No termbase entries.</p>")
     else:
-        html.append("    <p><em>None</em></p>")
-    html.append("  </div>")
+        html.append("<h3>Termbases</h3>")
+        html.append("<p>No termbases configured.</p>")
 
     html.append("</div>")
-    return "\n".join(html)
 
-
-def _render_punch_list(punch_list: dict[str, list]) -> str:
-    """Render punch list (errors and warnings) as HTML."""
-    errors = punch_list.get("errors", [])
-    warnings = punch_list.get("warnings", [])
-
-    html = []
-
-    if errors:
-        html.append('<div class="punch-list-section">')
-        html.append("<h2>❌ Critical Issues</h2>")
-        html.append('<div class="punch-list">')
-        for error in errors:
-            html.append('<div class="punch-item error">')
-            html.append(
-                f"  <h3>{error.get('filename', 'Unknown')}: {error.get('title', 'Error')}</h3>"
-            )
-            html.append(
-                f"  <p><strong>Why it matters:</strong> {error.get('why_it_matters', '')}</p>"
-            )
-            html.append(
-                f"  <p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>"
-            )
-            html.append(f"  <p><strong>Ask an AI:</strong> {error.get('ask_ai_prompt', '')}</p>")
-            html.append("</div>")
-        html.append("</div>")
-        html.append("</div>")
-
-    if warnings:
-        html.append('<div class="punch-list-section">')
-        html.append("<h2>⚠️ Warnings</h2>")
-        html.append('<div class="punch-list">')
-        for warning in warnings:
-            html.append('<div class="punch-item warning">')
-            html.append(
-                f"  <h3>{warning.get('filename', 'Unknown')}: {warning.get('title', 'Warning')}</h3>"
-            )
-            html.append(
-                f"  <p><strong>Why it matters:</strong> {warning.get('why_it_matters', '')}</p>"
-            )
-            html.append(
-                f"  <p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>"
-            )
-            html.append(f"  <p><strong>Ask an AI:</strong> {warning.get('ask_ai_prompt', '')}</p>")
-            html.append("</div>")
-        html.append("</div>")
-        html.append("</div>")
-
-    if not errors and not warnings:
-        html.append('<div class="punch-list-section">')
-        html.append("<h2>✅ No Issues Found</h2>")
-        html.append("<p>All files passed evaluation with no errors or warnings.</p>")
-        html.append("</div>")
+    # HTML footer
+    html.append("</body>")
+    html.append("</html>")
 
     return "\n".join(html)
