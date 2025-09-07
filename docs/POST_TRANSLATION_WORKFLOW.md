@@ -81,19 +81,39 @@ For each language directory in `targets/`:
 
 1. **File Pair Discovery**: Matches source files in `originals/` with translated files in `targets/{lang}/`
 2. **Per-Pair Evaluation**: Calls `evaluate_pair()` for each source/target file pair
-3. **Issue Detection**: Identifies various issue types and creates detailed counts:
+3. **Issue Detection and Organization**: Identifies individual issues and arranges them by type:
+
+   **Individual Issue Detection**:
+   - Reads CSV files created by `evaluate_pair()` (e.g., `untranslated_{lang}_{batch}.csv`)
+   - Analyzes SRT files directly for missing translations
+   - Calculates timing statistics from source/target cue comparisons
+
+   **Issue Organization by Type**:
    - **`missing_translation`**: Empty or placeholder-only target lines
    - **`untranslated_after_dnt`**: Terms that should not be translated but were
    - **`timing_fail`**: Subtitle timing that doesn't match source
    - **`placeholder_mismatch`**: Placeholder mismatches (not implemented yet)
    - **`parity_issue`**: Cue count mismatches (not implemented yet)
 
-   **Note**: These issue types are later classified as errors or warnings in the report compilation phase.
+   **Data Structure Created**:
+   ```python
+   issues_counts = {
+       "missing_translation": len(missing_issues),
+       "untranslated_after_dnt": len(un_issues),
+       "timing_fail": 1 if timing_fail else 0,
+       # ... etc
+   }
 
-##### Relationship Between Issues and Errors/Warnings
-- **Issues** (detected here): Raw problem types found during evaluation
-- **Errors/Warnings** (classified later): Same issues, but categorized by severity in the report compiler
-- **Timing**: Issues are detected during evaluation (Phase 2), errors/warnings are classified during report compilation (Phase 3)
+   issues_detail = {
+       "missing_translation": [list of individual issues],
+       "untranslated_after_dnt": [list of individual issues],
+       "timing_fail": [timing failure details],
+       # ... etc
+   }
+   ```
+
+   **Note**: These issue are later classified as errors or warnings in the report compilation phase.
+
 
 #### 2.3 Detailed CSV Generation
 **Location**: `srt_translator/eval/tools.py:evaluate_pair()`
@@ -309,6 +329,7 @@ translation-batch-20240115_143022_+0000/
 │   └── es/                                      # Spanish translations
 │       ├── file1.srt
 │       └── file2.srt
+├── manifest.json                                # Batch metadata and version info
 ├── artifacts/                                   # Evaluation outputs
 │   ├── ai_config.json                           # Translation configuration used
 │   ├── eval_report.json                         # Raw evaluation data
@@ -340,6 +361,37 @@ translation-batch-20240115_143022_+0000/
 │       ├── source_fragments_es_batch.csv
 │       └── eval_summary_es_batch.md
 └── translation_issues_20240115_143022_+0000.log # Translation process log
+```
+
+### Key Files Explained
+
+#### `manifest.json`
+Contains batch metadata and version information:
+```json
+{
+  "app_version": "1.0.0",
+  "evaluator_version": "1.0.0",
+  "original_language": {
+    "code": "en",
+    "name": "English"
+  }
+}
+```
+
+#### `artifacts/ai_config.json`
+Translation configuration snapshot used for this batch:
+```json
+{
+  "version": "1.0",
+  "timestamp": "2024-01-15T14:30:22+00:00",
+  "source_files": ["file1.srt", "file2.srt", "file3.srt"],
+  "target_languages": ["fr", "ja", "es"],
+  "dnt_terms": ["API", "GPU", "NASA"],
+  "termbase": {
+    "fr": {"input metrics": "métriques d'entrée"},
+    "ja": {"input metrics": "入力指標"}
+  }
+}
 ```
 
 ## File Purpose Descriptions
@@ -544,10 +596,18 @@ If report compilation fails:
    eval_json_path = _write_json_report(batch_root, rollup, logger)
    ```
 
-3. **Report Compilation** (`srt_translator/eval/report.py:emit_all_reports()`):
+3. **Report Compilation Orchestrator** (`srt_translator/eval/report.py:emit_all_reports()`):
    ```python
-   # Writes compiled in-memory data to artifacts/report_v1.json
+   # Orchestrates the report generation process
+   # Step 1: Write eval_report.json
+   eval_json_path = write_evaluator_json(artifacts_dir, rollup)
+
+   # Step 2: Compile report_v1.json (calls compiler)
    report_v1_path = compile_report(artifacts_dir)
+
+   # Step 3: Render markdown and HTML
+   md_path = build_eval_md(report_v1_path, artifacts_dir / "eval_report.md")
+   html_path = build_eval_html(report_v1_path, artifacts_dir / "eval_report.html")
    ```
 
 4. **Human-Friendly Report Compilation** (`srt_translator/report/compiler.py:compile_report()`):
