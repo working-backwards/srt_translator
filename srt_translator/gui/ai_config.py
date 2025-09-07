@@ -349,16 +349,27 @@ EXAMPLE FORMAT:
         """
         dnt_set = {t.lower().strip() for t in (dnt_terms or [])}
 
-        # source-language hint (if GUI already detected it)
+        # ---- Source-language hint (if GUI already detected it) ----
+        # We make the source/target roles explicit and non-optional to prevent
+        # accidental target→source flips (observed for zh-Hans).
+        src_hint = ""
         if source_language:
             src_code = str(
                 source_language.get("normalized_code") or source_language.get("detected_code") or ""
             ).strip()
-            # src_name = str(source_language.get("normalized_name") or "").strip()
+            src_name = str(source_language.get("normalized_name") or "").strip()
             if src_code:
-                # pretty = f"{src_code}" + (f" · {src_name}" if src_name else "")
-                # src_hint = f"Source language: {pretty}. Use surface forms from this language for all extracted terms; do not convert them to another language."
-                pass
+                pretty = f"{src_code}" + (f" · {src_name}" if src_name else "")
+                # Two hard rules:
+                # 1) All items in pass1_terms/pass2_terms must be the *exact source-language surface forms*
+                #    as they appear in the transcript (no translation, no romanization).
+                # 2) "termbase" must map *SOURCE term* ➜ *{lang_name} translation*.
+                src_hint = (
+                    f"\nSOURCE LANGUAGE: {pretty}\n"
+                    '- In pass1_terms and pass2_terms, the "term" MUST be the EXACT surface form '
+                    "from the transcript in the SOURCE language. NEVER translate these terms.\n"
+                    f'- In "termbase", map from the SOURCE term ➜ {lang_name} translation.\n'
+                )
 
         # soft alignment + concrete pass targets (optional)
         soft_block = ""
@@ -379,6 +390,7 @@ Aim to return a TOTAL of {soft_lo}–{soft_hi} items **in the "extracted_terms" 
         prompt = f"""
 You are building a bilingual termbase for target language: {lang_name} ({lang_code}).
 The transcript's source language has already been detected elsewhere. Do NOT detect it here.
+{src_hint}
 
 REQUIREMENT: Return a total of {soft_lo}–{soft_hi} terms across Pass 1 + Pass 2, unless the content is genuinely exhausted.
 If you cannot legitimately reach {soft_lo}, set "exhausted": true and provide "exhaustion_reason".
@@ -395,7 +407,8 @@ Hard-exclude any terms present in DNT. Use culturally appropriate, subtitle-frie
 2. PASS 1: Extract the topic-critical source-language terms most likely to cause confusion or mistranslation{f" (aim ≈{pass1_goal})" if pass1_goal else ""}. These should meet one or more of the following criteria:
 
    INCLUDE if they:
-   - **Appear in the transcript** (surface forms from the source language)
+   - **Appear in the transcript** (surface forms from the source language; do NOT translate here)
+   - **Remain in the source language** for pass lists; translation only belongs in the "termbase" mapping
    - Are **multi-word, domain-specific noun phrases** and proper names
    - Could be misunderstood or mistranslated due to ambiguity, abstraction, cultural specificity, or figurative language
    - Are important for learners to grasp — even if they appear only once
@@ -425,7 +438,7 @@ Hard-exclude any terms present in DNT. Use culturally appropriate, subtitle-frie
 Return JSON with:
 - "pass1_terms": [{{"term": "...","reason":"..."}}]
 - "pass2_terms": [{{"term": "...","reason":"..."}}]
-- "termbase": {{"<source-term>": "<translated-term>", ...}}
+- "termbase": {{"<SOURCE term>": "<{lang_name} translation>", ...}}
 - "exhausted": boolean
 - "exhaustion_reason": string|null
 
@@ -454,6 +467,8 @@ TRANSLATION RULES
 - If no exact equivalent, use the most natural localized term (not a long definition).
 - Preserve proper names; do not translate trademarks.
 - Do NOT include any DNT terms (they were excluded from selection).
+- Do NOT add new terms in the \"termbase\" that are not present (verbatim) as SOURCE terms
+  in pass1_terms or pass2_terms.
 
 DNT_TERMS (JSON array):
 {json.dumps(sorted(list(dnt_set)), ensure_ascii=False)}

@@ -81,10 +81,19 @@ For each language directory in `targets/`:
 
 1. **File Pair Discovery**: Matches source files in `originals/` with translated files in `targets/{lang}/`
 2. **Per-Pair Evaluation**: Calls `evaluate_pair()` for each source/target file pair
-3. **Issue Detection**: Identifies three types of problems:
-   - **Missing Translation**: Empty or placeholder-only target lines
-   - **DNT Violations**: Terms that should not be translated but were
-   - **Timing Failures**: Subtitle timing that doesn't match source
+3. **Issue Detection**: Identifies various issue types and creates detailed counts:
+   - **`missing_translation`**: Empty or placeholder-only target lines
+   - **`untranslated_after_dnt`**: Terms that should not be translated but were
+   - **`timing_fail`**: Subtitle timing that doesn't match source
+   - **`placeholder_mismatch`**: Placeholder mismatches (not implemented yet)
+   - **`parity_issue`**: Cue count mismatches (not implemented yet)
+
+   **Note**: These issue types are later classified as errors or warnings in the report compilation phase.
+
+##### Relationship Between Issues and Errors/Warnings
+- **Issues** (detected here): Raw problem types found during evaluation
+- **Errors/Warnings** (classified later): Same issues, but categorized by severity in the report compiler
+- **Timing**: Issues are detected during evaluation (Phase 2), errors/warnings are classified during report compilation (Phase 3)
 
 #### 2.3 Detailed CSV Generation
 **Location**: `srt_translator/eval/tools.py:evaluate_pair()`
@@ -96,7 +105,10 @@ For each file pair, creates detailed CSV files in `artifacts/{lang}/`:
 - **`dnt_coverage_{lang}_{batch}.csv`**: DNT term preservation statistics
 - **`termbase_coverage_{lang}_{batch}.csv`**: Termbase usage statistics
 - **`untranslated_{lang}_{batch}.csv`**: DNT violation details
-- **`source_fragments_{lang}_{batch}.csv`**: Untranslated English fragments
+- **`source_fragments_{lang}_{batch}.csv`**: Untranslated Latin script fragments (assumes English source language)
+  - **Content**: Cues where target text contains Latin script sequences (A-Za-z) of 6+ characters
+  - **Limitation**: Hardcoded regex `[A-Za-z]{6,}` assumes English source language
+  - **Columns**: `cue`, `index`, `target_text`, `snippet` (the Latin script fragment found)
 - **`eval_summary_{lang}_{batch}.md`**: Per-language evaluation summary
 
 ### Phase 3: Report Generation
@@ -129,33 +141,145 @@ Converts detailed evaluation data into standardized `eval_report.json`:
 **Location**: `srt_translator/report/compiler.py:compile_report()`
 
 Transforms raw data into `report_v1.json` with:
-- **Decision level**: pass/review/fix
+- **Decision level**: pass/review/fail
 - **One-liner summary**: Human-readable status
 - **Punch list**: Detailed error/warning records with context
-- **File status**: Per-file readiness indicators
+- **File status**: Per-file readiness indicators (ready/review/blocked)
 - **KPIs**: Summary statistics
 - **Lexicons**: DNT and termbase information
+
+##### Error vs Warning Classification
+The compiler classifies issues into two categories:
+
+**ERRORS** (must be fixed before publishing):
+- `untranslated_after_dnt` - DNT terms that were translated when they shouldn't have been
+- `timing_fail` - Timing drift too high (median or p95)
+- `placeholder_mismatch` - Placeholder mismatch between source and target
+
+**WARNINGS** (fix items in punch list):
+- `missing_translation` - Cues with no translation
+- `parity_issue` - Cue count mismatch between source and target files
+
+##### Decision Logic
+- **`fail`** - If any errors exist (must be fixed before publishing)
+- **`review`** - If only warnings exist (fix items in punch list)
+- **`pass`** - If no errors or warnings exist (ready to use)
 
 #### 3.3 Report Rendering
 **Location**: `srt_translator/eval/report.py:emit_all_reports()`
 
-Generates final reports:
+The `emit_all_reports()` function orchestrates the generation of all final reports:
+
+```python
+def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
+    """Orchestrator: write eval_report.json, compile report_v1.json, render MD/HTML."""
+
+    # Step 1: Write eval_report.json
+    eval_json_path = write_evaluator_json(artifacts_dir, rollup)
+
+    # Step 2: Compile report_v1.json from eval_report.json + ai_config.json
+    report_v1_path = compile_report(artifacts_dir)
+
+    # Step 3: Render markdown and HTML from report_v1.json
+    md_path = build_eval_md(report_v1_path, artifacts_dir / "eval_report.md")
+    html_path = build_eval_html(report_v1_path, artifacts_dir / "eval_report.html")
+
+    return {
+        "eval_report_json": eval_json_path,
+        "report_v1_json": report_v1_path,
+        "eval_report_md": md_path,
+        "eval_report_html": html_path,
+    }
+```
+
+**Generated Reports:**
+- **`eval_report.json`**: Raw evaluation data (machine-readable)
+- **`report_v1.json`**: Compiled human-friendly data (used by presenters)
 - **`eval_report.md`**: Markdown report for technical review
 - **`eval_report.html`**: HTML report for content creator review
+
+#### 3.4 Presenter Architecture (File-Based)
+**Location**: `srt_translator/presenters/eval_html/build.py` and `srt_translator/presenters/eval_md/build.py`
+
+The HTML and Markdown presenters are **file-based** (not in-memory). They read from `report_v1.json`:
+
+```python
+# HTML Presenter reads from file system
+def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
+    # Load and validate report_v1.json with strict schema
+    report_data = _load_json_or_raise(
+        report_v1_path,
+        ["decision", "one_liner", "punch_list", "file_status", "kpis", "lexicons"],
+    )
+
+    # Extract data for HTML generation
+    decision = report_data["decision"]
+    one_liner = report_data["one_liner"]
+    punch_list = report_data["punch_list"]
+    # ... generate HTML from loaded data
+```
+
+**Example of report_v1.json structure:**
+```json
+{
+  "decision": "REVIEW",
+  "one_liner": "3 files need review due to DNT violations",
+  "punch_list": {
+    "errors": [
+      {
+        "issue_type": "untranslated_after_dnt",
+        "file": "file1.srt",
+        "language": "fr",
+        "context": {
+          "source": {"cur": "API key", "idx": 5},
+          "target": {"cur": "clé API", "idx": 5}
+        }
+      }
+    ],
+    "warnings": []
+  },
+  "file_status": {
+    "fr": {"file1.srt": "review", "file2.srt": "pass"},
+    "ja": {"file1.srt": "pass", "file3.srt": "pass"}
+  },
+  "kpis": {
+    "files_total": 3,
+    "languages_total": 2,
+    "issues_total": 1,
+    "by_type": {"untranslated_after_dnt": 1}
+  },
+  "lexicons": {
+    "dnt": {"count": 5, "sample": ["API", "GPU", "NASA"]},
+    "termbase": {
+      "fr": {"count": 10, "sample": [{"source": "input metrics", "target": "métriques d'entrée"}]}
+    }
+  }
+}
+```
 
 ### Phase 4: GUI/CLI Integration
 
 #### 4.1 Signal Emission
 **Location**: `srt_translator/gui/workers/translation_worker.py:run()`
 
-The worker emits signals with all report paths:
+The worker emits signals with all report paths. The `emit_all_reports()` function returns a dictionary of report paths, which is then emitted:
+
 ```python
-self.eval_report_ready.emit({
-    "eval_report_json": path,
-    "report_v1_json": path,
-    "eval_report_md": path,
-    "eval_report_html": path
-})
+# Generate all reports and get their paths
+paths = emit_all_reports(artifacts_dir, rollup)
+
+# Emit signal with all report paths (converts Path objects to strings)
+self.eval_report_ready.emit({k: str(v) for k, v in paths.items()})
+```
+
+**Example of what the signal actually contains:**
+```python
+{
+    "eval_report_json": "/path/to/translation-batch-20240115_143022_+0000/artifacts/eval_report.json",
+    "report_v1_json": "/path/to/translation-batch-20240115_143022_+0000/artifacts/report_v1.json",
+    "eval_report_md": "/path/to/translation-batch-20240115_143022_+0000/artifacts/eval_report.md",
+    "eval_report_html": "/path/to/translation-batch-20240115_143022_+0000/artifacts/eval_report.html"
+}
 ```
 
 #### 4.2 GUI Response
@@ -392,5 +516,88 @@ If report compilation fails:
 - Process scales linearly with number of files and languages
 - Memory usage remains constant regardless of batch size
 - Can handle batches with hundreds of files and multiple languages
+
+## Data Flow: In-Memory vs File-Based Operations
+
+### Where In-Memory Data is Written to Output Directories
+
+1. **Translation Configuration** (`srt_translator/core/main.py:translate_srt_files()`):
+   ```python
+   # Writes in-memory TranslationConfig to artifacts/ai_config.json
+   ai_config_path = batch_root / "artifacts" / "ai_config.json"
+   with ai_config_path.open("w", encoding="utf-8") as f:
+       json.dump({
+           "version": "1.0",
+           "timestamp": datetime.now().isoformat(),
+           "source_files": [str(f) for f in config.files],
+           "target_languages": config.target_languages,
+           "dnt_terms": config.dnt_terms,
+           "termbase": config.termbase,
+           "batch_sizes": {lang: policy.get("target_batch_size") for lang, policy in config.language_policies.items()},
+           "aggressiveness": config.aggressiveness
+       }, f, indent=2)
+   ```
+
+2. **Evaluation Results** (`srt_translator/eval/runner.py:run_batch_evaluation()`):
+   ```python
+   # Writes in-memory rollup data to artifacts/eval_report.json
+   eval_json_path = _write_json_report(batch_root, rollup, logger)
+   ```
+
+3. **Report Compilation** (`srt_translator/eval/report.py:emit_all_reports()`):
+   ```python
+   # Writes compiled in-memory data to artifacts/report_v1.json
+   report_v1_path = compile_report(artifacts_dir)
+   ```
+
+4. **Human-Friendly Report Compilation** (`srt_translator/report/compiler.py:compile_report()`):
+   ```python
+   # Reads eval_report.json + ai_config.json, classifies errors/warnings, writes report_v1.json
+   # Classifies issues: untranslated_after_dnt, timing_fail, placeholder_mismatch = ERRORS
+   #                   missing_translation, parity_issue = WARNINGS
+   output_path = artifacts_dir / "report_v1.json"
+   with open(output_path, "w", encoding="utf-8") as f:
+       json.dump(report_v1, f, ensure_ascii=False, indent=2)
+   ```
+
+### Where Modules Read from Output Directory Files (Not In-Memory)
+
+1. **HTML Presenter** (`srt_translator/presenters/eval_html/build.py:build_eval_html()`):
+   ```python
+   # Reads report_v1.json from file system - NO in-memory data
+   report_data = _load_json_or_raise(
+       report_v1_path,
+       ["decision", "one_liner", "punch_list", "file_status", "kpis", "lexicons"],
+   )
+   ```
+
+2. **Markdown Presenter** (`srt_translator/presenters/eval_md/build.py`):
+   ```python
+   # Reads report_v1.json from file system - NO in-memory data
+   report_data = json.loads(report_v1_path.read_text(encoding="utf-8"))
+   ```
+
+3. **Report Compiler** (`srt_translator/report/compiler.py:compile_report()`):
+   ```python
+   # Reads eval_report.json and ai_config.json from artifacts directory
+   eval_data = json.loads((artifacts_dir / "eval_report.json").read_text())
+   ai_config = json.loads((artifacts_dir / "ai_config.json").read_text())
+   ```
+
+### Key Architecture Points
+
+- **Core/Evaluation**: Writes in-memory data to files
+- **Presenters**: Read from files (file-based architecture)
+- **Report Compiler**: Bridges between raw data files and presenter-ready files
+- **No Direct Memory Sharing**: Presenters never receive in-memory data structures
+
+## Known Limitations
+
+### Source Language Assumptions
+- **`source_fragments_{lang}_{batch}.csv`**: The fragment detection uses a hardcoded regex pattern `[A-Za-z]{6,}` that assumes English as the source language. This will not work correctly for non-English source languages (e.g., Spanish, French, German, etc.).
+
+### Future Improvements Needed
+- Make fragment detection language-aware based on the detected source language
+- Use appropriate character sets for different source languages (e.g., Latin script for Romance languages, Cyrillic for Russian, etc.)
 
 This workflow ensures that content creators receive comprehensive, actionable feedback on their translations while maintaining detailed audit trails for quality control and process improvement.
