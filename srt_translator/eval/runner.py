@@ -667,7 +667,29 @@ def run_batch_evaluation(
                 tgt_norm = normalize_for_empty_check(target_cue.text or "")
                 if tgt_norm:
                     continue  # definitely not empty
-                # Target is effectively empty: decide if it was rolled into a neighbor
+                # Target is effectively empty:
+                # Simple v1.0 guard to avoid roll-up/split false positives:
+                prev_norm = (
+                    normalize_for_empty_check(target_cues[cue_idx - 1].text or "")
+                    if cue_idx > 0
+                    else ""
+                )
+                next_norm = (
+                    normalize_for_empty_check(target_cues[cue_idx + 1].text or "")
+                    if (cue_idx + 1) < len(target_cues)
+                    else ""
+                )
+                if prev_norm or next_norm:
+                    # Treat as a benign roll-up/split — do not warn.
+                    continue
+                # Only warn if the source is non-trivial length.
+                src_norm = normalize_for_empty_check(source_cues[cue_idx].text or "")
+                if len(src_norm) < 12:
+                    # Very short source fragments are common in re-segmentation; ignore.
+                    continue
+
+                # If both neighbors are empty and the source is substantial, fall back to the richer classifier.
+                # This preserves any additional evidence checks already implemented.
                 rollup_class, _reason = classify_empty_target_rollup(
                     lang=lang,
                     cue_index=cue_idx,

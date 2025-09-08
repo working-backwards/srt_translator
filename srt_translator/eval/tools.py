@@ -197,6 +197,21 @@ def classify_empty_target_rollup(
     if i < 0 or i >= len(source_cues):
         return "MISSING", "index out of range"
 
+    # Simple guard to align with runner: if either neighbor is non-empty, treat as roll-up.
+    prev_norm = normalize_for_empty_check(target_cues[i - 1].text or "") if i > 0 else ""
+    next_norm = (
+        normalize_for_empty_check(target_cues[i + 1].text or "")
+        if (i + 1) < len(target_cues)
+        else ""
+    )
+    if prev_norm or next_norm:
+        return "BENIGN_ROLLUP", "neighbor non-empty (simple guard)"
+
+    # Ignore very short source fragments (common in re-segmentation).
+    src_norm = normalize_for_empty_check(source_cues[i].text or "")
+    if len(src_norm) < 12:
+        return "BENIGN_ROLLUP", "short source (simple guard)"
+
     # Precompute normalized lists for ratio estimation
     src_after_all = [strip_terms(c.text, do_not_translate_terms) for c in source_cues]
     tgt_norm_all = [normalize_for_empty_check(c.text) for c in target_cues]

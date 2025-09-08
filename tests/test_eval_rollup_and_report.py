@@ -63,3 +63,82 @@ def test_tiny_remainder_ar():
 
 
 # test_status_label_uses_error_totals_only() removed - _status_label function was removed during refactor
+
+
+def test_missing_translation_skipped_when_neighbor_nonempty():
+    """Test that missing_translation is skipped when either neighbor is non-empty."""
+    lang = "en"
+    dnt = []
+    tb_map = {}
+    source = [
+        cue(1, "Hello world."),  # cur
+    ]
+    target = [
+        cue(1, ""),  # cur empty
+    ]
+    # Simulate non-empty next neighbor
+    target.append(cue(2, "Hola mundo."))
+
+    cls, reason = classify_empty_target_rollup(
+        lang=lang,
+        cue_index=0,
+        source_cues=source,
+        target_cues=target,
+        do_not_translate_terms=dnt,
+        termbase_map_for_lang=tb_map,
+    )
+    # Expected: no missing issue created (should be BENIGN_ROLLUP due to neighbor)
+    assert cls == "BENIGN_ROLLUP"
+    assert "neighbor non-empty" in reason
+
+
+def test_missing_translation_warns_when_both_neighbors_empty_and_long_source():
+    """Test that missing_translation warns when both neighbors are empty and source is long."""
+    lang = "en"
+    dnt = []
+    tb_map = {}
+    source = [
+        cue(1, "This sentence should not be empty in target."),  # long source
+    ]
+    target = [
+        cue(1, ""),  # cur empty
+    ]
+    # No neighbors; both effectively empty
+    # Expected: one missing issue created (should fall through to MISSING)
+    cls, reason = classify_empty_target_rollup(
+        lang=lang,
+        cue_index=0,
+        source_cues=source,
+        target_cues=target,
+        do_not_translate_terms=dnt,
+        termbase_map_for_lang=tb_map,
+    )
+    # Expected: missing issue created since no neighbors and long source
+    assert cls == "MISSING"
+    assert "no non-empty neighbors" in reason
+
+
+def test_missing_translation_skipped_when_short_source():
+    """Test that missing_translation is skipped when source is very short."""
+    lang = "en"
+    dnt = []
+    tb_map = {}
+    source = [
+        cue(1, "Hi"),  # short source
+    ]
+    target = [
+        cue(1, ""),  # cur empty
+    ]
+    # No neighbors; both effectively empty
+    # Expected: no missing issue created due to short source
+    cls, reason = classify_empty_target_rollup(
+        lang=lang,
+        cue_index=0,
+        source_cues=source,
+        target_cues=target,
+        do_not_translate_terms=dnt,
+        termbase_map_for_lang=tb_map,
+    )
+    # Expected: BENIGN_ROLLUP due to short source
+    assert cls == "BENIGN_ROLLUP"
+    assert "short source" in reason

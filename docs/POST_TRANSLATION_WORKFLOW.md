@@ -89,7 +89,7 @@ For each language directory in `targets/`:
    - Calculates timing statistics from source/target cue comparisons
 
    **Issue Organization by Type**:
-   - **`missing_translation`**: Empty or placeholder-only target lines
+   - **`missing_translation`**: Empty target lines with empty neighbors and substantial source (≥12 chars)
    - **`timing_fail`**: Subtitle timing that doesn't match source
    - **`placeholder_mismatch`**: Placeholder mismatches (not implemented yet)
    - **`parity_issue`**: Cue count mismatches (not implemented yet)
@@ -172,7 +172,7 @@ The compiler classifies issues into two categories:
 - `placeholder_mismatch` - Placeholder mismatch between source and target
 
 **WARNINGS** (fix items in punch list):
-- `missing_translation` - Cues with no translation
+- `missing_translation` - Cues with no translation (only when both neighbors are empty and source is substantial)
 - `parity_issue` - Cue count mismatch between source and target files
 
 ##### Decision Logic
