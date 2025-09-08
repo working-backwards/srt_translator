@@ -290,14 +290,35 @@ def _create_punch_item(
 
     # Create human-friendly descriptions
     descriptions = {
-        "missing_translation": "This cue has no translation.",
+        "missing_translation": (
+            "Some subtitles look blank in the translation. "
+            "This usually isn't a translation error. In many languages, translations are shorter, "
+            "so the sentence can flow into a neighboring subtitle, leaving this cue empty. "
+            "No content is lost—it's just shifted."
+        ),
         "timing_fail": "Timing drift too high (median or p95)",
         "placeholder_mismatch": "Placeholder mismatch between source and target.",
         "parity_issue": "Cue count mismatch between source and target files.",
     }
 
     suggested_fixes = {
-        "missing_translation": "Translate the source text to the target language.",
+        "missing_translation": (
+            "1) Quick verify: Back-translate the Target context (only) to the original language and "
+            "compare it to the Source context shown above. If the meaning is present in a neighbor, you can leave it as-is.\n"
+            "2) If something is truly missing (rare): Translate the Source sentence into the target language and paste it into the blank subtitle.\n\n"
+            "Copy-paste prompt (Target only):\n"
+            "```\n"
+            "Please translate the text below from <target language> to <original language>.\n"
+            "Return only the translations line-by-line (no commentary).\n"
+            "\n"
+            "Target context:\n"
+            "prev2: <paste from report>\n"
+            "prev1: <paste from report>\n"
+            "cur:   <paste from report or (none)>\n"
+            "next1: <paste from report>\n"
+            "next2: <paste from report>\n"
+            "```\n"
+        ),
         "timing_fail": "Check subtitle timing synchronization.",
         "placeholder_mismatch": "Ensure placeholders match between source and target.",
         "parity_issue": "Check that both files have the same number of cues.",
