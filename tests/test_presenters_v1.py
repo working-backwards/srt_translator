@@ -102,7 +102,7 @@ class TestPresentersV1:
                         "lang": "es",
                         "file": "test1.srt",
                         "subtitle": 1,
-                        "type": "untranslated_after_dnt",
+                        "type": "timing_fail",
                         "message": "This term should not be translated.",
                         "suggest_fix": "Keep the original term untranslated.",
                         "context": {
@@ -146,7 +146,7 @@ class TestPresentersV1:
         assert "❌ Fix required" in html_content
         assert "Critical Issues" in html_content
         assert "Warnings" in html_content
-        assert "untranslated_after_dnt" in html_content
+        assert "timing_fail" in html_content
         assert "missing_translation" in html_content
 
         # Check KPIs

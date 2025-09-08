@@ -97,7 +97,7 @@ class TestOrchestratorV1:
                             "target_file": "test1.srt",
                             "issues": {
                                 "missing_translation": [{"idx": 1, "src": "Hello", "tgt": ""}],
-                                "untranslated_after_dnt": [{"idx": 2, "src": "API", "tgt": "API"}],
+                                "timing_fail": [{"idx": 2, "src": "API", "tgt": "API"}],
                             },
                         },
                         {

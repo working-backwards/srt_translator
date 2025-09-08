@@ -96,14 +96,6 @@ def _compile_tolerant_patterns(self):
             self.tolerant_patterns[term] = re.compile(possessive_pattern, re.IGNORECASE)
 ```
 
-### Untranslated Content Detection
-
-```python
-def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
-    """Check if target text equals source text after removing DNT terms"""
-    # Normalize and compare, accounting for DNT term preservation
-    # Returns True if content appears untranslated
-```
 
 ## Output Transparency
 

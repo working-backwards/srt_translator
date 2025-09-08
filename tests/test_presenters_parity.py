@@ -33,7 +33,6 @@ class TestPresentersParity:
                 "warnings_total": 2,
                 "per_type": {
                     "missing_translation": 2,
-                    "untranslated_after_dnt": 0,
                     "timing_fail": 0,
                 },
             },
@@ -275,7 +274,7 @@ class TestPresentersParity:
             "kpis": {
                 "errors_total": 1,
                 "warnings_total": 0,
-                "per_type": {"untranslated_after_dnt": 1},
+                "per_type": {"timing_fail": 1},
             },
             "file_status": {"ja": {"file1.srt": "error"}},
             "punch_list": {
@@ -284,7 +283,7 @@ class TestPresentersParity:
                         "language": "ja",
                         "file": "file1.srt",
                         "cue_index": 3,
-                        "type": "untranslated_after_dnt",
+                        "type": "timing_fail",
                         "human_summary": "This term should not be translated according to your DNT list.",
                         "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
                         "context": {

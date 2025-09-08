@@ -93,7 +93,6 @@ def compile_report(artifacts_dir: Path) -> Path:
             # Validate counts match details (fail fast)
             for issue_type in [
                 "missing_translation",
-                "untranslated_after_dnt",
                 "timing_fail",
                 "placeholder_mismatch",
                 "parity_issue",
@@ -113,11 +112,10 @@ def compile_report(artifacts_dir: Path) -> Path:
             missing_count = issues_counts.get("missing_translation", 0)
             warnings_total += missing_count
 
-            # untranslated_after_dnt, timing_fail, placeholder_mismatch are ERRORS
-            untrans_dnt_count = issues_counts.get("untranslated_after_dnt", 0)
+            # timing_fail, placeholder_mismatch are ERRORS
             timing_fail_count = issues_counts.get("timing_fail", 0)
             placeholder_count = issues_counts.get("placeholder_mismatch", 0)
-            errors_total += untrans_dnt_count + timing_fail_count + placeholder_count
+            errors_total += timing_fail_count + placeholder_count
 
     # Determine overall status using exact specification
     if errors_total > 0:
@@ -187,11 +185,10 @@ def _compute_file_status(eval_data: Dict[str, Any]) -> Dict[str, Dict[str, str]]
             missing_count = issues_counts.get("missing_translation", 0)
             warnings += missing_count
 
-            # untranslated_after_dnt, timing_fail, placeholder_mismatch are ERRORS
-            untrans_dnt_count = issues_counts.get("untranslated_after_dnt", 0)
+            # timing_fail, placeholder_mismatch are ERRORS
             timing_fail_count = issues_counts.get("timing_fail", 0)
             placeholder_count = issues_counts.get("placeholder_mismatch", 0)
-            errors += untrans_dnt_count + timing_fail_count + placeholder_count
+            errors += timing_fail_count + placeholder_count
 
             # Determine file status
             if errors > 0:
@@ -210,7 +207,6 @@ def _compute_per_type_counts(eval_data: Dict[str, Any]) -> Dict[str, int]:
     """Compute per-type issue counts across all languages and files."""
     per_type = {
         "missing_translation": 0,
-        "untranslated_after_dnt": 0,
         "timing_fail": 0,
         "placeholder_mismatch": 0,
         "parity_issue": 0,
@@ -220,7 +216,6 @@ def _compute_per_type_counts(eval_data: Dict[str, Any]) -> Dict[str, int]:
         for _file_path, file_data in lang_data.get("files", {}).items():
             issues_counts = file_data.get("issues_counts", {})
             per_type["missing_translation"] += issues_counts.get("missing_translation", 0)
-            per_type["untranslated_after_dnt"] += issues_counts.get("untranslated_after_dnt", 0)
             per_type["timing_fail"] += issues_counts.get("timing_fail", 0)
             per_type["placeholder_mismatch"] += issues_counts.get("placeholder_mismatch", 0)
             per_type["parity_issue"] += issues_counts.get("parity_issue", 0)
@@ -250,7 +245,6 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
 
                     # Classify as error or warning
                     if issue_type in [
-                        "untranslated_after_dnt",
                         "timing_fail",
                         "placeholder_mismatch",
                     ]:
@@ -297,7 +291,6 @@ def _create_punch_item(
     # Create human-friendly descriptions
     descriptions = {
         "missing_translation": "This cue has no translation.",
-        "untranslated_after_dnt": "This term should not be translated according to your DNT list.",
         "timing_fail": "Timing drift too high (median or p95)",
         "placeholder_mismatch": "Placeholder mismatch between source and target.",
         "parity_issue": "Cue count mismatch between source and target files.",
@@ -305,7 +298,6 @@ def _create_punch_item(
 
     suggested_fixes = {
         "missing_translation": "Translate the source text to the target language.",
-        "untranslated_after_dnt": "Keep the original term untranslated or add it to your DNT list.",
         "timing_fail": "Check subtitle timing synchronization.",
         "placeholder_mismatch": "Ensure placeholders match between source and target.",
         "parity_issue": "Check that both files have the same number of cues.",

@@ -24,14 +24,12 @@ class TestOrchestratorPipeline:
                             "target_rel": "file1.srt",
                             "issues_counts": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
                             },
                             "issues_detail": {
                                 "missing_translation": [],
-                                "untranslated_after_dnt": [],
                                 "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
@@ -83,14 +81,12 @@ class TestOrchestratorPipeline:
                             "target_rel": "file1.srt",
                             "issues_counts": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
                             },
                             "issues_detail": {
                                 "missing_translation": [],
-                                "untranslated_after_dnt": [],
                                 "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
@@ -142,14 +138,12 @@ class TestOrchestratorPipeline:
                             "target_rel": "file1.srt",
                             "issues_counts": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
                             },
                             "issues_detail": {
                                 "missing_translation": [],
-                                "untranslated_after_dnt": [],
                                 "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
@@ -207,14 +201,12 @@ class TestOrchestratorPipeline:
                             "target_rel": "file1.srt",
                             "issues_counts": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
                             },
                             "issues_detail": {
                                 "missing_translation": [],
-                                "untranslated_after_dnt": [],
                                 "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
@@ -244,7 +236,6 @@ class TestOrchestratorPipeline:
                             "target_rel": "file1.srt",
                             "issues_counts": {
                                 "missing_translation": 1,  # warning
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
@@ -258,7 +249,6 @@ class TestOrchestratorPipeline:
                                         "context": {"source": {}, "target": {}},
                                     }
                                 ],
-                                "untranslated_after_dnt": [],
                                 "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
@@ -268,14 +258,13 @@ class TestOrchestratorPipeline:
                             "target_rel": "file2.srt",
                             "issues_counts": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 1,  # error
-                                "timing_fail": 0,
+                                "timing_fail": 1,  # error
                                 "placeholder_mismatch": 0,
                                 "parity_issue": 0,
                             },
                             "issues_detail": {
                                 "missing_translation": [],
-                                "untranslated_after_dnt": [
+                                "timing_fail": [
                                     {
                                         "cue_index": 1,
                                         "source_text": "API",
@@ -283,7 +272,6 @@ class TestOrchestratorPipeline:
                                         "context": {"source": {}, "target": {}},
                                     }
                                 ],
-                                "timing_fail": [],
                                 "placeholder_mismatch": [],
                                 "parity_issue": [],
                             },
@@ -335,7 +323,7 @@ class TestOrchestratorPipeline:
         assert report_v1["kpis"]["languages_total"] == 1
         assert report_v1["kpis"]["issues_total"] == 2
         assert report_v1["kpis"]["by_type"]["missing_translation"] == 1
-        assert report_v1["kpis"]["by_type"]["untranslated_after_dnt"] == 1
+        assert report_v1["kpis"]["by_type"]["timing_fail"] == 1
 
         # Test file status
         assert "ja" in report_v1["file_status"]

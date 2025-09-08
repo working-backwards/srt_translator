@@ -21,12 +21,10 @@ class TestReportCompilerV1:
                     "files": {
                         "file1.srt": {
                             "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
                             "timing_fail": 0,
                         },
                         "file2.srt": {
                             "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
                             "timing_fail": 0,
                         },
                     }
@@ -100,13 +98,11 @@ class TestReportCompilerV1:
                     "files": {
                         "file1.srt": {
                             "missing_translation": 2,  # warnings
-                            "untranslated_after_dnt": 0,
                             "timing_fail": 0,
                         },
                         "file2.srt": {
                             "missing_translation": 0,
-                            "untranslated_after_dnt": 1,  # error
-                            "timing_fail": 0,
+                            "timing_fail": 1,  # error
                         },
                     }
                 }
@@ -166,7 +162,7 @@ class TestReportCompilerV1:
         assert "human_summary" in error
         assert "suggested_fix" in error
         assert "context" in error
-        assert error["type"] == "untranslated_after_dnt"
+        assert error["type"] == "timing_fail"
 
         warning = result["punch_list"]["warnings"][0]
         assert warning["type"] == "missing_translation"
@@ -184,7 +180,6 @@ class TestReportCompilerV1:
                     "files": {
                         "file1.srt": {
                             "missing_translation": 0,
-                            "untranslated_after_dnt": 0,
                             "timing_fail": 0,
                         },
                     }

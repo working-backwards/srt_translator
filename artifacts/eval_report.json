@@ -11,7 +11,6 @@
         "test.srt": {
           "issues_counts": {
             "missing_translation": 1,
-            "untranslated_after_dnt": 0,
             "timing_fail": 0,
             "placeholder_mismatch": 0,
             "parity_issue": 0
@@ -40,7 +39,6 @@
                 }
               }
             ],
-            "untranslated_after_dnt": [],
             "timing_fail": [],
             "placeholder_mismatch": [],
             "parity_issue": []

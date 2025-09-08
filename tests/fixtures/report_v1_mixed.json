@@ -7,7 +7,7 @@
         "language": "pt-BR",
         "file": "targets/pt-BR/InputMetrics10 - EN.srt",
         "cue_index": 168,
-        "type": "untranslated_after_dnt",
+        "type": "timing_fail",
         "desc": "This term should not be translated according to your DNT list.",
         "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
         "context": {
@@ -89,7 +89,6 @@
     "issues_total": 3,
     "by_type": {
       "missing_translation": 1,
-      "untranslated_after_dnt": 1,
       "timing_fail": 1,
       "placeholder_mismatch": 0,
       "parity_issue": 0

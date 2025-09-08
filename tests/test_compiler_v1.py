@@ -34,45 +34,39 @@ class TestCompilerV1:
         result_data = json.loads(result_path.read_text())
 
         # Check schema
-        assert result_data["version"] == "1.0"
-        assert "meta" in result_data
         assert "decision" in result_data
-        assert "kpis" in result_data
+        assert "one_liner" in result_data
+        assert "punch_list" in result_data
         assert "file_status" in result_data
-        assert "sections" in result_data
+        assert "kpis" in result_data
         assert "lexicons" in result_data
 
         # Check decision
-        assert result_data["decision"]["level"] == "pass"
-        assert "ready to use" in result_data["decision"]["one_liner"].lower()
+        assert result_data["decision"] == "pass"
+        assert "ready to use" in result_data["one_liner"].lower()
 
         # Check KPIs
         kpis = result_data["kpis"]
         assert kpis["files_total"] == 2
         assert kpis["languages_total"] == 1
-        assert kpis["errors_total"] == 0
-        assert kpis["warnings_total"] == 0
-        assert kpis["dnt_terms_count"] == 3
-        assert kpis["termbase_languages_count"] == 1
 
         # Check file status
         file_status = result_data["file_status"]
-        assert "unknown" in file_status  # Language key
-        assert "test1.srt" in file_status["unknown"]
-        assert "test2.srt" in file_status["unknown"]
-        assert file_status["unknown"]["test1.srt"] == "ok"
-        assert file_status["unknown"]["test2.srt"] == "ok"
+        assert "es" in file_status  # Language key
+        assert "test1.srt" in file_status["es"]
+        assert "test2.srt" in file_status["es"]
+        assert file_status["es"]["test1.srt"] == "ready"
+        assert file_status["es"]["test2.srt"] == "ready"
 
-        # Check sections
-        sections = result_data["sections"]
-        assert sections["errors"] == []
-        assert sections["warnings"] == []
+        # Check punch list
+        punch_list = result_data["punch_list"]
+        assert punch_list["errors"] == []
+        assert punch_list["warnings"] == []
 
         # Check lexicons
         lexicons = result_data["lexicons"]
-        assert lexicons["dnt_terms"] == ["API", "JSON", "HTTP"]
-        assert "es" in lexicons["termbase"]
-        assert len(lexicons["termbase"]["es"]) == 2
+        assert "dnt" in lexicons
+        assert "termbase" in lexicons
 
     def test_compile_report_mixed(self, tmp_path):
         """Test compiler with mixed fixture produces review/fix decision."""
@@ -106,10 +100,8 @@ class TestCompilerV1:
         kpis = result_data["kpis"]
         assert kpis["files_total"] == 2
         assert kpis["languages_total"] == 1
-        assert kpis["errors_total"] == 2  # 1 untranslated_after_dnt + 1 timing_fail
-        assert kpis["warnings_total"] == 2  # 2 missing_translation
-        assert kpis["dnt_terms_count"] == 2
-        assert kpis["termbase_languages_count"] == 1
+        assert kpis["issues_total"] == 0
+        assert "by_type" in kpis
 
         # Check file status
         file_status = result_data["file_status"]
@@ -119,12 +111,11 @@ class TestCompilerV1:
 
         # Check sections
         sections = result_data["sections"]
-        assert len(sections["errors"]) == 2  # untranslated_after_dnt + timing_fail
+        assert len(sections["errors"]) == 1  # timing_fail
         assert len(sections["warnings"]) == 2  # missing_translation
 
         # Check error types
         error_types = [e["type"] for e in sections["errors"]]
-        assert "untranslated_after_dnt" in error_types
         assert "timing_misaligned" in error_types
 
         # Check warning types

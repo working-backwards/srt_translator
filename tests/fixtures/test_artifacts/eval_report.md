@@ -1,7 +1,7 @@
 # ❌ We found 2 errors that must be fixed before publishing.
 
 ## ❌ Critical Issues
-### targets/pt-BR/InputMetrics10 - EN.srt: untranslated_after_dnt
+### targets/pt-BR/InputMetrics10 - EN.srt: timing_fail
 **Language:** pt-BR
 **Cue Index:** 168
 **Summary:** This term should not be translated according to your DNT list.
@@ -73,7 +73,6 @@ next2: Next line 2
 **Issues by Type:**
 - missing_translation: 1
 - timing_fail: 1
-- untranslated_after_dnt: 1
 
 ## 📚 Lexicons
 

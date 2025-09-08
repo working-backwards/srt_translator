@@ -1,19 +1,18 @@
 {
+  "version": "2.0.0",
   "files_total": 2,
   "languages_total": 1,
-  "issues_total": 2,
+  "issues_total": 1,
   "source_language": "en",
   "languages": {
     "ja": {
       "files": {
         "file1.srt": {
           "missing_translation": 1,
-          "untranslated_after_dnt": 0,
           "timing_fail": 0
         },
         "file2.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 1,
           "timing_fail": 0
         }
       }

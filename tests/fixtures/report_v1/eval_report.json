@@ -10,13 +10,11 @@
       "files": {
         "test1 - FR.srt": {
           "missing_translation": 1,
-          "untranslated_after_dnt": 0,
           "timing_fail": 0
         },
         "test2 - FR.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 1,
-          "timing_fail": 0
+          "timing_fail": 1
         }
       }
     },
@@ -24,12 +22,10 @@
       "files": {
         "test1 - JA.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 0,
           "timing_fail": 1
         },
         "test2 - JA.srt": {
           "missing_translation": 1,
-          "untranslated_after_dnt": 0,
           "timing_fail": 0
         }
       }

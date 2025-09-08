@@ -5,7 +5,6 @@ from typing import Dict
 from srt_translator.eval.schema import (
     MISSING,
     TIMING,
-    UNTRANS_DNT,
     validate_eval_report_v1,
 )
 
@@ -19,7 +18,7 @@ def build_eval_report_v1(
     Returns a dict matching EvalReportV1.
 
     Args:
-        per_language_file_counts: languages -> files -> {missing_translation, untranslated_after_dnt, timing_fail}
+        per_language_file_counts: languages -> files -> {missing_translation, timing_fail}
         source_language: string or None (convert None to "")
 
     Returns:
@@ -36,7 +35,6 @@ def build_eval_report_v1(
             # Ensure all required categories exist with default 0
             normalized_counts = {
                 MISSING: file_counts.get(MISSING, 0),
-                UNTRANS_DNT: file_counts.get(UNTRANS_DNT, 0),
                 TIMING: file_counts.get(TIMING, 0),
             }
             # Validate types

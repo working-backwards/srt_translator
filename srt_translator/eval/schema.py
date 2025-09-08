@@ -15,11 +15,10 @@ class EvalReportV1(TypedDict):
 
 # Constants for issue category keys
 MISSING = "missing_translation"
-UNTRANS_DNT = "untranslated_after_dnt"
 TIMING = "timing_fail"
 
 # All required issue categories
-REQUIRED_CATEGORIES = {MISSING, UNTRANS_DNT, TIMING}
+REQUIRED_CATEGORIES = {MISSING, TIMING}
 
 
 def validate_eval_report_v1(obj: dict) -> None:

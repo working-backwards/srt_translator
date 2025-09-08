@@ -26,7 +26,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -76,7 +75,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -126,7 +124,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -179,7 +176,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -235,7 +231,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -296,7 +291,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -358,7 +352,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -425,7 +418,6 @@ class TestReportV1Schema:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }

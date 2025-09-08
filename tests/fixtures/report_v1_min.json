@@ -6,56 +6,30 @@
     "source_language": "en"
   },
   "decision": {
-    "level": "fix",
-    "one_liner": "We found 1 errors that must be fixed before publishing."
+    "level": "review",
+    "one_liner": "We found 1 warnings. Fix the items in the Punch List below."
   },
   "totals": {
     "files_total": 2,
     "languages_total": 1,
-    "issues_total": 2
+    "issues_total": 1
   },
   "kpis": {
-    "errors_total": 1,
+    "errors_total": 0,
     "warnings_total": 1,
     "per_type": {
       "missing_translation": 1,
-      "untranslated_after_dnt": 1,
       "timing_fail": 0
     }
   },
   "file_status": {
     "ja": {
       "file1.srt": "review",
-      "file2.srt": "error"
+      "file2.srt": "ready"
     }
   },
   "punch_list": {
-    "errors": [
-      {
-        "language": "ja",
-        "file": "file2.srt",
-        "cue_index": 5,
-        "type": "untranslated_after_dnt",
-        "human_summary": "This term should not be translated according to your DNT list.",
-        "suggested_fix": "Keep the original term untranslated or add it to your DNT list.",
-        "context": {
-          "source": {
-            "prev2": "",
-            "prev1": "",
-            "cur": "API call",
-            "next1": "Response received",
-            "next2": ""
-          },
-          "target": {
-            "prev2": "",
-            "prev1": "",
-            "cur": "API呼び出し",
-            "next1": "レスポンス受信",
-            "next2": ""
-          }
-        }
-      }
-    ],
+    "errors": [],
     "warnings": [
       {
         "language": "ja",

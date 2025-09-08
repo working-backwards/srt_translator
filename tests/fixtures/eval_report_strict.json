@@ -1,19 +1,18 @@
 {
+  "version": "2.0.0",
   "files_total": 3,
   "languages_total": 2,
-  "issues_total": 4,
+  "issues_total": 3,
   "source_language": "en",
   "languages": {
     "fr": {
       "files": {
         "Input1 - EN.srt": {
           "missing_translation": 1,
-          "untranslated_after_dnt": 0,
           "timing_fail": 0
         },
         "Input2 - EN.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 1,
           "timing_fail": 0
         }
       }
@@ -22,12 +21,10 @@
       "files": {
         "Input1 - EN.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 0,
           "timing_fail": 1
         },
         "Input3 - EN.srt": {
           "missing_translation": 0,
-          "untranslated_after_dnt": 0,
           "timing_fail": 1
         }
       }

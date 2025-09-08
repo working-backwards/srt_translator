@@ -90,7 +90,6 @@ For each language directory in `targets/`:
 
    **Issue Organization by Type**:
    - **`missing_translation`**: Empty or placeholder-only target lines
-   - **`untranslated_after_dnt`**: Terms that should not be translated but were
    - **`timing_fail`**: Subtitle timing that doesn't match source
    - **`placeholder_mismatch`**: Placeholder mismatches (not implemented yet)
    - **`parity_issue`**: Cue count mismatches (not implemented yet)
@@ -99,14 +98,12 @@ For each language directory in `targets/`:
    ```python
    issues_counts = {
        "missing_translation": len(missing_issues),
-       "untranslated_after_dnt": len(un_issues),
        "timing_fail": 1 if timing_fail else 0,
        # ... etc
    }
 
    issues_detail = {
        "missing_translation": [list of individual issues],
-       "untranslated_after_dnt": [list of individual issues],
        "timing_fail": [timing failure details],
        # ... etc
    }
@@ -148,7 +145,6 @@ Converts detailed evaluation data into standardized `eval_report.json`:
       "files": {
         "file1.srt": {
           "missing_translation": 1,
-          "untranslated_after_dnt": 0,
           "timing_fail": 0
         }
       }
@@ -172,7 +168,6 @@ Transforms raw data into `report_v1.json` with:
 The compiler classifies issues into two categories:
 
 **ERRORS** (must be fixed before publishing):
-- `untranslated_after_dnt` - DNT terms that were translated when they shouldn't have been
 - `timing_fail` - Timing drift too high (median or p95)
 - `placeholder_mismatch` - Placeholder mismatch between source and target
 
@@ -247,7 +242,7 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
   "punch_list": {
     "errors": [
       {
-        "issue_type": "untranslated_after_dnt",
+        "issue_type": "timing_fail",
         "file": "file1.srt",
         "language": "fr",
         "context": {
@@ -266,7 +261,7 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
     "files_total": 3,
     "languages_total": 2,
     "issues_total": 1,
-    "by_type": {"untranslated_after_dnt": 1}
+    "by_type": {"timing_fail": 1}
   },
   "lexicons": {
     "dnt": {"count": 5, "sample": ["API", "GPU", "NASA"]},
@@ -488,11 +483,6 @@ Translation configuration snapshot used for this batch:
 - Coverage statistics
 
 #### `artifacts/{lang}/untranslated_{lang}_batch.csv`
-**Purpose**: DNT violation details
-**Contents**:
-- Specific lines where DNT terms were translated
-- Source and target text
-- Cue indices for easy location
 
 #### `artifacts/{lang}/source_fragments_{lang}_batch.csv`
 **Purpose**: Untranslated English fragments
@@ -613,7 +603,7 @@ If report compilation fails:
 4. **Human-Friendly Report Compilation** (`srt_translator/report/compiler.py:compile_report()`):
    ```python
    # Reads eval_report.json + ai_config.json, classifies errors/warnings, writes report_v1.json
-   # Classifies issues: untranslated_after_dnt, timing_fail, placeholder_mismatch = ERRORS
+   # Classifies issues: timing_fail, placeholder_mismatch = ERRORS
    #                   missing_translation, parity_issue = WARNINGS
    output_path = artifacts_dir / "report_v1.json"
    with open(output_path, "w", encoding="utf-8") as f:

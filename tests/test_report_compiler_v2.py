@@ -52,7 +52,7 @@ def test_compiler_v2_happy_path():
         punch_list = result["punch_list"]
         assert "errors" in punch_list
         assert "warnings" in punch_list
-        assert len(punch_list["errors"]) == 2  # untranslated_after_dnt + timing_fail
+        assert len(punch_list["errors"]) == 1  # timing_fail
         assert len(punch_list["warnings"]) == 1  # missing_translation
 
         # Check that punch list items have real data (not synthetic)
@@ -64,8 +64,8 @@ def test_compiler_v2_happy_path():
             assert "suggested_fix" in error
             assert "context" in error
 
-            # Verify context has real data for untranslated_after_dnt
-            if error["type"] == "untranslated_after_dnt":
+            # Verify context has real data for timing_fail
+            if error["type"] == "timing_fail":
                 assert error["cue_index"] == 168
                 assert "Amazon marketing campaign" in error["context"]["source"]["cur"]
                 assert "Amazon marketing campaign" in error["context"]["target"]["cur"]
@@ -84,7 +84,6 @@ def test_compiler_v2_happy_path():
 
         by_type = kpis["by_type"]
         assert by_type["missing_translation"] == 1
-        assert by_type["untranslated_after_dnt"] == 1
         assert by_type["timing_fail"] == 1
         assert by_type["placeholder_mismatch"] == 0
         assert by_type["parity_issue"] == 0
@@ -125,16 +124,14 @@ def test_compiler_v2_fail_fast_on_missing_details():
                 "files": {
                     "test.srt": {
                         "issues_counts": {
-                            "untranslated_after_dnt": 1,
+                            "timing_fail": 1,
                             "missing_translation": 0,
-                            "timing_fail": 0,
                             "placeholder_mismatch": 0,
                             "parity_issue": 0,
                         },
                         "issues_detail": {
-                            "untranslated_after_dnt": [],  # Empty details!
+                            "timing_fail": [],  # Empty details!
                             "missing_translation": [],
-                            "timing_fail": [],
                             "placeholder_mismatch": [],
                             "parity_issue": [],
                         },
@@ -155,9 +152,7 @@ def test_compiler_v2_fail_fast_on_missing_details():
 
     try:
         # Test that compiler fails fast
-        with pytest.raises(
-            ValueError, match="Count mismatch.*untranslated_after_dnt.*count=1.*details empty"
-        ):
+        with pytest.raises(ValueError, match="Count mismatch.*timing_fail.*count=1.*details empty"):
             compile_report(artifacts_dir)
 
     finally:

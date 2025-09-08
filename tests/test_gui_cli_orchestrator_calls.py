@@ -36,7 +36,6 @@ class TestGUIOrchestratorCalls:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -81,7 +80,6 @@ class TestGUIOrchestratorCalls:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -162,7 +160,6 @@ Sous-titre de test"""
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -235,7 +232,6 @@ Sous-titre de test"""
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }

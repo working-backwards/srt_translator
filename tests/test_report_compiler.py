@@ -62,7 +62,7 @@ class TestReportCompiler:
             kpis = report_data["kpis"]
             assert kpis["files_total"] == 2
             assert kpis["languages_total"] == 2
-            assert kpis["errors_total"] == 2  # 1 untranslated_after_dnt + 1 timing_fail
+            assert kpis["errors_total"] == 1  # 1 timing_fail
             assert kpis["warnings_total"] == 2  # 2 missing_translation (reclassified)
 
             # Check file status structure
@@ -140,7 +140,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -176,7 +175,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 1,  # Warning
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -212,7 +210,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -243,7 +240,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 1,  # Warning
-                                "untranslated_after_dnt": 1,  # Error
                                 "timing_fail": 1,  # Error
                             }
                         }
@@ -284,7 +280,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 2,  # Should be warnings
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }
@@ -318,7 +313,6 @@ class TestReportCompiler:
                         "files": {
                             "test - FR.srt": {
                                 "missing_translation": 0,
-                                "untranslated_after_dnt": 0,
                                 "timing_fail": 0,
                             }
                         }

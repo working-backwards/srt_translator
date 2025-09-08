@@ -141,9 +141,9 @@ def test_compiler_passes_through_context():
             "es": {
                 "files": {
                     "test.srt": {
-                        "issues_counts": {"untranslated_after_dnt": 1},
+                        "issues_counts": {"timing_fail": 1},
                         "issues_detail": {
-                            "untranslated_after_dnt": [
+                            "timing_fail": [
                                 {
                                     "cue_index": 2,
                                     "source_text": "Test source",

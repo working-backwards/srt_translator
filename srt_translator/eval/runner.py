@@ -1,7 +1,6 @@
 # srt_translator/eval/runner.py
 from __future__ import annotations
 
-import csv
 import datetime
 import json
 import logging
@@ -659,19 +658,6 @@ def run_batch_evaluation(
             source_cues = parse_srt(source_file)
             target_cues = parse_srt(target_file)
 
-            # Untranslated after DNT
-            un_csv = out_dir / f"untranslated_{lang}_{batch_label}.csv"
-            un_issues = []
-            if un_csv.exists():
-                for row in csv.DictReader(un_csv.read_text(encoding="utf-8").splitlines()):
-                    un_issues.append(
-                        {
-                            "idx": int(row["cue"]),
-                            "src": row["original_text"],
-                            "tgt": row["target_text"],
-                        }
-                    )
-
             # Missing translation with roll-up classification:
             # treat punctuation-only / placeholders as empty; exclude benign/suspect roll-ups.
             dnt_terms = _extract_dnt_terms({"terms": batch_dnt_terms})
@@ -730,19 +716,12 @@ def run_batch_evaluation(
 
             verdict = res.get("verdict", "FAIL")
 
-            # Validate per-cue issue schema before context attachment
-            for issue in un_issues:
-                if not {"idx", "src", "tgt"} <= issue.keys():
-                    raise ValueError("Per-cue DNT issue missing required keys: idx, src, tgt")
-
             # Attach ±2 context to issues (stored directly in the rollup JSON).
             _attach_context_to_issues(missing_issues, source_cues, target_cues)
-            _attach_context_to_issues(un_issues, source_cues, target_cues)
 
             # Create v2 issues structure with counts and details
             issues_counts = {
                 "missing_translation": len(missing_issues),
-                "untranslated_after_dnt": len(un_issues),
                 "timing_fail": 1 if timing_fail else 0,
                 "placeholder_mismatch": 0,  # Not implemented yet
                 "parity_issue": 0,  # Not implemented yet
@@ -758,15 +737,6 @@ def run_batch_evaluation(
                         "context": issue.get("context", {}),
                     }
                     for issue in missing_issues
-                ],
-                "untranslated_after_dnt": [
-                    {
-                        "cue_index": issue["idx"],
-                        "source_text": issue["src"],
-                        "target_text": issue["tgt"],
-                        "context": issue.get("context", {}),
-                    }
-                    for issue in un_issues
                 ],
                 "timing_fail": [
                     {

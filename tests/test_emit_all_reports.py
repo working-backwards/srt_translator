@@ -32,7 +32,6 @@ class TestEmitAllReports:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -88,7 +87,6 @@ class TestEmitAllReports:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -163,7 +161,6 @@ class TestEmitAllReports:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -227,7 +224,6 @@ class TestEmitAllReports:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }
@@ -260,7 +256,6 @@ class TestEmitAllReports:
                                 "target_file": "test - FR.srt",
                                 "issues": {
                                     "missing_translation": [],
-                                    "untranslated_after_dnt": [],
                                     "timing_fail": False,
                                 },
                             }

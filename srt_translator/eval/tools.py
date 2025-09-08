@@ -265,47 +265,6 @@ def strip_terms(text: str, terms: List[str]) -> str:
     return re.sub(r"\s+", " ", out).strip()
 
 
-def is_untranslated_after_dnt(src: str, tgt: str, dnt_terms: List[str]) -> bool:
-    a = _nfkc_lower(strip_terms(src, dnt_terms))
-    b = _nfkc_lower(strip_terms(tgt, dnt_terms))
-    return (a != "") and (a == b)
-
-
-def untranslated_after_dnt_check(src: str, tgt: str, rubric: Dict) -> Tuple[str, str]:
-    """
-    Rubric-aware untranslated check.
-    Returns one of: ('fail'|'info'|'pass', note).
-    - Ignore trivial one-word cognates shorter than rubric.min_remainder_len (default 5).
-    - Treat ALL-CAPS acronyms as INFO by default (unless rubric overrides).
-    """
-    s = (src or "").strip()
-    t = (tgt or "").strip()
-    if not s:
-        return "pass", ""
-
-    # Numbers/punctuation-only guard (skip)
-    if re.fullmatch(r"[\s\W\d]+", s) and re.fullmatch(r"[\s\W\d]+", t):
-        return "pass", ""
-
-    if s == t:
-        # strip leading/trailing punctuation before token tests
-        core = re.sub(r"^\W+|\W+$", "", s)
-        toks = [core] if core else []
-        if len(toks) == 1:
-            tok = toks[0]
-            ua_cfg = rubric.get("untranslated_after_dnt", {}) or {}
-            min_len = int(ua_cfg.get("min_remainder_len", 5))
-            # Treat common acronym forms as tiny too (OKR/OKRs, etc.)
-            if len(tok) < min_len or re.fullmatch(r"[A-Z]{2,}s?", tok):
-                return "pass", ""
-            # For longer all-caps tokens, allow rubric-based downgrade
-            if tok.isupper():
-                sev = str(ua_cfg.get("uppercase_acronym_treated_as", "info")).lower()
-                return sev, "Uppercase acronym carried through."
-        return "fail", "Identical to original after DNT removal."
-    return "pass", ""
-
-
 def _occurrences(cues: List[Cue], term: str) -> List[int]:
     norm = _nfkc_lower(term)
     base = re.escape(norm).replace(r"\ ", r"[ \-]?")
@@ -543,8 +502,8 @@ def evaluate_pair(
         )
         w.writerows(tb_rows)
 
-    # --- Untranslated after DNT + source fragments (global policy) ---
-    untranslated_after_dnt_rows, source_fragment_rows = [], []
+    # --- Source fragments (global policy) ---
+    source_fragment_rows = []
     proj_root = Path(__file__).resolve().parents[2]
     frag_cfg = _load_frag_cfg(proj_root)
     mode = frag_cfg.get("mode", "auto_non_latin")
@@ -554,20 +513,6 @@ def evaluate_pair(
     )
 
     for cue_idx in range(cue_count):
-        # Check untranslated after DNT removal
-        src_after_dnt = strip_terms(source_cues[cue_idx].text, dnt_terms)
-        status, note = untranslated_after_dnt_check(
-            src_after_dnt, target_cues[cue_idx].text, rubric
-        )
-        if status == "fail":
-            untranslated_after_dnt_rows.append(
-                [
-                    cue_idx + 1,
-                    source_cues[cue_idx].index,
-                    source_cues[cue_idx].text.replace("\n", " / "),
-                    target_cues[cue_idx].text.replace("\n", " / "),
-                ]
-            )
         if emit_frags:
             stripped = strip_terms(target_cues[cue_idx].text, dnt_terms)
             m = re.search(rf"[A-Za-z]{{{min_run},}}", stripped)
@@ -580,13 +525,6 @@ def evaluate_pair(
                         m.group(0),
                     ]
                 )
-
-    with (out_dir / f"untranslated_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
-        w = csv.writer(f)
-        w.writerow(["cue", "index", "original_text", "target_text"])
-        w.writerows(untranslated_after_dnt_rows)
 
     # Fragments: only emit when rubric says so AND there is at least one row
     if should_emit_fragments(lang, {"fragments": {"mode": mode}}, len(source_fragment_rows)):
@@ -613,8 +551,6 @@ def evaluate_pair(
         fail_reasons.append(f"Cue parity mismatch: src={len(source_cues)} tgt={len(target_cues)}")
     if med_ds > 200 or med_de > 200 or p95_ds > 500 or p95_de > 500:
         fail_reasons.append("Timing drift too high (median or p95)")
-    if untranslated_after_dnt_rows:
-        fail_reasons.append(f"Untranslated after DNT: {len(untranslated_after_dnt_rows)}")
 
     verdict = "PASS" if not fail_reasons else "FAIL"
 

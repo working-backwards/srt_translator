@@ -33,8 +33,8 @@ def test_presenters_parity_v2():
     assert "Warnings" in html_content
 
     # Test specific punch list items
-    assert "untranslated_after_dnt" in md_content
-    assert "untranslated_after_dnt" in html_content
+    assert "timing_fail" in md_content
+    assert "timing_fail" in html_content
     assert "Amazon marketing campaign" in md_content
     assert "Amazon marketing campaign" in html_content
     assert "Cue Index" in md_content
@@ -109,7 +109,6 @@ def test_presenters_no_issues_found():
             "issues_total": 0,
             "by_type": {
                 "missing_translation": 0,
-                "untranslated_after_dnt": 0,
                 "timing_fail": 0,
                 "placeholder_mismatch": 0,
                 "parity_issue": 0,

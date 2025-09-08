@@ -105,7 +105,6 @@ Absolutely — here’s the detailed, **single-source-of-truth spec** you asked 
 | Code                     | Level   | Description (creator-facing)                                       | Suggested Fix (plain language)                                                                                                                                    |
 | ------------------------ | ------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `missing_translation`    | Warning | Target cue is empty but likely translated nearby (shorter target). | Copy the **target** and **source** contexts below into your AI assistant; ask to translate target → source language; compare with source; merge/adjust as needed. |
-| `untranslated_after_dnt` | Error   | Placeholder/DNT suppressed too much; target lost content.          | Replace placeholder with the correct term from DNT/termbase; re-run the cue translation in context; ensure the sentence reads naturally.                          |
 | `timing_fail`            | Error   | Subtitle timing overlaps or exceeds limits.                        | Use your subtitle editor to adjust timing so cues don’t overlap and respect duration limits.                                                                      |
 | `parity_issue`           | Warning | Target length/pace mismatches source (may hurt readability).       | Rephrase target to a similar idea density and line breaks; keep critical terms consistent with termbase.                                                          |
 | `placeholder_mismatch`   | Error   | Placeholder indices mismatched between source and target.          | Fix the placeholder indices to match source numbering; then regenerate the cue translation if needed.                                                             |
@@ -130,7 +129,6 @@ Absolutely — here’s the detailed, **single-source-of-truth spec** you asked 
   "kpis": {
     "issue_counts": {
       "missing_translation": 0,
-      "untranslated_after_dnt": 0,
       "timing_fail": 0,
       "parity_issue": 0,
       "placeholder_mismatch": 0,
