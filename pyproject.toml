@@ -16,7 +16,7 @@ name = "srt-translator"
 version = "1.0.0"
 description = "A subtitle translation tool with CLI and GUI interfaces"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Working Backwards LLC", email = "ColinB-WB@users.noreply.github.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"
