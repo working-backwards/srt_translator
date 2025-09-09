@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import json
 import os
-from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict
 
 from dotenv import dotenv_values, find_dotenv
+
+from srt_translator.config import load_language_catalog
 
 DEFAULT_LANGS = {
     "Spanish": "es",
@@ -21,28 +22,11 @@ DEFAULT_LANGS = {
 }
 
 
-def _resolve_languages_json_path() -> Path:
-    candidates = [
-        Path("languages.json"),
-        Path("config/languages.json"),
-        Path("srt_translator/resources/languages.json"),
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    raise FileNotFoundError(
-        f"Could not find languages.json. Tried: {', '.join(str(c) for c in candidates)}"
-    )
-
-
 def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
-    path = _resolve_languages_json_path()
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except JSONDecodeError as e:
-        raise RuntimeError(f"languages.json is malformed ({path}): {e}") from e
+    """Shared loader used by CLI paths; reads from packaged resources."""
+    raw = load_language_catalog()
     if "languages" not in raw:
-        raise RuntimeError(f"languages.json missing 'languages' key ({path})")
+        raise RuntimeError("languages.json missing 'languages' key")
     # policy_defaults is recommended to avoid per-lang bloat
     defaults = raw.get("policy_defaults", {})
     langs = raw["languages"]

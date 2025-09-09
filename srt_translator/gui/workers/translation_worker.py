@@ -4,20 +4,19 @@ Translation Worker for the SRT Translator GUI.
 """
 
 import io
-import json
 import logging
 import threading
 import time
 import uuid
 from collections import deque
 from contextlib import redirect_stdout
-from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
 
+from srt_translator.config import load_language_catalog
 from srt_translator.core.config.models import TranslationConfig
 
 # Evaluation imports (config-gated)
@@ -28,27 +27,11 @@ from srt_translator.eval.runner import run_batch_evaluation
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
 
 
-def _resolve_languages_json_path() -> Path:
-    for c in (
-        Path("languages.json"),
-        Path("config/languages.json"),
-        Path("srt_translator/resources/languages.json"),
-    ):
-        if c.exists():
-            return c
-    raise FileNotFoundError(
-        "Could not find languages.json (looked in project root, config/, and resources/)."
-    )
-
-
 def _load_language_policies(selected_codes: list[str]) -> dict:
-    path = _resolve_languages_json_path()
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except JSONDecodeError as e:
-        raise RuntimeError(f"languages.json is malformed ({path}): {e}") from e
+    """Return packaged language catalog (read-only)."""
+    raw = load_language_catalog()
     if "languages" not in raw:
-        raise RuntimeError(f"languages.json missing 'languages' key ({path})")
+        raise RuntimeError("languages.json missing 'languages' key")
     defaults = raw.get("policy_defaults", {})
     langs = raw["languages"]
     missing = {}

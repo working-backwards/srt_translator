@@ -7,9 +7,9 @@ This script checks that:
 3. Family defaults are clean
 """
 
-import json
-import pathlib
 import sys
+
+from srt_translator.config import load_language_catalog
 
 FORBIDDEN_KEYS = {
     "cps_soft",
@@ -22,15 +22,8 @@ REQUIRED_KEYS = {"cps_cap"}
 
 
 def main():
-    config_path = pathlib.Path("config/languages.json")
-
-    if not config_path.exists():
-        print(f"Error: {config_path} not found")
-        sys.exit(1)
-
-    # Load config
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
+    # Load config from packaged resources
+    config = load_language_catalog()
 
     languages = config.get("languages", {})
     errors = []

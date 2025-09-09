@@ -46,7 +46,6 @@ def create_release_package():
     essential_files = [
         "README.md",
         "LICENSE",
-        "config/languages.json",
         "examples/env_example",
     ]
 
@@ -141,9 +140,17 @@ def main():
     logger.info(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Check if executables already exist
-    gui_exe_path = "dist/SRT-Translator-GUI.exe"
-    if os.path.exists(gui_exe_path):
-        logger.info(f"\n✅ Executable already exists: {gui_exe_path}")
+    if platform.system() == "Windows":
+        gui_exe_path = "dist/SRT-Translator.exe"
+        app_bundle_path = None
+    else:
+        gui_exe_path = None
+        app_bundle_path = "dist/SRT Translator/SRT Translator.app"
+
+    if (gui_exe_path and os.path.exists(gui_exe_path)) or (
+        app_bundle_path and os.path.exists(app_bundle_path)
+    ):
+        logger.info("\n✅ Executable already exists")
         logger.info("📦 Skipping build step...")
     else:
         # Build executables

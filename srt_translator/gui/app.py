@@ -58,7 +58,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("GUI deps missing. Try: pip install 'srt-translator[gui]'") from e
 
     from srt_translator import __version__ as _ver
+    from srt_translator.config import sanity_check
     from srt_translator.gui.main_window import SRTTranslatorMainWindow
+
+    # Fail fast: essential packaged resources must load.
+    sanity_check()
 
     app = QApplication(sys.argv)
     app.setApplicationName("SRT Translator")

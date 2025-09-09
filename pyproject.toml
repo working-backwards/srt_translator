@@ -8,7 +8,7 @@ exclude = ["tests*", "scripts*", "build_specs*", "design_docs*", "translation_lo
 
 [tool.setuptools.package-data]
 "srt_translator.gui" = ["**/*.ui", "**/*.qss", "assets/**"]
-"srt_translator.core.config" = ["languages.json"]
+"srt_translator.config" = ["languages.json", "translation_rubric.yaml"]
 "srt_translator.presenters.eval_html" = ["templates/*.tmpl", "assets/*.css"]
 
 [project]

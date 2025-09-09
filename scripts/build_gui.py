@@ -38,7 +38,7 @@ def main():
 
     logger.info("🔨 Building GUI executable...")
     try:
-        # Run PyInstaller
+        # Run PyInstaller with the spec file (spec file defines onefile vs onedir)
         subprocess.run(
             [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", spec_file],
             check=True,
@@ -47,7 +47,10 @@ def main():
         )
 
         logger.info("✅ Successfully built GUI executable!")
-        logger.info("📁 Executable created in: dist/windows/")
+        if platform.system() == "Windows":
+            logger.info("📁 Executable created in: dist/ (SRT-Translator.exe)")
+        else:
+            logger.info("📁 App bundle created in: dist/SRT Translator/")
 
     except subprocess.CalledProcessError as e:
         logger.error(f"❌ Build failed: {e}")

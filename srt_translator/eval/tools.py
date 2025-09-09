@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Tuple
 
-import yaml
+from srt_translator.config import load_evaluation_rubric
 
 # -----------------------------
 # Roll-up helpers (normalization & evidence)
@@ -298,20 +298,15 @@ def _localized_hits(cues: List[Cue], localized: str) -> List[int]:
 
 def _load_frag_cfg(project_root: Path) -> Dict[str, Any]:
     cfg = {"mode": "auto_non_latin", "min_ascii_run": 6}
-    rb = project_root / "config" / "translation_rubric.yaml"
-    if rb.exists():
-        try:
-            y = yaml.safe_load(rb.read_text(encoding="utf-8"))
-            if isinstance(y, dict) and "fragments" in y:
-                f = y["fragments"]
-                mode = str(f.get("mode", "auto_non_latin")).strip()
-                if mode not in ("auto_non_latin", "always", "never"):
-                    mode = "auto_non_latin"
-                cfg["mode"] = mode
-                cfg["min_ascii_run"] = int(f.get("min_ascii_run", 6))
-        except Exception as e:
-            # Fallback to defaults if YAML loading fails
-            print(f"Warning: Failed to load YAML config: {e}")  # noqa: T201
+    # Always use packaged rubric; keep behavior stable across build modes.
+    rubric = load_evaluation_rubric()
+    if isinstance(rubric, dict) and "fragments" in rubric:
+        f = rubric["fragments"]
+        mode = str(f.get("mode", "auto_non_latin")).strip()
+        if mode not in ("auto_non_latin", "always", "never"):
+            mode = "auto_non_latin"
+        cfg["mode"] = mode
+        cfg["min_ascii_run"] = int(f.get("min_ascii_run", 6))
     return cfg
 
 

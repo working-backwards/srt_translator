@@ -54,23 +54,20 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Load language configuration once
         try:
-            import json
-
+            from srt_translator.config import load_language_catalog
             from srt_translator.core.config.language_config import LanguageConfig
 
-            languages_path = "config/languages.json"
-            with open(languages_path, "r", encoding="utf-8") as f:
-                lang_data = json.load(f)
+            lang_data = load_language_catalog()
             self.language_config = LanguageConfig(lang_data)
             self.logger.info(
                 f"Loaded language configuration with {len(self.language_config.get_all_languages())} languages"
             )
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+        except Exception as e:
             self.logger.error(f"Failed to load language configuration: {e}")
             QMessageBox.critical(
                 self,
                 "Configuration Error",
-                f"Failed to load language configuration: {e}\n\nPlease ensure config/languages.json exists and is valid.",
+                f"Failed to load language configuration: {e}\n\nPlease ensure the application is properly installed.",
             )
             raise RuntimeError(f"Language configuration load failed: {e}") from e
 

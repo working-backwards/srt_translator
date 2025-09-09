@@ -10,8 +10,7 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import yaml
-
+from srt_translator.config import load_evaluation_rubric, load_language_catalog
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.eval.tools import (
     classify_empty_target_rollup,
@@ -28,8 +27,9 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _rubric_path() -> Path:
-    return _project_root() / "config" / "translation_rubric.yaml"
+def _load_rubric() -> dict:
+    """Return parsed rubric from packaged resources."""
+    return load_evaluation_rubric()
 
 
 def _discover_batch_label(batch_root: Path) -> str:
@@ -168,14 +168,11 @@ def _copy_into_artifacts(src: Optional[Path], dest_dir: Path, logger) -> Optiona
 def _get_language_info(code: str) -> Dict[str, str]:
     """Get language info using the language config abstraction."""
     try:
-        # Load languages.json from project root
-        project_root = _project_root()
-        languages_file = project_root / "config" / "languages.json"
-        if languages_file.exists():
-            data = json.loads(languages_file.read_text(encoding="utf-8"))
-            config = LanguageConfig(data)
-            name = config.get_language_name(code)
-            return {"name": name, "code": code}
+        # Load languages.json from packaged resources
+        data = load_language_catalog()
+        config = LanguageConfig(data)
+        name = config.get_language_name(code)
+        return {"name": name, "code": code}
     except Exception as e:
         # Fallback to code if language lookup fails
         print(f"Warning: Failed to load language info for {code}: {e}")  # noqa: T201
@@ -474,19 +471,12 @@ def run_batch_evaluation(
     _ensure_batch_log_handler(batch_root, logger)
 
     # Rubric gating
-    rubric_file = _rubric_path()
-    if not rubric_file.exists():
-        log.info(
-            "Evaluation skipped: rubric not found",
-            extra={"expected_path": str(rubric_file)},
-        )
-        return None
     try:
-        rubric = yaml.safe_load(rubric_file.read_text(encoding="utf-8")) or {}
+        rubric = _load_rubric()
     except Exception as e:
         log.error(
             "Invalid rubric; evaluation skipped",
-            extra={"path": str(rubric_file), "error": str(e)},
+            extra={"error": str(e)},
         )
         return None
 
