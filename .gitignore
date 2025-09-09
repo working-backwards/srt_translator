@@ -35,6 +35,9 @@ original_captions/
 translated_srt_files/
 termbase.json
 
+# Build outputs
+release/
+
 
 # Log files
 *.log
