@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -49,7 +50,7 @@ jobs:
             cp dist/SRT-Translator.exe "release/SRT-Translator-${{ github.ref_name }}-win.exe"
             certutil -hashfile "release/SRT-Translator-${{ github.ref_name }}-win.exe" SHA256 > "release/SRT-Translator-${{ github.ref_name }}-win.exe.sha256"
           else
-            APP_DIR="dist/SRT Translator/SRT Translator.app"
+            APP_DIR="dist/SRT Translator.app"
             [ -d "$APP_DIR" ] || { echo "App not found: $APP_DIR"; exit 1; }
             mkdir -p dmgroot
             cp -R "$APP_DIR" dmgroot/
@@ -74,5 +75,6 @@ jobs:
         with:
           files: artifacts/**/*
           fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
