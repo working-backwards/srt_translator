@@ -67,7 +67,13 @@ if is_macos:
             "LSApplicationCategoryType": "public.app-category.productivity",
         },
     )
-    # For macOS, we don't need COLLECT when using BUNDLE
+    coll = COLLECT(
+        app,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        name="SRT-Translator"
+    )
 else:
     # Windows onefile (and Linux if you build it): DO NOT define COLLECT.
     # Leaving the spec ending with `exe` produces a single-file executable in dist/.
