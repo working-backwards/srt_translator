@@ -89,7 +89,9 @@ For each language directory in `targets/`:
    - Calculates timing statistics from source/target cue comparisons
 
    **Issue Organization by Type**:
-   - **`missing_translation`**: Empty target lines with empty neighbors and substantial source (≥12 chars)
+   - **`missing_translation`**: Empty target lines with both neighbors empty AND substantial source (≥12 chars)
+     - **Tightened threshold**: Only warns when both previous and next cues are also empty
+     - **Reduces false positives**: Common re-segmentation patterns (roll-ups/splits) are ignored
    - **`timing_fail`**: Subtitle timing that doesn't match source
    - **`placeholder_mismatch`**: Placeholder mismatches (not implemented yet)
    - **`parity_issue`**: Cue count mismatches (not implemented yet)
@@ -111,6 +113,9 @@ For each language directory in `targets/`:
 
    **Note**: These issue are later classified as errors or warnings in the report compilation phase.
 
+   **Recent Changes**:
+   - **Removed `untranslated_after_dnt` feature**: This detection rule was completely removed to simplify the evaluation system
+   - **Tightened `missing_translation` threshold**: Added neighbor+length guard to reduce false positives from common re-segmentation patterns
 
 #### 2.3 Detailed CSV Generation
 **Location**: `srt_translator/eval/tools.py:evaluate_pair()`

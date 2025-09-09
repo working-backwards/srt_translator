@@ -1,53 +1,121 @@
-## SRT Translator GUI User Manual
+# SRT Translator — GUI User Manual
 
-### Welcome
+## Introduction
 
-Thank you for using the SRT Translator. This guide is your friendly companion. It explains how the application works, and it walks you through a typical translation from start to finish. You do not need to write any code. You only need your subtitle files and your OpenAI API key.
+Thank you for using the SRT Translator. This guide explains how the application works, and it walks you through a typical translation from start to finish. You do not need to write any code. You only need your original language subtitle files and your OpenAI API key.
 
-### What the application does
+An **SRT file** is a subtitle file format. It contains:
+- A numbered list of captions
+- Start and end times for each caption
+- The text of the caption
 
-The SRT Translator reads your original SRT subtitle files, translates them into one or more target languages, and writes clean, well‑timed SRT files to an output folder. It keeps your important terms intact when you tell it which words or phrases should never be translated. It can also apply a custom termbase so your business terms remain consistent. The application processes files one at a time to ensure quality and prevent resource conflicts.
+The SRT Translator helps you create **high-quality translated subtitles** from your original SRT files.
+
+The SRT Translator reads your original SRT subtitle files, translates them into one or more target languages, and writes clean, well‑timed SRT files to an output folder. It keeps your important terms intact when you tell it which words or phrases should never be translated. It can also apply a custom termbase so your business terms remain consistent.
+
+The SRT Translator can help you if you are:
+- A **content creator** who wants to reach a broader audience with multilingual subtitles.
+- Someone who wants **control over your subtitles** (e.g., YouTube auto-generates subtitles but doesn’t let you edit them easily).
+- A person or team who needs **Do Not Translate (DNT) lists** or **Termbases** to ensure brand names, technical terms, or special vocabulary are handled correctly.
+
+With this tool, you stay in control of your content and ensure your subtitles are accurate and consistent.
 
 ---
 
 ## Getting Started
 
-### How to get the app
+When you open the application, the main window guides you through these steps (in order):
 
-- **Download a packaged build** from `dist/<platform>/SRT_Translator/` (or from a release zip).
-- If you are a developer, you can build it yourself following **INSTALLATION.md**.
-
-Then launch the app and go to **API Configuration** to paste your OpenAI API key.
+1. **Original Language SRT Files**
+2. **Target Languages**
+3. **API Configuration**
+4. **Translation Settings**
+5. **Files & Output**
+6. **Translation**
 
 ---
 
-## A Quick Tour of the Interface
+## 1. Original Language SRT Files
 
-The main window is divided into clear sections. Each section has a simple job.
+- First, choose a **folder** that contains your `.srt` files.
+- After selecting the folder, the app will show you all available SRT files.
+- You can:
+  - Select individual files
+  - Or click **Select All**
 
-### API Configuration
+This ensures you’re working with the right source files before translation.
 
-This section stores your OpenAI API key. The application uses this key to contact the translation models. You can test your key and update it at any time.
+---
 
-### Files & Output
+## 2. Target Languages
 
-This section lets you choose the folder that contains your original SRT files and the folder where translated files will be written. The application never deletes or modifies your original files. It reads them and writes new files to the output directory. The output directory will contain translated SRT files, a manifest of all translations, your DNT terms, termbase, and detailed log files for troubleshooting.
+- Choose the **languages you want to translate into**.
+- You can pick one or many.
+- The app shows language **names** (e.g., “Japanese”), not codes (like `ja`).
+- Internally, the tool maps names to codes for you, so you don’t need to worry about technical details.
 
-### Language Selection
+---
 
-This section lets you choose the languages you want to translate into. You can select one language or many languages. The application normalizes language names and codes for you, so you can choose “Japanese” or “ja” and the result will be the same.
+## 3. API Configuration
 
-### AI Configuration
+This section is where you enter your **OpenAI API key**.
 
-This section controls the translation models and options. The application chooses sensible defaults. If you are new to the tool, you can accept the defaults. If you want to change the model for quality, speed, or cost, you can do so here.
+- An API key is like a password that lets the translator connect securely to OpenAI’s translation models.
+- You can get an API key by creating an account at [platform.openai.com](https://platform.openai.com/) and going to your **API Keys** page.
+- Copy your key and paste it into the app.
+- You can test your key and update it at any time.
 
-### Translation
+### API Key Security
 
-This section starts and monitors your translation. It shows progress and it writes a log that you can review later. It also shows any errors that occur. When the translation finishes, it tells you where the new files are located.
+The SRT Translator takes your API key security seriously:
 
-### Preview (optional)
+- **Secure Storage**: Your API key is stored securely in your system's registry (Windows) or preferences (macOS/Linux) using Qt's built-in [settings system]( https://doc.qt.io/qt-6/qsettings.html)
+- **Masked Input**: The key is hidden with dots as you type it
+- **No Logging**: Your API key is never written to log files or reports
+- **HTTPS Only**: The key is only transmitted over secure HTTPS connections to OpenAI
+- **Easy Management**: You can update or clear your API key at any time through the app settings
 
-Some builds include a preview section. If you see it, you can preview how a translated SRT block will look before you translate the entire file. This is helpful if you are adjusting your DNT terms or your termbase. The preview shows exactly how your DNT terms and termbase will be applied to a small sample of text.
+Your API key stays on your computer and is only used to communicate with OpenAI's translation services.
+
+---
+
+## 4. Translation Settings
+
+Here you can control how the translator handles **terminology**:
+
+- **Do Not Translate (DNT)** - These are words or phrases that should never be translated (e.g., brand names like “iPhone” or proper names, like the author of the video). DNT terms will remain exactly the same in each laguage translation. There can be up to one DNT list per translation batch.
+
+- **Termbase**  - Termbase is a glossary of approved translations for important terms in your video. They are used to ensure consistency (e.g., “cloud computing” → always translated the same way) across translations. Termbases are useful your content has specialized vocabulary (like medicine, law, or company-specific terms). Each target language can have up to one termbase.
+
+**Good news:**
+- You don’t need to create these yourself — the SRT app can provide sensible defaults that can you can view and edit. If you want to the SRT app to generate a DNT or Termbases for you, choose your original language SRT files, the target languages, then click on the "Regenerate" button. The SRT app will send the first 12,500 tokens (about 9,000 - 10,000 English words) to the AI translator. When finished, click on the "Edit Settings" button to view and/or change them.
+
+While DNT and Termbases are optional, using them will typically yield a higher quality translation.
+
+---
+
+## 5. Files & Output
+
+- After selecting your input files and target languages, you choose an **output folder**.
+- The translated `.srt` files will be written here.
+- The workflow is:
+  1. Pick an input folder.
+  2. Select one or more `.srt` files.
+  3. Choose an output folder.
+  4. The app saves your translated subtitles into subfolders for each language.
+
+---
+
+## 6. Translation
+
+The final section is where you run the translations.
+
+Features include:
+- **Estimated Cost** — shows you an estimate of OpenAI usage cost before you begin.
+- **Translate All Files** button — runs translations for all selected files.
+- **Progress Bar** — shows progress while translations are running.
+- **Logs Window** — shows real-time progress messages.
+- **Open HTML Report** button — once translations finish, you can open a detailed evaluation report (helpful for quality checks).
 
 ---
 
@@ -55,21 +123,16 @@ Some builds include a preview section. If you see it, you can preview how a tran
 
 These steps describe a typical translation workflow in complete sentences.
 
-1. Open the application. Confirm that your API key is set in the API Configuration section.
-2. Select the folder that contains your original SRT files. Confirm your output folder.
-3. Open the Language Selection section. Choose your target languages. You may use common names or ISO codes. The application handles normalization.
-4. (Optional) Open the Do Not Translate Terms editor. Add names, brands, and technical acronyms that should remain in the original language.
-5. (Optional) Open the Termbase editor. Add consistent translations for business terms so the output remains professional and predictable.
+1. Open the application. Select your original language SRT files.
+2. Select your Output Directory.
+3. Choose your target languages.
+4. Open the API Configuration box, enter your OpenAI API key, and click on the "Test Connection" button.
+5. (Optional) Open Translations Setting box, click on the "Regenerate" button to build your DNT and Termbases.
+6. (Optional) Click on the "Edit Settings" button, then review your DNT and Termbases. Edit, if necessary. Usually the default is fine.
 6. Click Translate All Files. Watch the progress bar and the live log. The application creates a separate translated SRT for each target language.
 7. The application automatically runs fixes after each SRT file is translated to all languages. You will see "Running automatic fixes for [filename]..." in the log.
-8. When the translation completes, open the output folder. You'll find:
-   - Translated SRT files (one per target language)
-   - A manifest file listing all translations
-   - Your DNT terms and termbase files
-   - Detailed log files for troubleshooting
-   Review the translated files in your media player or subtitle editor.
-
-If you notice a term that should not have been translated, add it to your DNT list and translate again. If you want a term to be translated in a specific way, add it to the termbase and translate again. The application will respect your preferences.
+8. When the translation completes, click on the Open HTML Report" button to view and fix any translation issues. Remember SRT files are just text files, so you can make any minor changes with our favorite text editor.
+9. Go to your Output Directory. A new folder will be created for each translation batch. Upload your newly translated SRT files in your video hosting system!
 
 ---
 
@@ -180,48 +243,48 @@ Some languages express ideas in more or fewer words. We allow small changes and 
 
 Yes. DNT preserves exact tokens; the Termbase defines how domain terms should be translated.
 
-**How long will it take to translate my content?**
+## How long will it take to translate my content?
 
-Translation time depends on your content length and the number of target languages. The good news is that our system translates faster than real-time, so you won't be waiting as long as your video duration.
+Translation time depends on your content length, complexity and the number of target languages. It’s typically **faster than real-time**.
 
-**For a single language:**
-- **5 minutes of content:** 1-2 minutes to translate
-- **15 minutes of content:** 6-8 minutes to translate
-- **30 minutes of content:** 12-16 minutes to translate
-- **60 minutes of content:** 24-32 minutes to translate
+### Rule of thumb (based on real runs)
 
-**For multiple languages (processing in parallel):**
+* **Speed:** \~**42–54 seconds per 100 subtitles per language**
+* **What 100 subtitles represents:** roughly **3–5 minutes of video**
+* **Per-file overhead:** add **\~15–30 seconds** for each additional file in a job
+* **Languages are processed serially (one after another) in the current version.**
 
-| Content Length | 3 Languages | 5 Languages | 10 Languages | 12 Languages |
-|----------------|-------------|-------------|--------------|---------------|
-| 5 minutes     | 2-3 min     | 3-4 min     | 5-7 min      | 6-8 min       |
-| 15 minutes    | 18-24 min   | 30-40 min   | 1-1.3 hours  | 1.2-1.6 hours |
-| 30 minutes    | 36-48 min   | 1-1.3 hours | 2-2.6 hours  | 2.4-3.2 hours |
-| 60 minutes    | 1.2-1.6 hr | 2-2.6 hours | 4-5.2 hours  | 4.8-6.4 hours |
+---
 
-**Real-world example:** A recent translation of 9 modules (ranging from 1 minute to 27 minutes each) to 12 languages took 5 hours and 18 minutes total. The system processed 108 translation operations successfully with zero errors.
+### For a single language
 
-**Performance tip:** Translation speed is consistent across all languages. Spanish, Chinese, Arabic, and Japanese all translate at roughly the same speed, so you can plan your workflow confidently regardless of your target languages.
+*(Assumes one file; add \~15–30 sec per extra file.)*
 
-**How much will it cost to translate my content?**
+* **5 minutes of content:** **\~1.1–1.6 min**
+* **15 minutes of content:** **\~2.9–3.9 min**
+* **30 minutes of content:** **\~5.5–7.2 min**
+* **60 minutes of content:** **\~10.8–14.0 min**
 
-Translation costs depend on content length, number of languages, and the AI model you choose. Our system uses GPT-4o-mini for optimal balance of quality and cost.
+---
 
-**Cost factors:**
-- **Content length:** More content = more tokens = higher cost
-- **Language count:** Each language requires separate API calls
-- **Model efficiency:** GPT-4o-mini provides high quality at ~1/10th the cost of GPT-4
+### For multiple languages *(current app = serial processing)*
 
-**Estimated costs (using GPT-4o-mini):**
+Multiply the single-language time by the number of languages:
 
-| Content Length | 1 Language | 3 Languages | 5 Languages | 10 Languages | 12 Languages |
-|----------------|-------------|-------------|-------------|--------------|---------------|
-| 5 minutes     | $0.03 - $0.05 | $0.09 - $0.15 | $0.15 - $0.25 | $0.30 - $0.50 | $0.36 - $0.60 |
-| 15 minutes    | $0.08 - $0.12 | $0.24 - $0.36 | $0.40 - $0.60 | $0.80 - $1.20 | $0.96 - $1.44 |
-| 30 minutes    | $0.15 - $0.25 | $0.45 - $0.75 | $0.75 - $1.25 | $1.50 - $2.50 | $1.80 - $3.00 |
-| 60 minutes    | $0.30 - $0.50 | $0.90 - $1.50 | $1.50 - $2.50 | $3.00 - $5.00 | $3.60 - $6.00 |
-| 90 minutes    | $0.45 - $0.75 | $1.35 - $2.25 | $2.25 - $3.75 | $4.50 - $7.50 | $5.40 - $9.00 |
+| Content Length |   3 Languages |   5 Languages |  10 Languages |  12 Languages |
+| -------------- | ------------: | ------------: | ------------: | ------------: |
+| **5 minutes**  |   3.4–4.9 min |   5.6–8.1 min | 11.2–16.2 min | 13.5–19.5 min |
+| **15 minutes** |  8.6–11.6 min | 14.4–19.4 min | 28.8–38.8 min | 34.5–46.5 min |
+| **30 minutes** | 16.5–21.8 min | 27.5–36.2 min | 55.0–72.5 min | 66.0–87.0 min |
+| **60 minutes** | 32.2–42.0 min | 53.8–70.0 min |    1.8–2.3 hr |    2.1–2.8 hr |
 
+---
+
+### Real-world example
+
+A recent translation of 9 modules (ranging from 1–27 minutes each) into **12 languages** took **\~5 hours 18 minutes** end-to-end. The system processed 108 translation operations successfully with zero errors.
+
+> **Performance tip:** Speed is broadly consistent across languages (Spanish, Chinese, Arabic, Japanese, etc.), so you can plan confidently regardless of target languages.
 
 
 ## Troubleshooting
