@@ -147,6 +147,12 @@ logging.basicConfig(level=logging.INFO)  # NO!
 - Keep README and other docs current
 - Document any breaking changes
 
+### Documentation Deployment
+- **MkDocs is deployed to a separate public repository**: `srt_translator_docs`
+- **Deploy command**: `mkdocs gh-deploy --remote-name docs --remote-branch gh-pages`
+- **Never deploy to the main repository's gh-pages branch** - use the separate docs repo
+- The main repository's gh-pages branch should remain deleted/empty
+
 ## ⚡ Performance
 - Use lazy loading for heavy dependencies
 - Optimize for memory usage in large file processing
