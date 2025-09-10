@@ -1,0 +1,48 @@
+name: Publish MkDocs to Public Docs Repo
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "mkdocs.yml"
+      - "docs/**"
+      - ".github/workflows/publish-docs.yml"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # ⬇️ Your public docs repo (owner/repo)
+  PUBLIC_DOCS_REPO: working-backwards/srt_translator_docs
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out private repo (docs source)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install docs deps via pyproject extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[docs]"
+
+      - name: Build MkDocs site
+        run: mkdocs build --clean
+
+      # Push the built site/ to the separate public repo's gh-pages branch
+      - name: Publish to public docs repo gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.DOCS_PUBLISH_TOKEN }}
+          external_repository: ${{ env.PUBLIC_DOCS_REPO }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          keep_files: false

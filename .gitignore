@@ -79,3 +79,5 @@ gui_design*.md
 
 # MkDocs build output
 site/
+
+THIRD_PARTY_LICENSES.txt
