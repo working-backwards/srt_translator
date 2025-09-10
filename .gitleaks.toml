@@ -1,0 +1,21 @@
+title = "srt_translator gitleaks"
+
+[allowlist]
+# Ignore local junk & big binaries when scanning the working tree
+paths = [
+  '''^\.env$''',
+  '''^dist/''',
+  '''^release/''',
+  '''^build/''',
+  '''^site/''',
+  '''^\.venv/''',
+  '''^__pycache__/''',
+  '''gitleaks\.sarif$''',
+  '''.*\.exe$''',
+  '''.*\.dmg$''',
+  '''.*\.zip$''',
+  '''.*\.app/''',
+  '''.*\.dll$''',
+  '''.*\.pyd$''',
+  '''.*\.pyc$'''
+]
