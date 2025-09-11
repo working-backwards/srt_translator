@@ -56,18 +56,6 @@ class SettingsManager:
         """Load list of selected files"""
         return self.settings.value("selected_files", [])
 
-    def save_window_geometry(self, geometry: bytes) -> None:
-        """Save window geometry"""
-        self.settings.setValue("window_geometry", geometry)
-
-    def load_window_geometry(self) -> Optional[bytes]:
-        """Load window geometry"""
-        return self.settings.value("window_geometry", None)
-
-    def clear_all_settings(self) -> None:
-        """Clear all settings"""
-        self.settings.clear()
-
     def save_ai_config(
         self,
         dnt_terms: List[str],

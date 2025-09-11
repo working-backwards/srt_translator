@@ -92,65 +92,6 @@ def build_effective_dnt(dnt_terms: List[str], termbase: Dict[str, str]) -> List[
     return sorted(effective_dnt, key=str.lower)
 
 
-def safe_placeholder(
-    text: str, term: str, reserve_dict: Dict[str, str], next_index: int = 1
-) -> Tuple[str, int, int]:
-    """
-    Safely replace a term with a placeholder, avoiding conflicts.
-
-    Args:
-        text: Text to process
-        term: Term to replace
-        reserve_dict: Dictionary to store term-placeholder mappings
-        next_index: Next available placeholder index
-
-    Returns:
-        Tuple of (processed_text, replacement_count, next_available_index)
-    """
-    if not term or term not in text:
-        return text, 0, next_index
-
-    # Generate unique placeholder
-    placeholder = f"__DNT_{next_index}__"
-    while placeholder in reserve_dict.values():
-        next_index += 1
-        placeholder = f"__DNT_{next_index}__"
-
-    # Store the mapping
-    reserve_dict[placeholder] = term
-
-    # Replace all occurrences
-    replacement_count = text.count(term)
-    processed_text = text.replace(term, placeholder)
-
-    return processed_text, replacement_count, next_index + 1
-
-
-def restore_placeholders(text: str, reserve_dict: Dict[str, str]) -> Tuple[str, int]:
-    """
-    Restore all placeholders with their original terms.
-
-    Args:
-        text: Text with placeholders
-        reserve_dict: Dictionary mapping placeholders to original terms
-
-    Returns:
-        Tuple of (restored_text, restoration_count)
-    """
-    if not reserve_dict:
-        return text, 0
-
-    restored_text = text
-    restoration_count = 0
-
-    for placeholder, original_term in reserve_dict.items():
-        if placeholder in restored_text:
-            restored_text = restored_text.replace(placeholder, original_term)
-            restoration_count += 1
-
-    return restored_text, restoration_count
-
-
 def filter_dnt_terms_with_metadata(dnt_terms: List[str]) -> Tuple[List[str], List[str]]:
     """
     Filter DNT terms and return both filtered terms and metadata about what was filtered out.

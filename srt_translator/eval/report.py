@@ -9,20 +9,6 @@ from typing import Any, Dict
 # v1.0: reporter is JSON-only. No SRT parsing/imports here.
 
 
-def _load_ai_config_from_artifacts(batch_root: Path) -> dict:
-    """Load ai_config.json from artifacts directory with strict validation."""
-    ai_config_path = batch_root / "artifacts" / "ai_config.json"
-    if not ai_config_path.exists():
-        raise ValueError(
-            f"ai_config.json must be located alongside eval_report.json; not found at: {ai_config_path}"
-        )
-
-    try:
-        return json.loads(ai_config_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in {ai_config_path}: {e}") from e
-
-
 # Display blanks as real empty lines; avoid glyphs like "(none)" that look odd to users.
 EMPTY_CUE_PLACEHOLDER = ""
 
