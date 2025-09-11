@@ -152,11 +152,11 @@ class TranslationWorker(QObject):
         try:
             # Debug logging for target languages
             self.logger.info(
-                f"TranslationWorker received target_languages: {self.target_languages}"
+                "TranslationWorker received target_languages: %s", self.target_languages
             )
-            self.logger.info(f"Number of target languages: {len(self.target_languages)}")
-            self.logger.info(f"Target language names: {list(self.target_languages.keys())}")
-            self.logger.info(f"Target language codes: {list(self.target_languages.values())}")
+            self.logger.info("Number of target languages: %s", len(self.target_languages))
+            self.logger.info("Target language names: %s", list(self.target_languages.keys()))
+            self.logger.info("Target language codes: %s", list(self.target_languages.values()))
 
             # Emit progress via signal (thread-safe, throttled)
             self._throttled_emit(
@@ -170,8 +170,9 @@ class TranslationWorker(QObject):
 
             # Debug logging
             self.logger.info(
-                f"Starting translation with {len(self.selected_files)} files and "
-                f"{len(self.target_languages)} languages"
+                "Starting translation with %s files and %s languages",
+                len(self.selected_files),
+                len(self.target_languages),
             )
             self._throttled_emit(
                 self.progress_updated,
@@ -191,7 +192,7 @@ class TranslationWorker(QObject):
                         list((self.target_languages or {}).values())
                     )
                 except Exception as e:
-                    self.logger.warning(f"Failed to load language policies, using defaults: {e}")
+                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
                     # Continue with empty policies - will use defaults
 
                 # Build config from settings manager with actual data
@@ -210,13 +211,13 @@ class TranslationWorker(QObject):
                     language_policies=lang_policies,
                 )
                 self.logger.info(
-                    f"Using configuration from settings manager: "
-                    f"{len(api_cfg.target_languages)} languages"
+                    "Using configuration from settings manager: %s languages",
+                    len(api_cfg.target_languages),
                 )
-                self.logger.info(f"DNT terms loaded: {len(api_cfg.dnt_terms)}")
-                self.logger.info(f"Termbase languages loaded: {len(api_cfg.termbase)}")
+                self.logger.info("DNT terms loaded: %s", len(api_cfg.dnt_terms))
+                self.logger.info("Termbase languages loaded: %s", len(api_cfg.termbase))
                 if api_cfg.termbase:
-                    self.logger.info(f"Termbase languages: {list(api_cfg.termbase.keys())}")
+                    self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
             else:
                 # Load language policies for selected target languages
                 lang_policies = {}
@@ -225,7 +226,7 @@ class TranslationWorker(QObject):
                         list((self.target_languages or {}).values())
                     )
                 except Exception as e:
-                    self.logger.warning(f"Failed to load language policies, using defaults: {e}")
+                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
                     # Continue with empty policies - will use defaults
 
                 # Fallback to direct parameters
@@ -243,8 +244,8 @@ class TranslationWorker(QObject):
                     language_policies=lang_policies,
                 )
                 self.logger.info(
-                    f"Using configuration from direct parameters: "
-                    f"{len(api_cfg.target_languages)} languages"
+                    "Using configuration from direct parameters: %s languages",
+                    len(api_cfg.target_languages),
                 )
 
             # Check for cooperative stop before starting translation
@@ -305,7 +306,9 @@ class TranslationWorker(QObject):
                         try:
                             self.settings_manager.track_language_usage(code)
                         except Exception as e:
-                            self.logger.warning(f"Failed to track usage for language '{code}': {e}")
+                            self.logger.warning(
+                                "Failed to track usage for language '%s': %s", code, e
+                            )
             except Exception:
                 # Never fail the run due to usage tracking
                 self.logger.exception("Adaptive language usage tracking failed")
@@ -364,9 +367,9 @@ class TranslationWorker(QObject):
                             paths = emit_all_reports(artifacts_dir, rollup)
                             self.logger.info("Generated all reports:")
                             for name, path in paths.items():
-                                self.logger.info(f"  {name}: {path.absolute()}")
+                                self.logger.info("  %s: %s", name, path.absolute())
                         except Exception as e:
-                            self.logger.error(f"Failed to generate reports: {e}")
+                            self.logger.error("Failed to generate reports: %s", e)
                             raise
 
                         self.logger.info("Evaluation completed successfully")
@@ -415,18 +418,18 @@ class TranslationWorker(QObject):
         try:
             dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
             self.logger.info("AI configuration (snapshot) loaded from settings")
-            self.logger.info(f"DNT terms count: {len(dnt_terms)}")
+            self.logger.info("DNT terms count: %s", len(dnt_terms))
             if termbase:
-                self.logger.info(f"Termbase languages: {list(termbase.keys())}")
+                self.logger.info("Termbase languages: %s", list(termbase.keys()))
             if source_language:
                 code = source_language.get("code")
                 name = source_language.get("name")
-                self.logger.info(f"Source language: {name} ({code})")
+                self.logger.info("Source language: %s (%s)", name, code)
 
             # Note: The translation run receives the config directly; this is logging only.
 
         except Exception as e:
-            self.logger.error(f"Error setting up AI configuration: {e}")
+            self.logger.error("Error setting up AI configuration: %s", e)
             # Don't raise - this is not critical for translation
 
     # (no fixer here; core owns fixes)

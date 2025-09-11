@@ -60,10 +60,11 @@ class SRTTranslatorMainWindow(QMainWindow):
             lang_data = load_language_catalog()
             self.language_config = LanguageConfig(lang_data)
             self.logger.info(
-                f"Loaded language configuration with {len(self.language_config.get_all_languages())} languages"
+                "Loaded language configuration with %s languages",
+                len(self.language_config.get_all_languages()),
             )
         except Exception as e:
-            self.logger.error(f"Failed to load language configuration: {e}")
+            self.logger.error("Failed to load language configuration: %s", e)
             QMessageBox.critical(
                 self,
                 "Configuration Error",
@@ -344,8 +345,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         api_key = self.settings_manager.load_api_key()
 
         self.logger.info(
-            f"Starting AI configuration generation with {len(selected_files)} "
-            f"files and {len(target_codes)} languages"
+            "Starting AI configuration generation with %s files and %s languages",
+            len(selected_files),
+            len(target_codes),
         )
 
         # Validate inputs
@@ -371,7 +373,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             )
             return
 
-        self.logger.info(f"Selected files: {[os.path.basename(f) for f in selected_files]}")
+        self.logger.info("Selected files: %s", [os.path.basename(f) for f in selected_files])
 
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
@@ -462,7 +464,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
                 except Exception as e:
                     # Fallback if logging bridge fails
-                    self.logger.warning(f"Failed to set up logging bridge: {e}")
+                    self.logger.warning("Failed to set up logging bridge: %s", e)
 
         # Create and start worker thread
         self.ai_config_thread = QThread()
@@ -489,8 +491,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         dnt_terms, termbase, source_language = result
 
         self.logger.info(
-            f"AI configuration generation completed: {len(dnt_terms)} DNT terms, "
-            f"{len(termbase)} languages in termbase"
+            "AI configuration generation completed: %s DNT terms, %s languages in termbase",
+            len(dnt_terms),
+            len(termbase),
         )
 
         # Hide progress
@@ -525,7 +528,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def ai_config_generation_error(self, error_message: str):
         """Handle AI configuration generation errors"""
-        self.logger.error(f"AI configuration generation failed: {error_message}")
+        self.logger.error("AI configuration generation failed: %s", error_message)
 
         # Hide progress
         self.ai_config_section.show_progress(False)
@@ -596,8 +599,9 @@ class SRTTranslatorMainWindow(QMainWindow):
                 )
 
                 logging.info(
-                    f"Translation Settings updated: {len(modified_terms)} terms, "
-                    f"{len(modified_termbase)} languages"
+                    "Translation Settings updated: %s terms, %s languages",
+                    len(modified_terms),
+                    len(modified_termbase),
                 )
 
     def regenerate_translation_settings(self):
@@ -725,7 +729,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Debug logging to track language selection
         target_codes = list(target_languages.values())
         self.logger.info(
-            f"Translation requested with {len(target_codes)} languages: {target_codes}"
+            "Translation requested with %s languages: %s", len(target_codes), target_codes
         )
 
         # Get API key from settings manager
@@ -789,7 +793,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.settings_manager.save_target_languages(target_languages)
 
         # Log the results being processed
-        logging.info(f"Processing translation results: {results}")
+        logging.info("Processing translation results: %s", results)
         self.translation_section.update_log_output(f"Processing translation results: {results}")
 
         # Show results dialog
@@ -815,7 +819,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Handle evaluation completion - consume paths only, no double rendering"""
         self.logger.info("Evaluation completed - reports available:")
         for name, path in report_paths.items():
-            self.logger.info(f"  {name}: {path}")
+            self.logger.info("  %s: %s", name, path)
 
         # Store paths for UI access (e.g., "Open HTML Report" button)
         self._last_eval_json = Path(report_paths.get("eval_report_json", ""))
@@ -879,12 +883,12 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self._mem_sample_count = 1
 
             if self._mem_sample_count % 10 == 0:  # Every 5 minutes
-                self.logger.debug(f"Memory usage: {growth_mb:.1f} MB growth since start")
+                self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
             # Warn if memory growth exceeds 1GB
             if growth_mb > 1000 and not self._memory_warning_shown:
                 self._memory_warning_shown = True
-                self.logger.warning(f"High memory usage detected: {growth_mb:.1f} MB growth")
+                self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
                 # Show warning to user
                 QMessageBox.warning(
@@ -896,7 +900,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                     "This helps prevent crashes during long translation sessions.",
                 )
         except Exception as e:
-            self.logger.error(f"Error sampling memory: {e}")
+            self.logger.error("Error sampling memory: %s", e)
 
     def _get_target_codes_from_ui(self) -> list[str]:
         """Return the currently selected language codes from the UI, sorted deterministically."""
@@ -925,9 +929,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         self._last_eval_md = Path(report_paths["eval_report_md"])
         self._last_report_v1 = Path(report_paths["report_v1_json"])
 
-        self.logger.info(f"Eval report ready: {self._last_eval_json}")
-        self.logger.info(f"HTML report available: {self._last_eval_html}")
-        self.logger.info(f"MD report available: {self._last_eval_md}")
+        self.logger.info("Eval report ready: %s", self._last_eval_json)
+        self.logger.info("HTML report available: %s", self._last_eval_html)
+        self.logger.info("MD report available: %s", self._last_eval_md)
 
         # Enable the HTML button
         self.translation_section.open_html_btn.setEnabled(True)

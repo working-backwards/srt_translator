@@ -221,7 +221,7 @@ class SettingsManager:
             capped = deduped[:limit]
             self.settings.setValue("user_popular_languages", capped)
         except Exception as e:
-            self.logger.warning(f"Failed to save user popular languages: {e}")
+            self.logger.warning("Failed to save user popular languages: %s", e)
 
     def load_user_popular_languages(self) -> List[str]:
         """Load user's preferred popular languages"""
@@ -297,7 +297,7 @@ class SettingsManager:
 
             return hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()
         except Exception as e:
-            self.logger.error(f"Error calculating file hash: {e}")
+            self.logger.error("Error calculating file hash: %s", e)
             return ""
 
     def has_files_changed(self) -> bool:
