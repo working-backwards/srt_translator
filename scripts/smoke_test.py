@@ -10,9 +10,7 @@ import shutil
 import sys
 
 # Set up logging - ALWAYS include this
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -46,12 +44,12 @@ And writer functionality"""
     subtitles = SRTParser.parse_file("test.srt")
 
     if len(subtitles) == 2:
-        logger.info(f"✅ SRT parsing successful: found {len(subtitles)} subtitles")
+        logger.info("✅ SRT parsing successful: found %s subtitles", len(subtitles))
         for i, sub in enumerate(subtitles, 1):
-            logger.info(f'   {i}. {sub.start} --> {sub.end}: "{sub.content}"')
+            logger.info('   %s. %s --> %s: "%s"', i, sub.start, sub.end, sub.content)
         return True
     else:
-        logger.error(f"❌ SRT parsing failed: expected 2 subtitles, got {len(subtitles)}")
+        logger.error("❌ SRT parsing failed: expected 2 subtitles, got %s", len(subtitles))
         return False
 
 
@@ -69,7 +67,7 @@ def test_srt_writing():
 
     # Verify output file exists and has content
     if os.path.exists("output.srt"):
-        with open("output.srt", "r", encoding="utf-8") as f:
+        with open("output.srt", encoding="utf-8") as f:
             content = f.read()
         if "Hello world" in content and "Testing SRT parser" in content:
             logger.info("✅ SRT writing successful: output.srt created with correct content")
@@ -99,7 +97,7 @@ def test_cli_entry_point():
         logger.info("✅ CLI main function found and importable")
         return True
     except ImportError as e:
-        logger.error(f"❌ CLI main function import failed: {e}")
+        logger.error("❌ CLI main function import failed: %s", e)
         return False
 
 
@@ -110,10 +108,10 @@ def test_version_information():
     try:
         from srt_translator import __version__
 
-        logger.info(f"✅ Version information available: {__version__}")
+        logger.info("✅ Version information available: %s", __version__)
         return True
     except ImportError as e:
-        logger.error(f"❌ Version information import failed: {e}")
+        logger.error("❌ Version information import failed: %s", e)
         return False
 
 
@@ -127,7 +125,7 @@ def main():
     original_dir = os.getcwd()
     os.chdir(test_dir)
 
-    logger.info(f"📁 Created test directory: {test_dir}")
+    logger.info("📁 Created test directory: %s", test_dir)
 
     try:
         # Run tests
@@ -162,7 +160,7 @@ def main():
             return 1
 
     except Exception as e:
-        logger.error(f"❌ Smoke test failed with error: {e}")
+        logger.error("❌ Smoke test failed with error: %s", e)
         os.chdir(original_dir)
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)

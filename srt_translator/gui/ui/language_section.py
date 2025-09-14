@@ -4,7 +4,6 @@ Language Selection Section for the SRT Translator GUI.
 """
 
 import logging
-from typing import Dict
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -118,7 +117,7 @@ class LanguageSection(QGroupBox):
             item.setData(Qt.UserRole, code)
             self.language_list.addItem(item)
 
-    def get_target_languages(self) -> Dict[str, str]:
+    def get_target_languages(self) -> dict[str, str]:
         """Get the current target languages"""
         return self.target_languages.copy()
 
@@ -148,7 +147,7 @@ class LanguageSection(QGroupBox):
         self.settings_manager.update_target_languages(self.target_languages)
 
         # Log the update for debugging
-        logging.info(f"Updated target languages from UI: {self.target_languages}")
+        logging.info("Updated target languages from UI: %s", self.target_languages)
 
     def filter_languages(self):
         """Filter the language list based on search text"""
@@ -216,15 +215,16 @@ class LanguageSection(QGroupBox):
             # Update SettingsManager current state (thread-safe)
             self.settings_manager.update_target_languages(self.target_languages)
 
-            logging.info(f"Loaded saved languages: {self.target_languages}")
+            logging.info("Loaded saved languages: %s", self.target_languages)
 
             # Debug: Verify synchronization
             total_checkboxes = len(self.language_checkboxes)
-            checked_checkboxes = sum(
-                1 for checkbox in self.language_checkboxes.values() if checkbox.isChecked()
-            )
+            checked_checkboxes = sum(1 for checkbox in self.language_checkboxes.values() if checkbox.isChecked())
             logging.info(
-                f"Load verification: {checked_checkboxes}/{total_checkboxes} checkboxes checked, {len(self.target_languages)} languages in target_languages"
+                "Load verification: %s/%s checkboxes checked, %s languages in target_languages",
+                checked_checkboxes,
+                total_checkboxes,
+                len(self.target_languages),
             )
 
         finally:
@@ -290,7 +290,7 @@ class LanguageSection(QGroupBox):
         # Update target languages to reflect the changes
         self.update_target_languages_from_ui()
 
-        logging.debug(f"Refreshed popular languages: {new_popular_codes}")
+        logging.debug("Refreshed popular languages: %s", new_popular_codes)
 
     def check_for_adaptive_updates(self):
         """

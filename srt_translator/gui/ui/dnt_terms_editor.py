@@ -4,7 +4,6 @@ DNT Terms Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import Dict, List
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -38,7 +37,7 @@ class DNTTermsEditor(QWidget):
         self.setup_ui()
         self.connect_signals()
 
-    def set_source_language(self, source_language_info: Dict[str, object]):
+    def set_source_language(self, source_language_info: dict[str, object]):
         """Set the source language information for display purposes."""
         if source_language_info and "name" in source_language_info:
             self.source_language_name = str(source_language_info["name"])
@@ -48,9 +47,7 @@ class DNTTermsEditor(QWidget):
 
     def _update_title_label(self):
         """Update the title label with current source language."""
-        self.title_label.setText(
-            f"DNT terms (will remain in {self.source_language_name.lower()} language)"
-        )
+        self.title_label.setText(f"DNT terms (will remain in {self.source_language_name.lower()} language)")
 
     def setup_ui(self):
         """Set up the user interface."""
@@ -212,13 +209,13 @@ class DNTTermsEditor(QWidget):
         self.clear_button.clicked.connect(self.clear_all_terms)
         self.terms_list_widget.itemSelectionChanged.connect(self.update_button_states)
 
-    def set_terms(self, terms: List[str]):
+    def set_terms(self, terms: list[str]):
         """Set the list of DNT terms."""
         self.terms_list = terms.copy()
         self.refresh_display()
         # Don't emit signal during initialization - only emit when user makes changes
 
-    def get_terms(self) -> List[str]:
+    def get_terms(self) -> list[str]:
         """Get the current list of DNT terms."""
         return self.terms_list.copy()
 
@@ -269,9 +266,7 @@ class DNTTermsEditor(QWidget):
 
             # Check for duplicates
             if term.lower() in [t.lower() for t in self.terms_list]:
-                QMessageBox.warning(
-                    self, "Duplicate Term", f"The term '{term}' is already in the list."
-                )
+                QMessageBox.warning(self, "Duplicate Term", f"The term '{term}' is already in the list.")
                 return
 
             # Add term
@@ -279,7 +274,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.debug(f"Added DNT term: {term}")
+            self.logger.debug("Added DNT term: %s", term)
 
     def edit_selected_term(self):
         """Edit the currently selected term."""
@@ -313,7 +308,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.debug(f"Edited DNT term: '{old_term}' -> '{new_term}'")
+            self.logger.debug("Edited DNT term: '%s' -> '%s'", old_term, new_term)
 
     def remove_selected_term(self):
         """Remove the currently selected term."""
@@ -336,7 +331,7 @@ class DNTTermsEditor(QWidget):
             self.refresh_display()
             self.terms_changed.emit(self.terms_list)
 
-            self.logger.debug(f"Removed DNT term: {term}")
+            self.logger.debug("Removed DNT term: %s", term)
 
     def clear_all_terms(self):
         """Clear all terms from the list."""
@@ -386,7 +381,7 @@ class DNTTermsEditor(QWidget):
 
         return True
 
-    def is_modified(self, original_terms: List[str]) -> bool:
+    def is_modified(self, original_terms: list[str]) -> bool:
         """Check if the terms have been modified from the original list."""
         if len(self.terms_list) != len(original_terms):
             return True

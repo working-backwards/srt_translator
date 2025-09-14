@@ -8,7 +8,7 @@ import re
 import shutil
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from srt_translator.config import load_evaluation_rubric, load_language_catalog
 from srt_translator.core.config.language_config import LanguageConfig
@@ -37,7 +37,7 @@ def _discover_batch_label(batch_root: Path) -> str:
     return m.group(1) if m else batch_root.name
 
 
-def _find_originals_dir(batch_root: Path) -> Optional[Path]:
+def _find_originals_dir(batch_root: Path) -> Path | None:
     base = batch_root / "originals"
     if not base.exists():
         return None
@@ -49,7 +49,7 @@ def _find_originals_dir(batch_root: Path) -> Optional[Path]:
     return None
 
 
-def _collect_language_dirs(batch_root: Path) -> List[Path]:
+def _collect_language_dirs(batch_root: Path) -> list[Path]:
     out = []
     for p in batch_root.iterdir():
         if p.is_dir() and p.name not in ("originals", "artifacts", "config"):
@@ -58,11 +58,11 @@ def _collect_language_dirs(batch_root: Path) -> List[Path]:
     return sorted(out)
 
 
-def _pair_by_contract(originals_dir: Path, lang_dir: Path, lang: str) -> List[Tuple[Path, Path]]:
+def _pair_by_contract(originals_dir: Path, lang_dir: Path, lang: str) -> list[tuple[Path, Path]]:
     token = lang.replace("_", "-").upper()
     suffix = f" - {token}"
     source_map = {p.stem: p for p in originals_dir.rglob("*.srt")}
-    pairs: List[Tuple[Path, Path]] = []
+    pairs: list[tuple[Path, Path]] = []
     for target in lang_dir.rglob("*.srt"):
         stem = target.stem
         if stem.endswith(suffix):
@@ -73,7 +73,7 @@ def _pair_by_contract(originals_dir: Path, lang_dir: Path, lang: str) -> List[Tu
     return pairs
 
 
-def _caps_for(lang: str, rubric: dict) -> Tuple[int, int]:
+def _caps_for(lang: str, rubric: dict) -> tuple[int, int]:
     caps = rubric.get("caps", {})
     per = caps.get("per_language") or {}
     if lang in per:
@@ -143,14 +143,14 @@ def _attach_context_to_issues(issue_list: list[dict], source_cues, target_cues) 
         }
 
 
-def _find_summary(candidates: List[Path]) -> Optional[Path]:
+def _find_summary(candidates: list[Path]) -> Path | None:
     for p in candidates:
         if p and p.exists():
             return p
     return None
 
 
-def _copy_into_artifacts(src: Optional[Path], dest_dir: Path, logger) -> Optional[Path]:
+def _copy_into_artifacts(src: Path | None, dest_dir: Path, logger) -> Path | None:
     if not src:
         return None
     dest = dest_dir / src.name
@@ -165,7 +165,7 @@ def _copy_into_artifacts(src: Optional[Path], dest_dir: Path, logger) -> Optiona
     return dest
 
 
-def _get_language_info(code: str) -> Dict[str, str]:
+def _get_language_info(code: str) -> dict[str, str]:
     """Get language info using the language config abstraction."""
     try:
         # Load languages.json from packaged resources
@@ -179,7 +179,7 @@ def _get_language_info(code: str) -> Dict[str, str]:
     return {"name": code, "code": code}
 
 
-def _extract_dnt_terms(dnt_json: Dict[str, Any]) -> List[str]:
+def _extract_dnt_terms(dnt_json: dict[str, Any]) -> list[str]:
     """Accepts {'terms': [...]} or legacy {'dnt_terms': [...]}."""
     if not isinstance(dnt_json, dict):
         return []
@@ -187,7 +187,7 @@ def _extract_dnt_terms(dnt_json: Dict[str, Any]) -> List[str]:
     return terms if isinstance(terms, list) else []
 
 
-def _extract_tb_map(tb_json: Dict[str, Any], lang: str) -> Dict[str, str]:
+def _extract_tb_map(tb_json: dict[str, Any], lang: str) -> dict[str, str]:
     """
     Accepts {'languages': {'az': {...}}} or legacy {'az': {...}}.
     Returns a target-side term map for the language, or {}.
@@ -203,7 +203,7 @@ def _extract_tb_map(tb_json: Dict[str, Any], lang: str) -> Dict[str, str]:
     return m if isinstance(m, dict) else {}
 
 
-def _calculate_termbase_coverage(termbase: Dict[str, list]) -> str:
+def _calculate_termbase_coverage(termbase: dict[str, list]) -> str:
     """
     Calculate termbase coverage across all languages.
 
@@ -227,7 +227,7 @@ def _calculate_termbase_coverage(termbase: Dict[str, list]) -> str:
         return "partial"
 
 
-def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
+def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
     """
     Load and normalize configuration from ai_config.json.
 
@@ -250,8 +250,8 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     try:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except Exception as e:
-        logger.error(f"Failed to parse ai_config.json: {e}")
-        raise ValueError(f"Invalid ai_config.json: {e}") from e
+        logger.error("Failed to parse ai_config.json: %s", e)
+        raise ValueError("Invalid ai_config.json: %s" % e) from e
 
     # Normalize the data structure
     normalized = {
@@ -266,9 +266,7 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     raw_termbase = config.get("termbase", {})
     for lang, term_map in raw_termbase.items():
         if isinstance(term_map, dict):
-            normalized["termbase"][lang] = [
-                {"source": src, "target": tgt} for src, tgt in term_map.items()
-            ]
+            normalized["termbase"][lang] = [{"source": src, "target": tgt} for src, tgt in term_map.items()]
         else:
             logger.warning(f"Invalid termbase format for {lang}, skipping")
             normalized["termbase"][lang] = []
@@ -283,7 +281,7 @@ def _load_batch_config(batch_root: Path, logger) -> Dict[str, Any]:
     return normalized
 
 
-def _validate_batch_structure(batch_root: Path, logger, config: Dict[str, Any]) -> bool:
+def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) -> bool:
     """
     Validate that the batch has the required structure.
 
@@ -381,10 +379,10 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
 
 def _write_manifest_if_missing(
     batch_root: Path,
-    languages: List[str],
-    files_per_lang: Dict[str, List[str]],
+    languages: list[str],
+    files_per_lang: dict[str, list[str]],
     rubric: dict,
-    src_lang_info: Dict[str, str],
+    src_lang_info: dict[str, str],
     logger,
 ):
     mf = batch_root / "manifest.json"
@@ -453,9 +451,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
         logger.warning(f"Failed to add batch log file handler: {e}")
 
 
-def run_batch_evaluation(
-    batch_root: Path, logger, language_config: Optional[Any] = None
-) -> Optional[Dict[str, Any]]:
+def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None = None) -> dict[str, Any] | None:
     """
     Run batch evaluation on translated files.
 
@@ -572,7 +568,7 @@ def run_batch_evaluation(
         covered_langs = [lang for lang, entries in termbase.items() if entries]
         log.debug(f"Termbase coverage: {len(covered_langs)} languages with custom terms")
 
-    rollup: Dict[str, Any] = {
+    rollup: dict[str, Any] = {
         "batch_label": batch_label,
         "languages": {},
         "original_language": src_lang_info,  # report can use .name if non-empty
@@ -609,7 +605,7 @@ def run_batch_evaluation(
         cps_soft_cap, cps_hard_cap = _caps_for(lang, rubric)
         pairs = _pair_by_contract(originals_dir, lang_dir, lang)
 
-        per_files: List[Dict[str, Any]] = []
+        per_files: list[dict[str, Any]] = []
         for source_file, target_file in pairs:
             # Run evaluator (writes CSVs/MD)
             try:
@@ -652,18 +648,14 @@ def run_batch_evaluation(
             # treat punctuation-only / placeholders as empty; exclude benign/suspect roll-ups.
             dnt_terms = _extract_dnt_terms({"terms": batch_dnt_terms})
             tb_map = _extract_tb_map({"languages": {lang: tb_per_lang.get(lang, {})}}, lang)
-            missing_issues: List[Dict[str, Any]] = []
+            missing_issues: list[dict[str, Any]] = []
             for cue_idx, target_cue in enumerate(target_cues):
                 tgt_norm = normalize_for_empty_check(target_cue.text or "")
                 if tgt_norm:
                     continue  # definitely not empty
                 # Target is effectively empty:
                 # Simple v1.0 guard to avoid roll-up/split false positives:
-                prev_norm = (
-                    normalize_for_empty_check(target_cues[cue_idx - 1].text or "")
-                    if cue_idx > 0
-                    else ""
-                )
+                prev_norm = normalize_for_empty_check(target_cues[cue_idx - 1].text or "") if cue_idx > 0 else ""
                 next_norm = (
                     normalize_for_empty_check(target_cues[cue_idx + 1].text or "")
                     if (cue_idx + 1) < len(target_cues)
@@ -710,15 +702,11 @@ def run_batch_evaluation(
                     timing_delta_end_ms.append(delta_end_ms)
                 except Exception as e:
                     # Log any errors and skip this cue in drift stats
-                    log.warning(
-                        f"Error calculating timing drift for cue {cue_idx + 1}, skipping: {e}"
-                    )
+                    log.warning(f"Error calculating timing drift for cue {cue_idx + 1}, skipping: {e}")
                     continue
 
             # Convert to float lists for percentile function
-            start_floats = (
-                [float(x) for x in timing_delta_start_ms] if timing_delta_start_ms else []
-            )
+            start_floats = [float(x) for x in timing_delta_start_ms] if timing_delta_start_ms else []
             end_floats = [float(x) for x in timing_delta_end_ms] if timing_delta_end_ms else []
             med_ds = percentile(start_floats, 0.5) if start_floats else 0.0
             p95_ds = percentile(start_floats, 0.95) if start_floats else 0.0

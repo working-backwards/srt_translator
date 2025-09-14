@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from importlib.resources import as_file, files
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
@@ -21,13 +21,13 @@ def _read_text(fname: str) -> str:
 
 
 @lru_cache
-def load_language_catalog() -> Dict[str, Any]:
+def load_language_catalog() -> dict[str, Any]:
     """Parsed languages.json (read-only)."""
     return json.loads(_read_text(_LANGS))
 
 
 @lru_cache
-def load_evaluation_rubric() -> Dict[str, Any]:
+def load_evaluation_rubric() -> dict[str, Any]:
     """Parsed translation_rubric.yaml (read-only)."""
     return yaml.safe_load(_read_text(_RUBRIC))
 

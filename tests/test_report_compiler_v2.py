@@ -17,9 +17,7 @@ def test_compiler_v2_happy_path():
     # Copy our v2 fixture
     import shutil
 
-    shutil.copy(
-        "tests/fixtures/eval_report_v2_with_details.json", artifacts_dir / "eval_report.json"
-    )
+    shutil.copy("tests/fixtures/eval_report_v2_with_details.json", artifacts_dir / "eval_report.json")
 
     # Create minimal ai_config.json
     ai_config = {
@@ -37,7 +35,7 @@ def test_compiler_v2_happy_path():
         assert result_path.exists()
 
         # Load and validate result
-        with open(result_path, "r") as f:
+        with open(result_path) as f:
             result = json.load(f)
 
         # Check required keys

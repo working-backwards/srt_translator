@@ -7,15 +7,14 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
 
 # Public, stable placeholder regex — Fixer depends on this exact shape.
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__", re.UNICODE)
 
 
-def _dedup_preserve_order(items: List[str]) -> List[str]:
+def _dedup_preserve_order(items: list[str]) -> list[str]:
     seen = set()
-    out: List[str] = []
+    out: list[str] = []
     for x in items or []:
         if not x:
             continue
@@ -44,24 +43,22 @@ class TermHandler:
 
     def __init__(
         self,
-        dnt_terms: Optional[List[str]] = None,
-        termbase: Optional[Dict[str, Dict[str, str]]] = None,
-        lang_code: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
+        dnt_terms: list[str] | None = None,
+        termbase: dict[str, dict[str, str]] | None = None,
+        lang_code: str | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
         self.termbase = termbase or {}
 
         # Build stable placeholder map once per file/language
-        self._ordered_terms: List[str] = _dedup_preserve_order(dnt_terms or [])
+        self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
-        self.placeholder_map: Dict[str, str] = {
-            term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)
-        }
+        self.placeholder_map: dict[str, str] = {term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)}
         # Precompile exact patterns for speed and correctness
-        self._patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._patterns: list[tuple[re.Pattern, str, str]] = []
         # Sort longest-first to avoid partial/overlapping replacement issues.
         for term in sorted(self._ordered_terms, key=len, reverse=True):
             pat = _compile_word_safe_pattern(term)
@@ -80,7 +77,7 @@ class TermHandler:
     def placeholder_regex(self) -> re.Pattern:
         return PH_RE
 
-    def build_placeholder_map(self, new_terms: Optional[List[str]] = None) -> Dict[str, str]:
+    def build_placeholder_map(self, new_terms: list[str] | None = None) -> dict[str, str]:
         """
         Optional: rebuild the map if calling code wants to override terms.
         Returns the active map for convenience.
@@ -91,9 +88,7 @@ class TermHandler:
         self.placeholder_map = {t: f"__DNT_TERM_{i}__" for i, t in enumerate(self._ordered_terms)}
         self._patterns.clear()
         for term in sorted(self._ordered_terms, key=len, reverse=True):
-            self._patterns.append(
-                (_compile_word_safe_pattern(term), term, self.placeholder_map[term])
-            )
+            self._patterns.append((_compile_word_safe_pattern(term), term, self.placeholder_map[term]))
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 
@@ -142,17 +137,17 @@ class TermHandler:
     def placeholder_count(self) -> int:
         return len(self.placeholder_map)
 
-    def placeholder_report(self) -> List[Tuple[int, str, str]]:
+    def placeholder_report(self) -> list[tuple[int, str, str]]:
         """
         Returns list of (idx, term, placeholder) for logging/artifacts.
         """
         return [(i, term, self.placeholder_map[term]) for i, term in enumerate(self._ordered_terms)]
 
-    def get_filtered_termbase(self) -> Dict[str, str]:
+    def get_filtered_termbase(self) -> dict[str, str]:
         """Get termbase with DNT precedence enforced (collisions removed)"""
         # For now, return empty dict - this can be enhanced later if needed
         return {}
 
-    def get_effective_dnt(self) -> List[str]:
+    def get_effective_dnt(self) -> list[str]:
         """Get the effective DNT terms (after precedence rules applied)"""
         return self._ordered_terms.copy()

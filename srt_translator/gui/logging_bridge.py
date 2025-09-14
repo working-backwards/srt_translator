@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import logging
 import queue
+from collections.abc import Callable, Iterable
 from logging.handlers import QueueHandler, QueueListener
-from typing import Callable, Iterable, Optional
 
 
 class NamePrefixFilter(logging.Filter):
@@ -93,9 +93,9 @@ class SimpleFormatter(logging.Formatter):
 def make_gui_logging_pipeline(
     *,
     logger_name: str = "srt_translator",
-    name_prefix_filter: Optional[Iterable[str]] = ("srt_translator",),
+    name_prefix_filter: Iterable[str] | None = ("srt_translator",),
     append_callback: Callable[[str, int, dict], None],
-    file_handler: Optional[logging.Handler] = None,
+    file_handler: logging.Handler | None = None,
     queue_size: int = 1000,
     level: int = logging.INFO,
 ):

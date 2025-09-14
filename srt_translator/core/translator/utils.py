@@ -3,7 +3,7 @@ Translation utilities for SRT file processing.
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 import srt
 
@@ -18,12 +18,10 @@ class TranslationUtils:
     Subtitle format for file I/O operations.
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: logging.Logger | None = None):
         self.logger = logger or logging.getLogger(__name__)
 
-    def parse_source_to_local_subtitles(
-        self, parser, input_filepath: str
-    ) -> List[InternalSubtitle]:
+    def parse_source_to_local_subtitles(self, parser, input_filepath: str) -> list[InternalSubtitle]:
         """
         Adapter over existing parser → produce local InternalSubtitle list with ms times.
 
@@ -42,20 +40,18 @@ class TranslationUtils:
                 # Get text content (handle different attribute names)
                 text = getattr(s, "content", None) or getattr(s, "text", "")
 
-                subs.append(
-                    InternalSubtitle(index=s.index, start_ms=start_ms, end_ms=end_ms, text=text)
-                )
+                subs.append(InternalSubtitle(index=s.index, start_ms=start_ms, end_ms=end_ms, text=text))
         except Exception as e:
-            self.logger.error(f"Failed to parse source file {input_filepath}: {e}")
+            self.logger.error("Failed to parse source file %s: %s", input_filepath, e)
             raise
 
         return subs
 
     def write_local_subtitles_to_srt(
         self,
-        subs: List[InternalSubtitle],
+        subs: list[InternalSubtitle],
         output_filepath: str,
-        target_lang: Optional[str] = None,
+        _target_lang: str | None = None,
     ):
         """
         Write InternalSubtitle objects to SRT file format.
@@ -75,7 +71,7 @@ class TranslationUtils:
                 f.write(srt.compose(out_objs))
 
         except Exception as e:
-            self.logger.error(f"Failed to write output file {output_filepath}: {e}")
+            self.logger.error("Failed to write output file %s: %s", output_filepath, e)
             raise
 
     def _build_subtitle_like(self, subtitle: InternalSubtitle) -> Any:
@@ -101,12 +97,12 @@ class TranslationUtils:
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to build subtitle object: {e}")
+            self.logger.error("Failed to build subtitle object: %s", e)
             raise
 
     def validate_subtitle_structure(
-        self, src_subs: List[InternalSubtitle], tgt_subs: List[InternalSubtitle]
-    ) -> List[str]:
+        self, src_subs: list[InternalSubtitle], tgt_subs: list[InternalSubtitle]
+    ) -> list[str]:
         """
         Validate subtitle structure integrity.
 
@@ -122,24 +118,18 @@ class TranslationUtils:
         # Check for missing subtitles
         if any(s is None for s in tgt_subs):
             missing = [i + 1 for i, s in enumerate(tgt_subs) if s is None]
-            errors.append(
-                f"Missing subtitles in target: {missing[:8]}{'...' if len(missing) > 8 else ''}"
-            )
+            errors.append(f"Missing subtitles in target: {missing[:8]}{'...' if len(missing) > 8 else ''}")
 
         # Check timing consistency
-        for i, (src, tgt) in enumerate(zip(src_subs, tgt_subs)):
+        for i, (src, tgt) in enumerate(zip(src_subs, tgt_subs, strict=False)):
             if tgt is None:
                 continue
 
             if tgt.start_ms != src.start_ms:
-                errors.append(
-                    f"Start time mismatch at subtitle {i + 1}: {src.start_ms} != {tgt.start_ms}"
-                )
+                errors.append(f"Start time mismatch at subtitle {i + 1}: {src.start_ms} != {tgt.start_ms}")
 
             if tgt.end_ms != src.end_ms:
-                errors.append(
-                    f"End time mismatch at subtitle {i + 1}: {src.end_ms} != {tgt.end_ms}"
-                )
+                errors.append(f"End time mismatch at subtitle {i + 1}: {src.end_ms} != {tgt.end_ms}")
 
             if tgt.index != src.index:
                 errors.append(f"Index mismatch at subtitle {i + 1}: {src.index} != {tgt.index}")

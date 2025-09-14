@@ -42,7 +42,7 @@ def test_no_cross_imports_in_cli():
 
     # Check that the CLI module doesn't have GUI imports
     source = srt_translator.cli.app.__file__
-    with open(source, "r", encoding="utf-8") as f:
+    with open(source, encoding="utf-8") as f:
         content = f.read()
         assert "srt_translator.gui" not in content, "CLI should not import from GUI"
 
@@ -53,6 +53,6 @@ def test_no_cross_imports_in_gui():
 
     # Check that the GUI module doesn't have CLI imports
     source = srt_translator.gui.main_window.__file__
-    with open(source, "r", encoding="utf-8") as f:
+    with open(source, encoding="utf-8") as f:
         content = f.read()
         assert "srt_translator.cli" not in content, "GUI should not import from CLI"

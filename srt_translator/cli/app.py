@@ -111,38 +111,36 @@ Examples:
         )
 
         logger.info("Configuration loaded successfully")
-        logger.debug(f"API key source: {raw_config.get('api_key_source', 'unknown')}")
+        logger.debug("API key source: %s", raw_config.get("api_key_source", "unknown"))
 
         # Debug logging for termbase and DNT terms
         if args.debug:
-            logger.debug(f"DNT terms count: {len(api_cfg.dnt_terms)}")
-            logger.debug(f"Termbase languages count: {len(api_cfg.termbase)}")
+            logger.debug("DNT terms count: %s", len(api_cfg.dnt_terms))
+            logger.debug("Termbase languages count: %s", len(api_cfg.termbase))
             if api_cfg.termbase:
-                logger.debug(f"Termbase languages: {list(api_cfg.termbase.keys())}")
+                logger.debug("Termbase languages: %s", list(api_cfg.termbase.keys()))
             else:
-                logger.warning(
-                    "No termbase loaded - check if termbase.json exists and is accessible"
-                )
+                logger.warning("No termbase loaded - check if termbase.json exists and is accessible")
 
     except ImportError as e:
-        logger.error(f"Import error: {e}")
+        logger.error("Import error: %s", e)
         logger.error("Make sure you have installed the package: pip install -e .")
         return 1
     except Exception as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error: %s", e)
         return 2
 
     # Call main function with the configuration
     try:
         input_dir = raw_config.get("input_directory", "original_captions")
         if not os.path.exists(input_dir):
-            logger.error(f"INPUT_DIRECTORY not found: {input_dir}")
+            logger.error("INPUT_DIRECTORY not found: %s", input_dir)
             return 1
         files = [Path(input_dir) / f for f in sorted(os.listdir(input_dir)) if f.endswith(".srt")]
         if not files:
-            logger.info(f"No .srt files found in {input_dir}")
+            logger.info("No .srt files found in %s", input_dir)
             return 0
-        logger.info(f"Found {len(files)} .srt files to translate")
+        logger.info("Found %s .srt files to translate", len(files))
         cfg_with_files = api_cfg.__class__(**{**api_cfg.__dict__, "files": files})
         # Run translation and get results including batch directory
         results = Translator(cfg_with_files).run()
@@ -164,21 +162,13 @@ Examples:
                     latest_batch = None
                 else:
                     parent = Path(out_dir)
-                    candidates = [
-                        d
-                        for d in parent.iterdir()
-                        if d.is_dir() and d.name.startswith("translation-batch-")
-                    ]
+                    candidates = [d for d in parent.iterdir() if d.is_dir() and d.name.startswith("translation-batch-")]
                     # Choose by modification time to avoid lexicographic surprises
-                    latest_batch = (
-                        max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
-                    )
+                    latest_batch = max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
 
             if latest_batch and latest_batch.exists():
                 logger.info("Running evaluation", extra={"batch": latest_batch.name})
-                rollup = run_batch_evaluation(
-                    batch_root=latest_batch, logger=eval_logger, language_config=api_cfg
-                )
+                rollup = run_batch_evaluation(batch_root=latest_batch, logger=eval_logger, language_config=api_cfg)
 
                 if rollup:
                     artifacts_dir = latest_batch / "artifacts"
@@ -194,9 +184,9 @@ Examples:
                         paths = emit_all_reports(artifacts_dir, rollup)
                         logger.info("Generated all reports:")
                         for name, path in paths.items():
-                            logger.info(f"  {name}: {path.absolute()}")
+                            logger.info("  %s: %s", name, path.absolute())
                     except Exception as e:
-                        logger.error(f"Failed to generate reports: {e}")
+                        logger.error("Failed to generate reports: %s", e)
                         return 1
 
                     logger.info("Evaluation completed successfully")
@@ -211,11 +201,11 @@ Examples:
             # Don't fail the translation - evaluation is optional
 
     except ImportError as e:
-        logger.error(f"Import error: {e}")
+        logger.error("Import error: %s", e)
         logger.error("Make sure you have installed the package: pip install -e .")
         return 1
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error("Unexpected error: %s", e)
         return 1
 
     return 0

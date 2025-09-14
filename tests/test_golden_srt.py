@@ -113,9 +113,7 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
     assert src_blocks, f"Invalid SRT fixture: {filename}"
 
     # Common config
-    language_config = LanguageConfig(
-        {"languages": {}}
-    )  # use your real config loader in app; tests use minimal stub
+    language_config = LanguageConfig({"languages": {}})  # use your real config loader in app; tests use minimal stub
     termbase = {"es": TERMS_ES}  # non-ES languages may have empty mappings
 
     for target_lang in languages:
@@ -144,7 +142,7 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
         out_text = out_path.read_text(encoding="utf-8")
         out_blocks = _read_srt_blocks(out_text)
         assert len(out_blocks) == len(src_blocks)
-        for sb, ob in zip(src_blocks, out_blocks):
+        for sb, ob in zip(src_blocks, out_blocks, strict=False):
             assert sb["idx"] == ob["idx"]
             assert sb["ts"] == ob["ts"]
 
@@ -178,9 +176,7 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
         "version": "1.0.0",
         "dnt_terms": overrides.get("dnt_terms", []),
     }
-    (batch_dir / "ai_config.json").write_text(
-        json.dumps(ai_config, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    (batch_dir / "ai_config.json").write_text(json.dumps(ai_config, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # Copy the translated outputs to the batch structure (simulating what main.py does)
     for target_lang in languages:
@@ -194,9 +190,7 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
 
     # Run fixer in dry-run mode
     fixer = SRTFixer(log_file=str(batch_dir / "fixer_golden.log"), translations_dir=str(batch_dir))
-    summary = fixer.scan_and_fix_placeholders(
-        batch_dir=batch_dir, dnt_terms=ai_config["dnt_terms"], dry_run=True
-    )
+    summary = fixer.scan_and_fix_placeholders(batch_dir=batch_dir, dnt_terms=ai_config["dnt_terms"], dry_run=True)
 
     # No backups on dry-run
     assert not list(batch_dir.rglob("*.srt.bak"))

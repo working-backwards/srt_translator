@@ -57,14 +57,11 @@ class TestReportCompilerV1:
         result_path = compile_report(tmp_path)
 
         # Load and verify result
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             result = json.load(f)
 
         # Test invariants
-        assert (
-            result["totals"]["issues_total"]
-            == result["kpis"]["errors_total"] + result["kpis"]["warnings_total"]
-        )
+        assert result["totals"]["issues_total"] == result["kpis"]["errors_total"] + result["kpis"]["warnings_total"]
         assert result["kpis"]["errors_total"] == 0
         assert result["kpis"]["warnings_total"] == 0
         assert len(result["punch_list"]["errors"]) == 0
@@ -133,14 +130,11 @@ class TestReportCompilerV1:
         result_path = compile_report(tmp_path)
 
         # Load and verify result
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             result = json.load(f)
 
         # Test invariants
-        assert (
-            result["totals"]["issues_total"]
-            == result["kpis"]["errors_total"] + result["kpis"]["warnings_total"]
-        )
+        assert result["totals"]["issues_total"] == result["kpis"]["errors_total"] + result["kpis"]["warnings_total"]
         assert result["kpis"]["errors_total"] == 1
         assert result["kpis"]["warnings_total"] == 2
         assert len(result["punch_list"]["errors"]) == 1
@@ -217,7 +211,7 @@ class TestReportCompilerV1:
         result_path = compile_report(tmp_path)
 
         # Load and verify result
-        with open(result_path, "r", encoding="utf-8") as f:
+        with open(result_path, encoding="utf-8") as f:
             result = json.load(f)
 
         # Test lexicons structure

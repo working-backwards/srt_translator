@@ -9,7 +9,6 @@ import logging
 import os
 from dataclasses import replace
 from datetime import datetime
-from typing import List, Optional
 
 from srt_translator import __version__
 from srt_translator.core.config.language_config import LanguageConfig
@@ -21,10 +20,10 @@ from srt_translator.core.translator.translator import SRTTranslator
 
 
 def translate_srt_files(
-    file_paths: List[str],
+    file_paths: list[str],
     config: TranslationConfig,
     *,
-    logger: Optional[logging.Logger] = None,
+    logger: logging.Logger | None = None,
 ) -> SummaryDict:
     """
     Translate SRT files to multiple target languages.
@@ -56,8 +55,8 @@ def translate_srt_files(
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    logger.info(f"Batch folder: {batch_dir}")
-    logger.info(f"Log file: {log_file}")
+    logger.info("Batch folder: %s", batch_dir)
+    logger.info("Log file: %s", log_file)
     logger.info("Translating with per-language batch sizes from injected policies")
 
     # Stage 3: the core must not read languages.json directly.
@@ -80,9 +79,7 @@ def translate_srt_files(
     source_code = None
     try:
         if isinstance(source_lang, dict):
-            source_code = (
-                source_lang.get("normalized_code") or source_lang.get("detected_code") or ""
-            ).strip()
+            source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
     except Exception:
         source_code = None
 
@@ -95,8 +92,9 @@ def translate_srt_files(
         }
         if len(keep) != len(config.target_languages):
             logger.warning(
-                f"Dropping target identical to detected source ({source_code}); "
-                f"{len(config.target_languages) - len(keep)} target(s) removed."
+                "Dropping target identical to detected source (%s); %s target(s) removed.",
+                source_code,
+                len(config.target_languages) - len(keep),
             )
             config = replace(config, target_languages=keep)
     if isinstance(source_lang, dict) and source_lang.get("mixed"):
@@ -108,12 +106,16 @@ def translate_srt_files(
 
     for lang_name, lang_code in config.target_languages.items():
         if not lang_code:
-            logger.warning(f"Skipping language '{lang_name}' with empty code")
+            logger.warning("Skipping language '%s' with empty code", lang_name)
             continue
 
         total_operations += 1
         logger.info(
-            f"translated by {total_operations} / {len(config.target_languages)} - {os.path.basename(file_paths[0])} → {lang_name}"
+            "translated by %s / %s - %s → %s",
+            total_operations,
+            len(config.target_languages),
+            os.path.basename(file_paths[0]),
+            lang_name,
         )
 
         try:
@@ -158,10 +160,10 @@ def translate_srt_files(
                 )
 
             successful_translations += 1
-            logger.info(f"Successfully translated to {lang_name}")
+            logger.info("Successfully translated to %s", lang_name)
 
         except Exception as e:
-            logger.error(f"Failed to translate to {lang_name}: {e}")
+            logger.error("Failed to translate to %s: %s", lang_name, e)
             continue
 
     # Write AI config manifest
@@ -196,7 +198,7 @@ def translate_srt_files(
             json.dump(manifest_data, f, ensure_ascii=False, indent=2)
         logger.info("Wrote AI config to artifacts: ai_config.json")
     except Exception as e:
-        logger.warning(f"Failed to write AI config manifest: {e}")
+        logger.warning("Failed to write AI config manifest: %s", e)
 
     # Artifacts directory already created above
 
@@ -212,9 +214,9 @@ def translate_srt_files(
             source_filename = os.path.basename(file_path)
             dest_path = os.path.join(originals_dir, source_filename)
             shutil.copy2(file_path, dest_path)
-            logger.info(f"Copied source file to originals: {source_filename}")
+            logger.info("Copied source file to originals: %s", source_filename)
         except Exception as e:
-            logger.warning(f"Failed to copy source file {file_path}: {e}")
+            logger.warning("Failed to copy source file %s: %s", file_path, e)
 
     # Per-language artifacts are now handled by the evaluation system
     # The core translation focuses only on translation, not artifact creation
@@ -224,11 +226,11 @@ def translate_srt_files(
 
     # Print summary
     logger.info(" === Translation Summary ===")
-    logger.info(f"Files processed: {len(file_paths)}")
-    logger.info(f"Languages processed: {len(config.target_languages)}")
-    logger.info(f"Total translation operations: {total_operations}")
-    logger.info(f"Successful translations: {successful_translations}")
-    logger.info(f"Failed translations: {total_operations - successful_translations}")
+    logger.info("Files processed: %s", len(file_paths))
+    logger.info("Languages processed: %s", len(config.target_languages))
+    logger.info("Total translation operations: %s", total_operations)
+    logger.info("Successful translations: %s", successful_translations)
+    logger.info("Failed translations: %s", total_operations - successful_translations)
     logger.info("==========================")
 
     # Remove file handler to avoid duplicate logging
@@ -246,14 +248,12 @@ def translate_srt_files(
         fixer_logger.addHandler(file_handler)
 
         fixer = SRTFixer(log_file, batch_dir)
-        fixer.scan_and_fix_placeholders(
-            batch_dir=Path(batch_dir), dnt_terms=config.dnt_terms, dry_run=False
-        )
+        fixer.scan_and_fix_placeholders(batch_dir=Path(batch_dir), dnt_terms=config.dnt_terms, dry_run=False)
 
         # Remove file handler from fixer's logger
         fixer_logger.removeHandler(file_handler)
     except Exception as e:
-        logger.error(f"Failed to run SRT fixer: {e}")
+        logger.error("Failed to run SRT fixer: %s", e)
 
     logger.info("SRT fixer completed.")
 

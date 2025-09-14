@@ -171,6 +171,46 @@ logging.basicConfig(level=logging.INFO)  # NO!
 - **Document changes clearly**
 - **Maintain backward compatibility when possible**
 
+
+## 📋 PR Checklist (MUST)
+
+### Before submitting any PR:
+- [ ] No f-strings in any `logger.*` call
+- [ ] No unused parameters without `_` prefix
+- [ ] All logging uses parameterized messages
+- [ ] Ruff check passes: `ruff check --select E,F,I,B,TID,G,ARG,UP .`
+
+### If unsure about any rule: STOP CODING AND ASK
+
+## 🔧 Logging & Parameters (MUST)
+
+### Never use f-strings or `.format()` in logger calls
+- **FORBIDDEN**: `logger.info(f"Processing {count} files")`
+- **FORBIDDEN**: `logger.info("Processing {} files".format(count))`
+- **FORBIDDEN**: `logger.info("Processing %s files" % count)`
+- **REQUIRED**: `logger.info("Processing %s files", count)`
+
+### Always use parameterized messages with placeholders + args
+```python
+# ✅ CORRECT
+logger.info("Saved %s items", count)
+logger.warning("Failed to process %s: %s", filename, error)
+logger.debug("Processing %d files, %d remaining", processed, remaining)
+
+# ❌ FORBIDDEN
+logger.info(f"Saved {count} items")
+logger.warning(f"Failed to process {filename}: {error}")
+```
+
+### Do not prebuild log strings
+- **FORBIDDEN**: `message = f"Processing {count} files"; logger.info(message)`
+- **REQUIRED**: Pass values as logger args directly
+
+### Unused parameters must be prefixed with `_`
+- **REQUIRED**: If a parameter is unused but required by an interface, prefix with `_`
+- **EXAMPLE**: `def event_handler(self, _event):` instead of `def event_handler(self, event):`
+- **EXAMPLE**: `def callback(self, _data, _metadata):` for interface compliance
+
 ## 🚨 CRITICAL REMINDER
 When working with the core engine (srt_translator/core/):
 1. **NEVER import global settings**

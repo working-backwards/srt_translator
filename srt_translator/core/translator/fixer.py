@@ -1,7 +1,6 @@
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List
 
 import srt
 
@@ -17,9 +16,7 @@ class SRTFixer:
         self.translations_dir = translations_dir
         self.parser = SRTParser()
 
-    def scan_and_fix_placeholders(
-        self, *, batch_dir: Path, dnt_terms: List[str], dry_run: bool = False
-    ) -> Dict:
+    def scan_and_fix_placeholders(self, *, batch_dir: Path, dnt_terms: list[str], dry_run: bool = False) -> dict:
         """
         Scan and fix placeholder issues in translated SRT files.
 
@@ -40,7 +37,7 @@ class SRTFixer:
         tokens_removed = 0
         unknown_indices = 0
 
-        logger.info(f"Scanning {len(srt_files)} SRT files for placeholder issues...")
+        logger.info("Scanning %s SRT files for placeholder issues...", len(srt_files))
 
         for file_path in srt_files:
             file_stats = self._process_single_file(file_path, dnt_terms, dry_run)
@@ -69,7 +66,7 @@ class SRTFixer:
             "unknown_indices": unknown_indices,
         }
 
-    def _discover_srt_files(self, batch_dir: Path) -> List[Path]:
+    def _discover_srt_files(self, batch_dir: Path) -> list[Path]:
         """Discover all translated SRT files under batch_dir."""
         srt_files = []
 
@@ -83,11 +80,11 @@ class SRTFixer:
 
         return srt_files
 
-    def _process_single_file(self, file_path: Path, dnt_terms: List[str], dry_run: bool) -> Dict:
+    def _process_single_file(self, file_path: Path, dnt_terms: list[str], dry_run: bool) -> dict:
         """Process a single SRT file for placeholder issues."""
         try:
             # Read the file
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Parse subtitles
@@ -131,7 +128,7 @@ class SRTFixer:
             }
 
         except Exception as e:
-            logger.error(f"Error processing {file_path}: {e}")
+            logger.error("Error processing %s: %s", file_path, e)
             return {
                 "changed": False,
                 "tokens_replaced": 0,
@@ -139,7 +136,7 @@ class SRTFixer:
                 "unknown_indices": 0,
             }
 
-    def _process_subtitle_content(self, content: str, dnt_terms: List[str]) -> Dict:
+    def _process_subtitle_content(self, content: str, dnt_terms: list[str]) -> dict:
         """Process subtitle content for placeholder issues."""
         # Define character classes for Unicode variants
         UNDERSCORE_CLASS = r"[_\uFF3F]"  # ASCII underscore and fullwidth underscore
@@ -185,25 +182,19 @@ class SRTFixer:
                 # If index is in range, replace with DNT term + tail
                 if 0 <= index < len(dnt_terms):
                     replacement = dnt_terms[index] + tail
-                    new_content = (
-                        new_content[: match.start()] + replacement + new_content[match.end() :]
-                    )
+                    new_content = new_content[: match.start()] + replacement + new_content[match.end() :]
                     tokens_replaced += 1
                 else:
                     # Remove the placeholder but keep punctuation
                     replacement = tail
-                    new_content = (
-                        new_content[: match.start()] + replacement + new_content[match.end() :]
-                    )
+                    new_content = new_content[: match.start()] + replacement + new_content[match.end() :]
                     tokens_removed += 1
                     unknown_indices += 1
 
             except ValueError:
                 # Invalid index, remove the placeholder but keep punctuation
                 replacement = tail
-                new_content = (
-                    new_content[: match.start()] + replacement + new_content[match.end() :]
-                )
+                new_content = new_content[: match.start()] + replacement + new_content[match.end() :]
                 tokens_removed += 1
                 unknown_indices += 1
 
@@ -214,12 +205,12 @@ class SRTFixer:
             "unknown_indices": unknown_indices,
         }
 
-    def _apply_changes(self, file_path: Path, subtitles: List[srt.Subtitle], changes: List[Dict]):
+    def _apply_changes(self, file_path: Path, subtitles: list[srt.Subtitle], changes: list[dict]):
         """Apply changes to the SRT file with backup."""
         # Create backup
         backup_path = file_path.with_suffix(file_path.suffix + ".bak")
         if not backup_path.exists():
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 original_content = f.read()
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(original_content)
@@ -232,7 +223,7 @@ class SRTFixer:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(srt.compose(subtitles))
 
-        logger.info(f"Updated {file_path} (backup: {backup_path})")
+        logger.info("Updated %s (backup: %s)", file_path, backup_path)
 
     def _log_summary(
         self,
@@ -247,12 +238,12 @@ class SRTFixer:
         logger.info("=" * 60)
         logger.info("SRT Fixer Status Report")
         logger.info("=" * 60)
-        logger.info(f"Files scanned: {files_scanned}, Files changed: {files_changed}")
-        logger.info(f"Tokens replaced: {tokens_replaced} (mapped to DNT terms)")
-        logger.info(f"Tokens removed: {tokens_removed} (unmappable/invalid index)")
+        logger.info("Files scanned: %s, Files changed: %s", files_scanned, files_changed)
+        logger.info("Tokens replaced: %s (mapped to DNT terms)", tokens_replaced)
+        logger.info("Tokens removed: %s (unmappable/invalid index)", tokens_removed)
 
         if unknown_indices > 0:
-            logger.info(f"Unknown indices encountered: {unknown_indices}")
+            logger.info("Unknown indices encountered: %s", unknown_indices)
 
         if dry_run and (tokens_replaced > 0 or tokens_removed > 0):
             logger.info("Dry-run: changes were NOT written")
@@ -262,16 +253,14 @@ class SRTFixer:
         """Deprecated: Log parsing is no longer used."""
         logger.warning("parse_log_file() is deprecated - using SRT-first approach")
 
-    def fix_srt_files(self, aggressiveness: float = 0.75):
+    def fix_srt_files(self, _aggressiveness: float = 0.75):
         """Deprecated: Use scan_and_fix_placeholders() instead."""
         logger.warning("fix_srt_files() is deprecated - use scan_and_fix_placeholders()")
 
-    def fix_specific_srt_files(self, file_paths: List[str], aggressiveness: float = 0.75):
+    def fix_specific_srt_files(self, _file_paths: list[str], _aggressiveness: float = 0.75):
         """Deprecated: Use scan_and_fix_placeholders() instead."""
         logger.warning("fix_specific_srt_files() is deprecated - use scan_and_fix_placeholders()")
 
     def report_status(self):
         """Deprecated: Status is now reported by scan_and_fix_placeholders()."""
-        logger.warning(
-            "report_status() is deprecated - status reported by scan_and_fix_placeholders()"
-        )
+        logger.warning("report_status() is deprecated - status reported by scan_and_fix_placeholders()")

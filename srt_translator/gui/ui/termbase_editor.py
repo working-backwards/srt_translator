@@ -4,7 +4,6 @@ Termbase Editor for the SRT Translator GUI.
 """
 
 import logging
-from typing import Dict, List, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
@@ -38,14 +37,14 @@ class TermbaseEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.termbase: Dict[str, Dict[str, str]] = {}  # {language: {source_term: translation}}
-        self.languages: List[str] = []
+        self.termbase: dict[str, dict[str, str]] = {}  # {language: {source_term: translation}}
+        self.languages: list[str] = []
         self.source_language_name: str = "Source"  # Will be updated dynamically
         self._updating_table = False  # Flag to prevent signal loops
         self.setup_ui()
         self.connect_signals()
 
-    def set_source_language(self, source_language_info: Dict[str, object]):
+    def set_source_language(self, source_language_info: dict[str, object]):
         """Set the source language information for display purposes."""
         if source_language_info and "name" in source_language_info:
             self.source_language_name = str(source_language_info["name"])
@@ -256,15 +255,12 @@ class TermbaseEditor(QWidget):
         source_term = source_term_item.text()
 
         # Count how many languages have this term
-        term_count = sum(
-            1 for lang_termbase in self.termbase.values() if source_term in lang_termbase
-        )
+        term_count = sum(1 for lang_termbase in self.termbase.values() if source_term in lang_termbase)
 
         reply = QMessageBox.question(
             self,
             "Remove Term",
-            f"Remove '{source_term}' from {term_count} language(s)?\n\n"
-            "This action cannot be undone.",
+            f"Remove '{source_term}' from {term_count} language(s)?\n\nThis action cannot be undone.",
             QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
             QMessageBox.No,  # type: ignore[attr-defined]
         )
@@ -363,7 +359,7 @@ class AddTermDialog(QDialog):
         super().__init__(parent)
         self.languages = languages
         self.source_term = ""
-        self.translations: Dict[str, QLineEdit] = {}
+        self.translations: dict[str, QLineEdit] = {}
         self.setup_ui()
         self.connect_signals()
 
@@ -426,12 +422,10 @@ class AddTermDialog(QDialog):
             bool(source_term) and has_translations
         )
 
-    def get_data(self) -> Tuple[str, dict]:
+    def get_data(self) -> tuple[str, dict]:
         """Get the entered data."""
         source_term = self.source_input.text().strip()
-        translations = {
-            language: self.translations[language].text().strip() for language in self.languages
-        }
+        translations = {language: self.translations[language].text().strip() for language in self.languages}
         return source_term, translations
 
 
@@ -448,7 +442,7 @@ class EditTermDialog(QDialog):
         super().__init__(parent)
         self.source_term = source_term
         self.languages = languages
-        self.translations: Dict[str, QLineEdit] = {}
+        self.translations: dict[str, QLineEdit] = {}
         self.setup_ui()
         self.populate_data(current_translations)
         self.connect_signals()

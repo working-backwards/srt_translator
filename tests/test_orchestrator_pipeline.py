@@ -175,17 +175,11 @@ class TestOrchestratorPipeline:
         assert len(paths) == 4
 
         # Check that HTML generation is logged only once
-        html_logs = [
-            record.message for record in caplog.records if "eval_report.html" in record.message
-        ]
-        assert len(html_logs) == 1, (
-            f"Expected 1 HTML generation log, got {len(html_logs)}: {html_logs}"
-        )
+        html_logs = [record.message for record in caplog.records if "eval_report.html" in record.message]
+        assert len(html_logs) == 1, f"Expected 1 HTML generation log, got {len(html_logs)}: {html_logs}"
 
         # Check that MD generation is logged only once
-        md_logs = [
-            record.message for record in caplog.records if "eval_report.md" in record.message
-        ]
+        md_logs = [record.message for record in caplog.records if "eval_report.md" in record.message]
         assert len(md_logs) == 1, f"Expected 1 MD generation log, got {len(md_logs)}: {md_logs}"
 
     def test_emit_all_reports_fails_fast_on_missing_ai_config(self, tmp_path):
@@ -303,7 +297,7 @@ class TestOrchestratorPipeline:
         paths = emit_all_reports(artifacts_dir, rollup)
 
         # Load and verify report_v1.json
-        with open(paths["report_v1_json"], "r", encoding="utf-8") as f:
+        with open(paths["report_v1_json"], encoding="utf-8") as f:
             report_v1 = json.load(f)
 
         # Test structure (according to rulebook)

@@ -196,7 +196,7 @@ def test_compiler_passes_through_context():
         report_v1_path = compile_report(artifacts_dir)
 
         # Load and verify context was passed through
-        with open(report_v1_path, "r", encoding="utf-8") as f:
+        with open(report_v1_path, encoding="utf-8") as f:
             report_v1 = json.load(f)
 
         # Check that context is in the punch list

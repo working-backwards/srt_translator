@@ -7,7 +7,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Literal
 
 from srt_translator.config import load_evaluation_rubric
 
@@ -48,7 +48,7 @@ def is_numbers_or_punct_only(text: str) -> bool:
     return bool(re.fullmatch(r"[\s\W\d]+", t))
 
 
-def extract_numbers(text: str) -> List[str]:
+def extract_numbers(text: str) -> list[str]:
     """Extract number tokens (Latin & Arabic-Indic digits)."""
     if not text:
         return []
@@ -66,7 +66,7 @@ def has_discourse_marker(lang: str, text: str) -> bool:
     return any(norm.startswith(m) or f" {m} " in f" {norm} " for m in markers)
 
 
-def termbase_hit_in_text(tb_map: Dict[str, str], text: str) -> bool:
+def termbase_hit_in_text(tb_map: dict[str, str], text: str) -> bool:
     """
     Termbase presence: True if ANY target-side term appears in `text`, allowing
     trailing punctuation (e.g., 'OKRs?' matches 'OKRs'). Uses word-ish boundaries.
@@ -101,12 +101,10 @@ def _parse_time(t: str) -> int:
     return (int(hh) * 3600 + int(mm) * 60 + int(ss)) * 1000 + int(ms)
 
 
-def parse_srt(path: Path) -> List[Cue]:
-    txt = (
-        path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
-    )
+def parse_srt(path: Path) -> list[Cue]:
+    txt = path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
     blocks = re.split(r"\n\s*\n", txt)
-    cues: List[Cue] = []
+    cues: list[Cue] = []
     expected_idx = 1
     for b in blocks:
         b = b.strip()
@@ -140,7 +138,7 @@ def cps_for_cue(c: Cue) -> float:
     return len(c.text.replace("\n", "")) / dur_s
 
 
-def percentile(values: List[float], p: float) -> float:
+def percentile(values: list[float], p: float) -> float:
     if not values:
         return 0.0
     v = sorted(values)
@@ -156,13 +154,13 @@ def _nfkc_lower(s: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s or "")).strip().lower()
 
 
-def median_expansion_ratio(source_after_dnt: List[str], target_norm: List[str]) -> float:
+def median_expansion_ratio(source_after_dnt: list[str], target_norm: list[str]) -> float:
     """
     Robust expansion ratio R = median(len(target)/len(source_after_dnt))
     over cues where both sides are non-empty.
     """
-    vals: List[float] = []
-    for s, t in zip(source_after_dnt, target_norm):
+    vals: list[float] = []
+    for s, t in zip(source_after_dnt, target_norm, strict=False):
         if not s or not t:
             continue
         vals.append(len(t) / max(1, len(s)))
@@ -180,12 +178,12 @@ def classify_empty_target_rollup(
     *,
     lang: str,
     cue_index: int,
-    source_cues: List[Cue],
-    target_cues: List[Cue],
-    do_not_translate_terms: List[str],
-    termbase_map_for_lang: Dict[str, str],
+    source_cues: list[Cue],
+    target_cues: list[Cue],
+    do_not_translate_terms: list[str],
+    termbase_map_for_lang: dict[str, str],
     length_ratio_alpha: float = 0.8,
-) -> Tuple[RollupClass, str]:
+) -> tuple[RollupClass, str]:
     """
     Classify a normalized-empty target cue as:
       - BENIGN_ROLLUP: sufficient neighbor length + at least one evidence signal
@@ -199,11 +197,7 @@ def classify_empty_target_rollup(
 
     # Simple guard to align with runner: if either neighbor is non-empty, treat as roll-up.
     prev_norm = normalize_for_empty_check(target_cues[i - 1].text or "") if i > 0 else ""
-    next_norm = (
-        normalize_for_empty_check(target_cues[i + 1].text or "")
-        if (i + 1) < len(target_cues)
-        else ""
-    )
+    next_norm = normalize_for_empty_check(target_cues[i + 1].text or "") if (i + 1) < len(target_cues) else ""
     if prev_norm or next_norm:
         return "BENIGN_ROLLUP", "neighbor non-empty (simple guard)"
 
@@ -236,7 +230,7 @@ def classify_empty_target_rollup(
         return "MISSING", "no non-empty neighbors"
 
     # Evidence signals
-    evidence: List[str] = []
+    evidence: list[str] = []
     if has_discourse_marker(lang, source_cues[i].text or "") and has_discourse_marker(
         lang, target_cues[neighbor].text or ""
     ):
@@ -265,7 +259,7 @@ def classify_empty_target_rollup(
 # ---------- DNT / TB helpers ----------
 
 
-def strip_terms(text: str, terms: List[str]) -> str:
+def strip_terms(text: str, terms: list[str]) -> str:
     """
     Boundary-aware, case-insensitive removal of DNT terms from text
     to assess "what remains to be translated".
@@ -280,7 +274,7 @@ def strip_terms(text: str, terms: List[str]) -> str:
     return re.sub(r"\s+", " ", out).strip()
 
 
-def _occurrences(cues: List[Cue], term: str) -> List[int]:
+def _occurrences(cues: list[Cue], term: str) -> list[int]:
     norm = _nfkc_lower(term)
     base = re.escape(norm).replace(r"\ ", r"[ \-]?")
     poss = r"(?:'s|'s|s')?"
@@ -288,7 +282,7 @@ def _occurrences(cues: List[Cue], term: str) -> List[int]:
     return [c.index for c in cues if pat.search(_nfkc_lower(c.text))]
 
 
-def _localized_hits(cues: List[Cue], localized: str) -> List[int]:
+def _localized_hits(cues: list[Cue], localized: str) -> list[int]:
     pat = re.compile(re.escape(localized))
     return [c.index for c in cues if pat.search(c.text)]
 
@@ -296,7 +290,7 @@ def _localized_hits(cues: List[Cue], localized: str) -> List[int]:
 # ---------- Fragments global policy ----------
 
 
-def _load_frag_cfg(project_root: Path) -> Dict[str, Any]:
+def _load_frag_cfg(_project_root: Path) -> dict[str, Any]:
     cfg = {"mode": "auto_non_latin", "min_ascii_run": 6}
     # Always use packaged rubric; keep behavior stable across build modes.
     rubric = load_evaluation_rubric()
@@ -310,7 +304,7 @@ def _load_frag_cfg(project_root: Path) -> Dict[str, Any]:
     return cfg
 
 
-def _target_is_non_latin(cues: List[Cue]) -> bool:
+def _target_is_non_latin(cues: list[Cue]) -> bool:
     """
     Heuristic: if majority of letters are outside Basic Latin, treat as non-Latin script.
     """
@@ -381,7 +375,7 @@ def evaluate_pair(
     # --- Timing deltas ---
     cue_count = min(len(source_cues), len(target_cues))
     timing_delta_start_ms, timing_delta_end_ms = [], []
-    timing_rows: List[List[Any]] = []
+    timing_rows: list[list[Any]] = []
     for cue_idx in range(cue_count):
         delta_start_ms = target_cues[cue_idx].start_ms - source_cues[cue_idx].start_ms
         delta_end_ms = target_cues[cue_idx].end_ms - source_cues[cue_idx].end_ms
@@ -417,7 +411,7 @@ def evaluate_pair(
 
     # --- CPS distribution ---
     cps_values, over_soft_count, over_hard_count = [], 0, 0
-    cps_rows: List[List[Any]] = []
+    cps_rows: list[list[Any]] = []
     for cue in target_cues:
         cps = cps_for_cue(cue)
         cps_values.append(cps)
@@ -439,7 +433,7 @@ def evaluate_pair(
         w.writerows(cps_rows)
 
     # --- DNT coverage (always write CSV, even empty) ---
-    dnt_rows: List[List[Any]] = []
+    dnt_rows: list[list[Any]] = []
     if dnt_terms:
         source_occurrence_cache = {}  # small cache to avoid re-scanning
         for term in dnt_terms:
@@ -459,9 +453,7 @@ def evaluate_pair(
                     term_hits[:3],
                 ]
             )
-    with (out_dir / f"dnt_coverage_{lang}_{batch}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as f:
+    with (out_dir / f"dnt_coverage_{lang}_{batch}.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [
@@ -476,7 +468,7 @@ def evaluate_pair(
         w.writerows(dnt_rows)
 
     # --- Termbase coverage (always write CSV, even empty) ---
-    tb_rows: List[List[Any]] = []
+    tb_rows: list[list[Any]] = []
     if tb_map:
         source_occurrence_cache = {}
         for key, loc in tb_map.items():
@@ -518,9 +510,7 @@ def evaluate_pair(
     frag_cfg = _load_frag_cfg(proj_root)
     mode = frag_cfg.get("mode", "auto_non_latin")
     min_run = int(frag_cfg.get("min_ascii_run", 6))
-    emit_frags = (mode == "always") or (
-        mode == "auto_non_latin" and _target_is_non_latin(target_cues)
-    )
+    emit_frags = (mode == "always") or (mode == "auto_non_latin" and _target_is_non_latin(target_cues))
 
     for cue_idx in range(cue_count):
         if emit_frags:
@@ -538,9 +528,7 @@ def evaluate_pair(
 
     # Fragments: only emit when rubric says so AND there is at least one row
     if should_emit_fragments(lang, {"fragments": {"mode": mode}}, len(source_fragment_rows)):
-        with (out_dir / f"source_fragments_{lang}_{batch}.csv").open(
-            "w", encoding="utf-8", newline=""
-        ) as f:
+        with (out_dir / f"source_fragments_{lang}_{batch}.csv").open("w", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
             w.writerow(["cue", "index", "target_text", "snippet"])
             w.writerows(source_fragment_rows)
@@ -556,7 +544,7 @@ def evaluate_pair(
     med_de = percentile(end_floats, 0.5)
     p95_de = percentile(end_floats, 0.95)
 
-    fail_reasons: List[str] = []
+    fail_reasons: list[str] = []
     if len(source_cues) != len(target_cues):
         fail_reasons.append(f"Cue parity mismatch: src={len(source_cues)} tgt={len(target_cues)}")
     if med_ds > 200 or med_de > 200 or p95_ds > 500 or p95_de > 500:

@@ -5,7 +5,6 @@ SRT parser for the SRT Translator.
 
 import logging
 import os
-from typing import List
 
 import srt
 
@@ -22,7 +21,7 @@ class SRTParser:
     """
 
     @staticmethod
-    def parse_file(filepath: str) -> List[srt.Subtitle]:
+    def parse_file(filepath: str) -> list[srt.Subtitle]:
         """
         Parse an SRT file into a list of srt.Subtitle objects.
 
@@ -44,18 +43,18 @@ class SRTParser:
 
         for enc in encodings:
             try:
-                with open(filepath, "r", encoding=enc) as file:
+                with open(filepath, encoding=enc) as file:
                     content = file.read()
                 break  # Successfully read with this encoding
             except UnicodeDecodeError:
                 # Try next encoding if this one fails
                 continue
             except Exception as e:
-                logger.error(f"Error reading {filepath}: {e}")
+                logger.error("Error reading %s: %s", filepath, e)
                 return []
         else:
             # All encodings failed
-            logger.error(f"Could not decode {filepath} with supported encodings.")
+            logger.error("Could not decode %s with supported encodings.", filepath)
             return []
 
         # Parse the SRT content into subtitle objects
@@ -63,11 +62,11 @@ class SRTParser:
             subtitles = list(srt.parse(content))
             return subtitles
         except Exception as e:
-            logger.error(f"Error parsing SRT content in {filepath}: {e}")
+            logger.error("Error parsing SRT content in %s: %s", filepath, e)
             return []
 
     @staticmethod
-    def write_file(filepath: str, subtitles: List[srt.Subtitle]):
+    def write_file(filepath: str, subtitles: list[srt.Subtitle]):
         """
         Write a list of srt.Subtitle objects to an SRT file.
 
@@ -90,4 +89,4 @@ class SRTParser:
             with open(filepath, "w", encoding="utf-8") as file:
                 file.write(srt_content)
         except Exception as e:
-            logger.error(f"Error writing {filepath}: {e}")
+            logger.error("Error writing %s: %s", filepath, e)

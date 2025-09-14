@@ -3,10 +3,11 @@
 Typed configuration models for SRT Translator.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, TypedDict
+from typing import Any, Literal, TypedDict
 
 
 class LogMode(str, Enum):
@@ -26,16 +27,16 @@ class SummaryDict(TypedDict):
     successes: int
     skipped: int
     errors: int
-    error_details: List[str]
+    error_details: list[str]
     batch_directory: str
 
 
 @dataclass(frozen=True)
 class TranslationConfig:
     # Core translation parameters
-    target_languages: Dict[str, str]  # e.g., {"Spanish": "es", ...}
-    dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]  # target_lang_code -> {canonical_term -> translation}
+    target_languages: dict[str, str]  # e.g., {"Spanish": "es", ...}
+    dnt_terms: list[str]
+    termbase: dict[str, dict[str, str]]  # target_lang_code -> {canonical_term -> translation}
     output_directory: Path
     api_key: str
     model_name: str
@@ -46,11 +47,11 @@ class TranslationConfig:
         "BOUNDED"  # Error handling policy for translation system (BOUNDED for testing)
     )
     # File handling
-    files: Optional[Iterable[Path]] = None
+    files: Iterable[Path] | None = None
     # NEW: optional batch-level source language detection payload
-    source_language: Optional[Dict[str, object]] = None
+    source_language: dict[str, object] | None = None
     # NEW: language policies injected by GUI/CLI loaders
-    language_policies: Optional[Dict[str, Dict[str, Any]]] = None
+    language_policies: dict[str, dict[str, Any]] | None = None
 
     def run(self) -> SummaryDict:
         """Run the translation with this configuration and return summary."""
@@ -65,9 +66,7 @@ class TranslationConfig:
         )
 
     @classmethod
-    def from_raw(
-        cls, raw: Dict[str, Any], mode: Literal["CLI", "GUI"] = "GUI"
-    ) -> "TranslationConfig":
+    def from_raw(cls, raw: dict[str, Any], mode: Literal["CLI", "GUI"] = "GUI") -> "TranslationConfig":
         """Create a TranslationConfig from raw configuration data."""
         errors = []
 

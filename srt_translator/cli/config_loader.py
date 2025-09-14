@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from dotenv import dotenv_values, find_dotenv
 
@@ -22,7 +22,7 @@ DEFAULT_LANGS = {
 }
 
 
-def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
+def _load_language_policies(selected_codes: list[str]) -> dict[str, Any]:
     """Shared loader used by CLI paths; reads from packaged resources."""
     raw = load_language_catalog()
     if "languages" not in raw:
@@ -53,7 +53,7 @@ def _load_language_policies(selected_codes: list[str]) -> Dict[str, Any]:
     return raw  # type: ignore[no-any-return]
 
 
-def collect_cli_raw() -> Dict[str, Any]:
+def collect_cli_raw() -> dict[str, Any]:
     """
     Collect raw configuration for CLI mode.
 
@@ -77,7 +77,7 @@ def collect_cli_raw() -> Dict[str, Any]:
         raise ValueError("OPENAI_API_KEY is required (set via OS env or .env).")
 
     # Load termbase data directly from file
-    termbase_data: Dict[str, Any] = {}
+    termbase_data: dict[str, Any] = {}
     termbase_path: str = env_file.get("TERMBASE_PATH") or "termbase.json"
 
     if not os.path.isabs(termbase_path):
@@ -100,7 +100,7 @@ def collect_cli_raw() -> Dict[str, Any]:
     # Load the actual termbase data
     if os.path.exists(termbase_path):
         try:
-            with open(termbase_path, "r", encoding="utf-8") as f:
+            with open(termbase_path, encoding="utf-8") as f:
                 termbase_data = json.load(f)
         except Exception as e:
             # Log warning but continue with empty termbase
@@ -110,7 +110,7 @@ def collect_cli_raw() -> Dict[str, Any]:
         print(f"Warning: Termbase file not found at {termbase_path}")
 
     # Load per-language policy (batch size, apostrophe flag, cps cap)
-    target_map: Dict[str, str] = {}
+    target_map: dict[str, str] = {}
     try:
         target_langs_str = env_file.get("TARGET_LANGUAGES") or json.dumps(DEFAULT_LANGS)
         target_map = json.loads(target_langs_str)
@@ -118,7 +118,7 @@ def collect_cli_raw() -> Dict[str, Any]:
         print(f"Warning: Failed to parse TARGET_LANGUAGES, using defaults: {e}")
         target_map = DEFAULT_LANGS
 
-    language_policies: Dict[str, Any] = {}
+    language_policies: dict[str, Any] = {}
     try:
         language_policies = _load_language_policies(list(target_map.values()))
     except Exception as e:

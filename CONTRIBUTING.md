@@ -119,12 +119,13 @@ We follow [PEP 8](https://pep8.org/) with some modifications:
 
 ### Automated Formatting
 
-We use several tools to maintain code quality:
-
-```bash
-# Format and lint code
-ruff --fix srt_translator/ tests/
-ruff format srt_translator/ tests/
+- Run Ruff locally (fixes what it can, flags what matters):
+  ```bash
+  ruff check --select E,F,I,B,TID,G,ARG,UP --fix .
+  ```
+  - `G` forbids f-strings/formatting in logger calls.
+  - `ARG` flags unused function parameters (prefix with `_` if required by an interface).
+  - `UP` keeps syntax modern (pyupgrade).
 
 # Type checking
 mypy srt_translator/
@@ -132,7 +133,6 @@ mypy srt_translator/
 # Security scanning
 bandit -r srt_translator/
 safety check --full-report
-```
 
 ### Pre-commit Hooks
 
@@ -146,7 +146,7 @@ pre-commit run --all-files  # Run on all files initially
 
 The pre-commit hooks will automatically:
 - Format code with Ruff
-- Fix linting issues
+- Fix linting issues (including G/ARG/UP rules)
 - Run type checking
 - Scan for security issues (Bandit + Safety)
 - Ensure consistent code quality across all commits
@@ -263,9 +263,7 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 3. **Test thoroughly**:
    ```bash
    pytest
-   black --check srt_translator/ tests/
-   isort --check-only srt_translator/ tests/
-   pylint srt_translator/
+   ruff check --select E,F,I,B,TID,G,ARG,UP --fix .
    ```
 
 4. **Commit your changes** with clear messages

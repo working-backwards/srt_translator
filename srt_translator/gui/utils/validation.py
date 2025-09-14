@@ -4,13 +4,12 @@ Input validation functions for the GUI
 """
 
 import logging
-from typing import Dict, List
 
 from PySide6.QtWidgets import QMessageBox
 
 
 def validate_translation_inputs(
-    api_key: str, selected_files: List[str], target_languages: Dict[str, str]
+    api_key: str, selected_files: list[str], target_languages: dict[str, str]
 ) -> tuple[bool, str]:
     """
     Validate translation inputs
@@ -18,16 +17,16 @@ def validate_translation_inputs(
     Returns:
         tuple: (is_valid, error_message)
     """
-    logging.debug(f"API key loaded: {'Yes' if api_key else 'No'}")
+    logging.debug("API key loaded: %s", "Yes" if api_key else "No")
 
     if not api_key:
         return False, "Please enter your OpenAI API key."
 
-    logging.debug(f"Selected files: {len(selected_files)}")
+    logging.debug("Selected files: %s", len(selected_files))
     if not selected_files:
         return False, "Please select at least one SRT file to translate."
 
-    logging.debug(f"Target languages: {target_languages}")
+    logging.debug("Target languages: %s", target_languages)
     if not target_languages:
         return False, "Please select at least one target language."
 
@@ -47,7 +46,7 @@ def show_translation_results(parent, results: dict):
     output_directory = results.get("output_directory", "translated_srt_files")
 
     logging.info(
-        f"Success count: {success_count} (languages), Error count: {error_count}, Total files: {total_files}"
+        "Success count: %s (languages), Error count: %s, Total files: %s", success_count, error_count, total_files
     )
 
     if error_count == 0:
@@ -61,8 +60,7 @@ def show_translation_results(parent, results: dict):
         QMessageBox.warning(
             parent,
             "Translation Complete with Errors",
-            f"Translated {total_files} files with {error_count} errors.\n\n"
-            f"Check the log output above for details.",
+            f"Translated {total_files} files with {error_count} errors.\n\nCheck the log output above for details.",
         )
 
 

@@ -62,13 +62,18 @@ st-eval = "srt_translator.eval.cli:main"
 
 # Ruff configuration (replaces Black, isort, flake8, pylint)
 [tool.ruff]
-line-length = 100
-target-version = "py39"
+line-length = 120
+target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "TID"]
+select = ["E", "F", "I", "B", "TID", "G", "ARG", "UP"]
 ignore = ["E501"]  # Temporarily ignore line length for v1.0 release
-# E = pycodestyle errors, F = pyflakes, I = isort, B = flake8-bugbear, TID = flake8-tidy-imports
+# E/F = correctness; I = import order; B = bugbear; TID = tidy-imports
+# G = logging-format (ban f-strings/formatting in logger calls)
+# ARG = unused-arguments; UP = pyupgrade (keep syntax modern)
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG001", "ARG002"]  # allow unused args in test fixtures/mocks
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

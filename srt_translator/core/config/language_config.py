@@ -4,14 +4,14 @@ Language configuration for the SRT Translator.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 
 class LanguageConfig:
     """Immutable view over a preloaded languages mapping.
     Core code MUST receive this via DI; it never reads files itself."""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         # Injected languages.json content (nested or flat). No file I/O here.
         self._raw = data or {}
         self._defaults = self._raw.get("policy_defaults", {})
@@ -22,7 +22,7 @@ class LanguageConfig:
         "Return language codes available in the injected policy."
         return list(self._langs.keys())
 
-    def get_all_languages(self) -> Dict[str, Any]:
+    def get_all_languages(self) -> dict[str, Any]:
         """Get all available languages"""
         return self._langs
 
@@ -81,7 +81,7 @@ class LanguageConfig:
                 result[code] = code
         return result
 
-    def get_language_rules(self, code: str) -> Dict[str, Any]:
+    def get_language_rules(self, code: str) -> dict[str, Any]:
         """Get language-specific rules for sentence endings and break markers"""
         languages = self.get_all_languages()
         lang_info = languages.get(code, {})
@@ -183,7 +183,7 @@ class LanguageConfig:
         lang_info = languages.get(code, {})
         return lang_info.get("family", "")
 
-    def get_sentence_endings(self, code: str) -> List[str]:
+    def get_sentence_endings(self, code: str) -> list[str]:
         """Get sentence ending punctuation for a language"""
         languages = self.get_all_languages()
         lang_info = languages.get(code, {})

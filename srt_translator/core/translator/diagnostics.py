@@ -1,6 +1,8 @@
 import re
 from collections import defaultdict
-from typing import TYPE_CHECKING, DefaultDict, List, Optional, Pattern, Sequence, Tuple
+from collections.abc import Sequence
+from re import Pattern
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from srt_translator.core.translator.translator import (
@@ -52,7 +54,7 @@ def build_oversize_probe_question(
     repetitive_loop_detected: bool,
 ) -> str:
     # Format the source items as a numbered list; keep it compact (max ~8 lines typical)
-    src_lines: List[str] = []
+    src_lines: list[str] = []
     for i, s in enumerate(source_items, start=1):
         if s is None:
             continue
@@ -93,7 +95,7 @@ class MalformedProbeBudget:
     """Allow at most one probe per (file, lang)."""
 
     def __init__(self) -> None:
-        self._seen: DefaultDict[Tuple[str, str], int] = defaultdict(int)
+        self._seen: defaultdict[tuple[str, str], int] = defaultdict(int)
 
     def allow(self, file_base: str, lang: str) -> bool:
         key = (file_base, lang)
@@ -112,10 +114,10 @@ def probe_malformed_json_with_translator(
     budget: MalformedProbeBudget,
     file_base: str,
     lang: str,
-    batch_ids: List[int],
+    batch_ids: list[int],
     raw_excerpt: str,
     hint_class: str = "unknown",
-    source_text: Optional[str] = None,
+    source_text: str | None = None,
 ) -> None:
     """Actually ask the AI what went wrong when JSON is malformed. Uses translator's OpenAI client directly."""
     try:
@@ -131,11 +133,7 @@ def probe_malformed_json_with_translator(
         )
 
         # Create the diagnostic probe question for the AI
-        source_content = (
-            source_text
-            if source_text
-            else f"[Source text for {len(batch_ids)} items - not available]"
-        )
+        source_content = source_text if source_text else f"[Source text for {len(batch_ids)} items - not available]"
         probe_question = (
             f"You are a diagnostic AI that analyzes translation failures. "
             f"Explain why the AI translator failed in this specific case.\n\n"
@@ -183,9 +181,7 @@ def probe_malformed_json_with_translator(
 
         # Log the AI's explanation if we got one
         if ai_explanation:
-            translator.logger.info(
-                "AI explanation for malformed JSON: %s", snip(ai_explanation, 400)
-            )
+            translator.logger.info("AI explanation for malformed JSON: %s", snip(ai_explanation, 400))
         else:
             translator.logger.warning("AI probe failed - logging question for manual review")
             translator.logger.info("AI probe question (manual review needed): %s", probe_question)

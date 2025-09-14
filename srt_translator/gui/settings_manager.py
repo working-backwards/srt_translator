@@ -8,7 +8,7 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 from PySide6.QtCore import QSettings
 
@@ -18,11 +18,11 @@ from srt_translator.core.config.language_config import LanguageConfig
 class AIConfigTriple(NamedTuple):
     """Runtime-typed contract for load_ai_config()."""
 
-    dnt_terms: List[str]
-    termbase: Dict[str, Dict[str, str]]
+    dnt_terms: list[str]
+    termbase: dict[str, dict[str, str]]
     # Allow None at the type level for future-proofing, but we currently
     # return {} when not present to avoid breaking existing callers.
-    source_language: Optional[Dict[str, Any]]
+    source_language: dict[str, Any] | None
 
 
 class SettingsManager:
@@ -48,19 +48,19 @@ class SettingsManager:
         """Load last used output directory"""
         return self.settings.value("last_output_directory", "")
 
-    def save_selected_files(self, file_paths: List[str]) -> None:
+    def save_selected_files(self, file_paths: list[str]) -> None:
         """Save list of selected files"""
         self.settings.setValue("selected_files", file_paths)
 
-    def load_selected_files(self) -> List[str]:
+    def load_selected_files(self) -> list[str]:
         """Load list of selected files"""
         return self.settings.value("selected_files", [])
 
     def save_ai_config(
         self,
-        dnt_terms: List[str],
-        termbase: Dict[str, Dict[str, str]],
-        source_language: Optional[Dict[str, object]] = None,
+        dnt_terms: list[str],
+        termbase: dict[str, dict[str, str]],
+        source_language: dict[str, object] | None = None,
     ) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
@@ -118,7 +118,7 @@ class SettingsManager:
         self.settings.remove("ai_config_timestamp")
         self.settings.remove("ai_config_file_hash")
 
-    def get_ai_config_age_days(self) -> Optional[int]:
+    def get_ai_config_age_days(self) -> int | None:
         """Get age of AI configuration in days"""
         timestamp_str = self.settings.value("ai_config_timestamp", "")
         if not timestamp_str:
@@ -140,25 +140,25 @@ class SettingsManager:
         value = self.settings.value("api_key", "")
         return str(value) if value is not None else ""
 
-    def save_target_languages(self, languages: Dict[str, str]) -> None:
+    def save_target_languages(self, languages: dict[str, str]) -> None:
         """Save target languages dictionary"""
         self.settings.setValue("target_languages", languages)
 
     # --- UI compatibility shims (keep SSOT in QSettings) ---
-    def update_target_languages(self, languages: Dict[str, str]) -> None:
+    def update_target_languages(self, languages: dict[str, str]) -> None:
         self.save_target_languages(languages)
 
-    def get_current_target_languages(self) -> Dict[str, str]:
+    def get_current_target_languages(self) -> dict[str, str]:
         return self.load_target_languages()
 
-    def load_target_languages(self) -> Dict[str, str]:
+    def load_target_languages(self) -> dict[str, str]:
         """Load target languages dictionary"""
         value = self.settings.value("target_languages", {})
         if isinstance(value, dict):
             return value
         return {}
 
-    def save_target_languages_from_codes(self, language_codes: List[str]) -> None:
+    def save_target_languages_from_codes(self, language_codes: list[str]) -> None:
         """Save target languages from list of language codes using unified config"""
         languages = {}
         for code in language_codes:
@@ -168,16 +168,16 @@ class SettingsManager:
 
         self.save_target_languages(languages)
 
-    def load_target_language_codes(self) -> List[str]:
+    def load_target_language_codes(self) -> list[str]:
         """Load target languages as list of codes"""
         languages = self.load_target_languages()
         return list(languages.values())
 
-    def get_popular_languages(self) -> List[str]:
+    def get_popular_languages(self) -> list[str]:
         """Get popular languages from unified config"""
         return self.language_config.get_popular_languages()
 
-    def get_adaptive_popular_languages(self) -> List[str]:
+    def get_adaptive_popular_languages(self) -> list[str]:
         """
         Get adaptive popular languages based on user preferences and usage.
 
@@ -206,7 +206,7 @@ class SettingsManager:
         # If user has enough preferences, use them (up to the limit)
         return user_preferences[:popular_limit]
 
-    def save_user_popular_languages(self, language_codes: List[str]) -> None:
+    def save_user_popular_languages(self, language_codes: list[str]) -> None:
         """Save user's preferred popular languages (deduped, capped to limit)"""
         try:
             # Ensure uniqueness while preserving order
@@ -223,7 +223,7 @@ class SettingsManager:
         except Exception as e:
             self.logger.warning("Failed to save user popular languages: %s", e)
 
-    def load_user_popular_languages(self) -> List[str]:
+    def load_user_popular_languages(self) -> list[str]:
         """Load user's preferred popular languages"""
         value = self.settings.value("user_popular_languages", [])
         if isinstance(value, list):
@@ -248,15 +248,15 @@ class SettingsManager:
         self.save_language_usage_data(usage_data)
         self._update_adaptive_popular_languages(usage_data)
 
-    def load_language_usage_data(self) -> Dict[str, Dict]:
+    def load_language_usage_data(self) -> dict[str, dict]:
         """Load language usage tracking data"""
         return self.settings.value("language_usage_data", {})
 
-    def save_language_usage_data(self, usage_data: Dict[str, Dict]) -> None:
+    def save_language_usage_data(self, usage_data: dict[str, dict]) -> None:
         """Save language usage tracking data"""
         self.settings.setValue("language_usage_data", usage_data)
 
-    def _update_adaptive_popular_languages(self, usage_data: Dict[str, Dict]) -> None:
+    def _update_adaptive_popular_languages(self, usage_data: dict[str, dict]) -> None:
         """Update adaptive popular languages based on usage data"""
         # Sort languages by usage count (descending) and then by last used
         # (descending)
@@ -273,7 +273,7 @@ class SettingsManager:
         # Save as user's preferred popular languages (will dedupe/cap)
         self.save_user_popular_languages(top_languages)
 
-    def get_all_languages(self) -> Dict[str, str]:
+    def get_all_languages(self) -> dict[str, str]:
         """Get all available languages from unified config"""
         return self.language_config.get_all_languages()
 

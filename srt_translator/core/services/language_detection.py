@@ -1,5 +1,4 @@
 # srt_translator/core/services/language_detection.py
-from typing import Dict, Optional
 
 
 def detect_source_language(
@@ -7,9 +6,9 @@ def detect_source_language(
     *,
     chat,  # object exposing .chat.completions.create(...)
     model: str,
-    language_config: Optional[object] = None,
+    language_config: object | None = None,
     sample_chars: int = 2000,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     """
     Returns:
       {

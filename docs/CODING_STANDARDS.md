@@ -35,6 +35,19 @@ A `Translator` instance can run **only one file at a time**. Starting a second f
 - **No side logs**: Core code never creates handlers, calls `basicConfig()`, or writes separate log files
 - **Unified logging**: One run log per execution, funneled through the app's logging system
 
+**Must**: parameterized logging only. No f-strings/`.format()` inside `logger.debug/info/warning/error/exception/critical`.
+Examples:
+```python
+# ✅ DO
+logger.info("Wrote eval_report.json: %s", json_path)
+def handle_event(_event, context): ...
+
+# ❌ DON'T
+logger.info(f"Wrote eval_report.json: {json_path}")
+logger.info("Wrote eval_report.json: {}".format(json_path))
+def handle_event(event, context): ...  # event unused
+```
+
 ### Forbidden Patterns in Core Code
 ```python
 # ❌ FORBIDDEN - Fallback to default logger
@@ -77,11 +90,17 @@ def __init__(self, *, logger: logging.Logger, ...):
 - Raise specific exceptions (`FileNotFoundError`, `ValueError`, etc.); avoid bare `Exception`.
 
 ### Strings
-- Prefer f‑strings for general formatting.
-- For logging, use parameterized messages:
+- Prefer **f-strings** for general (non-logging) formatting.
+- For **logging**, use **lazy/parameterized** messages; never f-strings or `.format()`:
   ```python
-  logger.info("Processing %d files", len(files))
+  logger.info("Processing %s files", len(files))
   ```
+  **Forbidden in logger calls**: f-strings, `"..." % x`, and `"...".format(x)`.
+  Prefer structured context via `extra={...}` when useful.
+
+### Function parameters
+- Remove truly unused parameters. If an interface requires an unused parameter, **prefix with `_`**
+  (e.g., `_event`) so static checks pass and intent is clear.
 
 ### Dependencies
 - Prefer the standard library; keep third‑party deps minimal and justified in PRs.

@@ -5,7 +5,6 @@ Handles DNT filtering, hard-preserve detection, and effective DNT building.
 """
 
 import re
-from typing import Dict, List, Tuple
 
 
 def is_numeric_like(text: str) -> bool:
@@ -56,7 +55,7 @@ def is_hard_preserve(text: str) -> bool:
     return False
 
 
-def partition_hard_preserve(terms: List[str]) -> Tuple[List[str], List[str]]:
+def partition_hard_preserve(terms: list[str]) -> tuple[list[str], list[str]]:
     """Partition terms into hard-preserve and soft-preserve categories"""
     hard_preserve = []
     soft_preserve = []
@@ -70,7 +69,7 @@ def partition_hard_preserve(terms: List[str]) -> Tuple[List[str], List[str]]:
     return hard_preserve, soft_preserve
 
 
-def build_effective_dnt(dnt_terms: List[str], termbase: Dict[str, str]) -> List[str]:
+def build_effective_dnt(dnt_terms: list[str], termbase: dict[str, str]) -> list[str]:
     """
     Build effective DNT list with Termbase → DNT precedence.
 
@@ -92,7 +91,7 @@ def build_effective_dnt(dnt_terms: List[str], termbase: Dict[str, str]) -> List[
     return sorted(effective_dnt, key=str.lower)
 
 
-def filter_dnt_terms_with_metadata(dnt_terms: List[str]) -> Tuple[List[str], List[str]]:
+def filter_dnt_terms_with_metadata(dnt_terms: list[str]) -> tuple[list[str], list[str]]:
     """
     Filter DNT terms and return both filtered terms and metadata about what was filtered out.
 

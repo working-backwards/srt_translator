@@ -5,7 +5,6 @@ File Selection Section for the SRT Translator GUI.
 
 import logging
 import os
-from typing import List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -102,7 +101,7 @@ class FileSection(QGroupBox):
         self.file_list.itemSelectionChanged.connect(selection_changed_callback)
         self.browse_output_btn.clicked.connect(browse_output_callback)
 
-    def get_selected_files(self) -> List[str]:
+    def get_selected_files(self) -> list[str]:
         """Get list of currently selected file paths"""
         selected_files = []
         for i in range(self.file_list.count()):
@@ -117,9 +116,9 @@ class FileSection(QGroupBox):
         if file_path not in self.selected_files:
             self.selected_files.append(file_path)
             self.add_file_to_list(file_path)
-            logging.debug(f"Added file to selection: {file_path}")
+            logging.debug("Added file to selection: %s", file_path)
         else:
-            logging.debug(f"File already selected: {file_path}")
+            logging.debug("File already selected: %s", file_path)
 
     def add_file_to_list(self, file_path: str):
         """Add a file to the file list widget"""
@@ -209,7 +208,7 @@ class FileSection(QGroupBox):
             selected_dir = dialog.selectedFiles()[0]
             self.set_output_directory(selected_dir)
             self.settings_manager.save_last_output_directory(selected_dir)
-            logging.debug(f"Selected output directory: {selected_dir}")
+            logging.debug("Selected output directory: %s", selected_dir)
 
     def load_saved_output_directory(self):
         """Load previously saved output directory"""

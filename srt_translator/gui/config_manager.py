@@ -2,7 +2,7 @@
 """Configuration manager for the SRT Translator GUI (no fallbacks)."""
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.gui.settings_manager import SettingsManager
@@ -19,7 +19,7 @@ class GUIConfigManager:
         self.language_config = language_config
         self.logger = logging.getLogger(__name__)
 
-    def get_dnt_terms(self) -> List[str]:
+    def get_dnt_terms(self) -> list[str]:
         """Return DNT terms from AI config if present, else []."""
         result = self.settings_manager.load_ai_config()
         ai_dnt_terms = getattr(result, "dnt_terms", None) or []
@@ -29,10 +29,10 @@ class GUIConfigManager:
             self.logger.debug("No DNT terms provided")
         return ai_dnt_terms
 
-    def get_termbase(self, target_language: str) -> Dict[str, str]:
+    def get_termbase(self, target_language: str) -> dict[str, str]:
         """Return the AI-config termbase for target_language (by name or code), else {}."""
         result = self.settings_manager.load_ai_config()
-        ai_termbase: Dict[str, Dict[str, str]] = getattr(result, "termbase", {}) or {}
+        ai_termbase: dict[str, dict[str, str]] = getattr(result, "termbase", {}) or {}
         if not ai_termbase:
             self.logger.debug("No termbases provided")
             return {}
@@ -44,16 +44,14 @@ class GUIConfigManager:
         try:
             for code, lang_info in self.language_config.get_all_languages().items():
                 if lang_info.get("name") == target_language and code in ai_termbase:
-                    self.logger.info(
-                        "Using AI-generated termbase for %s (code: %s)", target_language, code
-                    )
+                    self.logger.info("Using AI-generated termbase for %s (code: %s)", target_language, code)
                     return ai_termbase[code]
         except Exception as e:
             self.logger.debug("Language mapping lookup failed: %s", e)
         self.logger.debug("No termbase found for %s", target_language)
         return {}
 
-    def get_all_termbases(self) -> Dict[str, Dict[str, str]]:
+    def get_all_termbases(self) -> dict[str, dict[str, str]]:
         """Return all AI-config termbases, else {}."""
         result = self.settings_manager.load_ai_config()
         ai_termbase = getattr(result, "termbase", {}) or {}
@@ -63,9 +61,9 @@ class GUIConfigManager:
             self.logger.debug("No termbases provided")
         return ai_termbase
 
-    def get_config_source_info(self) -> Dict[str, str]:
+    def get_config_source_info(self) -> dict[str, str]:
         """Report whether AI-generated config is present."""
-        info: Dict[str, str] = {}
+        info: dict[str, str] = {}
         result = self.settings_manager.load_ai_config()
         if getattr(result, "dnt_terms", None):
             info["dnt_terms_source"] = "AI Generated"
@@ -73,9 +71,9 @@ class GUIConfigManager:
             info["termbase_source"] = "AI Generated"
         return info
 
-    def validate_ai_config(self) -> Tuple[bool, List[str]]:
+    def validate_ai_config(self) -> tuple[bool, list[str]]:
         """Validate AI config recency and file-coherency only; DNT/termbase are optional."""
-        issues: List[str] = []
+        issues: list[str] = []
         if not self.settings_manager.has_ai_config():
             # It's valid to proceed without AI config for DNT/termbase—report, but don't fail hard.
             return True, ["No AI configuration found"]
@@ -86,7 +84,7 @@ class GUIConfigManager:
             issues.append("Selected files have changed since AI configuration was generated")
         return True, issues
 
-    def get_config_summary(self) -> Dict[str, Any]:
+    def get_config_summary(self) -> dict[str, Any]:
         """Summarize current optional configuration without implying defaults."""
         dnt_terms = self.get_dnt_terms()
         termbases = self.get_all_termbases()

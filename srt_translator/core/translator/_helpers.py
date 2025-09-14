@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from srt_translator.core.translator.models import Subtitle
@@ -19,11 +19,11 @@ if TYPE_CHECKING:
 
 
 def _create_batches_with_logging(
-    self: "SRTTranslator",
-    src_subs: List["Subtitle"],
+    self: SRTTranslator,
+    src_subs: list[Subtitle],
     target_lang: str,
     file_logger: logging.LoggerAdapter,
-) -> Tuple[List[List["Subtitle"]], logging.LoggerAdapter]:
+) -> tuple[list[list[Subtitle]], logging.LoggerAdapter]:
     """Create sentence-aware batches with logging setup."""
     batches = self._create_batches(
         subtitles=src_subs,
@@ -45,12 +45,12 @@ def _create_batches_with_logging(
 
 
 def _translate_batch_and_extract(
-    self: "SRTTranslator",
-    src_items: List[str],
-    batch_ids: List[int],
+    self: SRTTranslator,
+    src_items: list[str],
+    batch_ids: list[int],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
-) -> List[str]:
+) -> list[str]:
     """Translate batch and extract target texts."""
     # Shape-locked translate: one call in the happy path; on mismatch, split halves and retry once.
     try:
@@ -77,15 +77,15 @@ def _translate_batch_and_extract(
 
 
 def _handle_mid_batch_empty_retries(
-    self: "SRTTranslator",
-    batch: List["Subtitle"],
-    tgt_texts: List[str],
+    self: SRTTranslator,
+    batch: list[Subtitle],
+    tgt_texts: list[str],
     target_lang: str,
     batch_logger: logging.LoggerAdapter,
-) -> List[str]:
+) -> list[str]:
     """Handle mid-batch empty translation retries."""
     # Empty guard — single pair-retry for mid-stream empty; no source fallback
-    for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts)):
+    for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=False)):
         if tgt_raw.strip():
             continue
         sid = batch[i].idx

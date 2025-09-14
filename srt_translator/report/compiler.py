@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 
 def compile_report(artifacts_dir: Path) -> Path:
@@ -33,46 +33,38 @@ def compile_report(artifacts_dir: Path) -> Path:
 
     # Load and validate inputs
     try:
-        with open(eval_path, "r", encoding="utf-8") as f:
+        with open(eval_path, encoding="utf-8") as f:
             eval_data = json.load(f)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {eval_path}: {e}") from e
 
     try:
-        with open(ai_path, "r", encoding="utf-8") as f:
+        with open(ai_path, encoding="utf-8") as f:
             ai_data = json.load(f)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {ai_path}: {e}") from e
 
     # Validate v2 format
     if eval_data.get("version") != "2.0.0":
-        raise ValueError(
-            f"Expected eval_report.json version 2.0.0, got: {eval_data.get('version')}"
-        )
+        raise ValueError(f"Expected eval_report.json version 2.0.0, got: {eval_data.get('version')}")
 
     required_eval_keys = {"totals", "per_language"}
     missing_keys = required_eval_keys - set(eval_data.keys())
     if missing_keys:
-        raise ValueError(
-            f"eval_report.json missing required keys: {', '.join(sorted(missing_keys))}"
-        )
+        raise ValueError(f"eval_report.json missing required keys: {', '.join(sorted(missing_keys))}")
 
     # Validate totals structure
     totals = eval_data.get("totals", {})
     required_totals_keys = {"files_total", "languages_total", "issues_total"}
     missing_totals_keys = required_totals_keys - set(totals.keys())
     if missing_totals_keys:
-        raise ValueError(
-            f"eval_report.json totals missing required keys: {', '.join(sorted(missing_totals_keys))}"
-        )
+        raise ValueError(f"eval_report.json totals missing required keys: {', '.join(sorted(missing_totals_keys))}")
 
     # Validate required fields in ai_data
     required_ai_keys = {"dnt_terms", "termbase"}
     missing_ai_keys = required_ai_keys - set(ai_data.keys())
     if missing_ai_keys:
-        raise ValueError(
-            f"ai_config.json missing required keys: {', '.join(sorted(missing_ai_keys))}"
-        )
+        raise ValueError(f"ai_config.json missing required keys: {', '.join(sorted(missing_ai_keys))}")
 
     # Compute totals and status from v2 data
     files_total = totals["files_total"]
@@ -167,7 +159,7 @@ def compile_report(artifacts_dir: Path) -> Path:
     return output_path
 
 
-def _compute_file_status(eval_data: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+def _compute_file_status(eval_data: dict[str, Any]) -> dict[str, dict[str, str]]:
     """Compute per-file status (ready/review/blocked) in format {lang: {file: status}}."""
     file_status = {}
 
@@ -203,7 +195,7 @@ def _compute_file_status(eval_data: Dict[str, Any]) -> Dict[str, Dict[str, str]]
     return file_status
 
 
-def _compute_per_type_counts(eval_data: Dict[str, Any]) -> Dict[str, int]:
+def _compute_per_type_counts(eval_data: dict[str, Any]) -> dict[str, int]:
     """Compute per-type issue counts across all languages and files."""
     per_type = {
         "missing_translation": 0,
@@ -223,7 +215,7 @@ def _compute_per_type_counts(eval_data: Dict[str, Any]) -> Dict[str, int]:
     return per_type
 
 
-def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+def _extract_punch_list(eval_data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """Extract punch list from v2 eval_report.json - transform real details, never fabricate."""
     errors = []
     warnings = []
@@ -234,9 +226,7 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
 
             # Fail fast if issues_detail exists but lacks required structure
             if issues_detail and not isinstance(issues_detail, dict):
-                raise ValueError(
-                    f"issues_detail must be dict, got {type(issues_detail)} for {file_path}"
-                )
+                raise ValueError(f"issues_detail must be dict, got {type(issues_detail)} for {file_path}")
 
             # Process each issue type from real details
             for issue_type, details in issues_detail.items():
@@ -255,9 +245,7 @@ def _extract_punch_list(eval_data: Dict[str, Any]) -> Dict[str, List[Dict[str, A
     return {"errors": errors, "warnings": warnings}
 
 
-def _create_punch_item(
-    lang_code: str, file_path: str, issue_type: str, detail: Dict[str, Any]
-) -> Dict[str, Any]:
+def _create_punch_item(lang_code: str, file_path: str, issue_type: str, detail: dict[str, Any]) -> dict[str, Any]:
     """Create a punch list item from real issue detail."""
 
     # Get cue index (handle both single cues and file-level issues)
@@ -335,7 +323,7 @@ def _create_punch_item(
     }
 
 
-def _extract_lexicons(ai_data: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_lexicons(ai_data: dict[str, Any]) -> dict[str, Any]:
     """Extract lexicon data from ai_config.json."""
     dnt_terms = ai_data.get("dnt_terms", [])
     termbase = ai_data.get("termbase", {})
@@ -365,7 +353,7 @@ def _extract_lexicons(ai_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _enforce_invariants(report_v1: Dict[str, Any]) -> None:
+def _enforce_invariants(report_v1: dict[str, Any]) -> None:
     """Enforce invariants and fail fast if violated."""
     kpis = report_v1["kpis"]
     punch_list = report_v1["punch_list"]
@@ -376,8 +364,7 @@ def _enforce_invariants(report_v1: Dict[str, Any]) -> None:
     computed_total = sum(by_type.values())
     if kpis["issues_total"] != computed_total:
         raise ValueError(
-            f"Invariant violated: issues_total ({kpis['issues_total']}) != "
-            f"sum of by_type counts ({computed_total})"
+            f"Invariant violated: issues_total ({kpis['issues_total']}) != sum of by_type counts ({computed_total})"
         )
 
     # Invariant 2: If errors/warnings > 0, punch_list must not be empty
@@ -385,14 +372,10 @@ def _enforce_invariants(report_v1: Dict[str, Any]) -> None:
     warnings_total = len(punch_list["warnings"])
 
     if errors_total > 0 and len(punch_list["errors"]) == 0:
-        raise ValueError(
-            f"Invariant violated: errors_total ({errors_total}) > 0 but punch_list.errors is empty"
-        )
+        raise ValueError(f"Invariant violated: errors_total ({errors_total}) > 0 but punch_list.errors is empty")
 
     if warnings_total > 0 and len(punch_list["warnings"]) == 0:
-        raise ValueError(
-            f"Invariant violated: warnings_total ({warnings_total}) > 0 but punch_list.warnings is empty"
-        )
+        raise ValueError(f"Invariant violated: warnings_total ({warnings_total}) > 0 but punch_list.warnings is empty")
 
     # Invariant 3: No "unknown" keys in file_status
     for lang_code, files in file_status.items():

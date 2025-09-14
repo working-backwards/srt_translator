@@ -9,17 +9,11 @@ import random
 import re
 import time
 from collections import deque
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from re import Match, Pattern
 from typing import (
     Any,
-    Dict,
-    List,
-    Mapping,
-    Match,
-    Optional,
-    Pattern,
-    Sequence,
-    Set,
     TypeAlias,
     cast,
 )
@@ -100,12 +94,12 @@ def _parse_time_to_seconds(ts: str) -> float:
     return h * 3600 + m_ * 60 + s + ms / 1000.0
 
 
-def parse_srt(text: str) -> List[Subtitle]:
+def parse_srt(text: str) -> list[Subtitle]:
     """
     Parse SRT content into Subtitle objects.
     Handles empty cues correctly by stopping at blank lines or next index.
     """
-    subs: List[Subtitle] = []
+    subs: list[Subtitle] = []
 
     # Split into blocks by double newlines
     blocks = re.split(r"\r?\n\r?\n", text.strip())
@@ -123,9 +117,7 @@ def parse_srt(text: str) -> List[Subtitle]:
             idx = int(lines[0].strip())
 
             # Second line should be timing
-            timing_match = re.match(
-                r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[1]
-            )
+            timing_match = re.match(r"(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})", lines[1])
             if not timing_match:
                 continue
 
@@ -152,7 +144,7 @@ def render_srt(subs: Sequence[Subtitle]) -> str:
     This preserves 1:1 cue parity and timings, allowing the evaluator to
     surface true 'Missing translation' instead of silently shifting indices.
     """
-    parts: List[str] = []
+    parts: list[str] = []
     for i, sub in enumerate(subs, start=1):
         translated = (sub.text or "").strip()
         parts.append(str(i))
@@ -162,7 +154,7 @@ def render_srt(subs: Sequence[Subtitle]) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) -> str:
+def build_termbase_block(termbase: dict[str, dict[str, str]], lang_code: str) -> str:
     lang = lang_code.lower()
     if not termbase or lang not in termbase:
         return "(none)"
@@ -175,17 +167,17 @@ def build_termbase_block(termbase: Dict[str, Dict[str, str]], lang_code: str) ->
 
 
 # DNT placeholder validation helpers
-def _extract_ph_ids(text: str, ph_regex: Pattern[str]) -> Set[str]:
+def _extract_ph_ids(text: str, ph_regex: Pattern[str]) -> set[str]:
     return set(ph_regex.findall(text or ""))
 
 
 def validate_placeholders_pair(
-    src_items: List[str],
-    tgt_items: List[str],
+    src_items: list[str],
+    tgt_items: list[str],
     ph_regex: Pattern[str],
-) -> Dict[int, Dict[str, Set[str]]]:
-    issues: Dict[int, Dict[str, Set[str]]] = {}
-    for i, (src, tgt) in enumerate(zip(src_items, tgt_items)):
+) -> dict[int, dict[str, set[str]]]:
+    issues: dict[int, dict[str, set[str]]] = {}
+    for i, (src, tgt) in enumerate(zip(src_items, tgt_items, strict=False)):
         src_ids = _extract_ph_ids(src, ph_regex)
         tgt_ids = _extract_ph_ids(tgt, ph_regex)
         invented = tgt_ids - src_ids
@@ -195,7 +187,7 @@ def validate_placeholders_pair(
     return issues
 
 
-def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: Pattern[str]) -> str:
+def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pattern[str]) -> str:
     if not invented_ids:
         return text
 
@@ -211,9 +203,9 @@ def strip_invented_placeholders(text: str, invented_ids: Set[str], ph_regex: Pat
 # ---------------------------
 
 
-def _load_and_parse_file(self: "SRTTranslator", input_filepath: str) -> List[Subtitle]:
+def _load_and_parse_file(_self: SRTTranslator, input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
-    with open(input_filepath, "r", encoding="utf-8") as f:
+    with open(input_filepath, encoding="utf-8") as f:
         src_text = f.read()
     src_subs = parse_srt(src_text)
     if not src_subs:
@@ -222,7 +214,7 @@ def _load_and_parse_file(self: "SRTTranslator", input_filepath: str) -> List[Sub
 
 
 def _setup_file_logging(
-    self: "SRTTranslator", input_filepath: str, target_lang: str
+    self: SRTTranslator, input_filepath: str, target_lang: str
 ) -> logging.LoggerAdapter[logging.Logger]:
     """Setup file-scoped logging with file/lang context."""
 
@@ -233,9 +225,7 @@ def _setup_file_logging(
         base_logger = cast(logging.Logger, self.logger)
 
     extra: Mapping[str, object] = {
-        "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")(
-            "run_id", "n/a"
-        ),
+        "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
         "file": os.path.basename(input_filepath),
         "lang": target_lang,
     }
@@ -246,15 +236,15 @@ def _setup_file_logging(
 
 
 def _validate_and_repair_placeholders(
-    self: "SRTTranslator",
-    src_items: List[str],
-    tgt_texts: List[str],
-    batch_ids: List[int],
+    self: SRTTranslator,
+    src_items: list[str],
+    tgt_texts: list[str],
+    batch_ids: list[int],
     batch_logger: LoggerLike,
-) -> List[str]:
+) -> list[str]:
     """Validate and repair placeholder integrity."""
     # Log input/output for troubleshooting placeholder issues
-    for i, (src, tgt) in enumerate(zip(src_items, tgt_texts)):
+    for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
         # Use the regex pattern directly to avoid logging violations
         src_placeholders = PH_RE.findall(src)
         tgt_placeholders = PH_RE.findall(tgt)
@@ -273,18 +263,14 @@ def _validate_and_repair_placeholders(
             )
 
     # Policy-aware placeholder validation for apostrophes after placeholders
-    target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")(
-        "lang", "unknown"
-    )
+    target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
     if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
         # Normalize for detection only: treat "__...__'..." as "__...__"
         norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
-        ph_issues = validate_placeholders_pair(
-            src_items, norm_tgts, self.term_handler.placeholder_regex
-        )
+        ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
         # Once-per-batch debug (observational only)
         seen = False
-        for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+        for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                 batch_logger.debug(
                     "Apostrophe after placeholder observed (allowed for %s, item=%d).",
@@ -294,13 +280,11 @@ def _validate_and_repair_placeholders(
                 seen = True
                 break
     else:
-        ph_issues = validate_placeholders_pair(
-            src_items, tgt_texts, self.term_handler.placeholder_regex
-        )
+        ph_issues = validate_placeholders_pair(src_items, tgt_texts, self.term_handler.placeholder_regex)
         # Stage 1: language-agnostic detector (observational logging only, once per batch)
         seen = False
 
-        for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts)):
+        for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                 batch_logger.debug(
                     "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
@@ -315,7 +299,7 @@ def _validate_and_repair_placeholders(
     # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
     # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
     tgt_texts = self._repair_adjacent_placeholder_drift(
-        src_items=src_items,
+        _src_items=src_items,
         tgt_items=tgt_texts,
         ph_issues=ph_issues,
         batch_ids=batch_ids,
@@ -360,16 +344,16 @@ def _validate_and_repair_placeholders(
 
 
 def _format_and_append_subtitles(
-    self: "SRTTranslator",
-    batch: List[Subtitle],
-    tgt_texts: List[str],
+    _self: SRTTranslator,
+    batch: list[Subtitle],
+    tgt_texts: list[str],
     target_lang: str,
-    cps_cap: Optional[int],
-    file_logger: LoggerLike,
-) -> List[Subtitle]:
+    cps_cap: int | None,
+    _file_logger: LoggerLike,
+) -> list[Subtitle]:
     """Format subtitles with CPS and append to global list."""
     formatted_subs = []
-    for s, tgt in zip(batch, tgt_texts):
+    for s, tgt in zip(batch, tgt_texts, strict=False):
         start_s = _parse_time_to_seconds(s.start)
         end_s = _parse_time_to_seconds(s.end)
         formatted = format_subtitle_text(
@@ -405,8 +389,8 @@ class SRTTranslator:
     def __init__(
         self,
         *,
-        dnt_terms: List[str],
-        termbase: Dict[str, Dict[str, str]],
+        dnt_terms: list[str],
+        termbase: dict[str, dict[str, str]],
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
@@ -455,11 +439,11 @@ class SRTTranslator:
         # One-shot advisory probe budget per (file, lang)
         self._probe_budget = MalformedProbeBudget()
         # Probe budget: only ask the "why was it oversized?" question once per target language
-        self._probe_budget_langs: Set[str] = set()
+        self._probe_budget_langs: set[str] = set()
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
 
-    def _strict_retry_kwargs(self, src_items: list[str]) -> Dict[str, Any]:
+    def _strict_retry_kwargs(self, src_items: list[str]) -> dict[str, Any]:
         """
         Strict decoding for retries: cools repetition and caps length conservatively,
         but guarantees enough budget to close the JSON wrapper even for tiny inputs.
@@ -480,11 +464,11 @@ class SRTTranslator:
     # --- Sentence-aware batching ----------------------------
     def _create_batches(
         self,
-        subtitles: List[Subtitle],
+        subtitles: list[Subtitle],
         target_size: int,
         max_size: int,
         target_lang: str,
-    ) -> List[List[Subtitle]]:
+    ) -> list[list[Subtitle]]:
         """
         Group consecutive subtitles into batches that prefer ending at a natural
         sentence boundary once the target size is reached, without exceeding
@@ -493,8 +477,8 @@ class SRTTranslator:
         if not subtitles:
             return []
 
-        batches: List[List[Subtitle]] = []
-        current: List[Subtitle] = []
+        batches: list[list[Subtitle]] = []
+        current: list[Subtitle] = []
 
         # Pull language-specific rules from the injected language_config, if present.
         # Falls back to a generic set if not available.
@@ -564,10 +548,8 @@ class SRTTranslator:
         )
 
         # 2) Create batches with logging
-        batches, file_logger = _create_batches_with_logging(
-            self, src_subs, target_lang, file_logger
-        )
-        all_tgt_subs: List[Subtitle] = []
+        batches, file_logger = _create_batches_with_logging(self, src_subs, target_lang, file_logger)
+        all_tgt_subs: list[Subtitle] = []
 
         # === Cross-batch pair-retry state ===================================
         # If the *last* cue of a batch returns empty, we cannot repair it inside
@@ -579,16 +561,14 @@ class SRTTranslator:
         # on the next batch. This preserves both invariants:
         #   - 1:1 cue parity with source
         #   - original timings unchanged
-        deferred_tail_retry: Optional[Dict[str, Any]] = None
+        deferred_tail_retry: dict[str, Any] | None = None
 
         # Language CPS cap
         cps_cap = self.language_config.get_cps_cap(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
             # Batch-scoped logger with correlation ids
-            batch_logger = logging.LoggerAdapter(
-                file_logger, {"batch": bi, "ids": [s.idx for s in batch]}
-            )
+            batch_logger = logging.LoggerAdapter(file_logger, {"batch": bi, "ids": [s.idx for s in batch]})
 
             # Handle deferred tail now, pairing with THIS batch's head via shape-lock
             if deferred_tail_retry is not None:
@@ -700,7 +680,7 @@ class SRTTranslator:
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 cps_cap=cps_cap,
-                file_logger=file_logger,
+                _file_logger=file_logger,
             )
             all_tgt_subs.extend(formatted_subs)
 
@@ -728,12 +708,12 @@ class SRTTranslator:
     def _translate_batch_json(
         self,
         *,
-        src_items: List[str],
+        src_items: list[str],
         target_lang: str,
-        termbase: Dict[str, Dict[str, str]],
-        batch_ids: List[int],
+        termbase: dict[str, dict[str, str]],
+        batch_ids: list[int],
         strict: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
         One item per input, same order and ids.
@@ -741,9 +721,7 @@ class SRTTranslator:
         termbase_block = build_termbase_block(termbase, target_lang)
         mapped_target_lang = target_lang
 
-        system_prompt = (
-            "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
-        )
+        system_prompt = "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
         if strict:
             system_prompt += (
                 " Hard constraint: never repeat any single word/syllable/token more than 3 times consecutively;"
@@ -909,7 +887,7 @@ INPUT ITEMS:
 
             # Lightweight degeneracy check per item (advisory; retry paths already exist)
             bad = []
-            for i, (src, out) in enumerate(zip(src_items, norm)):
+            for i, (src, out) in enumerate(zip(src_items, norm, strict=False)):
                 tgt = (out or {}).get("tgt", "")
                 if not tgt:
                     continue
@@ -950,11 +928,7 @@ INPUT ITEMS:
                     len(payload_text),
                     len(content or ""),
                 )
-                hint_class = (
-                    "repetitive_token_loop"
-                    if looks_like_repetitive_loop(content or "")
-                    else "unknown"
-                )
+                hint_class = "repetitive_token_loop" if looks_like_repetitive_loop(content or "") else "unknown"
                 file_base = "?"
                 if isinstance(self.logger, logging.LoggerAdapter):
                     try:
@@ -988,7 +962,7 @@ INPUT ITEMS:
                         (batch_ids[0] if batch_ids else "?"),
                     )
                     fallback_txt = self._translate_single_string_fallback(
-                        src_text=src_items[0],
+                        _src_text=src_items[0],
                         target_lang=target_lang,
                     )
                     wrapped = [{"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}]
@@ -998,11 +972,9 @@ INPUT ITEMS:
 
             # Otherwise, let shape-lock handle it as before.
             self.logger.error("Model did not return JSON; cannot recover without shape lock.")
-            raise RuntimeError(
-                "Translation failed: model did not return valid JSON format"
-            ) from None
+            raise RuntimeError("Translation failed: model did not return valid JSON format") from None
 
-    def _translate_single_string_fallback(self, *, src_text: str, target_lang: str) -> str:
+    def _translate_single_string_fallback(self, *, _src_text: str, target_lang: str) -> str:
         """
         Minimal escape hatch for repeated JSON truncation in size=1 strict retries.
         Returns ONLY a translated string; caller will wrap into JSON.
@@ -1032,20 +1004,18 @@ INPUT ITEMS:
         )
         out = (resp.choices[0].message.content or "").strip()
         # Be defensive about accidental quoting
-        if (out.startswith('"') and out.endswith('"')) or (
-            out.startswith("'") and out.endswith("'")
-        ):
+        if (out.startswith('"') and out.endswith('"')) or (out.startswith("'") and out.endswith("'")):
             out = out[1:-1].strip()
         return out
 
     def _reformat_fix_placeholders(
         self,
         *,
-        src_items: List[str],
-        tgt_items: List[str],
-        ids: List[int],
-        allowed_placeholders: List[str],
-    ) -> Optional[List[str]]:
+        src_items: list[str],
+        tgt_items: list[str],
+        ids: list[int],
+        allowed_placeholders: list[str],
+    ) -> list[str] | None:
         """
         Ask model to remove invented placeholders and restore any missing ones
         that appear in the corresponding source item.
@@ -1101,9 +1071,9 @@ TARGET ITEMS (TO FIX):
     # Removed: no backward compatibility; single cps_cap is required in config.
 
     @staticmethod
-    def _render_items_for_prompt(ids: List[int], texts: List[str]) -> str:
+    def _render_items_for_prompt(ids: list[int], texts: list[str]) -> str:
         rows = []
-        for i, t in zip(ids, texts):
+        for i, t in zip(ids, texts, strict=False):
             # One line per item; escape braces lightly for JSON-mode friendliness
             clean = t.replace("\n", " ").strip()
             rows.append(f"{i}) {clean}")
@@ -1113,12 +1083,12 @@ TARGET ITEMS (TO FIX):
     def _repair_adjacent_placeholder_drift(
         self,
         *,
-        src_items: List[str],
-        tgt_items: List[str],
-        ph_issues: Dict[int, Dict[str, Set[str]]],
-        batch_ids: List[int],
+        _src_items: list[str],
+        tgt_items: list[str],
+        ph_issues: dict[int, dict[str, set[str]]],
+        batch_ids: list[int],
         logger: LoggerLike,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         If item i 'invented' a placeholder that item i+1 'missed', and i+1 is empty,
         the model likely under-ran and merged content forward. Split item i at the
@@ -1185,13 +1155,13 @@ TARGET ITEMS (TO FIX):
     # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
     def _translate_with_simple_shape_lock(
         self,
-        src_items: List[str],
+        src_items: list[str],
         target_lang: str,
-        termbase: Dict[str, Dict[str, str]],
-        batch_ids: List[int],
+        termbase: dict[str, dict[str, str]],
+        batch_ids: list[int],
         logger: LoggerLike,
         strict: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Bounded, iterative shape-lock:
         - Try the full batch once.
@@ -1206,16 +1176,14 @@ TARGET ITEMS (TO FIX):
         if total == 0:
             return []
 
-        results: List[Optional[Dict[str, Any]]] = [None] * total
+        results: list[dict[str, Any] | None] = [None] * total
 
         # Queue holds (start, end, depth, retries)
         work_q: deque[tuple[int, int, int, int]] = deque()
         work_q.append((0, total, 0, 0))
 
         # Guard maximum iterations to ensure termination
-        max_iterations = (
-            total * (self._MAX_SPLIT_DEPTH + 1) * (self._MAX_JSON_RETRIES_PER_SEGMENT + 1) + 10
-        )
+        max_iterations = total * (self._MAX_SPLIT_DEPTH + 1) * (self._MAX_JSON_RETRIES_PER_SEGMENT + 1) + 10
         iterations = 0
 
         while work_q:

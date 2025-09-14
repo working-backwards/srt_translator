@@ -11,7 +11,7 @@ import uuid
 from collections import deque
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
@@ -66,10 +66,10 @@ class TranslationWorker(QObject):
     def __init__(
         self,
         api_key: str,
-        selected_files: List[str],
-        target_languages: Dict[str, str],
-        settings_manager: Optional[Any] = None,
-        output_directory: Optional[str] = None,
+        selected_files: list[str],
+        target_languages: dict[str, str],
+        settings_manager: Any | None = None,
+        output_directory: str | None = None,
     ):
         super().__init__()
         self.api_key = api_key
@@ -103,20 +103,18 @@ class TranslationWorker(QObject):
         return self._stop.is_set()
 
     # === Logging bridge ===
-    def _append_log_to_ui(self, text: str, levelno: int, extra: dict) -> None:
+    def _append_log_to_ui(self, text: str, _levelno: int, _extra: dict) -> None:
         self._throttled_emit(self.progress_updated, text)
 
     def _start_logging_bridge(self) -> None:
         try:
-            self._log_logger, self._log_queue_handler, self._log_listener = (
-                make_gui_logging_pipeline(
-                    logger_name="srt_translator",
-                    name_prefix_filter=("srt_translator",),
-                    append_callback=self._append_log_to_ui,
-                    file_handler=None,  # core already writes logs to file
-                    queue_size=1000,
-                    level=logging.INFO,
-                )
+            self._log_logger, self._log_queue_handler, self._log_listener = make_gui_logging_pipeline(
+                logger_name="srt_translator",
+                name_prefix_filter=("srt_translator",),
+                append_callback=self._append_log_to_ui,
+                file_handler=None,  # core already writes logs to file
+                queue_size=1000,
+                level=logging.INFO,
             )
         except Exception:
             logging.getLogger("srt_translator").exception("Failed to start GUI logging bridge")
@@ -151,9 +149,7 @@ class TranslationWorker(QObject):
         self._start_logging_bridge()
         try:
             # Debug logging for target languages
-            self.logger.info(
-                "TranslationWorker received target_languages: %s", self.target_languages
-            )
+            self.logger.info("TranslationWorker received target_languages: %s", self.target_languages)
             self.logger.info("Number of target languages: %s", len(self.target_languages))
             self.logger.info("Target language names: %s", list(self.target_languages.keys()))
             self.logger.info("Target language codes: %s", list(self.target_languages.values()))
@@ -188,9 +184,7 @@ class TranslationWorker(QObject):
                 # Load language policies for selected target languages
                 lang_policies = {}
                 try:
-                    lang_policies = _load_language_policies(
-                        list((self.target_languages or {}).values())
-                    )
+                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
                 except Exception as e:
                     self.logger.warning("Failed to load language policies, using defaults: %s", e)
                     # Continue with empty policies - will use defaults
@@ -222,9 +216,7 @@ class TranslationWorker(QObject):
                 # Load language policies for selected target languages
                 lang_policies = {}
                 try:
-                    lang_policies = _load_language_policies(
-                        list((self.target_languages or {}).values())
-                    )
+                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
                 except Exception as e:
                     self.logger.warning("Failed to load language policies, using defaults: %s", e)
                     # Continue with empty policies - will use defaults
@@ -306,9 +298,7 @@ class TranslationWorker(QObject):
                         try:
                             self.settings_manager.track_language_usage(code)
                         except Exception as e:
-                            self.logger.warning(
-                                "Failed to track usage for language '%s': %s", code, e
-                            )
+                            self.logger.warning("Failed to track usage for language '%s': %s", code, e)
             except Exception:
                 # Never fail the run due to usage tracking
                 self.logger.exception("Adaptive language usage tracking failed")
@@ -318,9 +308,7 @@ class TranslationWorker(QObject):
                 eval_logger = self.logger.getChild("eval")
 
                 # Prefer an explicit batch root if your translation returns it
-                batch_root = results.get(
-                    "batch_directory"
-                )  # <— add this in your pipeline if possible
+                batch_root = results.get("batch_directory")  # <— add this in your pipeline if possible
                 if batch_root:
                     latest_batch = Path(batch_root)
                 else:
@@ -332,14 +320,10 @@ class TranslationWorker(QObject):
                     else:
                         parent = Path(out_dir)
                         candidates = [
-                            d
-                            for d in parent.iterdir()
-                            if d.is_dir() and d.name.startswith("translation-batch-")
+                            d for d in parent.iterdir() if d.is_dir() and d.name.startswith("translation-batch-")
                         ]
                         # Choose by modification time to avoid lexicographic surprises
-                        latest_batch = (
-                            max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
-                        )
+                        latest_batch = max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
 
                 if latest_batch and latest_batch.exists():
                     self.logger.info("Running evaluation", extra={"batch": latest_batch.name})
@@ -356,9 +340,7 @@ class TranslationWorker(QObject):
 
                         if not ai_config_path.exists():
                             # Fail fast: a single source of truth
-                            raise FileNotFoundError(
-                                f"ai_config.json not found at: {ai_config_path}"
-                            )
+                            raise FileNotFoundError(f"ai_config.json not found at: {ai_config_path}")
 
                         # Call the orchestrator
                         from srt_translator.eval.report import emit_all_reports

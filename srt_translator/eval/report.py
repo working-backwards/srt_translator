@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # v1.0: reporter is JSON-only. No SRT parsing/imports here.
 
@@ -31,7 +31,7 @@ def _render_context_pairs(pairs: list[tuple[int, str]]) -> str:
 # This function is no longer needed since we directly iterate over the languages structure
 
 
-def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path:
+def _write_json_report(batch_root: Path, rollup: dict[str, Any], logger) -> Path:
     """
     Write eval_report.json with strict v2 format.
 
@@ -68,9 +68,7 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
             }
 
     # Calculate totals
-    files_total = sum(
-        len(files) for lang_data in per_language.values() for files in [lang_data["files"]]
-    )
+    files_total = sum(len(files) for lang_data in per_language.values() for files in [lang_data["files"]])
     languages_total = len(per_language)
 
     # Calculate total issues across all files and languages
@@ -113,7 +111,7 @@ def _write_json_report(batch_root: Path, rollup: Dict[str, Any], logger) -> Path
         return json_path
 
     except Exception as e:
-        log.error(f"Failed to build v2 eval_report.json: {e}")
+        log.error("Failed to build v2 eval_report.json: %s", e)
         raise
 
 

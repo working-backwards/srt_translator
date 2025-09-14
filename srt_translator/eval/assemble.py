@@ -1,7 +1,5 @@
 """Assembler to build strict EvalReportV1 from per-language/file counts."""
 
-from typing import Dict
-
 from srt_translator.eval.schema import (
     MISSING,
     TIMING,
@@ -11,9 +9,9 @@ from srt_translator.eval.schema import (
 
 def build_eval_report_v1(
     *,
-    per_language_file_counts: Dict[str, Dict[str, Dict[str, int]]],
+    per_language_file_counts: dict[str, dict[str, dict[str, int]]],
     source_language: str | None,
-) -> Dict:
+) -> dict:
     """
     Returns a dict matching EvalReportV1.
 
@@ -40,9 +38,7 @@ def build_eval_report_v1(
             # Validate types
             for category, count in normalized_counts.items():
                 if not isinstance(count, int):
-                    raise ValueError(
-                        f"Category '{category}' count must be integer, got {type(count).__name__}"
-                    )
+                    raise ValueError(f"Category '{category}' count must be integer, got {type(count).__name__}")
             languages[lang_code]["files"][file_path] = normalized_counts
 
     # Compute totals
