@@ -7,10 +7,15 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 ROOT = Path.cwd()
 ENTRY = str(ROOT / "srt_translator" / "gui" / "app.py")
 
-# Bundle data if present (adjust/remove if you don't use it)
+# Bundle app data needed at runtime:
+#  - Config (languages.json, translation_rubric.yaml)
+#  - HTML presenter assets (eval.css, icons, etc.)
 DATAS = []
-# NEW: collect from the package so dev/wheel/frozen all match
 DATAS.extend(collect_data_files("srt_translator.config", includes=["*.json", "*.yaml"]))
+DATAS.extend(collect_data_files(
+    "srt_translator.presenters.eval_html.assets",
+    includes=["*.css", "*.js", "*.png", "*.svg", "*.ico", "*.jpg", "*.gif", "*.webp"],
+))
 
 # Bring in dynamic packages defensively
 HIDDEN_IMPORTS = []

@@ -17,6 +17,17 @@ def _format_number(value: int | float) -> str:
         return str(value)
 
 
+def _load_eval_css() -> str:
+    """Load CSS from package data; fail soft so HTML still renders if missing."""
+    try:
+        return (importlib.resources.files("srt_translator.presenters.eval_html.assets") / "eval.css").read_text(
+            encoding="utf-8"
+        )
+    except Exception as e:
+        logging.warning("eval_html: missing CSS asset (eval.css); continuing without CSS: %s", e)
+        return ""
+
+
 def _validate_punch_list_context(punch_list: dict) -> None:
     """Validate that punch list items have proper context structure."""
     for category in ["errors", "warnings"]:
@@ -26,9 +37,7 @@ def _validate_punch_list_context(punch_list: dict) -> None:
                 source_context = context.get("source", {})
                 target_context = context.get("target", {})
                 if not source_context.get("cur") and not target_context.get("cur"):
-                    logging.warning(
-                        "Punch list item missing context.cur: %s", item.get("issue_type", "unknown")
-                    )
+                    logging.warning("Punch list item missing context.cur: %s", item.get("issue_type", "unknown"))
 
 
 def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, Any]:
@@ -63,11 +72,7 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
 
     try:
         # Load CSS resource
-        css_text = (
-            importlib.resources.files("srt_translator.presenters.eval_html.assets")
-            .joinpath("eval.css")
-            .read_text(encoding="utf-8")
-        )
+        css_text = _load_eval_css()
 
         # Load and validate report_v1.json with strict schema
         report_data = _load_json_or_raise(
@@ -104,9 +109,7 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
         icon = {"pass": "✅", "review": "⚠️", "fail": "❌"}.get(decision, "⚠️")
 
         # Generate HTML
-        html_content = _generate_html(
-            icon, one_liner, punch_list, file_status, kpis, lexicons, css_text
-        )
+        html_content = _generate_html(icon, one_liner, punch_list, file_status, kpis, lexicons, css_text)
 
         # Write the file
         out_path.write_text(html_content, encoding="utf-8")
@@ -159,16 +162,12 @@ def _generate_html(
         if errors:
             for error in errors:
                 html.append('<div class="punch-item error">')
-                html.append(
-                    f"<h3>{error.get('file', 'Unknown')}: {error.get('type', 'Error')}</h3>"
-                )
+                html.append(f"<h3>{error.get('file', 'Unknown')}: {error.get('type', 'Error')}</h3>")
                 html.append(f"<p><strong>Language:</strong> {error.get('language', 'Unknown')}</p>")
                 if error.get("cue_index") is not None:
                     html.append(f"<p><strong>Cue Index:</strong> {error.get('cue_index')}</p>")
                 html.append(f"<p><strong>Summary:</strong> {error.get('desc', '')}</p>")
-                html.append(
-                    f"<p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>"
-                )
+                html.append(f"<p><strong>Suggested fix:</strong> {error.get('suggested_fix', '')}</p>")
                 # Render context if available
                 context = error.get("context", {})
                 if context:
@@ -199,18 +198,12 @@ def _generate_html(
         if warnings:
             for warning in warnings:
                 html.append('<div class="punch-item warning">')
-                html.append(
-                    f"<h3>{warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}</h3>"
-                )
-                html.append(
-                    f"<p><strong>Language:</strong> {warning.get('language', 'Unknown')}</p>"
-                )
+                html.append(f"<h3>{warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}</h3>")
+                html.append(f"<p><strong>Language:</strong> {warning.get('language', 'Unknown')}</p>")
                 if warning.get("cue_index") is not None:
                     html.append(f"<p><strong>Cue Index:</strong> {warning.get('cue_index')}</p>")
                 html.append(f"<p><strong>Summary:</strong> {warning.get('desc', '')}</p>")
-                html.append(
-                    f"<p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>"
-                )
+                html.append(f"<p><strong>Suggested fix:</strong> {warning.get('suggested_fix', '')}</p>")
                 # Render context if available
                 context = warning.get("context", {})
                 if context:
