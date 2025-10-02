@@ -53,6 +53,10 @@ class TermHandler:
         self.termbase = termbase or {}
 
         # Build stable placeholder map once per file/language
+
+        # DOUBT: is order required for the dnt terms?
+        # ISSUES: use set() to easily remove duplicates, and wrap it as list, if order is required use dict or OrderedDict
+
         self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
@@ -97,6 +101,8 @@ class TermHandler:
         Replace DNT terms in `text` with placeholders.
         Longest-first; token-safe; preserves punctuation/spacing.
         """
+        # ISSUES: Also check if the test is present in the dnt terms or not
+
         if not text or not self._patterns:
             return text
 
@@ -115,6 +121,8 @@ class TermHandler:
         """
         Restore placeholders back to original DNT terms in `text`.
         """
+        # ISSUES: Also check if the test is present in the dnt terms or not
+
         if not text or not self.placeholder_map:
             return text
         # Reverse mapping: placeholder -> term

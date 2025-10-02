@@ -22,6 +22,7 @@ class LanguageConfig:
         "Return language codes available in the injected policy."
         return list(self._langs.keys())
 
+    # repeated:  get_language_codes(50)
     def get_all_languages(self) -> dict[str, Any]:
         """Get all available languages"""
         return self._langs
@@ -44,6 +45,7 @@ class LanguageConfig:
         popular = lang_info.get("popular")
         return bool(popular) if popular is not None else False
 
+#this is duplicate which is same as codes method
     def get_language_codes(self) -> list[str]:
         """Get list of all language codes"""
         return list(self.get_all_languages().keys())
@@ -103,14 +105,21 @@ class LanguageConfig:
         """Get the target batch size for a language."""
         languages = self.get_all_languages()
         lang_info = languages.get(code, {})
+        # RECOMMENDATIONS: Both above lines can be comprised to one
         # Check language-specific override first
         if "target_batch_size" in lang_info:
             return int(lang_info["target_batch_size"])
         # Check policy defaults
         if "target_batch_size" in self._defaults:
             return int(self._defaults["target_batch_size"])
+
+        # RECOMMENDATIONS: The above if conditions can be written simply as
+        # `return int(lang_info["target_batch_size"] or self._defaults["target_batch_size"])`
         # Log the error before raising
         self.logger.error("Missing target_batch_size for language %s and no policy default", code)
+
+        # UNWANTED: The ValueError will never be thrown, since at the time of the _load_language_policies call we are
+        # throwing RuntimeException if the "target_batch_size" is missing in the lang config
         raise ValueError(f"Missing target_batch_size for language {code} and no policy default")
 
     def get_max_batch_size(self, code: str) -> int:
@@ -171,6 +180,7 @@ class LanguageConfig:
         # Return as-is for other codes
         return code
 
+# Change from self._config to self._raw to ensure we are reading the original
     def get_family_defaults(self, family: str) -> dict:
         """Get family-level defaults for language configuration"""
         return (self._config.get("family_defaults") or {}).get(family, {})

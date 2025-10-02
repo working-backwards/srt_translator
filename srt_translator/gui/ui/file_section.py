@@ -157,6 +157,7 @@ class FileSection(QGroupBox):
 
         if count == 0:
             self.file_count_label.setText("No files selected")
+            #unwanted elif
         elif count == 1:
             self.file_count_label.setText("1 file selected")
         else:

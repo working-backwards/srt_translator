@@ -11,7 +11,6 @@ import uuid
 from collections import deque
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
@@ -25,6 +24,7 @@ from srt_translator.eval.runner import run_batch_evaluation
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
+from srt_translator.gui.settings_manager import SettingsManager
 
 
 def _load_language_policies(selected_codes: list[str]) -> dict:
@@ -68,7 +68,7 @@ class TranslationWorker(QObject):
         api_key: str,
         selected_files: list[str],
         target_languages: dict[str, str],
-        settings_manager: Any | None = None,
+        settings_manager: SettingsManager | None = None,
         output_directory: str | None = None,
     ):
         super().__init__()
@@ -90,6 +90,7 @@ class TranslationWorker(QObject):
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
         # Logging bridge state
+        # UNUSED: All below 3 variables are not used, can they be removed?
         self._log_listener = None
         self._log_queue_handler = None
         self._log_logger = None
@@ -176,7 +177,10 @@ class TranslationWorker(QObject):
                 f"{len(self.target_languages)} languages",
             )
 
+            # ISSUES: Below if-else can be simplified since only difference is the settings manager config
+            # in the TranslationConfig we can have setters to set the values if the settings manager is non-null
             # Build configuration from GUI settings manager
+
             if self.settings_manager:
                 # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
                 dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
@@ -196,7 +200,7 @@ class TranslationWorker(QObject):
                     target_languages=self.target_languages,
                     dnt_terms=dnt_terms,
                     termbase=termbase,
-                    model_name="gpt-4o-mini",
+                    model_name="gpt-4o-mini",# RECOMMENDATIONS: Add model name to the UI for the user to select
                     aggressiveness=0.75,
                     log_mode="Standard",
                     api_key=self.api_key,
@@ -247,6 +251,10 @@ class TranslationWorker(QObject):
 
             # Run the translation
             # Capture both stdout and logging output
+
+            # ISSUES: There is no need for the _GuiTranslator, since the run method does nothing but call the run method
+            # of the ai_config, it can be made in-line or separate function in this file, doing this can release some
+            # unwanted memory usage
             from srt_translator.api import Translator as _GuiTranslator
 
             # Let the core engine handle its own logging to files

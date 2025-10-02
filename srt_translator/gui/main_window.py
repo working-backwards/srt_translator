@@ -870,6 +870,12 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         event.accept()
 
+    # DOUBT: Why use 30 seconds timeout, when we are doing nothing but increasing the sample, and only do actual handling
+    # on the 5th minute?
+    # DOUBT: What if the memory grows beyond 1000mb and user does not restart, will the application crash in-between?
+    # DOUBT: What happens if application is crashed in middle of translation, will the next translation pick up from where
+    # if was left off?
+
     def _sample_memory(self):
         """Sample memory usage and warn if it grows too much"""
         try:

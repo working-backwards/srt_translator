@@ -64,6 +64,9 @@ class SettingsManager:
     ) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
+        # ISSUES: its better to create variables in the class __init__ function than creating miscellaneous values using
+        # setValue, which will cause the conflicts later in the development
+
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
         self.settings.setValue("ai_source_language", source_language or {})
@@ -89,7 +92,7 @@ class SettingsManager:
             termbase = {}
         if not isinstance(source_language, dict):
             source_language = {}
-
+        # UNWANTED: We can directly return Tuple[length(3)], why create a class for this when the caller function has not requirement for this
         return AIConfigTriple(dnt_terms, termbase, source_language)
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
@@ -173,6 +176,7 @@ class SettingsManager:
         languages = self.load_target_languages()
         return list(languages.values())
 
+#duplicate which is from language_config file
     def get_popular_languages(self) -> list[str]:
         """Get popular languages from unified config"""
         return self.language_config.get_popular_languages()
@@ -202,7 +206,6 @@ class SettingsManager:
             # Fill up to the limit
             additional_languages = remaining_defaults[: popular_limit - len(user_preferences)]
             return user_preferences + additional_languages
-
         # If user has enough preferences, use them (up to the limit)
         return user_preferences[:popular_limit]
 
@@ -273,6 +276,7 @@ class SettingsManager:
         # Save as user's preferred popular languages (will dedupe/cap)
         self.save_user_popular_languages(top_languages)
 
+#duplicate which has in language_config file
     def get_all_languages(self) -> dict[str, str]:
         """Get all available languages from unified config"""
         return self.language_config.get_all_languages()

@@ -566,7 +566,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
         log.info("No termbase provided; continuing without termbase coverage")
     else:
         covered_langs = [lang for lang, entries in termbase.items() if entries]
-        log.debug(f"Termbase coverage: {len(covered_langs)} languages with custom terms")
+        log.debug(f"Termbase  coverage: {len(covered_langs)} languages with custom terms")
 
     rollup: dict[str, Any] = {
         "batch_label": batch_label,

@@ -202,6 +202,7 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
 # Stage 1A Helper Methods (stay in translator.py)
 # ---------------------------
 
+# UNUSED: _self is not needed in the following function, remove it
 
 def _load_and_parse_file(_self: SRTTranslator, input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
@@ -212,6 +213,7 @@ def _load_and_parse_file(_self: SRTTranslator, input_filepath: str) -> list[Subt
         raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
     return src_subs
 
+# ISSUES: Move the function to the class method since it needs the self
 
 def _setup_file_logging(
     self: SRTTranslator, input_filepath: str, target_lang: str
@@ -234,6 +236,7 @@ def _setup_file_logging(
     file_logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(base_logger, extra)
     return file_logger
 
+# ISSUES: Move the function to the class method since it needs the self
 
 def _validate_and_repair_placeholders(
     self: SRTTranslator,

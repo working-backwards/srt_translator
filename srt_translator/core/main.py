@@ -36,6 +36,7 @@ def translate_srt_files(
     Returns:
         SummaryDict: Summary of translation results
     """
+    # ISSUES: logger is always None
     if logger is None:
         logger = logging.getLogger(__name__)
 
@@ -61,6 +62,9 @@ def translate_srt_files(
 
     # Stage 3: the core must not read languages.json directly.
     # Language policy is injected by GUI/CLI loaders via config.language_policies.
+
+    # ISSUES: There is not need initialise any of the above if we are throwing RuntimeError here, since all the above
+    # will remain unused if following condition is true, so move the condition to the top
     if not config.language_policies:
         raise RuntimeError(
             "Missing language_policies in TranslationConfig. "
@@ -69,6 +73,7 @@ def translate_srt_files(
     language_config = LanguageConfig(config.language_policies)
     try:
         num_langs = len(language_config.codes())
+        # ISSUES: Unwanted catch
     except AttributeError:
         # Backward compatibility if codes() is not present
         num_langs = len(getattr(language_config, "_langs", {}) or {})
@@ -78,11 +83,16 @@ def translate_srt_files(
     source_lang = getattr(config, "source_language", None)
     source_code = None
     try:
+        # Instead of checking the instance type, we can check none null here, because the source_lang in config can
+        # be either NoneType or DictType
+
         if isinstance(source_lang, dict):
             source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
     except Exception:
         source_code = None
 
+    # UNWANTED: Too much work done to remove source language from the target languages dictionary, we can use dict.__delitem__(source_code)
+    # method to directly remove the source language from target languages
     if source_code:
         # Compare case-insensitively against requested target codes
         keep = {
@@ -97,6 +107,7 @@ def translate_srt_files(
                 len(config.target_languages) - len(keep),
             )
             config = replace(config, target_languages=keep)
+            # ISSUE: Use none check for source_lang here instead of isinstance check
     if isinstance(source_lang, dict) and source_lang.get("mixed"):
         logger.warning("Detected mixed-language source; proceeding with dominant language.")
 
