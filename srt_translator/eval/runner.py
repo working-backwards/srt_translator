@@ -45,6 +45,7 @@ def _find_originals_dir(batch_root: Path) -> Path | None:
     subs = [d for d in base.iterdir() if d.is_dir()]
     if len(subs) == 1:
         return subs[0]
+
     # DOUBT: What if this subdirectory is empty or contains no .srt files? Should we check its contents?
     if any(x.suffix.lower() == ".srt" for x in base.glob("*.srt")):
         return base
