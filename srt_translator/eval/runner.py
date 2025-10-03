@@ -35,6 +35,7 @@ def _load_rubric() -> dict:
 def _discover_batch_label(batch_root: Path) -> str:
     m = BATCH_RE.search(batch_root.as_posix())
     return m.group(1) if m else batch_root.name
+    # RECOMMENDATIONS: If your system ever allows multiple batch folders in the path (currently it doesn’t), consider using findall() to pick the last one.
 
 
 def _find_originals_dir(batch_root: Path) -> Path | None:
@@ -44,6 +45,7 @@ def _find_originals_dir(batch_root: Path) -> Path | None:
     subs = [d for d in base.iterdir() if d.is_dir()]
     if len(subs) == 1:
         return subs[0]
+    # DOUBT: What if this subdirectory is empty or contains no .srt files? Should we check its contents?
     if any(x.suffix.lower() == ".srt" for x in base.glob("*.srt")):
         return base
     return None
@@ -55,6 +57,7 @@ def _collect_language_dirs(batch_root: Path) -> list[Path]:
         if p.is_dir() and p.name not in ("originals", "artifacts", "config"):
             if any(True for _ in p.rglob("*.srt")):
                 out.append(p)
+                # DOUBT: Should we only include folders that have .srt files directly, not nested inside subfolders?
     return sorted(out)
 
 
@@ -257,7 +260,7 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
     normalized = {
         "version": config.get("version", "unknown"),
         "timestamp": config.get("timestamp", "unknown"),
-        "target_languages": config.get("target_languages", []),
+        "target_languages": config.get("target_languages", []),# RECOMMENDATIONS: Warn if empty
         "dnt_terms": config.get("dnt_terms", []),
         "termbase": {},
     }
@@ -428,6 +431,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
 
     # Use the first (and should be only) log file
     log_file = log_files[0]
+    # DOUBT: What if multiple log files exist? Is it guaranteed that the first one is correct?
 
     # Check if this logger already has a file handler for this log file
     for handler in logger.handlers:
@@ -447,6 +451,7 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         logger.debug(f"Added batch log file handler: {log_file.name}")
+        # RECOMMENDATIONS: You may want to store a reference to file_handler if you plan to remove it later
     except Exception as e:
         logger.warning(f"Failed to add batch log file handler: {e}")
 
@@ -496,6 +501,8 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
     src_lang_info = {}
     if log.isEnabledFor(logging.DEBUG):
         log.debug("language_config type: %s", type(language_config))
+        # UNWANTED: Excessive debug logging
+
     if language_config:
         if log.isEnabledFor(logging.DEBUG):
             try:
@@ -667,6 +674,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
                 # Only warn if the source is non-trivial length.
                 src_norm = normalize_for_empty_check(source_cues[cue_idx].text or "")
                 if len(src_norm) < 12:
+                    # RECOMMENDATION: make "12" configurable instead of hard-coded
                     # Very short source fragments are common in re-segmentation; ignore.
                     continue
 

@@ -132,7 +132,10 @@ Examples:
 
     # Call main function with the configuration
     try:
-        input_dir = raw_config.get("input_directory", "original_captions")
+        # input_dir = raw_config.get("input_directory", "original_captions")
+        BASE_DIR = Path(__file__).resolve().parent.parent.parent  # project root
+        input_dir = Path(raw_config.get("input_directory", "original_captions"))
+        input_dir = BASE_DIR / input_dir
         if not os.path.exists(input_dir):
             logger.error("INPUT_DIRECTORY not found: %s", input_dir)
             return 1
