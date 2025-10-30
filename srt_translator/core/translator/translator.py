@@ -202,9 +202,9 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
 # Stage 1A Helper Methods (stay in translator.py)
 # ---------------------------
 
-# UNUSED: _self is not needed in the following function, remove it
+# UNUSED solved: _self is not needed in the following function, remove it
 
-def _load_and_parse_file(_self: SRTTranslator, input_filepath: str) -> list[Subtitle]:
+def _load_and_parse_file(input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
     with open(input_filepath, encoding="utf-8") as f:
         src_text = f.read()
@@ -213,138 +213,139 @@ def _load_and_parse_file(_self: SRTTranslator, input_filepath: str) -> list[Subt
         raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
     return src_subs
 
-# ISSUES: Move the function to the class method since it needs the self
 
-def _setup_file_logging(
-    self: SRTTranslator, input_filepath: str, target_lang: str
-) -> logging.LoggerAdapter[logging.Logger]:
-    """Setup file-scoped logging with file/lang context."""
+# # ISSUES: Move the function to the class method since it needs the self
+#
+# def _setup_file_logging(
+#     self: SRTTranslator, input_filepath: str, target_lang: str
+# ) -> logging.LoggerAdapter[logging.Logger]:
+#     """Setup file-scoped logging with file/lang context."""
+#
+#     # Ensure we pass a real `logging.Logger` to LoggerAdapter (not a LoggerAdapter / Protocol)
+#     if isinstance(self.logger, logging.LoggerAdapter):
+#         base_logger: logging.Logger = self.logger.logger
+#     else:
+#         base_logger = cast(logging.Logger, self.logger)
+#
+#     extra: Mapping[str, object] = {
+#         "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
+#         "file": os.path.basename(input_filepath),
+#         "lang": target_lang,
+#     }
+#
+#     # Parameterize the adapter so MyPy knows its type argument
+#     file_logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(base_logger, extra)
+#     return file_logger
 
-    # Ensure we pass a real `logging.Logger` to LoggerAdapter (not a LoggerAdapter / Protocol)
-    if isinstance(self.logger, logging.LoggerAdapter):
-        base_logger: logging.Logger = self.logger.logger
-    else:
-        base_logger = cast(logging.Logger, self.logger)
-
-    extra: Mapping[str, object] = {
-        "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
-        "file": os.path.basename(input_filepath),
-        "lang": target_lang,
-    }
-
-    # Parameterize the adapter so MyPy knows its type argument
-    file_logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(base_logger, extra)
-    return file_logger
-
-# ISSUES: Move the function to the class method since it needs the self
-
-def _validate_and_repair_placeholders(
-    self: SRTTranslator,
-    src_items: list[str],
-    tgt_texts: list[str],
-    batch_ids: list[int],
-    batch_logger: LoggerLike,
-) -> list[str]:
-    """Validate and repair placeholder integrity."""
-    # Log input/output for troubleshooting placeholder issues
-    for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
-        # Use the regex pattern directly to avoid logging violations
-        src_placeholders = PH_RE.findall(src)
-        tgt_placeholders = PH_RE.findall(tgt)
-        if src_placeholders or tgt_placeholders:
-            batch_logger.debug(
-                "Placeholder comparison (item=%d):\n"
-                "  Source: %s\n"
-                "  Target: %s\n"
-                "  Source placeholders: %s\n"
-                "  Target placeholders: %s",
-                i,
-                src,
-                tgt,
-                src_placeholders,
-                tgt_placeholders,
-            )
-
-    # Policy-aware placeholder validation for apostrophes after placeholders
-    target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
-    if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
-        # Normalize for detection only: treat "__...__'..." as "__...__"
-        norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
-        ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
-        # Once-per-batch debug (observational only)
-        seen = False
-        for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
-            if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                batch_logger.debug(
-                    "Apostrophe after placeholder observed (allowed for %s, item=%d).",
-                    target_lang,
-                    i,
-                )
-                seen = True
-                break
-    else:
-        ph_issues = validate_placeholders_pair(src_items, tgt_texts, self.term_handler.placeholder_regex)
-        # Stage 1: language-agnostic detector (observational logging only, once per batch)
-        seen = False
-
-        for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
-            if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
-                batch_logger.debug(
-                    "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
-                    i,
-                    target_lang,
-                    snip(s_i),
-                    snip(t_i),
-                )
-                seen = True
-                break
-
-    # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
-    # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
-    tgt_texts = self._repair_adjacent_placeholder_drift(
-        _src_items=src_items,
-        tgt_items=tgt_texts,
-        ph_issues=ph_issues,
-        batch_ids=batch_ids,
-        logger=batch_logger,
-    )
-
-    if ph_issues:
-        for idx, kinds in ph_issues.items():
-            inv = ",".join(sorted(kinds["invented"])) or "-"
-            mis = ",".join(sorted(kinds["missing"])) or "-"
-            batch_logger.warning(
-                "Placeholder check (item=%d): invented=[%s] missing=[%s]",
-                idx,
-                inv,
-                mis,
-            )
-
-        if self.error_policy == "STRICT":
-            fixed = self._reformat_fix_placeholders(
-                src_items=src_items,
-                tgt_items=tgt_texts,
-                ids=batch_ids,
-                allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
-            )
-            if fixed is None:
-                raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
-            tgt_texts = fixed
-        elif self.error_policy in ("BOUNDED", "DEV"):
-            # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
-            for i, kinds in ph_issues.items():
-                if kinds["invented"]:
-                    tgt_texts[i] = strip_invented_placeholders(
-                        tgt_texts[i],
-                        kinds["invented"],
-                        self.term_handler.placeholder_regex,
-                    )
-
-    # Restore DNT placeholders to originals
-    tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
-
-    return tgt_texts
-
+# # ISSUES: Move the function to the class method since it needs the self
+#
+# def _validate_and_repair_placeholders(
+#     self: SRTTranslator,
+#     src_items: list[str],
+#     tgt_texts: list[str],
+#     batch_ids: list[int],
+#     batch_logger: LoggerLike,
+# ) -> list[str]:
+#     """Validate and repair placeholder integrity."""
+#     # Log input/output for troubleshooting placeholder issues
+#     for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
+#         # Use the regex pattern directly to avoid logging violations
+#         src_placeholders = PH_RE.findall(src)
+#         tgt_placeholders = PH_RE.findall(tgt)
+#         if src_placeholders or tgt_placeholders:
+#             batch_logger.debug(
+#                 "Placeholder comparison (item=%d):\n"
+#                 "  Source: %s\n"
+#                 "  Target: %s\n"
+#                 "  Source placeholders: %s\n"
+#                 "  Target placeholders: %s",
+#                 i,
+#                 src,
+#                 tgt,
+#                 src_placeholders,
+#                 tgt_placeholders,
+#             )
+#
+#     # Policy-aware placeholder validation for apostrophes after placeholders
+#     target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
+#     if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
+#         # Normalize for detection only: treat "__...__'..." as "__...__"
+#         norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
+#         ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
+#         # Once-per-batch debug (observational only)
+#         seen = False
+#         for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+#             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+#                 batch_logger.debug(
+#                     "Apostrophe after placeholder observed (allowed for %s, item=%d).",
+#                     target_lang,
+#                     i,
+#                 )
+#                 seen = True
+#                 break
+#     else:
+#         ph_issues = validate_placeholders_pair(src_items, tgt_texts, self.term_handler.placeholder_regex)
+#         # Stage 1: language-agnostic detector (observational logging only, once per batch)
+#         seen = False
+#
+#         for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+#             if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+#                 batch_logger.debug(
+#                     "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
+#                     i,
+#                     target_lang,
+#                     snip(s_i),
+#                     snip(t_i),
+#                 )
+#                 seen = True
+#                 break
+#
+#     # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
+#     # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
+#     tgt_texts = self._repair_adjacent_placeholder_drift(
+#         _src_items=src_items,
+#         tgt_items=tgt_texts,
+#         ph_issues=ph_issues,
+#         batch_ids=batch_ids,
+#         logger=batch_logger,
+#     )
+#
+#     if ph_issues:
+#         for idx, kinds in ph_issues.items():
+#             inv = ",".join(sorted(kinds["invented"])) or "-"
+#             mis = ",".join(sorted(kinds["missing"])) or "-"
+#             batch_logger.warning(
+#                 "Placeholder check (item=%d): invented=[%s] missing=[%s]",
+#                 idx,
+#                 inv,
+#                 mis,
+#             )
+#
+#         if self.error_policy == "STRICT":
+#             fixed = self._reformat_fix_placeholders(
+#                 src_items=src_items,
+#                 tgt_items=tgt_texts,
+#                 ids=batch_ids,
+#                 allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
+#             )
+#             if fixed is None:
+#                 raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
+#             tgt_texts = fixed
+#         elif self.error_policy in ("BOUNDED", "DEV"):
+#             # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
+#             for i, kinds in ph_issues.items():
+#                 if kinds["invented"]:
+#                     tgt_texts[i] = strip_invented_placeholders(
+#                         tgt_texts[i],
+#                         kinds["invented"],
+#                         self.term_handler.placeholder_regex,
+#                     )
+#
+#     # Restore DNT placeholders to originals
+#     tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
+#
+#     return tgt_texts
+#
 
 def _format_and_append_subtitles(
     _self: SRTTranslator,
@@ -464,6 +465,138 @@ class SRTTranslator:
             "stop": ["]}"],
         }
 
+    # ISSUES solved: Move the function to the class method since it needs the self
+
+    def _setup_file_logging(
+            self: SRTTranslator, input_filepath: str, target_lang: str
+    ) -> logging.LoggerAdapter[logging.Logger]:
+        """Setup file-scoped logging with file/lang context."""
+
+        # Ensure we pass a real `logging.Logger` to LoggerAdapter (not a LoggerAdapter / Protocol)
+        if isinstance(self.logger, logging.LoggerAdapter):
+            base_logger: logging.Logger = self.logger.logger
+        else:
+            base_logger = cast(logging.Logger, self.logger)
+
+        extra: Mapping[str, object] = {
+            "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
+            "file": os.path.basename(input_filepath),
+            "lang": target_lang,
+        }
+
+        # Parameterize the adapter so MyPy knows its type argument
+        file_logger: logging.LoggerAdapter[logging.Logger] = logging.LoggerAdapter(base_logger, extra)
+        return file_logger
+
+    # ISSUES: Move the function to the class method since it needs the self
+
+    def _validate_and_repair_placeholders(
+            self: SRTTranslator,
+            src_items: list[str],
+            tgt_texts: list[str],
+            batch_ids: list[int],
+            batch_logger: LoggerLike,
+    ) -> list[str]:
+        """Validate and repair placeholder integrity."""
+        # Log input/output for troubleshooting placeholder issues
+        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
+            # Use the regex pattern directly to avoid logging violations
+            src_placeholders = PH_RE.findall(src)
+            tgt_placeholders = PH_RE.findall(tgt)
+            if src_placeholders or tgt_placeholders:
+                batch_logger.debug(
+                    "Placeholder comparison (item=%d):\n"
+                    "  Source: %s\n"
+                    "  Target: %s\n"
+                    "  Source placeholders: %s\n"
+                    "  Target placeholders: %s",
+                    i,
+                    src,
+                    tgt,
+                    src_placeholders,
+                    tgt_placeholders,
+                )
+
+        # Policy-aware placeholder validation for apostrophes after placeholders
+        target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
+        if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
+            # Normalize for detection only: treat "__...__'..." as "__...__"
+            norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
+            ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
+            # Once-per-batch debug (observational only)
+            seen = False
+            for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+                if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                    batch_logger.debug(
+                        "Apostrophe after placeholder observed (allowed for %s, item=%d).",
+                        target_lang,
+                        i,
+                    )
+                    seen = True
+                    break
+        else:
+            ph_issues = validate_placeholders_pair(src_items, tgt_texts, self.term_handler.placeholder_regex)
+            # Stage 1: language-agnostic detector (observational logging only, once per batch)
+            seen = False
+
+            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+                if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
+                    batch_logger.debug(
+                        "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
+                        i,
+                        target_lang,
+                        snip(s_i),
+                        snip(t_i),
+                    )
+                    seen = True
+                    break
+
+        # Run drift repair BEFORE mutating targets (e.g., before stripping invented tokens),
+        # so we can split on the actual placeholder token (e.g., __DNT_TERM_12__).
+        tgt_texts = self._repair_adjacent_placeholder_drift(
+            _src_items=src_items,
+            tgt_items=tgt_texts,
+            ph_issues=ph_issues,
+            batch_ids=batch_ids,
+            logger=batch_logger,
+        )
+
+        if ph_issues:
+            for idx, kinds in ph_issues.items():
+                inv = ",".join(sorted(kinds["invented"])) or "-"
+                mis = ",".join(sorted(kinds["missing"])) or "-"
+                batch_logger.warning(
+                    "Placeholder check (item=%d): invented=[%s] missing=[%s]",
+                    idx,
+                    inv,
+                    mis,
+                )
+
+            if self.error_policy == "STRICT":
+                fixed = self._reformat_fix_placeholders(
+                    src_items=src_items,
+                    tgt_items=tgt_texts,
+                    ids=batch_ids,
+                    allowed_placeholders=sorted(self.term_handler.placeholder_map.keys()),
+                )
+                if fixed is None:
+                    raise RuntimeError("Reformat failed: phantom/missing placeholders unresolved.")
+                tgt_texts = fixed
+            elif self.error_policy in ("BOUNDED", "DEV"):
+                # After repair, remove any remaining invented tokens; warn about missing but do not invent content.
+                for i, kinds in ph_issues.items():
+                    if kinds["invented"]:
+                        tgt_texts[i] = strip_invented_placeholders(
+                            tgt_texts[i],
+                            kinds["invented"],
+                            self.term_handler.placeholder_regex,
+                        )
+
+        # Restore DNT placeholders to originals
+        tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
+
+        return tgt_texts
+
     # --- Sentence-aware batching ----------------------------
     def _create_batches(
         self,
@@ -536,7 +669,7 @@ class SRTTranslator:
         self._consecutive_decode_failures = 0
 
         # 1) Setup file logging and load/parse SRT
-        file_logger = _setup_file_logging(self, input_filepath, target_lang)
+        file_logger = self._setup_file_logging( input_filepath, target_lang)
         file_logger.info(
             "Using subtitle-based translation system for %s → %s",
             os.path.basename(input_filepath),
@@ -659,7 +792,7 @@ class SRTTranslator:
                 batch_logger=batch_logger,
             )
 
-            tgt_texts = _validate_and_repair_placeholders(
+            tgt_texts = self._validate_and_repair_placeholders(
                 self,
                 src_items=src_items,
                 tgt_texts=tgt_texts,

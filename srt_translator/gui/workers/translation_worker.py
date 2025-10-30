@@ -181,17 +181,36 @@ class TranslationWorker(QObject):
             # in the TranslationConfig we can have setters to set the values if the settings manager is non-null
             # Build configuration from GUI settings manager
 
-            if self.settings_manager:
-                # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
-                dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
+            # ISSUES solved:Instead of two large if/else blocks, we now only override values when settings_manager exists.
+            dnt_terms, termbase, source_language = [], {}, None
+            # if self.settings_manager:
+            #     # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
+            #     dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
+            #
+            #     # Load language policies for selected target languages
+            #     lang_policies = {}
+            #     try:
+            #         lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+            #     except Exception as e:
+            #         self.logger.warning("Failed to load language policies, using defaults: %s", e)
+            #         # Continue with empty policies - will use defaults
 
-                # Load language policies for selected target languages
-                lang_policies = {}
+            if self.settings_manager:
                 try:
-                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+                    dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
+                    self.logger.info(
+                        "Loaded DNT terms (%d) and termbase (%d) from settings manager.",
+                        len(dnt_terms), len(termbase),
+                    )
                 except Exception as e:
-                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
-                    # Continue with empty policies - will use defaults
+                    self.logger.warning("Failed to load AI config from settings manager: %s", e)
+
+            #  Common logic for both paths
+            try:
+                lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+            except Exception as e:
+                self.logger.warning("Failed to load language policies, using defaults: %s", e)
+                lang_policies = {}
 
                 # Build config from settings manager with actual data
                 api_cfg = TranslationConfig(
@@ -200,7 +219,7 @@ class TranslationWorker(QObject):
                     target_languages=self.target_languages,
                     dnt_terms=dnt_terms,
                     termbase=termbase,
-                    model_name="gpt-4o-mini",# RECOMMENDATIONS: Add model name to the UI for the user to select
+                    model_name="gpt-4o-mini",
                     aggressiveness=0.75,
                     log_mode="Standard",
                     api_key=self.api_key,
@@ -212,59 +231,53 @@ class TranslationWorker(QObject):
                     "Using configuration from settings manager: %s languages",
                     len(api_cfg.target_languages),
                 )
-                self.logger.info("DNT terms loaded: %s", len(api_cfg.dnt_terms))
-                self.logger.info("Termbase languages loaded: %s", len(api_cfg.termbase))
-                if api_cfg.termbase:
-                    self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
-            else:
-                # Load language policies for selected target languages
-                lang_policies = {}
-                try:
-                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
-                except Exception as e:
-                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
-                    # Continue with empty policies - will use defaults
-
-                # Fallback to direct parameters
-                api_cfg = TranslationConfig(
-                    files=[Path(p) for p in self.selected_files],
-                    output_directory=Path(self.output_directory or "translated_srt_files"),
-                    target_languages=self.target_languages,
-                    dnt_terms=[],
-                    termbase={},
-                    model_name="gpt-4o-mini",
-                    aggressiveness=0.75,
-                    log_mode="Standard",
-                    api_key=self.api_key,
-                    mode="GUI",
-                    language_policies=lang_policies,
-                )
-                self.logger.info(
-                    "Using configuration from direct parameters: %s languages",
-                    len(api_cfg.target_languages),
-                )
+            #     self.logger.info("DNT terms loaded: %s", len(api_cfg.dnt_terms))
+            #     self.logger.info("Termbase languages loaded: %s", len(api_cfg.termbase))
+            #     if api_cfg.termbase:
+            #         self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
+            # else:
+            #     # Load language policies for selected target languages
+            #     lang_policies = {}
+            #     try:
+            #         lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+            #     except Exception as e:
+            #         self.logger.warning("Failed to load language policies, using defaults: %s", e)
+            #         # Continue with empty policies - will use defaults
+            #
+            #     # Fallback to direct parameters
+            #     api_cfg = TranslationConfig(
+            #         files=[Path(p) for p in self.selected_files],
+            #         output_directory=Path(self.output_directory or "translated_srt_files"),
+            #         target_languages=self.target_languages,
+            #         dnt_terms=[],
+            #         termbase={},
+            #         model_name="gpt-4o-mini",
+            #         aggressiveness=0.75,
+            #         log_mode="Standard",
+            #         api_key=self.api_key,
+            #         mode="GUI",
+            #         language_policies=lang_policies,
+            #     )
+            #     self.logger.info(
+            #         "Using configuration from direct parameters: %s languages",
+            #         len(api_cfg.target_languages),
+            #     )
 
             # Check for cooperative stop before starting translation
             if self.is_stopped():
                 self.logger.info("Translation stopped by user request")
                 return
 
-            # Run the translation
-            # Capture both stdout and logging output
-
-            # ISSUES: There is no need for the _GuiTranslator, since the run method does nothing but call the run method
-            # of the ai_config, it can be made in-line or separate function in this file, doing this can release some
-            # unwanted memory usage
-            from srt_translator.api import Translator as _GuiTranslator
-
-            # Let the core engine handle its own logging to files
-            # The GUI will display progress through the existing progress signals
-
-            # Capture stdout output
             output = io.StringIO()
             with redirect_stdout(output):
-                # Call translation with configuration object
-                results = _GuiTranslator(api_cfg).run()
+                # from srt_translator.core.main import run_translation_session
+                from srt_translator.api import Translator as _GuiTranslator
+
+                try:
+                  results = _GuiTranslator(api_cfg).run()
+                except Exception as e:
+                    self.logger.error("Translation session failed: %s", e)
+                    raise e
 
             # Remember returned paths for fixer and UI
             self.log_file = results.get("log_file") if results else None
@@ -276,25 +289,75 @@ class TranslationWorker(QObject):
                 return
 
             # Capture any stdout output and chunk it if large
-            stdout_output = output.getvalue()
-            if stdout_output.strip():
-                output_lines = stdout_output.strip().split("\n")
-                if len(output_lines) > 10:
-                    # Chunk large outputs to prevent GUI issues
-                    for i in range(0, len(output_lines), 10):
-                        chunk = output_lines[i : i + 10]
-                        self._throttled_emit(
-                            self.progress_updated,
-                            f"Translation output (part {i // 10 + 1}): " + "\n".join(chunk),
-                        )
-                else:
+            stdout_output = output.getvalue().strip()
+            if stdout_output:
+                output_lines = stdout_output.split("\n")
+                chunk_size = 10
+
+                for i in range(0, len(output_lines), chunk_size):
+                    chunk = output_lines[i: i + chunk_size]
+                    part_num = (i // chunk_size) + 1
                     self._throttled_emit(
                         self.progress_updated,
-                        f"Translation output: {stdout_output.strip()}",
+                        f"Translation output{' (part ' + str(part_num) + ')' if len(output_lines) > chunk_size else ''}: "
+                        + "\n".join(chunk),
                     )
 
             # Store results for potential fixer use
             self.translation_results = results
+
+            # Run the translation
+            # Capture both stdout and logging output
+
+            # ISSUES solved: There is no need for the _GuiTranslator, since the run method does nothing but call the run method
+            # of the ai_config, it can be made in-line or separate function in this file, doing this can release some
+            # unwanted memory usage
+
+            # Let the core engine handle its own logging to files
+            # The GUI will display progress through the existing progress signals
+
+            # Capture stdout output
+            # output = io.StringIO()
+            # with redirect_stdout(output):
+            #     # Call translation with configuration object
+            #     # results = _GuiTranslator(api_cfg).run()
+            #     from srt_translator.core.main import run_translation_session
+            #
+            #     try:
+            #         results = run_translation_session(api_cfg)
+            #     except Exception as e:
+            #         self.logger.error("Translation session failed: %s", e)
+            #         raise e
+            #
+            # # Remember returned paths for fixer and UI
+            # self.log_file = results.get("log_file") if results else None
+            # self.batch_dir = results.get("batch_dir") if results else None
+            #
+            # # Check for cooperative stop before completion
+            # if self.is_stopped():
+            #     self.logger.info("Translation stopped by user request before completion")
+            #     return
+            #
+            # # Capture any stdout output and chunk it if large
+            # stdout_output = output.getvalue()
+            # if stdout_output.strip():
+            #     output_lines = stdout_output.strip().split("\n")
+            #     if len(output_lines) > 10:
+            #         # Chunk large outputs to prevent GUI issues
+            #         for i in range(0, len(output_lines), 10):
+            #             chunk = output_lines[i : i + 10]
+            #             self._throttled_emit(
+            #                 self.progress_updated,
+            #                 f"Translation output (part {i // 10 + 1}): " + "\n".join(chunk),
+            #             )
+            #     else:
+            #         self._throttled_emit(
+            #             self.progress_updated,
+            #             f"Translation output: {stdout_output.strip()}",
+            #         )
+            #
+            # # Store results for potential fixer use
+            # self.translation_results = results
 
             # (Fixer runs in core automatically; nothing to do here)
 

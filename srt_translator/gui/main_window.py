@@ -5,6 +5,7 @@ Main window for the SRT Translator application.
 
 import logging
 import os
+from datetime import time
 from pathlib import Path
 
 import psutil
@@ -882,29 +883,45 @@ class SRTTranslatorMainWindow(QMainWindow):
             rss = self._proc.memory_info().rss
             growth_mb = (rss - self._rss0) / (1024 * 1024)
 
-            # Log memory usage every 5 minutes (10 samples)
-            if hasattr(self, "_mem_sample_count"):
-                self._mem_sample_count += 1
-            else:
-                self._mem_sample_count = 1
+            # # Log memory usage every 5 minutes (10 samples)
+            # if hasattr(self, "_mem_sample_count"):
+            #     self._mem_sample_count += 1
+            # else:
+            #     self._mem_sample_count = 1
+            #
+            # if self._mem_sample_count % 10 == 0:  # Every 5 minutes
+            #     self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
-            if self._mem_sample_count % 10 == 0:  # Every 5 minutes
+            # Track sample timestamp (instead of arbitrary counter)
+            now = time.time()
+            if not hasattr(self, "_last_mem_sample_time"):
+                self._last_mem_sample_time = now
+
+            # Only log every 5 minutes
+            if now - self._last_mem_sample_time >= 300:
+                self._last_mem_sample_time = now
                 self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
-            # Warn if memory growth exceeds 1GB
-            if growth_mb > 1000 and not self._memory_warning_shown:
-                self._memory_warning_shown = True
-                self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
+            # # Warn if memory growth exceeds 1GB
+            # if growth_mb > 1000 and not self._memory_warning_shown:
+            #     self._memory_warning_shown = True
+            #     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
+
+            # === Preventive Mitigation for High Memory ===
+            if growth_mb > 1000:  # Over 1 GB growth
+                 if not getattr(self, "_memory_warning_shown", False):
+                    self._memory_warning_shown = True
+                    self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
                 # Show warning to user
-                QMessageBox.warning(
-                    self,
-                    "High Memory Usage",
-                    f"Memory usage has grown significantly ({growth_mb:.1f} MB).\n"
-                    "Consider restarting the application after completing the current "
-                    "translation.\n\n"
-                    "This helps prevent crashes during long translation sessions.",
-                )
+                    QMessageBox.warning(
+                        self,
+                        "High Memory Usage",
+                        f"Memory usage has grown significantly ({growth_mb:.1f} MB).\n"
+                        "Consider restarting the application after completing the current "
+                        "translation.\n\n"
+                        "This helps prevent crashes during long translation sessions.",
+                    )
         except Exception as e:
             self.logger.error("Error sampling memory: %s", e)
 

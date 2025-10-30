@@ -5,6 +5,7 @@ Term handler for the SRT Translator.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -96,6 +97,12 @@ class TermHandler:
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 
+    def load_dnt_terms(self,file_path: str, lang_code: str) -> list[str]:
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_terms = json.load(f)
+        return all_terms.get(lang_code, [])
+
+
     def apply_dnt_placeholders(self, text: str) -> str:
         """
         Replace DNT terms in `text` with placeholders.
@@ -103,18 +110,29 @@ class TermHandler:
         """
         # ISSUES: Also check if the test is present in the dnt terms or not
 
+        # ISSUES solved: Check presence of term before applying placeholder
         if not text or not self._patterns:
             return text
 
         def _sub_once(s: str, pat: re.Pattern, ph: str) -> str:
             return pat.sub(ph, s)
 
+        # out = text
+        # for pat, term, ph in self._patterns:
+        #     new_out = _sub_once(out, pat, ph)
+        #     if new_out != out:
+        #         self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
+        #         out = new_out
+        # return out
+
         out = text
         for pat, term, ph in self._patterns:
-            new_out = _sub_once(out, pat, ph)
-            if new_out != out:
-                self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
-                out = new_out
+            # Only apply placeholder if the term is in text
+            if term in out:
+                new_out = _sub_once(out, pat, ph)
+                if new_out != out:
+                    self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
+                    out = new_out
         return out
 
     def restore_dnt_placeholders(self, text: str) -> str:
@@ -123,6 +141,7 @@ class TermHandler:
         """
         # ISSUES: Also check if the test is present in the dnt terms or not
 
+        # ISSUES solved: Early return if no placeholders exist
         if not text or not self.placeholder_map:
             return text
         # Reverse mapping: placeholder -> term
