@@ -565,10 +565,6 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
 
     # Log coverage information for optional inputs
     dnt_terms = batch_config.get("dnt_terms", [])
-    if not dnt_terms:
-        log.info("No DNT terms provided; continuing without DNT coverage")
-    else:
-        log.debug(f"DNT terms loaded: {len(dnt_terms)} terms")
 
     termbase = batch_config.get("termbase", {})
     if not termbase:

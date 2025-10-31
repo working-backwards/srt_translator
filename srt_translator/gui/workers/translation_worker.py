@@ -193,7 +193,7 @@ class TranslationWorker(QObject):
                 api_key=self.api_key,
                 mode="GUI",
                 language_policies=lang_policies,
-                dnt_terms=["Thi's"],  # e.g. list of "do-not-translate" terms
+                dnt_terms=None,  # e.g. list of "do-not-translate" terms
                 termbase=None
             )
 
@@ -205,11 +205,16 @@ class TranslationWorker(QObject):
             if self.settings_manager:
                 try:
                     dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
+                    # Defensive normalization
+                    if not isinstance(dnt_terms, list):
+                        dnt_terms = []
+                    if not isinstance(termbase, dict):
+                        termbase = {}
+                    if not isinstance(source_language, dict):
+                        source_language = {}
                     api_cfg.dnt_terms = dnt_terms
                     api_cfg.termbase = termbase
                     api_cfg.source_language = source_language
-                    self.logger.info("DNT terms loaded: %s", len(api_cfg.dnt_terms))
-                    self.logger.info("Termbase languages loaded: %s", len(api_cfg.termbase))
                     if api_cfg.termbase:
                         self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
                 except Exception as e:

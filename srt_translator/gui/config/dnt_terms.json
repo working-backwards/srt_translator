@@ -1,6 +1,8 @@
 {
-  "tr": ["Thi's", "world"],
-  "en": ["Hello", "test"],
+  "ko": ["Amazon"],
+  "en": ["Amazon"],
   "es": ["Thi's", "world"],
-  "en-US": ["Hello", "test"]
+  "en-US": ["GOOGLE"],
+  "ta": ["GOOGLE"]
+
 }
