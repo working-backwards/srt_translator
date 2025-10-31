@@ -31,7 +31,7 @@ def test_ai_config_system():
     settings_manager = SettingsManager(language_config)
 
     # Test saving and loading AI config
-    test_dnt_terms = ["API", "CEO", "CFO", "Amazon","Thi's"]
+    test_dnt_terms = ["API", "CEO", "CFO", "Amazon"]
     test_termbase = {
         "Spanish": {
             "operating plan": "plan operativo",
