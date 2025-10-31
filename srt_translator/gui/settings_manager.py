@@ -8,21 +8,11 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any
 
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
-
-#
-# class AIConfigTriple(NamedTuple):
-#     """Runtime-typed contract for load_ai_config()."""
-#
-#     dnt_terms: list[str]
-#     termbase: dict[str, dict[str, str]]
-#     # Allow None at the type level for future-proofing, but we currently
-#     # return {} when not present to avoid breaking existing callers.
-#     source_language: dict[str, Any] | None
 
 
 class SettingsManager:
@@ -64,9 +54,6 @@ class SettingsManager:
     ) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
-        # ISSUES: its better to create variables in the class __init__ function than creating miscellaneous values using
-        # setValue, which will cause the conflicts later in the development
-
         self.settings.setValue("ai_dnt_terms", dnt_terms)
         self.settings.setValue("ai_termbase", termbase)
         self.settings.setValue("ai_source_language", source_language or {})
@@ -76,28 +63,12 @@ class SettingsManager:
         file_hash = self._calculate_file_hash()
         self.settings.setValue("ai_config_file_hash", file_hash)
 
-    # def load_ai_config(self) -> AIConfigTriple:
-    #     """Load AI-generated configuration as a stable 3-tuple.
-    #     Returns:
-    #         AIConfigTriple(dnt_terms, termbase, source_language)
-    #     """
-    #     dnt_terms = self.settings.value("ai_dnt_terms", [])
-    #     termbase = self.settings.value("ai_termbase", {})
-    #     source_language = self.settings.value("ai_source_language", {})
-    #
-    #     # Defensive normalization: QSettings may hand back unexpected types.
-    #     if not isinstance(dnt_terms, list):
-    #         dnt_terms = []
-    #     if not isinstance(termbase, dict):
-    #         termbase = {}
-    #     if not isinstance(source_language, dict):
-    #         source_language = {}
-    #     # UNWANTED: We can directly return Tuple[length(3)], why create a class for this when the caller function has not requirement for this
-    #     return AIConfigTriple(dnt_terms, termbase, source_language)
-
 
     def load_ai_config(self) -> tuple[list[str], dict[str, dict[str, str]], dict[str, Any]]:
-        """Load AI-generated configuration as a simple tuple (dnt_terms, termbase, source_language)."""
+        """Load AI-generated configuration as a stable 3-tuple.
+        Returns:
+            tuple(dnt_terms, termbase, source_language)
+        """
 
         dnt_terms = self.settings.value("ai_dnt_terms", [])
         termbase = self.settings.value("ai_termbase", {})
@@ -111,7 +82,6 @@ class SettingsManager:
         if not isinstance(source_language, dict):
             source_language = {}
 
-        #  Return tuple directly (removed NamedTuple usage)
         return dnt_terms, termbase, source_language
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
@@ -195,7 +165,6 @@ class SettingsManager:
         languages = self.load_target_languages()
         return list(languages.values())
 
-#duplicate which is from language_config file
     def get_popular_languages(self) -> list[str]:
         """Get popular languages from unified config"""
         return self.language_config.get_popular_languages()
@@ -295,7 +264,6 @@ class SettingsManager:
         # Save as user's preferred popular languages (will dedupe/cap)
         self.save_user_popular_languages(top_languages)
 
-#duplicate which has in language_config file
     def get_all_languages(self) -> dict[str, str]:
         """Get all available languages from unified config"""
         return self.language_config.get_all_languages()

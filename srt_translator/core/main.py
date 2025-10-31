@@ -7,7 +7,7 @@ Provides the core translation functionality for both CLI and GUI interfaces.
 import json
 import logging
 import os
-import shutil
+from dataclasses import replace
 from datetime import datetime
 
 from srt_translator import __version__
@@ -45,8 +45,6 @@ def translate_srt_files(
             "Entry points (GUI/CLI) must load languages.json and inject the policy."
         )
 
-
-    # ISSUES: logger is always None
     #Always logs to file + INFO-level messages appear in log file.
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -75,22 +73,7 @@ def translate_srt_files(
     # Stage 3: the core must not read languages.json directly.
     # Language policy is injected by GUI/CLI loaders via config.language_policies.
 
-    # # ISSUES: There is not need initialise any of the above if we are throwing RuntimeError here, since all the above
-    # # will remain unused if following condition is true, so move the condition to the top
-    # if not config.language_policies:
-    #     raise RuntimeError(
-    #         "Missing language_policies in TranslationConfig. "
-    #         "Entry points (GUI/CLI) must load languages.json and inject the policy."
-    #     )
-
     language_config = LanguageConfig(config.language_policies)
-
-    # try:
-    #     num_langs = len(language_config.codes())
-    #     # ISSUES: Unwanted catch
-    # except AttributeError:
-    #     # Backward compatibility if codes() is not present
-    #     num_langs = len(getattr(language_config, "_langs", {}) or {})
 
     #clear errors if codes() missing.
     num_langs = len(language_config.codes())
@@ -99,51 +82,30 @@ def translate_srt_files(
     # === Same-language guard: drop targets that match detected source ===
     source_lang = getattr(config, "source_language", None)
     source_code = None
-    # try:
-    #     # Instead of checking the instance type, we can check none null here, because the source_lang in config can
-    #     # be either NoneType or DictType
-    #
-    #     if isinstance(source_lang, dict):
-    #         source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
-    # except Exception:
-    #     source_code = None
 
+
+      #RECOMMENDATION solved: Instead of checking the instance type, we can check none null here, because the source_lang in config can
+      # be either NoneType or DictType
 
     if source_lang is not None and isinstance(source_lang, dict):
         source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
 
-    # UNWANTED: Too much work done to remove source language from the target languages dictionary, we can use dict.__delitem__(source_code)
-    # method to directly remove the source language from target languages
-    # if source_code:
-    #     # Compare case-insensitively against requested target codes
-    #     keep = {
-    #         name: code
-    #         for name, code in config.target_languages.items()
-    #         if (code or "").strip().lower() != source_code.lower()
-    #     }
-    #     if len(keep) != len(config.target_languages):
-    #         logger.warning(
-    #             "Dropping target identical to detected source (%s); %s target(s) removed.",
-    #             source_code,
-    #             len(config.target_languages) - len(keep),
-    #         )
-    #         config = replace(config, target_languages=keep)
-
-    # before Created a temporary dict; more CPU/memory.now Direct removal via del, same functional result, cleaner log:
-    if source_code and config.target_languages:
-        to_remove = [k for k, v in config.target_languages.items() if (v or "").strip().lower() == source_code.lower()]
-        for lang in to_remove:
-            del config.target_languages[lang]
-        if to_remove:
+    if source_code:
+        # Compare case-insensitively against requested target codes
+        keep = {
+            name: code
+            for name, code in config.target_languages.items()
+            if (code or "").strip().lower() != source_code.lower()
+        }
+        if len(keep) != len(config.target_languages):
             logger.warning(
-                "Dropping target identical to detected source (%s); %d target(s) removed.",
+                "Dropping target identical to detected source (%s); %s target(s) removed.",
                 source_code,
-                len(to_remove),
+                len(config.target_languages) - len(keep),
             )
+            config = replace(config, target_languages=keep)
 
-     # ISSUE: Use none check for source_lang here instead of isinstance check
-    # if isinstance(source_lang, dict) and source_lang.get("mixed"):
-    #     logger.warning("Detected mixed-language source; proceeding with dominant language.")
+     # ISSUE solved:Use none check for source_lang here instead of isinstance check
 
     if source_lang and isinstance(source_lang, dict) and source_lang.get("mixed"):
         logger.warning("Detected mixed-language source; proceeding with dominant language.")
@@ -221,15 +183,9 @@ def translate_srt_files(
         for _lang_name, lang_code in config.target_languages.items():
            #ai_config.json might show batch sizes for a language that actually failed.After: Manifest now accurately reflects translation batch sizes for all processed languages.
             if lang_code:
-                # try:
-                #     batch_size_for_lang = language_config.get_target_batch_size(lang_code)
-                #     language_batch_sizes[lang_code] = batch_size_for_lang
-                # except Exception:
-                #     language_batch_sizes[lang_code] = 5  # Default batch size
-
-                try:
+              try:
                     language_batch_sizes[lang_code] = language_config.get_target_batch_size(lang_code)
-                except Exception:
+              except Exception:
                     language_batch_sizes[lang_code] = 5
 
 
@@ -263,15 +219,9 @@ def translate_srt_files(
 
     # Copy source files to originals directory for evaluation pairing
     for file_path in file_paths:
-        # try:
-        #     source_filename = os.path.basename(file_path)
-        #     dest_path = os.path.join(originals_dir, source_filename)
-        #     shutil.copy2(file_path, dest_path)
-        #     logger.info("Copied source file to originals: %s", source_filename)
-        # except Exception as e:
-        #     logger.warning("Failed to copy source file %s: %s", file_path, e)
-
         try:
+            import shutil
+
             shutil.copy2(file_path, os.path.join(originals_dir, os.path.basename(file_path)))
             logger.info("Copied source file to originals: %s", os.path.basename(file_path))
         except Exception as e:
@@ -283,17 +233,6 @@ def translate_srt_files(
     # Batch-level artifacts are now handled by the evaluation system
     # The core translation focuses only on translation, not artifact creation
 
-    # # Print summary
-    # logger.info(" === Translation Summary ===")
-    # logger.info("Files processed: %s", len(file_paths))
-    # logger.info("Languages processed: %s", len(config.target_languages))
-    # logger.info("Total translation operations: %s", total_operations)
-    # logger.info("Successful translations: %s", successful_translations)
-    # logger.info("Failed translations: %s", total_operations - successful_translations)
-    # logger.info("==========================")
-    #
-    # # Remove file handler to avoid duplicate logging
-    # logger.removeHandler(file_handler)
 
     # Run SRT fixer (post-eval, batch-wide)
     logger.info("Running SRT fixer (post-eval, batch-wide)...")
@@ -311,10 +250,7 @@ def translate_srt_files(
         logger.info("SRT fixer completed successfully.")
     except Exception as e:
         logger.error("Failed to run SRT fixer: %s", e)
-    # except Exception as e:
-    #     logger.error("Failed to run SRT fixer: %s", e)
-    #
-    # logger.info("SRT fixer completed.")
+
 
     # Print summary,Compact readable summary at end of log.
     logger.info(" === Translation Summary ===")

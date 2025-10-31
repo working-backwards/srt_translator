@@ -23,7 +23,7 @@ def _create_batches_with_logging(
     src_subs: list[Subtitle],
     target_lang: str,
     file_logger: logging.LoggerAdapter,
-) -> tuple[list[list[Subtitle]], logging.LoggerAdapter]:
+) -> list[list[Subtitle]]:
     """Create sentence-aware batches with logging setup."""
     batches = self._create_batches(
         subtitles=src_subs,
@@ -41,7 +41,8 @@ def _create_batches_with_logging(
         self.batch_size,
         self.MAX_BATCH_SIZE,
     )
-    return batches, file_logger
+    #This change just removes redundancy — it’s a refactor, not a functional change.
+    return batches
 
 
 def _translate_batch_and_extract(

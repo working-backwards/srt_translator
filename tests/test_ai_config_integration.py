@@ -5,7 +5,7 @@ import traceback
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
-from srt_translator.gui.settings_manager import AIConfigTriple, SettingsManager
+from srt_translator.gui.settings_manager import SettingsManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -40,9 +40,7 @@ def test_settings_manager():
     logger.info(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages")
 
     # Load AI config (returns 3 values)
-    result = settings_manager.load_ai_config()
-    assert isinstance(result, AIConfigTriple)
-    loaded_terms, loaded_termbase, _ = result
+    loaded_terms, loaded_termbase, loaded_source_lang = settings_manager.load_ai_config()
     logger.info(f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_termbase)} languages")
 
     # Verify data integrity

@@ -35,6 +35,10 @@ original_captions/
 translated_srt_files/
 termbase.json
 
+
+# Ignore GUI-generated output/config files
+srt_translator/srt_translator/gui/config/*
+
 # Build outputs
 release/
 

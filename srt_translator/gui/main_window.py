@@ -717,7 +717,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Start the translation process"""
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
-            self.mem_timer.start(30000)
+            self.mem_timer.start(300000)
 
         # Disable HTML report button when starting new translation
         self.translation_section.open_html_btn.setEnabled(False)
@@ -871,26 +871,11 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         event.accept()
 
-    # DOUBT: Why use 30 seconds timeout, when we are doing nothing but increasing the sample, and only do actual handling
-    # on the 5th minute?
-    # DOUBT: What if the memory grows beyond 1000mb and user does not restart, will the application crash in-between?
-    # DOUBT: What happens if application is crashed in middle of translation, will the next translation pick up from where
-    # if was left off?
-
     def _sample_memory(self):
         """Sample memory usage and warn if it grows too much"""
         try:
             rss = self._proc.memory_info().rss
             growth_mb = (rss - self._rss0) / (1024 * 1024)
-
-            # # Log memory usage every 5 minutes (10 samples)
-            # if hasattr(self, "_mem_sample_count"):
-            #     self._mem_sample_count += 1
-            # else:
-            #     self._mem_sample_count = 1
-            #
-            # if self._mem_sample_count % 10 == 0:  # Every 5 minutes
-            #     self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
             # Track sample timestamp (instead of arbitrary counter)
             now = time.time()
@@ -902,13 +887,9 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self._last_mem_sample_time = now
                 self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
-            # # Warn if memory growth exceeds 1GB
-            # if growth_mb > 1000 and not self._memory_warning_shown:
-            #     self._memory_warning_shown = True
-            #     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
-
+            # Warn if memory growth exceeds 1GB
             # === Preventive Mitigation for High Memory ===
-            if growth_mb > 1000:  # Over 1 GB growth
+            if growth_mb > 1000 and not self._memory_warning_shown:  # Over 1 GB growth
                  if not getattr(self, "_memory_warning_shown", False):
                     self._memory_warning_shown = True
                     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)

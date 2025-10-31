@@ -13,18 +13,6 @@ import re
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__", re.UNICODE)
 
 
-def _dedup_preserve_order(items: list[str]) -> list[str]:
-    seen = set()
-    out: list[str] = []
-    for x in items or []:
-        if not x:
-            continue
-        if x not in seen:
-            seen.add(x)
-            out.append(x)
-    return out
-
-
 def _compile_word_safe_pattern(term: str) -> re.Pattern:
     """
     Compile a regex that matches `term` as a token without
@@ -43,11 +31,11 @@ class TermHandler:
     """
 
     def __init__(
-        self,
-        dnt_terms: list[str] | None = None,
-        termbase: dict[str, dict[str, str]] | None = None,
-        lang_code: str | None = None,
-        logger: logging.Logger | None = None,
+            self,
+            dnt_terms: list[str] | None = None,
+            termbase: dict[str, dict[str, str]] | None = None,
+            lang_code: str | None = None,
+            logger: logging.Logger | None = None,
     ) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
@@ -55,10 +43,7 @@ class TermHandler:
 
         # Build stable placeholder map once per file/language
 
-        # DOUBT: is order required for the dnt terms?
-        # ISSUES: use set() to easily remove duplicates, and wrap it as list, if order is required use dict or OrderedDict
-
-        self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
+        self._ordered_terms: list[str] = list(set(dnt_terms))
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
         self.placeholder_map: dict[str, str] = {term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)}
@@ -89,7 +74,7 @@ class TermHandler:
         """
         if new_terms is None:
             return self.placeholder_map
-        self._ordered_terms = _dedup_preserve_order(new_terms)
+        self._ordered_terms = list(set(new_terms))
         self.placeholder_map = {t: f"__DNT_TERM_{i}__" for i, t in enumerate(self._ordered_terms)}
         self._patterns.clear()
         for term in sorted(self._ordered_terms, key=len, reverse=True):
@@ -97,18 +82,16 @@ class TermHandler:
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 
-    def load_dnt_terms(self,file_path: str, lang_code: str) -> list[str]:
+    def load_dnt_terms(self, file_path: str, lang_code: str) -> list[str]:
         with open(file_path, "r", encoding="utf-8") as f:
             all_terms = json.load(f)
         return all_terms.get(lang_code, [])
-
 
     def apply_dnt_placeholders(self, text: str) -> str:
         """
         Replace DNT terms in `text` with placeholders.
         Longest-first; token-safe; preserves punctuation/spacing.
         """
-        # ISSUES: Also check if the test is present in the dnt terms or not
 
         # ISSUES solved: Check presence of term before applying placeholder
         if not text or not self._patterns:
@@ -116,14 +99,6 @@ class TermHandler:
 
         def _sub_once(s: str, pat: re.Pattern, ph: str) -> str:
             return pat.sub(ph, s)
-
-        # out = text
-        # for pat, term, ph in self._patterns:
-        #     new_out = _sub_once(out, pat, ph)
-        #     if new_out != out:
-        #         self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
-        #         out = new_out
-        # return out
 
         out = text
         for pat, term, ph in self._patterns:
@@ -139,11 +114,11 @@ class TermHandler:
         """
         Restore placeholders back to original DNT terms in `text`.
         """
-        # ISSUES: Also check if the test is present in the dnt terms or not
 
         # ISSUES solved: Early return if no placeholders exist
         if not text or not self.placeholder_map:
             return text
+
         # Reverse mapping: placeholder -> term
         rev = {ph: term for term, ph in self.placeholder_map.items()}
         # Fast path: if no placeholders, return early

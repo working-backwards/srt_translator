@@ -31,12 +31,12 @@ class SummaryDict(TypedDict):
     batch_directory: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class TranslationConfig:
     # Core translation parameters
     target_languages: dict[str, str]  # e.g., {"Spanish": "es", ...}
-    dnt_terms: list[str]
-    termbase: dict[str, dict[str, str]]  # target_lang_code -> {canonical_term -> translation}
+    dnt_terms: list[str] | None
+    termbase: dict[str, dict[str, str]] | None  # target_lang_code -> {canonical_term -> translation}
     output_directory: Path
     api_key: str
     model_name: str
