@@ -30,8 +30,7 @@ def main():
         settings_manager = SettingsManager(language_config)
 
         # Check what's currently stored
-        result = settings_manager.load_ai_config()
-        dnt_terms, termbase = result.dnt_terms, result.termbase
+        dnt_terms, termbase, _ = settings_manager.load_ai_config()
         logger.info(
             f"Current AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )
@@ -39,9 +38,20 @@ def main():
         # Clear the AI configuration
         settings_manager.clear_ai_config()
 
+        settings_manager.save_api_key("")
+        logger.info("Cleared saved API key")
+
+        settings_manager.save_selected_files([])
+        logger.info("Cleared selected files")
+
+        settings_manager.save_target_languages({})
+        logger.info("Cleared saved target languages")
+
+        settings_manager.save_last_output_directory("")
+        logger.info("Output directory cleared")
+
         # Verify it's cleared
-        result = settings_manager.load_ai_config()
-        dnt_terms, termbase = result.dnt_terms, result.termbase
+        dnt_terms, termbase, _ = settings_manager.load_ai_config()
         logger.info(
             f"After clearing: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
         )
