@@ -1,36 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
-import glob
 
-# -----------------------------
-# Project paths (cross-platform)
-# -----------------------------
-project_root = os.getcwd()  # Use current working directory
+project_root = os.getcwd()
 config_dir = os.path.join(project_root, 'srt_translator', 'config')
 
-# -----------------------------
-# Dynamically collect all files in config folder (recursively)
-# -----------------------------
+# Collect all config files dynamically
 datas = []
-
 for root, _, files in os.walk(config_dir):
     for f in files:
         filepath = os.path.join(root, f)
-        # Compute relative path inside the package
         rel_path = os.path.relpath(root, project_root)
-        target_path = rel_path.replace("\\", "/")  # Normalize for cross-platform
+        target_path = rel_path.replace("\\", "/")
         datas.append((filepath, target_path))
 
-# -----------------------------
-# PyInstaller spec setup
-# -----------------------------
 block_cipher = None
 
 a = Analysis(
     ['srt_translator/gui/app.py'],
     pathex=[project_root],
-    binaries=[],
-    datas=datas,
+    binaries=[],            # No extra binaries
+    datas=datas,            # include configs
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
@@ -46,22 +35,13 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
-    name='SRTTranslator',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,  # set False if GUI only
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
+    a.binaries,            # include binaries here
     a.zipfiles,
     a.datas,
+    name='SRTTranslator',
+    debug=False,
     strip=False,
     upx=True,
-    name='SRTTranslator'
+    console=False,          # GUI only
 )
+
