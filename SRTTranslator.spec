@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['srt_translator/gui/app.py'],
+    ['/Users/user/PycharmProjects/srt_translator/srt_translator/gui/app.py'],
     pathex=[],
     binaries=[],
     datas=[('/Users/user/PycharmProjects/srt_translator/srt_translator/config/languages.json', 'srt_translator/config'), ('/Users/user/PycharmProjects/srt_translator/srt_translator/config/translation_rubric.yaml', 'srt_translator/config')],

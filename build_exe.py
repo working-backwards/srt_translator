@@ -46,4 +46,4 @@ PyInstaller.__main__.run([
     str(ENTRY)
 ])
 
-print("\n✅ Build complete → dist/SRTTranslator")
+print("\n Build complete → dist/SRTTranslator")
