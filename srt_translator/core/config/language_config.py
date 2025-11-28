@@ -112,7 +112,7 @@ class LanguageConfig:
             self.logger.error("Missing target_batch_size for language %s and no policy default", code)
 
             # This case should rarely occur, as missing config is caught earlier
-            raise RuntimeError("Missing target_batch_size for language {code} and no policy default" )
+            raise RuntimeError(f"Missing target_batch_size for language {code} and no policy default")
 
         # Return as integer
         return int(batch_size)

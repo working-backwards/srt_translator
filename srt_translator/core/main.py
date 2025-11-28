@@ -84,9 +84,6 @@ def translate_srt_files(
     source_code = None
 
 
-      #RECOMMENDATION solved: Instead of checking the instance type, we can check none null here, because the source_lang in config can
-      # be either NoneType or DictType
-
     if source_lang is not None and isinstance(source_lang, dict):
         source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
 
@@ -105,7 +102,6 @@ def translate_srt_files(
             )
             config = replace(config, target_languages=keep)
 
-     # ISSUE solved:Use none check for source_lang here instead of isinstance check
 
     if source_lang and isinstance(source_lang, dict) and source_lang.get("mixed"):
         logger.warning("Detected mixed-language source; proceeding with dominant language.")
@@ -170,11 +166,11 @@ def translate_srt_files(
                 )
 
             successful_translations += 1
-            # logger.info("Successfully translated to %s", lang_name)
+            logger.info("Successfully translated to %s", lang_name)
 
         except Exception as e:
             logger.error("Failed to translate to %s: %s", lang_name, e)
-            # continue
+            continue
 
     # Write AI config manifest
     try:

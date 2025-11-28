@@ -5,7 +5,7 @@ Main window for the SRT Translator application.
 
 import logging
 import os
-from datetime import time
+import time
 from pathlib import Path
 
 import psutil
