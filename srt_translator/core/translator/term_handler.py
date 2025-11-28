@@ -13,6 +13,18 @@ import re
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__", re.UNICODE)
 
 
+def _dedup_preserve_order(items: list[str]) -> list[str]:
+    seen = set()
+    out: list[str] = []
+    for x in items or []:
+        if not x:
+            continue
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
 def _compile_word_safe_pattern(term: str) -> re.Pattern:
     """
     Compile a regex that matches `term` as a token without
@@ -43,7 +55,7 @@ class TermHandler:
 
         # Build stable placeholder map once per file/language
 
-        self._ordered_terms: list[str] = list(set(dnt_terms))
+        self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
         self.placeholder_map: dict[str, str] = {term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)}
@@ -74,7 +86,7 @@ class TermHandler:
         """
         if new_terms is None:
             return self.placeholder_map
-        self._ordered_terms = list(set(new_terms))
+        self._ordered_terms = _dedup_preserve_order(new_terms)
         self.placeholder_map = {t: f"__DNT_TERM_{i}__" for i, t in enumerate(self._ordered_terms)}
         self._patterns.clear()
         for term in sorted(self._ordered_terms, key=len, reverse=True):
