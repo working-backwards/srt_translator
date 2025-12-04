@@ -175,6 +175,9 @@ class TranslationWorker(QObject):
             )
 
             # Build configuration from GUI settings manager
+            # Architecture note: We load AI config and perform same-language filtering
+            # at this boundary, then construct an immutable TranslationConfig.
+            # The core engine receives a complete, frozen config object.
 
             try:
                 lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
@@ -182,25 +185,10 @@ class TranslationWorker(QObject):
                 self.logger.warning("Failed to load language policies, using defaults: %s", e)
                 lang_policies = {}
 
-            #  Build config regardless of whether the try/except succeeded or failed
-            api_cfg = TranslationConfig(
-                files=[Path(p) for p in self.selected_files],
-                output_directory=Path(self.output_directory or "translated_srt_files"),
-                target_languages=self.target_languages,
-                model_name="gpt-4o-mini",
-                aggressiveness=0.75,
-                log_mode="Standard",
-                api_key=self.api_key,
-                mode="GUI",
-                language_policies=lang_policies,
-                dnt_terms=None,  # e.g. list of "do-not-translate" terms
-                termbase=None
-            )
-
-            self.logger.info(
-                "Using configuration from settings manager: %s languages",
-                len(api_cfg.target_languages),
-            )
+            # Load AI config (DNT terms, termbase, source language) before creating config
+            dnt_terms: list[str] = []
+            termbase: dict[str, dict[str, str]] = {}
+            source_language: dict[str, object] | None = None
 
             if self.settings_manager:
                 try:
@@ -212,13 +200,71 @@ class TranslationWorker(QObject):
                         termbase = {}
                     if not isinstance(source_language, dict):
                         source_language = {}
-                    api_cfg.dnt_terms = dnt_terms
-                    api_cfg.termbase = termbase
-                    api_cfg.source_language = source_language
-                    if api_cfg.termbase:
-                        self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
+                    if termbase:
+                        self.logger.info("Termbase languages: %s", list(termbase.keys()))
                 except Exception as e:
                     self.logger.warning("Failed to load AI config from settings manager: %s", e)
+
+            # Same-language filtering: remove targets identical to detected source language.
+            # This logic belongs at the GUI boundary so the core engine receives clean config.
+            filtered_target_languages = self.target_languages
+            try:
+                if source_language and isinstance(source_language, dict):
+                    source_code = (
+                        source_language.get("normalized_code") or source_language.get("detected_code") or ""
+                    ).strip()
+                    if source_code:
+                        # Filter out target languages matching the source
+                        keep = {
+                            name: code
+                            for name, code in (self.target_languages or {}).items()
+                            if (code or "").strip().lower() != source_code.lower()
+                        }
+                        if len(keep) != len(self.target_languages):
+                            self.logger.warning(
+                                "Dropping target identical to detected source (%s); %s target(s) removed.",
+                                source_code,
+                                len(self.target_languages) - len(keep),
+                            )
+                        filtered_target_languages = keep
+            except Exception:
+                # Be defensive: if filtering fails, fall back to original target set
+                self.logger.exception("Failed to filter same-language targets - proceeding without filtering")
+
+            # Convert DNT/termbase into immutable shapes (tuple + MappingProxyType)
+            # This enforces read-only semantics in the core engine.
+            from types import MappingProxyType
+
+            dnt_tuple = tuple(dnt_terms or ())
+
+            # Build nested immutable termbase: outer and inner mappings are both MappingProxyType
+            safe_tb_outer = {}
+            for lang, inner in (termbase or {}).items():
+                if isinstance(inner, dict):
+                    # Copy to avoid aliasing to caller's mutable data
+                    safe_tb_outer[lang] = MappingProxyType(dict(inner))
+            termbase_proxy = MappingProxyType(safe_tb_outer)
+
+            # Construct the immutable, complete TranslationConfig
+            api_cfg = TranslationConfig(
+                files=[Path(p) for p in self.selected_files],
+                output_directory=Path(self.output_directory or "translated_srt_files"),
+                target_languages=filtered_target_languages,
+                dnt_terms=dnt_tuple,
+                termbase=termbase_proxy,
+                model_name="gpt-4o-mini",
+                aggressiveness=0.75,
+                log_mode="Standard",
+                api_key=self.api_key,
+                mode="GUI",
+                language_policies=lang_policies,
+                source_language=source_language,
+            )
+
+            self.logger.info(
+                "Using configuration from settings manager: %s languages",
+                len(api_cfg.target_languages),
+            )
 
             # Check for cooperative stop before starting translation
             if self.is_stopped():
@@ -252,12 +298,12 @@ class TranslationWorker(QObject):
                 output_lines = stdout_output.split("\n")
                 chunk_size = 10
                 for i in range(0, len(output_lines), chunk_size):
-                    chunk = output_lines[i: i + chunk_size]
+                    chunk = output_lines[i : i + chunk_size]
                     part_num = (i // chunk_size) + 1
+                    part_suffix = f" (part {part_num})" if len(output_lines) > chunk_size else ""
                     self._throttled_emit(
                         self.progress_updated,
-                        f"Translation output{' (part ' + str(part_num) + ')' if len(output_lines) > chunk_size else ''}: "
-                        + "\n".join(chunk),
+                        f"Translation output{part_suffix}: " + "\n".join(chunk),
                     )
 
             # Store results for potential fixer use
@@ -348,7 +394,7 @@ class TranslationWorker(QObject):
                     self.logger.warning("No batch directory found for evaluation")
 
             except Exception as e:
-                self.logger.error("Evaluation failed", extra={"error": str(e)}, exc_info=True)
+                self.logger.exception("Evaluation failed", extra={"error": str(e)})
                 # Don't fail the translation - evaluation is optional
                 self._throttled_emit(
                     self.progress_updated,
@@ -360,7 +406,7 @@ class TranslationWorker(QObject):
 
         except Exception as e:
             error_msg = f"Translation failed: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.exception(error_msg)
             # Emit error via signal (thread-safe)
             self.translation_error.emit(error_msg)
         finally:

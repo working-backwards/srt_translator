@@ -3,10 +3,11 @@
 Typed configuration models for SRT Translator.
 """
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Literal, TypedDict
 
 
@@ -31,26 +32,43 @@ class SummaryDict(TypedDict):
     batch_directory: str
 
 
-@dataclass(frozen=False)
+@dataclass(frozen=True)
 class TranslationConfig:
-    # Core translation parameters
+    """
+    Immutable configuration for translation runs.
+
+    Architecture note: This config is frozen to prevent accidental mutation.
+    DNT terms and termbase use immutable containers (Tuple, MappingProxyType)
+    to enforce read-only semantics throughout the core engine.
+    """
+
+    # Required fields (no defaults) - must come first in dataclass
     target_languages: dict[str, str]  # e.g., {"Spanish": "es", ...}
-    dnt_terms: list[str] | None
-    termbase: dict[str, dict[str, str]] | None  # target_lang_code -> {canonical_term -> translation}
     output_directory: Path
     api_key: str
     model_name: str
     aggressiveness: float  # Aggressiveness of automatic placeholder fixes
     log_mode: LogMode
     mode: Literal["CLI", "GUI"]
-    error_policy: Literal["STRICT", "BOUNDED", "DEV"] = (
-        "BOUNDED"  # Error handling policy for translation system (BOUNDED for testing)
-    )
+
+    # Optional fields with defaults - must come after required fields
+    # Immutable sequence of DNT (Do Not Translate) terms.
+    # Empty tuple if none provided - never None to avoid Optional handling in core.
+    dnt_terms: tuple[str, ...] = ()
+
+    # Immutable nested mapping: target_lang_code -> (source_term -> translation).
+    # Empty MappingProxy if none provided - never None to avoid Optional handling in core.
+    termbase: Mapping[str, Mapping[str, str]] = field(default_factory=lambda: MappingProxyType({}))
+
+    error_policy: Literal["STRICT", "BOUNDED", "DEV"] = "BOUNDED"
+
     # File handling
     files: Iterable[Path] | None = None
-    # NEW: optional batch-level source language detection payload
+
+    # Optional batch-level source language detection payload
     source_language: dict[str, object] | None = None
-    # NEW: language policies injected by GUI/CLI loaders
+
+    # Language policies injected by GUI/CLI loaders
     language_policies: dict[str, dict[str, Any]] | None = None
 
     def run(self) -> SummaryDict:
@@ -86,8 +104,8 @@ class TranslationConfig:
         else:
             dnt_list = []
 
-        # Validate termbase
-        termbase = raw.get("termbase", {})
+        # Validate termbase (normalize to dict of dicts)
+        termbase = raw.get("termbase", {}) or {}
         if not isinstance(termbase, dict):
             errors.append("termbase must be a dictionary")
             termbase = {}
@@ -134,10 +152,31 @@ class TranslationConfig:
         if errors:
             raise ValueError(f"Configuration validation failed: {'; '.join(errors)}")
 
+        # Convert to immutable containers before constructing the frozen config.
+        # This enforces read-only semantics throughout the core engine and prevents
+        # accidental mutation of configuration state.
+
+        # Convert DNT list to immutable tuple
+        dnt_tuple: tuple[str, ...] = tuple(dnt_list)
+
+        # Convert termbase to nested immutable mappings (MappingProxyType).
+        # Outer mapping: language_code -> inner_mapping
+        # Inner mapping: source_term -> target_translation
+        safe_tb_outer: dict[str, Mapping[str, str]] = {}
+        for lang, entries in (termbase or {}).items():
+            if isinstance(entries, dict):
+                # Copy inner dict to avoid aliasing to caller's mutable data
+                safe_tb_outer[lang] = MappingProxyType(dict(entries))
+            else:
+                # Normalize invalid entries to empty mapping
+                safe_tb_outer[lang] = MappingProxyType({})
+
+        termbase_proxy = MappingProxyType(safe_tb_outer)
+
         return cls(
             target_languages=target_languages,
-            dnt_terms=list(dnt_list),
-            termbase=termbase,
+            dnt_terms=dnt_tuple,
+            termbase=termbase_proxy,
             output_directory=output_dir,
             api_key=api_key,
             model_name=model_name,

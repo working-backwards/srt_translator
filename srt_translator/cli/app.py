@@ -66,7 +66,10 @@ Examples:
         "--report",
         choices=["html", "md", "both", "none"],
         default="none",
-        help="Generate report after evaluation: html (HTML only), md (Markdown only), both (HTML then MD), none (no reports)",
+        help=(
+            "Generate report after evaluation: html (HTML only), md (Markdown only), "
+            "both (HTML then MD), none (no reports)"
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -95,20 +98,35 @@ Examples:
         from srt_translator.core.config.models import TranslationConfig
 
         raw_config = collect_cli_raw()
-        api_cfg = TranslationConfig(
-            files=None,  # set after enumeration
-            output_directory=Path(raw_config.get("output_directory", "translated_srt_files")),
-            target_languages=raw_config.get("target_languages") or {},
-            dnt_terms=raw_config.get("dnt_terms") or [],
-            termbase=raw_config.get("termbase") or {},
-            model_name=raw_config.get("openai_model", "gpt-4o-mini"),
-            aggressiveness=float(raw_config.get("aggressiveness", 0.75)),
-            log_mode=raw_config.get("log_mode", "Standard"),
-            api_key=raw_config.get("api_key") or "",
-            mode="CLI",
-            source_language=raw_config.get("source_language"),
-            language_policies=raw_config.get("language_policies"),
-        )
+
+        # Architecture note: Filter same-language targets at CLI boundary
+        # before constructing TranslationConfig. The core engine receives
+        # a clean, immutable config with filtered targets.
+        target_languages = raw_config.get("target_languages") or {}
+        source_language = raw_config.get("source_language")
+
+        if source_language and isinstance(source_language, dict):
+            source_code = (source_language.get("normalized_code") or source_language.get("detected_code") or "").strip()
+            if source_code:
+                # Filter out target languages matching the detected source
+                filtered = {
+                    name: code
+                    for name, code in target_languages.items()
+                    if (code or "").strip().lower() != source_code.lower()
+                }
+                if len(filtered) != len(target_languages):
+                    logger.warning(
+                        "Dropping target identical to detected source (%s); %s target(s) removed.",
+                        source_code,
+                        len(target_languages) - len(filtered),
+                    )
+                target_languages = filtered
+
+        # Build normalized TranslationConfig using from_raw() to handle
+        # defaults and convert to immutable containers (tuple, MappingProxyType)
+        normalized_raw = dict(raw_config)
+        normalized_raw["target_languages"] = target_languages
+        api_cfg = TranslationConfig.from_raw(normalized_raw, mode="CLI")
 
         logger.info("Configuration loaded successfully")
         logger.debug("API key source: %s", raw_config.get("api_key_source", "unknown"))
@@ -200,7 +218,7 @@ Examples:
                 logger.warning("No batch directory found for evaluation")
 
         except Exception as e:
-            logger.error("Evaluation failed", extra={"error": str(e)}, exc_info=True)
+            logger.exception("Evaluation failed", extra={"error": str(e)})
             # Don't fail the translation - evaluation is optional
 
     except ImportError as e:
