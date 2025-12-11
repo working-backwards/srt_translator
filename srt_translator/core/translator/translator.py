@@ -458,6 +458,7 @@ class SRTTranslator:
         # Restore DNT placeholders to originals
         tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
 
+        tgt_texts = [self.term_handler.restore_termbase(t, target_lang) for t in tgt_texts]
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
@@ -575,7 +576,9 @@ class SRTTranslator:
                     head = batch[0]
                     pair_src = [
                         deferred_tail_retry["source_text_with_placeholders"],
-                        self.term_handler.apply_dnt_placeholders(head.text),
+                        self.term_handler.apply_dnt_placeholders(
+                            self.term_handler.apply_termbase(head.text)
+                        ),
                     ]
                     pair_ids = [deferred_tail_retry["cue_index"], head.idx]
                     batch_logger.debug(
@@ -591,9 +594,12 @@ class SRTTranslator:
                             pair_ids,
                             logger=batch_logger,
                         )
-                        fixed = self.term_handler.restore_dnt_placeholders(
-                            pair_tgts[0].get("text", "") if pair_tgts else ""
-                        )
+                        fixed = pair_tgts[0].get("text", "") if pair_tgts else ""
+                        if fixed:
+                            # Restore DNT placeholders first
+                            fixed = self.term_handler.restore_dnt_placeholders(fixed)
+                            # Then restore termbase for the target language
+                            fixed = self.term_handler.restore_termbase(fixed, target_lang)
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
                             batch_logger.debug(
@@ -635,7 +641,12 @@ class SRTTranslator:
             )
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
-            src_items = [self.term_handler.apply_dnt_placeholders(s.text) for s in batch]
+            src_items = [
+                self.term_handler.apply_dnt_placeholders(
+                    self.term_handler.apply_termbase(s.text)
+                )
+                for s in batch
+            ]
 
             # Log source items being sent to AI for troubleshooting
             file_logger.debug(
@@ -1071,9 +1082,8 @@ TARGET ITEMS (TO FIX):
     @staticmethod
     def _render_items_for_prompt(ids: list[int], texts: list[str]) -> str:
         rows = []
-        for i, t in zip(ids, texts, strict=False):
-            # One line per item; escape braces lightly for JSON-mode friendliness
-            clean = t.replace("\n", " ").strip()
+        for i, t in zip(ids, texts):
+            clean = (t or "").replace("\n", " ").replace("{", "{{").replace("}", "}}").strip()
             rows.append(f"{i}) {clean}")
         return "\n".join(rows)
 

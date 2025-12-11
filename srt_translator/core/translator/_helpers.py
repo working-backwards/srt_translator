@@ -99,9 +99,14 @@ def _handle_mid_batch_empty_retries(
                     sid,
                 )
                 pair_src = [
-                    self.term_handler.apply_dnt_placeholders(batch[i].text),
-                    self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
+                    self.term_handler.apply_dnt_placeholders(
+                        self.term_handler.apply_termbase(batch[i].text)
+                    ),
+                    self.term_handler.apply_dnt_placeholders(
+                        self.term_handler.apply_termbase(batch[i + 1].text)
+                    ),
                 ]
+
                 pair_ids = [batch[i].idx, batch[i + 1].idx]
                 pair_items = self._translate_batch_json(
                     src_items=pair_src,
@@ -114,6 +119,7 @@ def _handle_mid_batch_empty_retries(
                     candidate = pair_items[0].get("tgt", "")
                     if candidate and candidate.strip():
                         tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
+                        tgt_texts[i] = self.term_handler.restore_termbase(candidate, target_lang)
                         batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                         filled = True
             except Exception as ex:

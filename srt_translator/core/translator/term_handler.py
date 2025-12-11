@@ -52,6 +52,29 @@ class TermHandler:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
         self.termbase = termbase or {}
+        self.term_map: dict[str, str] = {}
+        self.patterns: list[tuple[re.Pattern, str]] = []
+        self.termbase_target_map: dict[str, dict[str, str]] = {}
+
+        for lang, entries in self.termbase.items():
+            if isinstance(entries, dict):
+                self.termbase_target_map[lang] = entries.copy()
+            else:
+                # wrap single string entry into a dict with itself as key/value
+                self.termbase_target_map[lang] = {entries: entries}
+
+
+        # Flatten the termbase into term_map for easy lookup
+        for key, value in self.termbase.items():
+            if isinstance(value, dict):
+                for sub_key, sub_val in value.items():
+                    self.term_map[sub_key] = sub_val
+            elif isinstance(value, str):
+                self.term_map[key] = value
+
+        for term, replacement in sorted(self.term_map.items(), key=lambda x: len(x[0]), reverse=True):
+            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            self.patterns.append((pat, replacement))
 
         # Build stable placeholder map once per file/language
 
@@ -66,6 +89,10 @@ class TermHandler:
             pat = _compile_word_safe_pattern(term)
             ph = self.placeholder_map[term]
             self._patterns.append((pat, term, ph))
+
+        for term in sorted(self.term_map.keys(), key=len, reverse=True):
+            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            self.patterns.append((pat, self.term_map[term]))
 
         self.logger.debug(
             "TermHandler initialized (lang=%s): %d DNT terms, %d TB entries",
@@ -146,6 +173,34 @@ class TermHandler:
         if restored != text:
             self.logger.debug("Restored DNT placeholders in translated text")
         return restored
+
+    def apply_termbase(self, text: str) -> str:
+        """
+        Replace termbase keys in source text before translation.
+        """
+        if not text:
+            return text
+
+        out = text
+        for pat, replacement in self.patterns:
+            out = pat.sub(replacement, out)
+        return out
+
+    def restore_termbase(self, text: str, lang_code: str) -> str:
+        """
+        Restore termbase replacements for a target language.
+        Replaces source-language keys in translated text with corresponding target-language values.
+        """
+        if not text or lang_code not in self.termbase_target_map:
+            return text
+
+        tb_map = self.termbase_target_map[lang_code]
+        out = text
+        for src_term, tgt_term in tb_map.items():
+            # Only replace full word matches
+            pat = re.compile(rf'\b{re.escape(src_term)}\b', re.IGNORECASE)
+            out = pat.sub(tgt_term, out)
+        return out
 
     # Optional artifacts/metrics helpers
     def placeholder_count(self) -> int:

@@ -575,7 +575,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(dnt_terms, termbase, self)
+        dialog = EditConfigurationDialog(self.settings_manager,dnt_terms, termbase)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
