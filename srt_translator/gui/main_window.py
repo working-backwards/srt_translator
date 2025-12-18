@@ -202,7 +202,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         # Translation Section signals
-        self.translation_section.connect_signals(self.start_translation, self.on_open_html_clicked)
+        self.translation_section.connect_signals(self.start_translation, self._open_html_report)
 
     def load_previous_settings(self):
         """Load previous settings from storage"""
@@ -925,27 +925,3 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         self.logger.info("Target languages (UI): %s", list(target_languages.values()))
         return target_languages
-
-    def _after_eval_finished(self, report_paths: dict) -> None:
-        """Handle evaluation completion - store all report paths"""
-        self._last_eval_json = Path(report_paths["eval_report_json"])
-        self._last_eval_html = Path(report_paths["eval_report_html"])
-        self._last_eval_md = Path(report_paths["eval_report_md"])
-        self._last_report_v1 = Path(report_paths["report_v1_json"])
-
-        self.logger.info("Eval report ready: %s", self._last_eval_json)
-        self.logger.info("HTML report available: %s", self._last_eval_html)
-        self.logger.info("MD report available: %s", self._last_eval_md)
-
-        # Enable the HTML button
-        self.translation_section.open_html_btn.setEnabled(True)
-
-    def on_open_html_clicked(self):
-        """Handle Open HTML Report button click"""
-        p = getattr(self, "_last_eval_html", None)
-        if not p or not Path(p).exists():
-            QMessageBox.warning(self, "HTML Report", "No HTML report available yet.")
-            return
-        import webbrowser
-
-        webbrowser.open(str(p))

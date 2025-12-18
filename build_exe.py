@@ -18,7 +18,7 @@ if not ENTRY.exists():
 LANG_FILE = ROOT / "srt_translator" / "config" / "languages.json"
 RUBRIC_FILE = ROOT / "srt_translator" / "config" / "translation_rubric.yaml"
 
-# Set environment variables (optional, like in your shell script)
+# Set environment variables
 os.environ["LANGUAGE_CONFIG"] = str(LANG_FILE)
 os.environ["TRANSLATION_RUBRIC"] = str(RUBRIC_FILE)
 
@@ -26,7 +26,7 @@ print(f"LANGUAGE_CONFIG={os.environ['LANGUAGE_CONFIG']}")
 print(f"TRANSLATION_RUBRIC={os.environ['TRANSLATION_RUBRIC']}")
 
 # ------------------------------
-# Detect OS and set add-data separator
+# Detect OS
 # ------------------------------
 OS_NAME = platform.system()
 SEP = ";" if OS_NAME == "Windows" else ":"
@@ -35,15 +35,34 @@ ADD_DATA_1 = f"{LANG_FILE}{SEP}srt_translator/config"
 ADD_DATA_2 = f"{RUBRIC_FILE}{SEP}srt_translator/config"
 
 # ------------------------------
-# Run PyInstaller
+# Build arguments
 # ------------------------------
-PyInstaller.__main__.run([
+args = [
     "--clean",
-    "--onefile",
     "--name=SRTTranslator",
     f"--add-data={ADD_DATA_1}",
     f"--add-data={ADD_DATA_2}",
-    str(ENTRY)
-])
+]
 
-print("\n Build complete → dist/SRTTranslator")
+if OS_NAME == "Darwin":
+    # macOS → produce .app bundle
+    args += [
+        "--windowed",          # REQUIRED for .app bundle
+        "--noconfirm",
+    ]
+else:
+    # Windows → produce single .exe
+    args += [
+        "--onefile",
+        "--noconfirm",
+    ]
+
+args.append(str(ENTRY))
+
+# ------------------------------
+# Run PyInstaller
+# ------------------------------
+PyInstaller.__main__.run(args)
+
+print("\n✅ Build complete")
+print("Output directory: dist/")

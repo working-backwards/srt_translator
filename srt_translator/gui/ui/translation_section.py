@@ -47,7 +47,7 @@ class TranslationSection(QGroupBox):
 
         # Open HTML Report button
         self.open_html_btn = QPushButton("Open HTML Report")
-        self.open_html_btn.setObjectName("secondaryActionButton")
+        self.open_html_btn.setObjectName("mainActionButton")
         self.open_html_btn.setFixedHeight(50)
         self.open_html_btn.setEnabled(False)  # Disabled by default
 
