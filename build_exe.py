@@ -54,7 +54,7 @@ else:
     # Windows → produce single .exe
     args += [
         "--onefile",
-        "--windowed",
+        "--windowed",  # REQUIRED for .app bundle
         "--noconfirm",
     ]
 
