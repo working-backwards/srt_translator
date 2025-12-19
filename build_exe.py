@@ -54,6 +54,7 @@ else:
     # Windows → produce single .exe
     args += [
         "--onefile",
+        "--windowed",
         "--noconfirm",
     ]
 
