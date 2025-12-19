@@ -23,7 +23,7 @@ class FileSection(QGroupBox):
     """File selection section with multi-select capabilities and output directory selection"""
 
     def __init__(self, settings_manager):
-        super().__init__("Original Language SRT Files")
+        super().__init__("Original Language SRT Files - test")
         self.settings_manager = settings_manager
         self.setObjectName("fileSection")
         self.selected_files = []
