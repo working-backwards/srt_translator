@@ -7,6 +7,8 @@ import logging
 import os
 import time
 from pathlib import Path
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -242,21 +244,35 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.api_section.toggle_expansion()
 
     def test_api_connection(self):
-        """Test the OpenAI API connection"""
+        """Test the OpenAI API connection (real validation)"""
         api_key = self.api_section.get_api_key()
+
         if not api_key:
             self.api_section.show_error("Please enter an API key")
+            self.api_section.set_connected_status(False)
             return
 
-        # Save API key
-        self.settings_manager.save_api_key(api_key)
+        self.api_section.clear_error()
+        self.api_section.status_indicator.setText("Testing connection...")
 
-        # Test connection (simplified - just check if key is valid format)
-        if api_key.startswith("sk-") and len(api_key) > 20:
+        ok, error = self._validate_openai_key(api_key)
+
+        if ok:
+            self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
-            self.api_section.clear_error()
         else:
-            self.api_section.show_error("Invalid API key format")
+            self.api_section.set_connected_status(False)
+            self.api_section.show_error(error)
+
+    def _validate_openai_key(self, api_key: str) -> tuple[bool, str | None]:
+                try:
+                    client = OpenAI(api_key=api_key)
+                    client.models.list()
+                    return True, None
+                except AuthenticationError:
+                    return False, "Invalid OpenAI API key."
+                except Exception as e:
+                    return False, str(e)
 
     def show_api_input(self):
         """Show the API input field when Edit Settings is clicked"""
