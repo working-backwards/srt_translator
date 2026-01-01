@@ -10,7 +10,7 @@ This guide covers installation methods for the SRT Translator application, with 
 
 1. **Download the release package** for your platform:
    - Windows: `SRT-Translator-v1.0.0-windows.zip`
-   - macOS: `SRT-Translator-v1.0.0-darwin.zip`
+   - macOS: `SRT-Translator-v1.0.0-mac.dmg`
    - Linux: `SRT-Translator-v1.0.0-linux.zip`
 
 2. **Extract the package** to a folder on your computer
