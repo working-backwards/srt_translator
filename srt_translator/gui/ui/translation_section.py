@@ -105,3 +105,4 @@ class TranslationSection(QGroupBox):
     def update_cost_estimate(self, cost: str):
         """Update the cost estimate display"""
         self.cost_estimate.setText(cost)
+        self.cost_estimate.setVisible(True)

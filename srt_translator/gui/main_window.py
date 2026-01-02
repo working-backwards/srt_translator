@@ -711,6 +711,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         if not selected_files or not target_languages:
             self.translation_section.update_cost_estimate("$0.00")
+            self.translation_section.cost_estimate.setVisible(True)
             return
 
         # Simple cost estimation: $0.002 per 1K tokens
@@ -725,7 +726,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         if not dnt_terms and not termbase:
             estimated_cost += 0.10  # AI configuration cost
 
-        cost_text = f"${estimated_cost:.2f}"
+        cost_text = f"${estimated_cost:.3f}"
         self.translation_section.update_cost_estimate(cost_text)
 
     # Translation Section Handlers
