@@ -6,7 +6,7 @@ from pathlib import Path
 # ------------------------------
 # Project root
 # ------------------------------
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 
 # Entry point
 ENTRY = ROOT / "srt_translator" / "gui" / "app.py"
