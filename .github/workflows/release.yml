@@ -79,15 +79,12 @@ jobs:
             certutil -hashfile "release/SRT-Translator-${{ github.ref_name }}-win.exe" SHA256 > "release/SRT-Translator-${{ github.ref_name }}-win.exe.sha256"
           else
             python scripts/build_release.py
-            # Rename the DMG to match the expected naming convention
-            mkdir -p release/SRT-Translator-${{ github.ref_name }}/
-            mv release/SRT-Translator-*-mac.dmg "release/SRT-Translator-${{ github.ref_name }}/mac.dmg"
           fi
 
       - name: Notarize & staple DMG (macOS)
         if: runner.os == 'macOS'
         run: |
-          DMG_PATH="release/SRT-Translator-${{ github.ref_name }}/mac.dmg"
+          DMG_PATH=$(ls release/SRT-Translator-*-mac.dmg 2>/dev/null)
 
           # Submit for notarization
           echo "Submitting DMG for notarization..."
