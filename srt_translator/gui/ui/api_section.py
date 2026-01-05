@@ -79,7 +79,7 @@ class APISection(QGroupBox):
         self.edit_key_btn.setObjectName("secondaryButton")
         self.edit_key_btn.setVisible(False)  # Initially hidden
 
-        self.test_connection_btn_connected = QPushButton("Test Connection...")
+        self.test_connection_btn_connected = QPushButton("Test Connection")
         self.test_connection_btn_connected.setObjectName("secondaryButton")
         self.test_connection_btn_connected.setVisible(False)  # Initially hidden
 
