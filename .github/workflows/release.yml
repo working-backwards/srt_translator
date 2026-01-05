@@ -82,7 +82,7 @@ jobs:
             [ -d "$APP_DIR" ] || { echo "App not found: $APP_DIR"; exit 1; }
             mkdir -p dmgroot
             cp -R "$APP_DIR" dmgroot/
-            hdiutil create -volname "SRT Translator" -srcfolder dmgroot -ov -format UDZO "release/SRT-Translator-${{ github.ref_name }}-mac.dmg"
+            hdiutil create -volname "SRTTranslator" -srcfolder SRTTranslator.app -ov -format UDZO "release/SRT-Translator-${{ github.ref_name }}-mac.dmg"
           fi
 
       - name: Notarize & staple DMG (macOS)
