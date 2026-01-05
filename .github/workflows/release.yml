@@ -78,11 +78,9 @@ jobs:
             cp dist/SRT-Translator.exe "release/SRT-Translator-${{ github.ref_name }}-win.exe"
             certutil -hashfile "release/SRT-Translator-${{ github.ref_name }}-win.exe" SHA256 > "release/SRT-Translator-${{ github.ref_name }}-win.exe.sha256"
           else
-            APP_DIR="dist/SRTTranslator.app"
-            [ -d "$APP_DIR" ] || { echo "App not found: $APP_DIR"; exit 1; }
-            mkdir -p dmgroot
-            cp -R "$APP_DIR" dmgroot/
-            hdiutil create -volname "SRTTranslator" -srcfolder SRTTranslator.app -ov -format UDZO "release/SRT-Translator-${{ github.ref_name }}-mac.dmg"
+            python scripts/build_release.py
+            # Rename the DMG to match the expected naming convention
+            mv release/SRT-Translator-*-mac.dmg "release/SRT-Translator-${{ github.ref_name }}-mac.dmg"
           fi
 
       - name: Notarize & staple DMG (macOS)
