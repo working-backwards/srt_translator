@@ -65,7 +65,7 @@ jobs:
           [ -d "$APP_DIR" ] || { echo "App not found: $APP_DIR"; exit 1; }
 
           # Codesign with entitlements and timestamp
-          /usr/bin/codesign --deep --options runtime --timestamp --sign "${{ secrets.APP_SIGN_IDENTITY }}" "$APP_DIR"
+          /usr/bin/codesign --deep --force --options runtime --timestamp --sign "${{ secrets.APP_SIGN_IDENTITY }}" "$APP_DIR"
 
           # Verify codesign
           /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_DIR"
