@@ -260,6 +260,11 @@ class SRTTranslatorMainWindow(QMainWindow):
         if ok:
             self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
+            QMessageBox.information(
+                self,
+                "API Connection Successful",
+                "✅ API connected successfully."
+            )
         else:
             self.api_section.set_connected_status(False)
             self.api_section.show_error(error)
