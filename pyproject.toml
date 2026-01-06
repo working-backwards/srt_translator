@@ -41,6 +41,7 @@ dev = [
     "safety>=2.3.0",
     "bandit>=1.7.0",
     "pip-tools>=7.0.0",
+    "marshmallow>=4.2.0"
 ]
 gui = [
     "PySide6>=6.6.0,<7.0.0",
