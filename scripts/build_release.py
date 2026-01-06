@@ -35,7 +35,7 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 # GUI artifact names produced by your PyInstaller spec
 WIN_EXE = DIST / "SRT-Translator.exe"
-MAC_APP = DIST / "SRTTranslator.app"
+MAC_APP = DIST / "SRT-Translator.app"
 
 
 # ----------------------------

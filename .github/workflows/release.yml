@@ -61,7 +61,7 @@ jobs:
       - name: Codesign app (macOS)
         if: runner.os == 'macOS'
         run: |
-          APP_DIR="dist/SRTTranslator.app"
+          APP_DIR="dist/SRT-Translator.app"
           [ -d "$APP_DIR" ] || { echo "App not found: $APP_DIR"; exit 1; }
 
           # Codesign with entitlements and timestamp
