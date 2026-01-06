@@ -244,7 +244,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.api_section.toggle_expansion()
 
     def test_api_connection(self):
-        """Test the OpenAI API connection (real validation)"""
+        """Test the OpenAI API connection"""
         api_key = self.api_section.get_api_key()
 
         if not api_key:

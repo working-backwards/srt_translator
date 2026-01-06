@@ -132,7 +132,6 @@ class TermHandler:
         Longest-first; token-safe; preserves punctuation/spacing.
         """
 
-        # ISSUES solved: Check presence of term before applying placeholder
         if not text or not self._patterns:
             return text
 

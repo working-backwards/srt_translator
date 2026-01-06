@@ -90,7 +90,6 @@ class TranslationWorker(QObject):
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
         # Logging bridge state
-        # UNUSED solved: All below 3 variables are not used, can they be removed?
 
     def request_stop(self):
         """Request cooperative stop of the worker"""

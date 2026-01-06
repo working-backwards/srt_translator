@@ -330,8 +330,6 @@ class SRTTranslator:
             "stop": ["]}"],
         }
 
-    # ISSUES solved: Move the function to the class method since it needs the self
-
     def _setup_file_logging(
             self: SRTTranslator, input_filepath: str, target_lang: str
     ) -> logging.LoggerAdapter[logging.Logger]:
