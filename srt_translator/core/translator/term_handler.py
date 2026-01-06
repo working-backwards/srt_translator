@@ -154,7 +154,6 @@ class TermHandler:
         Restore placeholders back to original DNT terms in `text`.
         """
 
-        # ISSUES solved: Early return if no placeholders exist
         if not text or not self.placeholder_map:
             return text
 
