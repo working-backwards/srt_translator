@@ -23,7 +23,7 @@ def _create_batches_with_logging(
     src_subs: list[Subtitle],
     target_lang: str,
     file_logger: logging.LoggerAdapter,
-) -> tuple[list[list[Subtitle]], logging.LoggerAdapter]:
+) -> list[list[Subtitle]]:
     """Create sentence-aware batches with logging setup."""
     batches = self._create_batches(
         subtitles=src_subs,
@@ -41,7 +41,8 @@ def _create_batches_with_logging(
         self.batch_size,
         self.MAX_BATCH_SIZE,
     )
-    return batches, file_logger
+    #This change just removes redundancy — it’s a refactor, not a functional change.
+    return batches
 
 
 def _translate_batch_and_extract(
@@ -98,9 +99,14 @@ def _handle_mid_batch_empty_retries(
                     sid,
                 )
                 pair_src = [
-                    self.term_handler.apply_dnt_placeholders(batch[i].text),
-                    self.term_handler.apply_dnt_placeholders(batch[i + 1].text),
+                    self.term_handler.apply_dnt_placeholders(
+                        self.term_handler.apply_termbase(batch[i].text)
+                    ),
+                    self.term_handler.apply_dnt_placeholders(
+                        self.term_handler.apply_termbase(batch[i + 1].text)
+                    ),
                 ]
+
                 pair_ids = [batch[i].idx, batch[i + 1].idx]
                 pair_items = self._translate_batch_json(
                     src_items=pair_src,
@@ -113,6 +119,7 @@ def _handle_mid_batch_empty_retries(
                     candidate = pair_items[0].get("tgt", "")
                     if candidate and candidate.strip():
                         tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
+                        tgt_texts[i] = self.term_handler.restore_termbase(candidate, target_lang)
                         batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                         filled = True
             except Exception as ex:

@@ -5,7 +5,7 @@ import sys
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
-from srt_translator.gui.settings_manager import AIConfigTriple, SettingsManager
+from srt_translator.gui.settings_manager import SettingsManager
 
 #!/usr/bin/env python3
 """
@@ -44,9 +44,8 @@ def test_ai_config_system():
     }
 
     settings_manager.save_ai_config(test_dnt_terms, test_termbase)
-    result = settings_manager.load_ai_config()
-    assert isinstance(result, AIConfigTriple)
-    loaded_terms, loaded_termbase, loaded_source_lang = result
+    loaded_terms, loaded_termbase, loaded_source_lang = settings_manager.load_ai_config()
+
 
     logger.info(f"Saved DNT terms: {test_dnt_terms}")
     logger.info(f"Loaded DNT terms: {loaded_terms}")

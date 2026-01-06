@@ -35,7 +35,7 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 # GUI artifact names produced by your PyInstaller spec
 WIN_EXE = DIST / "SRT-Translator.exe"
-MAC_APP = DIST / "SRT Translator.app"
+MAC_APP = DIST / "SRT-Translator.app"
 
 
 # ----------------------------
@@ -125,7 +125,7 @@ Windows:
 
 macOS:
   1) Open the DMG, drag "SRT Translator.app" into Applications
-  2) First launch: right–click the app → Open (to bypass Gatekeeper for unsigned apps)
+  2) Launch the app (signed and notarized for Gatekeeper compatibility)
 
 Notes:
   • This GUI build has no external config; required resources are bundled.

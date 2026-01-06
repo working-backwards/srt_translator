@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor
 from srt_translator.gui.ui.toggle_button import AnimatedToggleButton
@@ -275,6 +276,7 @@ class EditConfigurationDialog(QDialog):
 
     def __init__(
         self,
+        settings_manager: SettingsManager,
         dnt_terms: list,
         termbase: dict,
         parent=None,
@@ -285,6 +287,7 @@ class EditConfigurationDialog(QDialog):
         self.modified_terms = dnt_terms.copy()
         self.modified_termbase = termbase.copy()
 
+        self.settings_manager = settings_manager
         self.setup_ui()
         self.connect_signals()
 
@@ -337,6 +340,10 @@ class EditConfigurationDialog(QDialog):
     def on_termbase_changed(self, termbase: dict):
         """Handle termbase changes."""
         self.modified_termbase = termbase
+        self.settings_manager.save_ai_config(
+            dnt_terms=self.modified_terms,
+            termbase=self.modified_termbase
+        )
 
     def get_modified_config(self) -> tuple:
         """Get the modified configuration."""

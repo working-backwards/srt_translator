@@ -5,6 +5,7 @@ Term handler for the SRT Translator.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -42,17 +43,41 @@ class TermHandler:
     """
 
     def __init__(
-        self,
-        dnt_terms: list[str] | None = None,
-        termbase: dict[str, dict[str, str]] | None = None,
-        lang_code: str | None = None,
-        logger: logging.Logger | None = None,
+            self,
+            dnt_terms: list[str] | None = None,
+            termbase: dict[str, dict[str, str]] | None = None,
+            lang_code: str | None = None,
+            logger: logging.Logger | None = None,
     ) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
         self.termbase = termbase or {}
+        self.term_map: dict[str, str] = {}
+        self.patterns: list[tuple[re.Pattern, str]] = []
+        self.termbase_target_map: dict[str, dict[str, str]] = {}
+
+        for lang, entries in self.termbase.items():
+            if isinstance(entries, dict):
+                self.termbase_target_map[lang] = entries.copy()
+            else:
+                # wrap single string entry into a dict with itself as key/value
+                self.termbase_target_map[lang] = {entries: entries}
+
+
+        # Flatten the termbase into term_map for easy lookup
+        for key, value in self.termbase.items():
+            if isinstance(value, dict):
+                for sub_key, sub_val in value.items():
+                    self.term_map[sub_key] = sub_val
+            elif isinstance(value, str):
+                self.term_map[key] = value
+
+        for term, replacement in sorted(self.term_map.items(), key=lambda x: len(x[0]), reverse=True):
+            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            self.patterns.append((pat, replacement))
 
         # Build stable placeholder map once per file/language
+
         self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
@@ -64,6 +89,10 @@ class TermHandler:
             pat = _compile_word_safe_pattern(term)
             ph = self.placeholder_map[term]
             self._patterns.append((pat, term, ph))
+
+        for term in sorted(self.term_map.keys(), key=len, reverse=True):
+            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            self.patterns.append((pat, self.term_map[term]))
 
         self.logger.debug(
             "TermHandler initialized (lang=%s): %d DNT terms, %d TB entries",
@@ -92,11 +121,17 @@ class TermHandler:
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 
+    def load_dnt_terms(self, file_path: str, lang_code: str) -> list[str]:
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_terms = json.load(f)
+        return all_terms.get(lang_code, [])
+
     def apply_dnt_placeholders(self, text: str) -> str:
         """
         Replace DNT terms in `text` with placeholders.
         Longest-first; token-safe; preserves punctuation/spacing.
         """
+
         if not text or not self._patterns:
             return text
 
@@ -105,18 +140,22 @@ class TermHandler:
 
         out = text
         for pat, term, ph in self._patterns:
-            new_out = _sub_once(out, pat, ph)
-            if new_out != out:
-                self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
-                out = new_out
+            # Only apply placeholder if the term is in text
+            if term in out:
+                new_out = _sub_once(out, pat, ph)
+                if new_out != out:
+                    self.logger.debug("Applied DNT placeholder: '%s' → %s", term, ph)
+                    out = new_out
         return out
 
     def restore_dnt_placeholders(self, text: str) -> str:
         """
         Restore placeholders back to original DNT terms in `text`.
         """
+
         if not text or not self.placeholder_map:
             return text
+
         # Reverse mapping: placeholder -> term
         rev = {ph: term for term, ph in self.placeholder_map.items()}
         # Fast path: if no placeholders, return early
@@ -132,6 +171,34 @@ class TermHandler:
         if restored != text:
             self.logger.debug("Restored DNT placeholders in translated text")
         return restored
+
+    def apply_termbase(self, text: str) -> str:
+        """
+        Replace termbase keys in source text before translation.
+        """
+        if not text:
+            return text
+
+        out = text
+        for pat, replacement in self.patterns:
+            out = pat.sub(replacement, out)
+        return out
+
+    def restore_termbase(self, text: str, lang_code: str) -> str:
+        """
+        Restore termbase replacements for a target language.
+        Replaces source-language keys in translated text with corresponding target-language values.
+        """
+        if not text or lang_code not in self.termbase_target_map:
+            return text
+
+        tb_map = self.termbase_target_map[lang_code]
+        out = text
+        for src_term, tgt_term in tb_map.items():
+            # Only replace full word matches
+            pat = re.compile(rf'\b{re.escape(src_term)}\b', re.IGNORECASE)
+            out = pat.sub(tgt_term, out)
+        return out
 
     # Optional artifacts/metrics helpers
     def placeholder_count(self) -> int:

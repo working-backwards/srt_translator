@@ -30,8 +30,8 @@ See `/docs/ai-config.md` for the creator-first workflow and plain-language guida
 ## Quick Start (5 minutes)
 
 ### For GUI Users (Recommended for most users)
-- Download a packaged build from `dist/<platform>/SRT_Translator/` (or from a release zip)
-- Double‑click to run the app (see INSTALLATION.md for OS‑specific notes)
+- Download a packaged build from `dist/<platform>/SRT_Translator/` (or from a release: .exe for Windows, .dmg for macOS, .zip for Linux)
+- Double‑click to run the app (macOS: drag .dmg to Applications; see INSTALLATION.md for OS‑specific notes)
 - Open **API Configuration** in the app and paste your OpenAI API key
 - Add your `.srt` files and click **Translate All Files**
 

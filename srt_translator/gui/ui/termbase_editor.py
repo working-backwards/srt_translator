@@ -202,15 +202,25 @@ class TermbaseEditor(QWidget):
 
     def add_term(self):
         """Add a new term to the termbase."""
-        dialog = AddTermDialog(self.languages, self)
+        dialog = AddTermDialog(list(self.termbase.keys()), self)
         if dialog.exec():
             source_term, translations = dialog.get_data()
             if source_term:
-                self._add_term_to_termbase(source_term, translations)
+                # Add to termbase
+                for language, translation in translations.items():
+                    if language not in self.termbase:
+                        self.termbase[language] = {}
+                    if translation.strip():
+                        self.termbase[language][source_term] = translation.strip()
                 self.refresh_table()
                 self.update_count_label()
                 self.update_button_states()
                 self.termbase_changed.emit(self.termbase)
+                QMessageBox.information(
+                    self,
+                    "Term Added",
+                    f"The term '{source_term}' was successfully added to the termbase."
+                )
 
     def edit_selected_term(self):
         """Edit the selected term."""
@@ -218,7 +228,6 @@ class TermbaseEditor(QWidget):
         if not selected_items:
             return
 
-        # Get the source term from the first column
         row = selected_items[0].row()
         source_term_item = self.table.item(row, 0)
         if not source_term_item:
@@ -226,7 +235,7 @@ class TermbaseEditor(QWidget):
 
         source_term = source_term_item.text()
 
-        # Collect current translations
+        # Current translations
         current_translations = {}
         for col, language in enumerate(self.languages, 1):
             item = self.table.item(row, col)
@@ -236,10 +245,27 @@ class TermbaseEditor(QWidget):
         dialog = EditTermDialog(source_term, current_translations, self.languages, self)
         if dialog.exec():
             new_translations = dialog.get_translations()
-            self._update_term_translations(source_term, new_translations)
+
+            # Update termbase
+            for language, translation in new_translations.items():
+                if language not in self.termbase:
+                    self.termbase[language] = {}
+                if translation.strip():
+                    self.termbase[language][source_term] = translation.strip()
+                elif source_term in self.termbase.get(language, {}):
+                    del self.termbase[language][source_term]
+
+            # Update UI
             self.refresh_table()
             self.update_count_label()
+            self.update_button_states()
             self.termbase_changed.emit(self.termbase)
+
+            QMessageBox.information(
+                self,
+                "Term edited",
+                f"The term '{source_term}' was successfully edited the termbase."
+            )
 
     def remove_selected_term(self):
         """Remove the selected term from all languages."""
@@ -254,23 +280,33 @@ class TermbaseEditor(QWidget):
 
         source_term = source_term_item.text()
 
-        # Count how many languages have this term
         term_count = sum(1 for lang_termbase in self.termbase.values() if source_term in lang_termbase)
 
         reply = QMessageBox.question(
             self,
             "Remove Term",
             f"Remove '{source_term}' from {term_count} language(s)?\n\nThis action cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,  # type: ignore[attr-defined]
-            QMessageBox.No,  # type: ignore[attr-defined]
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
 
-        if reply == QMessageBox.Yes:  # type: ignore[attr-defined]
-            self._remove_term_from_termbase(source_term)
+        if reply == QMessageBox.Yes:
+            # Remove from termbase
+            for lang_termbase in self.termbase.values():
+                if source_term in lang_termbase:
+                    del lang_termbase[source_term]
+
+            # Update UI
             self.refresh_table()
             self.update_count_label()
             self.update_button_states()
             self.termbase_changed.emit(self.termbase)
+
+            QMessageBox.information(
+                self,
+                "Term removed",
+                f"The term '{source_term}' was successfully removed from the termbase."
+            )
 
     def clear_all_terms(self):
         """Clear all terms from the termbase."""
@@ -284,9 +320,9 @@ class TermbaseEditor(QWidget):
             QMessageBox.No,  # type: ignore[attr-defined]
         )
 
-        if reply == QMessageBox.Yes:  # type: ignore[attr-defined]
-            self.termbase.clear()
-            self.languages.clear()
+        if reply == QMessageBox.Yes:
+            for lang_termbase in self.termbase.values():
+                lang_termbase.clear()
             self.refresh_table()
             self.update_count_label()
             self.update_button_states()
@@ -322,14 +358,6 @@ class TermbaseEditor(QWidget):
         self.update_count_label()
         self.termbase_changed.emit(self.termbase)
 
-    def _add_term_to_termbase(self, source_term: str, translations: dict):
-        """Add a new term to the termbase."""
-        for language, translation in translations.items():
-            if language not in self.termbase:
-                self.termbase[language] = {}
-            if translation.strip():
-                self.termbase[language][source_term] = translation.strip()
-
     def _update_term_translations(self, source_term: str, translations: dict):
         """Update translations for an existing term."""
         for language, translation in translations.items():
@@ -340,12 +368,6 @@ class TermbaseEditor(QWidget):
                 self.termbase[language][source_term] = translation.strip()
             elif source_term in self.termbase[language]:
                 del self.termbase[language][source_term]
-
-    def _remove_term_from_termbase(self, source_term: str):
-        """Remove a term from all languages in the termbase."""
-        for language_termbase in self.termbase.values():
-            if source_term in language_termbase:
-                del language_termbase[source_term]
 
     def is_modified(self, original_termbase: dict) -> bool:
         """Check if the termbase has been modified from the original."""

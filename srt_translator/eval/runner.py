@@ -42,8 +42,10 @@ def _find_originals_dir(batch_root: Path) -> Path | None:
     if not base.exists():
         return None
     subs = [d for d in base.iterdir() if d.is_dir()]
+
     if len(subs) == 1:
         return subs[0]
+
     if any(x.suffix.lower() == ".srt" for x in base.glob("*.srt")):
         return base
     return None
@@ -257,7 +259,7 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
     normalized = {
         "version": config.get("version", "unknown"),
         "timestamp": config.get("timestamp", "unknown"),
-        "target_languages": config.get("target_languages", []),
+        "target_languages": config.get("target_languages", []),# RECOMMENDATIONS: Warn if empty
         "dnt_terms": config.get("dnt_terms", []),
         "termbase": {},
     }
@@ -496,6 +498,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
     src_lang_info = {}
     if log.isEnabledFor(logging.DEBUG):
         log.debug("language_config type: %s", type(language_config))
+
     if language_config:
         if log.isEnabledFor(logging.DEBUG):
             try:
@@ -556,17 +559,13 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
 
     # Log coverage information for optional inputs
     dnt_terms = batch_config.get("dnt_terms", [])
-    if not dnt_terms:
-        log.info("No DNT terms provided; continuing without DNT coverage")
-    else:
-        log.debug(f"DNT terms loaded: {len(dnt_terms)} terms")
 
     termbase = batch_config.get("termbase", {})
     if not termbase:
         log.info("No termbase provided; continuing without termbase coverage")
     else:
         covered_langs = [lang for lang, entries in termbase.items() if entries]
-        log.debug(f"Termbase coverage: {len(covered_langs)} languages with custom terms")
+        log.debug(f"Termbase  coverage: {len(covered_langs)} languages with custom terms")
 
     rollup: dict[str, Any] = {
         "batch_label": batch_label,
@@ -667,6 +666,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
                 # Only warn if the source is non-trivial length.
                 src_norm = normalize_for_empty_check(source_cues[cue_idx].text or "")
                 if len(src_norm) < 12:
+                    # RECOMMENDATION: make "12" configurable instead of hard-coded
                     # Very short source fragments are common in re-segmentation; ignore.
                     continue
 

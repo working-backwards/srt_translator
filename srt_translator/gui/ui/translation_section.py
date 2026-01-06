@@ -47,7 +47,7 @@ class TranslationSection(QGroupBox):
 
         # Open HTML Report button
         self.open_html_btn = QPushButton("Open HTML Report")
-        self.open_html_btn.setObjectName("secondaryActionButton")
+        self.open_html_btn.setObjectName("mainActionButton")
         self.open_html_btn.setFixedHeight(50)
         self.open_html_btn.setEnabled(False)  # Disabled by default
 
@@ -105,3 +105,4 @@ class TranslationSection(QGroupBox):
     def update_cost_estimate(self, cost: str):
         """Update the cost estimate display"""
         self.cost_estimate.setText(cost)
+        self.cost_estimate.setVisible(True)

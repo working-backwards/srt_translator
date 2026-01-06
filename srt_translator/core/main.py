@@ -7,12 +7,13 @@ Provides the core translation functionality for both CLI and GUI interfaces.
 import json
 import logging
 import os
-from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 
 from srt_translator import __version__
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.config.models import SummaryDict, TranslationConfig
+from srt_translator.core.translator.fixer import SRTFixer
 from srt_translator.core.translator.translator import SRTTranslator
 
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
@@ -36,8 +37,17 @@ def translate_srt_files(
     Returns:
         SummaryDict: Summary of translation results
     """
+    #  Moved this check to the very top, Immediate RuntimeError — no side effects, cleaner filesystem.
+    if not config.language_policies:
+        raise RuntimeError(
+            "Missing language_policies in TranslationConfig. "
+            "Entry points (GUI/CLI) must load languages.json and inject the policy."
+        )
+
+    # Always logs to file + INFO-level messages appear in log file.
     if logger is None:
         logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
 
     # Create batch directory with timestamp inside the configured output directory
     timestamp = datetime.now()
@@ -61,28 +71,23 @@ def translate_srt_files(
 
     # Stage 3: the core must not read languages.json directly.
     # Language policy is injected by GUI/CLI loaders via config.language_policies.
-    if not config.language_policies:
-        raise RuntimeError(
-            "Missing language_policies in TranslationConfig. "
-            "Entry points (GUI/CLI) must load languages.json and inject the policy."
-        )
+
     language_config = LanguageConfig(config.language_policies)
-    try:
-        num_langs = len(language_config.codes())
-    except AttributeError:
-        # Backward compatibility if codes() is not present
-        num_langs = len(getattr(language_config, "_langs", {}) or {})
+
+    # clear errors if codes() missing.
+    num_langs = len(language_config.codes())
     logger.info("Language policy injected (languages=%d)", num_langs)
 
     # === Same-language guard: drop targets that match detected source ===
+    # Note: We do NOT mutate the caller's config object (it's frozen).
+    # Instead, we compute active_target_languages for this run and use that throughout.
     source_lang = getattr(config, "source_language", None)
     source_code = None
-    try:
-        if isinstance(source_lang, dict):
-            source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
-    except Exception:
-        source_code = None
 
+    if source_lang is not None and isinstance(source_lang, dict):
+        source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
+
+    # Compute the active target languages for this run without mutating config
     if source_code:
         # Compare case-insensitively against requested target codes
         keep = {
@@ -96,15 +101,18 @@ def translate_srt_files(
                 source_code,
                 len(config.target_languages) - len(keep),
             )
-            config = replace(config, target_languages=keep)
-    if isinstance(source_lang, dict) and source_lang.get("mixed"):
+        active_target_languages = keep
+    else:
+        active_target_languages = config.target_languages
+
+    if source_lang and isinstance(source_lang, dict) and source_lang.get("mixed"):
         logger.warning("Detected mixed-language source; proceeding with dominant language.")
 
     # Process each target language
     successful_translations = 0
     total_operations = 0
 
-    for lang_name, lang_code in config.target_languages.items():
+    for lang_name, lang_code in active_target_languages.items():
         if not lang_code:
             logger.warning("Skipping language '%s' with empty code", lang_name)
             continue
@@ -113,7 +121,7 @@ def translate_srt_files(
         logger.info(
             "translated by %s / %s - %s → %s",
             total_operations,
-            len(config.target_languages),
+            len(active_target_languages),
             os.path.basename(file_paths[0]),
             lang_name,
         )
@@ -170,22 +178,25 @@ def translate_srt_files(
     try:
         # Collect the actual batch sizes used for each language
         language_batch_sizes = {}
-        for _lang_name, lang_code in config.target_languages.items():
+        for _lang_name, lang_code in active_target_languages.items():
+            # Record batch size for each processed language
             if lang_code:
                 try:
-                    batch_size_for_lang = language_config.get_target_batch_size(lang_code)
-                    language_batch_sizes[lang_code] = batch_size_for_lang
+                    language_batch_sizes[lang_code] = language_config.get_target_batch_size(lang_code)
                 except Exception:
-                    language_batch_sizes[lang_code] = 5  # Default batch size
+                    language_batch_sizes[lang_code] = 5
 
         manifest_data = {
             "version": __version__,
             "timestamp": ts_str,
             "mode": config.mode,
             "source_files": [os.path.basename(f) for f in file_paths],
-            "target_languages": list(config.target_languages.values()),
-            "dnt_terms": config.dnt_terms,
-            "termbase": config.termbase,
+            "target_languages": list(active_target_languages.values()),
+            # Convert immutable config containers to JSON-friendly types:
+            # - dnt_terms: tuple -> list (json.dump can't serialize tuple directly)
+            # - termbase: MappingProxyType (nested) -> dict of dicts
+            "dnt_terms": list(config.dnt_terms),
+            "termbase": {lang: dict(entries) for lang, entries in config.termbase.items()},
             "language_batch_sizes": language_batch_sizes,
             "aggressiveness": config.aggressiveness,
         }
@@ -211,10 +222,8 @@ def translate_srt_files(
         try:
             import shutil
 
-            source_filename = os.path.basename(file_path)
-            dest_path = os.path.join(originals_dir, source_filename)
-            shutil.copy2(file_path, dest_path)
-            logger.info("Copied source file to originals: %s", source_filename)
+            shutil.copy2(file_path, os.path.join(originals_dir, os.path.basename(file_path)))
+            logger.info("Copied source file to originals: %s", os.path.basename(file_path))
         except Exception as e:
             logger.warning("Failed to copy source file %s: %s", file_path, e)
 
@@ -224,25 +233,9 @@ def translate_srt_files(
     # Batch-level artifacts are now handled by the evaluation system
     # The core translation focuses only on translation, not artifact creation
 
-    # Print summary
-    logger.info(" === Translation Summary ===")
-    logger.info("Files processed: %s", len(file_paths))
-    logger.info("Languages processed: %s", len(config.target_languages))
-    logger.info("Total translation operations: %s", total_operations)
-    logger.info("Successful translations: %s", successful_translations)
-    logger.info("Failed translations: %s", total_operations - successful_translations)
-    logger.info("==========================")
-
-    # Remove file handler to avoid duplicate logging
-    logger.removeHandler(file_handler)
-
     # Run SRT fixer (post-eval, batch-wide)
     logger.info("Running SRT fixer (post-eval, batch-wide)...")
     try:
-        from pathlib import Path
-
-        from srt_translator.core.translator.fixer import SRTFixer
-
         # Temporarily attach file handler to fixer's logger
         fixer_logger = logging.getLogger("srt_translator.core.translator.fixer")
         fixer_logger.addHandler(file_handler)
@@ -252,15 +245,26 @@ def translate_srt_files(
 
         # Remove file handler from fixer's logger
         fixer_logger.removeHandler(file_handler)
+        logger.info("SRT fixer completed successfully.")
     except Exception as e:
         logger.error("Failed to run SRT fixer: %s", e)
 
-    logger.info("SRT fixer completed.")
+    # Print summary - compact readable summary at end of log.
+    logger.info(" === Translation Summary ===")
+    logger.info("Files processed: %s", len(file_paths))
+    logger.info("Languages processed: %s", len(active_target_languages))
+    logger.info("Total translation operations: %s", total_operations)
+    logger.info("Successful translations: %s", successful_translations)
+    logger.info("Failed translations: %s", total_operations - successful_translations)
+    logger.info("==========================")
+
+    # Each batch run logs only once, cleanly.
+    logger.removeHandler(file_handler)
 
     # Return summary of translation results with batch directory
     return {
         "total_files": len(file_paths),
-        "unique_languages": len(config.target_languages),
+        "unique_languages": len(active_target_languages),
         "total_operations": total_operations,
         "successes": successful_translations,
         "skipped": 0,

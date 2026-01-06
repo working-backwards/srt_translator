@@ -44,10 +44,6 @@ class LanguageConfig:
         popular = lang_info.get("popular")
         return bool(popular) if popular is not None else False
 
-    def get_language_codes(self) -> list[str]:
-        """Get list of all language codes"""
-        return list(self.get_all_languages().keys())
-
     def get_language_names(self) -> dict[str, str]:
         """Get mapping of language codes to display names"""
         languages = self.get_all_languages()
@@ -100,18 +96,27 @@ class LanguageConfig:
         return int(cap)
 
     def get_target_batch_size(self, code: str) -> int:
-        """Get the target batch size for a language."""
+        """
+        Get the target batch size for a language.
+
+        Returns the language-specific override if present, otherwise falls back
+        to the policy default. Uses explicit key checks to correctly handle 0 values
+        (using 'or' would incorrectly treat 0 as missing and fall through to default).
+        """
         languages = self.get_all_languages()
-        lang_info = languages.get(code, {})
-        # Check language-specific override first
+        lang_info = languages.get(code, {}) or {}
+
+        # Check language-specific override first (explicit key check honors 0)
         if "target_batch_size" in lang_info:
             return int(lang_info["target_batch_size"])
-        # Check policy defaults
+
+        # Fallback to policy default (explicit key check honors 0)
         if "target_batch_size" in self._defaults:
             return int(self._defaults["target_batch_size"])
-        # Log the error before raising
+
+        # Not found in either location -> configuration error
         self.logger.error("Missing target_batch_size for language %s and no policy default", code)
-        raise ValueError(f"Missing target_batch_size for language {code} and no policy default")
+        raise RuntimeError(f"Missing target_batch_size for language {code} and no policy default")
 
     def get_max_batch_size(self, code: str) -> int:
         """Get the maximum batch size for a language."""
@@ -173,7 +178,7 @@ class LanguageConfig:
 
     def get_family_defaults(self, family: str) -> dict:
         """Get family-level defaults for language configuration"""
-        return (self._config.get("family_defaults") or {}).get(family, {})
+        return (self._raw.get("family_defaults") or {}).get(family, {})
 
     # Orphan/protected lists are removed (no reflow/wrapping policy).
 

@@ -8,21 +8,11 @@ import hashlib
 import logging
 import os
 from datetime import datetime
-from typing import Any, NamedTuple
+from typing import Any
 
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
-
-
-class AIConfigTriple(NamedTuple):
-    """Runtime-typed contract for load_ai_config()."""
-
-    dnt_terms: list[str]
-    termbase: dict[str, dict[str, str]]
-    # Allow None at the type level for future-proofing, but we currently
-    # return {} when not present to avoid breaking existing callers.
-    source_language: dict[str, Any] | None
 
 
 class SettingsManager:
@@ -73,16 +63,18 @@ class SettingsManager:
         file_hash = self._calculate_file_hash()
         self.settings.setValue("ai_config_file_hash", file_hash)
 
-    def load_ai_config(self) -> AIConfigTriple:
+
+    def load_ai_config(self) -> tuple[list[str], dict[str, dict[str, str]], dict[str, Any]]:
         """Load AI-generated configuration as a stable 3-tuple.
         Returns:
-            AIConfigTriple(dnt_terms, termbase, source_language)
+            tuple(dnt_terms, termbase, source_language)
         """
+
         dnt_terms = self.settings.value("ai_dnt_terms", [])
         termbase = self.settings.value("ai_termbase", {})
         source_language = self.settings.value("ai_source_language", {})
 
-        # Defensive normalization: QSettings may hand back unexpected types.
+        # Defensive normalization: QSettings may hand back unexpected types
         if not isinstance(dnt_terms, list):
             dnt_terms = []
         if not isinstance(termbase, dict):
@@ -90,7 +82,7 @@ class SettingsManager:
         if not isinstance(source_language, dict):
             source_language = {}
 
-        return AIConfigTriple(dnt_terms, termbase, source_language)
+        return dnt_terms, termbase, source_language
 
     def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
         """Check if AI configuration is recent"""
@@ -202,7 +194,6 @@ class SettingsManager:
             # Fill up to the limit
             additional_languages = remaining_defaults[: popular_limit - len(user_preferences)]
             return user_preferences + additional_languages
-
         # If user has enough preferences, use them (up to the limit)
         return user_preferences[:popular_limit]
 

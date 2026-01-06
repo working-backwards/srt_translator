@@ -25,7 +25,7 @@ class _DummyClient:
     class chat:
         class completions:
             @staticmethod
-            def create(**kwargs):
+            def create():
                 return _DummyClient._Resp(
                     content='{"items":[{"id":1,"tgt":"__DNT_TERM_1__ Hello"}, {"id":2,"tgt":""}, {"id":3,"tgt":"World __DNT_TERM_2__"}]}'
                 )

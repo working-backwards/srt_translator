@@ -81,3 +81,5 @@ gui_design*.md
 site/
 
 THIRD_PARTY_LICENSES.txt
+
+SRTTranslator.spec

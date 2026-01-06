@@ -5,7 +5,10 @@ Main window for the SRT Translator application.
 
 import logging
 import os
+import time
 from pathlib import Path
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -201,7 +204,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         # Translation Section signals
-        self.translation_section.connect_signals(self.start_translation, self.on_open_html_clicked)
+        self.translation_section.connect_signals(self.start_translation, self._open_html_report)
 
     def load_previous_settings(self):
         """Load previous settings from storage"""
@@ -243,19 +246,38 @@ class SRTTranslatorMainWindow(QMainWindow):
     def test_api_connection(self):
         """Test the OpenAI API connection"""
         api_key = self.api_section.get_api_key()
+
         if not api_key:
             self.api_section.show_error("Please enter an API key")
+            self.api_section.set_connected_status(False)
             return
 
-        # Save API key
-        self.settings_manager.save_api_key(api_key)
+        self.api_section.clear_error()
+        self.api_section.status_indicator.setText("Testing connection...")
 
-        # Test connection (simplified - just check if key is valid format)
-        if api_key.startswith("sk-") and len(api_key) > 20:
+        ok, error = self._validate_openai_key(api_key)
+
+        if ok:
+            self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
-            self.api_section.clear_error()
+            QMessageBox.information(
+                self,
+                "API Connection Successful",
+                "✅ API connected successfully."
+            )
         else:
-            self.api_section.show_error("Invalid API key format")
+            self.api_section.set_connected_status(False)
+            self.api_section.show_error(error)
+
+    def _validate_openai_key(self, api_key: str) -> tuple[bool, str | None]:
+                try:
+                    client = OpenAI(api_key=api_key)
+                    client.models.list()
+                    return True, None
+                except AuthenticationError:
+                    return False, "Invalid OpenAI API key."
+                except Exception as e:
+                    return False, str(e)
 
     def show_api_input(self):
         """Show the API input field when Edit Settings is clicked"""
@@ -574,7 +596,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(dnt_terms, termbase, self)
+        dialog = EditConfigurationDialog(self.settings_manager,dnt_terms, termbase)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
@@ -694,6 +716,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         if not selected_files or not target_languages:
             self.translation_section.update_cost_estimate("$0.00")
+            self.translation_section.cost_estimate.setVisible(True)
             return
 
         # Simple cost estimation: $0.002 per 1K tokens
@@ -708,7 +731,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         if not dnt_terms and not termbase:
             estimated_cost += 0.10  # AI configuration cost
 
-        cost_text = f"${estimated_cost:.2f}"
+        cost_text = f"${estimated_cost:.3f}"
         self.translation_section.update_cost_estimate(cost_text)
 
     # Translation Section Handlers
@@ -716,7 +739,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Start the translation process"""
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
-            self.mem_timer.start(30000)
+            self.mem_timer.start(300000)
 
         # Disable HTML report button when starting new translation
         self.translation_section.open_html_btn.setEnabled(False)
@@ -876,29 +899,32 @@ class SRTTranslatorMainWindow(QMainWindow):
             rss = self._proc.memory_info().rss
             growth_mb = (rss - self._rss0) / (1024 * 1024)
 
-            # Log memory usage every 5 minutes (10 samples)
-            if hasattr(self, "_mem_sample_count"):
-                self._mem_sample_count += 1
-            else:
-                self._mem_sample_count = 1
+            # Track sample timestamp (instead of arbitrary counter)
+            now = time.time()
+            if not hasattr(self, "_last_mem_sample_time"):
+                self._last_mem_sample_time = now
 
-            if self._mem_sample_count % 10 == 0:  # Every 5 minutes
+            # Only log every 5 minutes
+            if now - self._last_mem_sample_time >= 300:
+                self._last_mem_sample_time = now
                 self.logger.debug("Memory usage: %.1f MB growth since start", growth_mb)
 
             # Warn if memory growth exceeds 1GB
-            if growth_mb > 1000 and not self._memory_warning_shown:
-                self._memory_warning_shown = True
-                self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
+            # === Preventive Mitigation for High Memory ===
+            if growth_mb > 1000 and not self._memory_warning_shown:  # Over 1 GB growth
+                 if not getattr(self, "_memory_warning_shown", False):
+                    self._memory_warning_shown = True
+                    self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
                 # Show warning to user
-                QMessageBox.warning(
-                    self,
-                    "High Memory Usage",
-                    f"Memory usage has grown significantly ({growth_mb:.1f} MB).\n"
-                    "Consider restarting the application after completing the current "
-                    "translation.\n\n"
-                    "This helps prevent crashes during long translation sessions.",
-                )
+                    QMessageBox.warning(
+                        self,
+                        "High Memory Usage",
+                        f"Memory usage has grown significantly ({growth_mb:.1f} MB).\n"
+                        "Consider restarting the application after completing the current "
+                        "translation.\n\n"
+                        "This helps prevent crashes during long translation sessions.",
+                    )
         except Exception as e:
             self.logger.error("Error sampling memory: %s", e)
 
@@ -921,27 +947,3 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         self.logger.info("Target languages (UI): %s", list(target_languages.values()))
         return target_languages
-
-    def _after_eval_finished(self, report_paths: dict) -> None:
-        """Handle evaluation completion - store all report paths"""
-        self._last_eval_json = Path(report_paths["eval_report_json"])
-        self._last_eval_html = Path(report_paths["eval_report_html"])
-        self._last_eval_md = Path(report_paths["eval_report_md"])
-        self._last_report_v1 = Path(report_paths["report_v1_json"])
-
-        self.logger.info("Eval report ready: %s", self._last_eval_json)
-        self.logger.info("HTML report available: %s", self._last_eval_html)
-        self.logger.info("MD report available: %s", self._last_eval_md)
-
-        # Enable the HTML button
-        self.translation_section.open_html_btn.setEnabled(True)
-
-    def on_open_html_clicked(self):
-        """Handle Open HTML Report button click"""
-        p = getattr(self, "_last_eval_html", None)
-        if not p or not Path(p).exists():
-            QMessageBox.warning(self, "HTML Report", "No HTML report available yet.")
-            return
-        import webbrowser
-
-        webbrowser.open(str(p))

@@ -11,7 +11,6 @@ import uuid
 from collections import deque
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtCore import Signal as pyqtSignal
@@ -25,6 +24,7 @@ from srt_translator.eval.runner import run_batch_evaluation
 # (Fixer now runs in core automatically)
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
+from srt_translator.gui.settings_manager import SettingsManager
 
 
 def _load_language_policies(selected_codes: list[str]) -> dict:
@@ -68,7 +68,7 @@ class TranslationWorker(QObject):
         api_key: str,
         selected_files: list[str],
         target_languages: dict[str, str],
-        settings_manager: Any | None = None,
+        settings_manager: SettingsManager | None = None,
         output_directory: str | None = None,
     ):
         super().__init__()
@@ -90,9 +90,6 @@ class TranslationWorker(QObject):
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
         # Logging bridge state
-        self._log_listener = None
-        self._log_queue_handler = None
-        self._log_logger = None
 
     def request_stop(self):
         """Request cooperative stop of the worker"""
@@ -177,112 +174,135 @@ class TranslationWorker(QObject):
             )
 
             # Build configuration from GUI settings manager
+            # Architecture note: We load AI config and perform same-language filtering
+            # at this boundary, then construct an immutable TranslationConfig.
+            # The core engine receives a complete, frozen config object.
+
+            try:
+                lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+            except Exception as e:
+                self.logger.warning("Failed to load language policies, using defaults: %s", e)
+                lang_policies = {}
+
+            # Load AI config (DNT terms, termbase, source language) before creating config
+            dnt_terms: list[str] = []
+            termbase: dict[str, dict[str, str]] = {}
+            source_language: dict[str, object] | None = None
+
             if self.settings_manager:
-                # Load DNT terms, termbase, and source language from settings manager BEFORE creating config
-                dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-
-                # Load language policies for selected target languages
-                lang_policies = {}
                 try:
-                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
+                    dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
+                    # Defensive normalization
+                    if not isinstance(dnt_terms, list):
+                        dnt_terms = []
+                    if not isinstance(termbase, dict):
+                        termbase = {}
+                    if not isinstance(source_language, dict):
+                        source_language = {}
+                    if termbase:
+                        self.logger.info("Termbase languages: %s", list(termbase.keys()))
                 except Exception as e:
-                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
-                    # Continue with empty policies - will use defaults
+                    self.logger.warning("Failed to load AI config from settings manager: %s", e)
 
-                # Build config from settings manager with actual data
-                api_cfg = TranslationConfig(
-                    files=[Path(p) for p in self.selected_files],
-                    output_directory=Path(self.output_directory or "translated_srt_files"),
-                    target_languages=self.target_languages,
-                    dnt_terms=dnt_terms,
-                    termbase=termbase,
-                    model_name="gpt-4o-mini",
-                    aggressiveness=0.75,
-                    log_mode="Standard",
-                    api_key=self.api_key,
-                    mode="GUI",
-                    source_language=source_language,
-                    language_policies=lang_policies,
-                )
-                self.logger.info(
-                    "Using configuration from settings manager: %s languages",
-                    len(api_cfg.target_languages),
-                )
-                self.logger.info("DNT terms loaded: %s", len(api_cfg.dnt_terms))
-                self.logger.info("Termbase languages loaded: %s", len(api_cfg.termbase))
-                if api_cfg.termbase:
-                    self.logger.info("Termbase languages: %s", list(api_cfg.termbase.keys()))
-            else:
-                # Load language policies for selected target languages
-                lang_policies = {}
-                try:
-                    lang_policies = _load_language_policies(list((self.target_languages or {}).values()))
-                except Exception as e:
-                    self.logger.warning("Failed to load language policies, using defaults: %s", e)
-                    # Continue with empty policies - will use defaults
+            # Same-language filtering: remove targets identical to detected source language.
+            # This logic belongs at the GUI boundary so the core engine receives clean config.
+            filtered_target_languages = self.target_languages
+            try:
+                if source_language and isinstance(source_language, dict):
+                    source_code = (
+                        source_language.get("normalized_code") or source_language.get("detected_code") or ""
+                    ).strip()
+                    if source_code:
+                        # Filter out target languages matching the source
+                        keep = {
+                            name: code
+                            for name, code in (self.target_languages or {}).items()
+                            if (code or "").strip().lower() != source_code.lower()
+                        }
+                        if len(keep) != len(self.target_languages):
+                            self.logger.warning(
+                                "Dropping target identical to detected source (%s); %s target(s) removed.",
+                                source_code,
+                                len(self.target_languages) - len(keep),
+                            )
+                        filtered_target_languages = keep
+            except Exception:
+                # Be defensive: if filtering fails, fall back to original target set
+                self.logger.exception("Failed to filter same-language targets - proceeding without filtering")
 
-                # Fallback to direct parameters
-                api_cfg = TranslationConfig(
-                    files=[Path(p) for p in self.selected_files],
-                    output_directory=Path(self.output_directory or "translated_srt_files"),
-                    target_languages=self.target_languages,
-                    dnt_terms=[],
-                    termbase={},
-                    model_name="gpt-4o-mini",
-                    aggressiveness=0.75,
-                    log_mode="Standard",
-                    api_key=self.api_key,
-                    mode="GUI",
-                    language_policies=lang_policies,
-                )
-                self.logger.info(
-                    "Using configuration from direct parameters: %s languages",
-                    len(api_cfg.target_languages),
-                )
+            # Convert DNT/termbase into immutable shapes (tuple + MappingProxyType)
+            # This enforces read-only semantics in the core engine.
+            from types import MappingProxyType
+
+            dnt_tuple = tuple(dnt_terms or ())
+
+            # Build nested immutable termbase: outer and inner mappings are both MappingProxyType
+            safe_tb_outer = {}
+            for lang, inner in (termbase or {}).items():
+                if isinstance(inner, dict):
+                    # Copy to avoid aliasing to caller's mutable data
+                    safe_tb_outer[lang] = MappingProxyType(dict(inner))
+            termbase_proxy = MappingProxyType(safe_tb_outer)
+
+            # Construct the immutable, complete TranslationConfig
+            api_cfg = TranslationConfig(
+                files=[Path(p) for p in self.selected_files],
+                output_directory=Path(self.output_directory or "translated_srt_files"),
+                target_languages=filtered_target_languages,
+                dnt_terms=dnt_tuple,
+                termbase=termbase_proxy,
+                model_name="gpt-4o-mini",
+                aggressiveness=0.75,
+                log_mode="Standard",
+                api_key=self.api_key,
+                mode="GUI",
+                language_policies=lang_policies,
+                source_language=source_language,
+            )
+
+            self.logger.info(
+                "Using configuration from settings manager: %s languages",
+                len(api_cfg.target_languages),
+            )
 
             # Check for cooperative stop before starting translation
             if self.is_stopped():
                 self.logger.info("Translation stopped by user request")
                 return
 
-            # Run the translation
-            # Capture both stdout and logging output
-            from srt_translator.api import Translator as _GuiTranslator
-
-            # Let the core engine handle its own logging to files
-            # The GUI will display progress through the existing progress signals
-
-            # Capture stdout output
+            # Run translation and capture stdout
             output = io.StringIO()
+
             with redirect_stdout(output):
-                # Call translation with configuration object
-                results = _GuiTranslator(api_cfg).run()
+                from srt_translator.api import Translator as _GuiTranslator
+
+                try:
+                    results = _GuiTranslator(api_cfg).run()
+                except Exception as e:
+                    self.logger.error("Translation session failed: %s", e)
+                    raise e
 
             # Remember returned paths for fixer and UI
             self.log_file = results.get("log_file") if results else None
             self.batch_dir = results.get("batch_dir") if results else None
 
-            # Check for cooperative stop before completion
+            # Check again after translation
             if self.is_stopped():
                 self.logger.info("Translation stopped by user request before completion")
                 return
 
-            # Capture any stdout output and chunk it if large
-            stdout_output = output.getvalue()
-            if stdout_output.strip():
-                output_lines = stdout_output.strip().split("\n")
-                if len(output_lines) > 10:
-                    # Chunk large outputs to prevent GUI issues
-                    for i in range(0, len(output_lines), 10):
-                        chunk = output_lines[i : i + 10]
-                        self._throttled_emit(
-                            self.progress_updated,
-                            f"Translation output (part {i // 10 + 1}): " + "\n".join(chunk),
-                        )
-                else:
+            # Capture stdout output and chunk if large
+            stdout_output = output.getvalue().strip()
+            if stdout_output:
+                output_lines = stdout_output.split("\n")
+                chunk_size = 10
+                for i in range(0, len(output_lines), chunk_size):
+                    chunk = output_lines[i : i + chunk_size]
+                    part_num = (i // chunk_size) + 1
+                    part_suffix = f" (part {part_num})" if len(output_lines) > chunk_size else ""
                     self._throttled_emit(
                         self.progress_updated,
-                        f"Translation output: {stdout_output.strip()}",
+                        f"Translation output{part_suffix}: " + "\n".join(chunk),
                     )
 
             # Store results for potential fixer use
@@ -373,7 +393,7 @@ class TranslationWorker(QObject):
                     self.logger.warning("No batch directory found for evaluation")
 
             except Exception as e:
-                self.logger.error("Evaluation failed", extra={"error": str(e)}, exc_info=True)
+                self.logger.exception("Evaluation failed", extra={"error": str(e)})
                 # Don't fail the translation - evaluation is optional
                 self._throttled_emit(
                     self.progress_updated,
@@ -385,7 +405,7 @@ class TranslationWorker(QObject):
 
         except Exception as e:
             error_msg = f"Translation failed: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.exception(error_msg)
             # Emit error via signal (thread-safe)
             self.translation_error.emit(error_msg)
         finally:

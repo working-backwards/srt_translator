@@ -60,7 +60,7 @@ class AIConfigGenerator:
 
     def get_supported_languages(self) -> list[str]:
         """Get all supported languages from unified configuration"""
-        return self._lang_cfg.get_language_codes()
+        return self._lang_cfg.codes()
 
     def get_supported_language_names(self) -> list[str]:
         """Get all supported language names from unified configuration"""
