@@ -39,7 +39,7 @@ ADD_DATA_2 = f"{RUBRIC_FILE}{SEP}srt_translator/config"
 # ------------------------------
 args = [
     "--clean",
-    "--name=SRTTranslator",
+    "--name=SRT-Translator",
     f"--add-data={ADD_DATA_1}",
     f"--add-data={ADD_DATA_2}",
 ]
