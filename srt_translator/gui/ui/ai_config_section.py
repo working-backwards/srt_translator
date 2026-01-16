@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QProgressBar,
     QPushButton,
     QTabWidget,
@@ -73,8 +74,82 @@ class AIConfigSection(QGroupBox):
             "Analyze your selected subtitle files to automatically identify:\n"
             "• Terms that should not be translated (company names, technical terms)\n"
             "• Important business vocabulary that needs consistent translation\n\n"
-            "Takes 30-60 seconds. Requires OpenAI API key."
+            "Takes 30-60 seconds. Requires OpenAI API key.\n\n"
+            "Note: If you have imported termbase/DNT files, they will be merged with AI-generated results."
         )
+
+        # Import buttons layout
+        import_layout = QHBoxLayout()
+        self.import_termbase_btn = QPushButton("Import Termbase")
+        self.import_termbase_btn.setObjectName("secondaryButton")
+        self.import_termbase_btn.setToolTip(
+            "Import your own termbase JSON file.\n"
+            "Format: {\"lang_code\": {\"source_term\": \"translation\", ...}, ...}\n"
+            "User-provided entries will take precedence over AI-generated ones."
+        )
+        
+        self.import_dnt_btn = QPushButton("Import DNT Terms")
+        self.import_dnt_btn.setObjectName("secondaryButton")
+        self.import_dnt_btn.setToolTip(
+            "Import your own DNT (Do Not Translate) terms.\n"
+            "Supports JSON array format: [\"term1\", \"term2\", ...]\n"
+            "Or text file: one term per line.\n"
+            "User-provided terms will take precedence over AI-generated ones."
+        )
+        
+        import_layout.addWidget(self.import_termbase_btn)
+        import_layout.addWidget(self.import_dnt_btn)
+        import_layout.addStretch()
+
+        # URL fetch section
+        url_layout = QVBoxLayout()
+        url_layout.setSpacing(8)
+        
+        url_label = QLabel("Or fetch from URL:")
+        url_label.setStyleSheet("color: #6B7280; font-size: 12px; font-weight: 500;")
+        
+        # Termbase URL
+        termbase_url_layout = QHBoxLayout()
+        termbase_url_label = QLabel("Termbase URL:")
+        termbase_url_label.setMinimumWidth(100)
+        self.termbase_url_input = QLineEdit()
+        self.termbase_url_input.setPlaceholderText("https://example.com/termbase.json")
+        self.termbase_url_input.setToolTip(
+            "Enter a URL to fetch termbase JSON from.\n"
+            "The URL will be saved and fetched automatically when generating settings."
+        )
+        self.fetch_termbase_btn = QPushButton("Fetch")
+        self.fetch_termbase_btn.setObjectName("secondaryButton")
+        self.fetch_termbase_btn.setFixedWidth(80)
+        self.fetch_termbase_btn.setToolTip("Fetch termbase from the URL above")
+        
+        termbase_url_layout.addWidget(termbase_url_label)
+        termbase_url_layout.addWidget(self.termbase_url_input)
+        termbase_url_layout.addWidget(self.fetch_termbase_btn)
+        
+        # DNT URL
+        dnt_url_layout = QHBoxLayout()
+        dnt_url_label = QLabel("DNT Terms URL:")
+        dnt_url_label.setMinimumWidth(100)
+        self.dnt_url_input = QLineEdit()
+        self.dnt_url_input.setPlaceholderText("https://example.com/dnt_terms.json")
+        self.dnt_url_input.setToolTip(
+            "Enter a URL to fetch DNT terms from.\n"
+            "Supports JSON array or text format.\n"
+            "The URL will be saved and fetched automatically when generating settings."
+        )
+        self.fetch_dnt_btn = QPushButton("Fetch")
+        self.fetch_dnt_btn.setObjectName("secondaryButton")
+        self.fetch_dnt_btn.setFixedWidth(80)
+        self.fetch_dnt_btn.setToolTip("Fetch DNT terms from the URL above")
+        
+        dnt_url_layout.addWidget(dnt_url_label)
+        dnt_url_layout.addWidget(self.dnt_url_input)
+        dnt_url_layout.addWidget(self.fetch_dnt_btn)
+        
+        url_layout.addWidget(url_label)
+        url_layout.addLayout(termbase_url_layout)
+        url_layout.addLayout(dnt_url_layout)
 
         # Action buttons for configured state
         self.action_buttons = QHBoxLayout()
@@ -150,6 +225,8 @@ class AIConfigSection(QGroupBox):
         self.termbase_display.setMaximumHeight(120)
 
         content_layout.addWidget(self.generate_btn)
+        content_layout.addLayout(import_layout)
+        content_layout.addLayout(url_layout)
         content_layout.addLayout(self.action_buttons)
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
@@ -169,6 +246,10 @@ class AIConfigSection(QGroupBox):
         regenerate_callback,
         view_details_callback,
         help_callback,
+        import_termbase_callback,
+        import_dnt_callback,
+        fetch_termbase_callback,
+        fetch_dnt_callback,
     ):
         """Connect button signals to callbacks"""
         self.toggle_btn.clicked.connect(toggle_callback)
@@ -177,6 +258,26 @@ class AIConfigSection(QGroupBox):
         self.regenerate_btn.clicked.connect(regenerate_callback)
         self.view_details_btn.clicked.connect(view_details_callback)
         self.help_btn.clicked.connect(help_callback)
+        self.import_termbase_btn.clicked.connect(import_termbase_callback)
+        self.import_dnt_btn.clicked.connect(import_dnt_callback)
+        self.fetch_termbase_btn.clicked.connect(fetch_termbase_callback)
+        self.fetch_dnt_btn.clicked.connect(fetch_dnt_callback)
+
+    def get_termbase_url(self) -> str:
+        """Get the termbase URL from the input field"""
+        return self.termbase_url_input.text().strip()
+
+    def set_termbase_url(self, url: str) -> None:
+        """Set the termbase URL in the input field"""
+        self.termbase_url_input.setText(url)
+
+    def get_dnt_url(self) -> str:
+        """Get the DNT URL from the input field"""
+        return self.dnt_url_input.text().strip()
+
+    def set_dnt_url(self, url: str) -> None:
+        """Set the DNT URL in the input field"""
+        self.dnt_url_input.setText(url)
 
     def toggle_expansion(self):
         """Toggle the Translation Settings section expansion"""

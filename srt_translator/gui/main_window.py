@@ -7,8 +7,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -23,6 +21,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.gui.ai_config import AIConfigGenerator
@@ -34,6 +34,14 @@ from srt_translator.gui.ui.api_section import APISection
 from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.translation_section import TranslationSection
+from srt_translator.gui.utils.termbase_merger import (
+    fetch_dnt_terms_from_url,
+    fetch_termbase_from_url,
+    load_dnt_terms_from_file,
+    load_termbase_from_file,
+    merge_dnt_terms,
+    merge_termbase,
+)
 from srt_translator.gui.utils.validation import (
     show_translation_error,
     show_translation_results,
@@ -201,6 +209,10 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.regenerate_translation_settings,
             self.view_translation_settings_details,
             self.show_ai_config_help,
+            self.import_termbase_file,
+            self.import_dnt_file,
+            self.fetch_termbase_from_url,
+            self.fetch_dnt_from_url,
         )
 
         # Translation Section signals
@@ -233,6 +245,14 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.update_termbase_display(termbase)
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
+        
+        # Load saved URLs
+        termbase_url = self.settings_manager.load_termbase_url()
+        dnt_url = self.settings_manager.load_dnt_url()
+        if termbase_url:
+            self.ai_config_section.set_termbase_url(termbase_url)
+        if dnt_url:
+            self.ai_config_section.set_dnt_url(dnt_url)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""
@@ -397,6 +417,35 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         self.logger.info("Selected files: %s", [os.path.basename(f) for f in selected_files])
 
+        # Load user-provided termbase and DNT terms if they exist
+        user_termbase = self.settings_manager.load_user_termbase()
+        user_dnt_terms = self.settings_manager.load_user_dnt_terms()
+        
+        # Also fetch from URLs if configured
+        termbase_url = self.settings_manager.load_termbase_url()
+        dnt_url = self.settings_manager.load_dnt_url()
+        
+        if termbase_url:
+            self.logger.info("Fetching termbase from URL: %s", termbase_url)
+            url_termbase = fetch_termbase_from_url(termbase_url, self.logger)
+            if url_termbase:
+                # Merge URL termbase with existing user termbase (URL takes precedence)
+                user_termbase = merge_termbase(ai_generated=user_termbase, user_provided=url_termbase)
+                self.logger.info("Fetched termbase from URL: %s languages", len(url_termbase))
+        
+        if dnt_url:
+            self.logger.info("Fetching DNT terms from URL: %s", dnt_url)
+            url_dnt_terms = fetch_dnt_terms_from_url(dnt_url, self.logger)
+            if url_dnt_terms:
+                # Merge URL DNT terms with existing user DNT terms (URL takes precedence)
+                user_dnt_terms = merge_dnt_terms(ai_generated=user_dnt_terms, user_provided=url_dnt_terms)
+                self.logger.info("Fetched DNT terms from URL: %s terms", len(url_dnt_terms))
+        
+        if user_termbase:
+            self.logger.info("User-provided termbase will be merged: %s languages", len(user_termbase))
+        if user_dnt_terms:
+            self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
+
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
             self.ai_config_generator = AIConfigGenerator(api_key, self.language_config)
@@ -411,11 +460,13 @@ class SRTTranslatorMainWindow(QMainWindow):
             error = Signal(str)
             progress = Signal(str)  # Add progress signal for GUI updates
 
-            def __init__(self, ai_generator, files, languages):
+            def __init__(self, ai_generator, files, languages, user_termbase, user_dnt_terms):
                 super().__init__()
                 self.ai_generator = ai_generator
                 self.files = files
                 self.languages = languages
+                self.user_termbase = user_termbase
+                self.user_dnt_terms = user_dnt_terms
                 self.logger = logging.getLogger(__name__)
 
                 # Set up logging bridge to capture AI config logs
@@ -433,14 +484,28 @@ class SRTTranslatorMainWindow(QMainWindow):
                         source_file_paths=self.files, target_lang_codes=self.languages
                     )
 
-                    progress_msg = f"AI Config Worker: Generated {len(batch_config.dnt_terms)} DNT terms and termbase for {len(batch_config.termbase)} languages (batch-level)"
+                    # Merge user-provided termbase and DNT terms with AI-generated ones
+                    merged_dnt = merge_dnt_terms(
+                        ai_generated=batch_config.dnt_terms,
+                        user_provided=self.user_dnt_terms,
+                    )
+                    merged_termbase = merge_termbase(
+                        ai_generated=batch_config.termbase,
+                        user_provided=self.user_termbase,
+                    )
+
+                    progress_msg = (
+                        f"AI Config Worker: Generated {len(batch_config.dnt_terms)} AI DNT terms "
+                        f"(merged to {len(merged_dnt)} total) and termbase for {len(batch_config.termbase)} languages "
+                        f"(merged to {len(merged_termbase)} languages)"
+                    )
                     self.progress.emit(progress_msg)
                     self.logger.info(progress_msg)
 
                     self.finished.emit(
                         (
-                            batch_config.dnt_terms,
-                            batch_config.termbase,
+                            merged_dnt,
+                            merged_termbase,
                             batch_config.source_language,
                         )
                     )
@@ -491,7 +556,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create and start worker thread
         self.ai_config_thread = QThread()
         self.ai_config_worker = AIConfigWorker(
-            self.ai_config_generator, selected_files, target_codes
+            self.ai_config_generator, selected_files, target_codes, user_termbase, user_dnt_terms
         )
         self.ai_config_worker.moveToThread(self.ai_config_thread)
 
@@ -632,6 +697,314 @@ class SRTTranslatorMainWindow(QMainWindow):
         if not self.ai_config_section.is_expanded:
             self.ai_config_section.toggle_expansion()  # Ensure section is expanded
         self.generate_translation_settings()
+
+    def import_termbase_file(self):
+        """Import termbase from a JSON file"""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("JSON Files (*.json);;All Files (*)")
+        
+        last_dir = self.settings_manager.load_last_input_directory()
+        if last_dir and os.path.exists(last_dir):
+            file_dialog.setDirectory(last_dir)
+        else:
+            file_dialog.setDirectory(os.getcwd())
+        
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            if selected_files:
+                file_path = selected_files[0]
+                self.logger.info("Importing termbase from %s", file_path)
+                
+                # Load termbase from file
+                termbase = load_termbase_from_file(file_path, self.logger)
+                
+                if termbase:
+                    # Save user-provided termbase
+                    self.settings_manager.save_user_termbase(termbase)
+                    
+                    # If we already have AI-generated config, merge and update
+                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+                    if ai_tb:
+                        merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
+                        self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
+                        self.ai_config_section.update_termbase_display(merged)
+                        QMessageBox.information(
+                            self,
+                            "Termbase Imported",
+                            f"Successfully imported termbase with {len(termbase)} languages.\n"
+                            f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                            f"The termbase has been merged with existing AI-generated settings.",
+                        )
+                    else:
+                        QMessageBox.information(
+                            self,
+                            "Termbase Imported",
+                            f"Successfully imported termbase with {len(termbase)} languages.\n"
+                            f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                            f"The termbase will be merged when you generate Translation Settings.",
+                        )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Import Failed",
+                        "Failed to load termbase from the selected file.\n"
+                        "Please ensure the file is valid JSON with the format:\n"
+                        '{"lang_code": {"source_term": "translation", ...}, ...}',
+                    )
+
+    def import_dnt_file(self):
+        """Import DNT terms from a JSON or text file"""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
+        
+        last_dir = self.settings_manager.load_last_input_directory()
+        if last_dir and os.path.exists(last_dir):
+            file_dialog.setDirectory(last_dir)
+        else:
+            file_dialog.setDirectory(os.getcwd())
+        
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            if selected_files:
+                file_path = selected_files[0]
+                self.logger.info("Importing DNT terms from %s", file_path)
+                
+                # Load DNT terms from file
+                dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
+                
+                if dnt_terms:
+                    # Save user-provided DNT terms
+                    self.settings_manager.save_user_dnt_terms(dnt_terms)
+                    
+                    # If we already have AI-generated config, merge and update
+                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+                    if ai_dnt:
+                        merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
+                        self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
+                        self.ai_config_section.update_dnt_display(merged)
+                        QMessageBox.information(
+                            self,
+                            "DNT Terms Imported",
+                            f"Successfully imported {len(dnt_terms)} DNT terms.\n\n"
+                            f"The terms have been merged with existing AI-generated settings.",
+                        )
+                    else:
+                        QMessageBox.information(
+                            self,
+                            "DNT Terms Imported",
+                            f"Successfully imported {len(dnt_terms)} DNT terms.\n\n"
+                            f"The terms will be merged when you generate Translation Settings.",
+                        )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Import Failed",
+                        "Failed to load DNT terms from the selected file.\n"
+                        "Please ensure the file is either:\n"
+                        "- JSON array: [\"term1\", \"term2\", ...]\n"
+                        "- Text file: one term per line",
+                    )
+
+    def fetch_termbase_from_url(self):
+        """Fetch termbase from a URL"""
+        url = self.ai_config_section.get_termbase_url()
+        
+        if not url:
+            QMessageBox.warning(
+                self,
+                "No URL",
+                "Please enter a termbase URL in the input field.",
+            )
+            return
+        
+        # Validate URL format
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError("Invalid URL format")
+        except Exception:
+            QMessageBox.warning(
+                self,
+                "Invalid URL",
+                "Please enter a valid URL (e.g., https://example.com/termbase.json).",
+            )
+            return
+        
+        # Show progress
+        self.ai_config_section.show_progress(True)
+        self.ai_config_section.update_progress(f"Fetching termbase from {url}...")
+        
+        # Fetch in a separate thread to avoid blocking UI
+        class FetchWorker(QObject):
+            finished = Signal(dict)
+            error = Signal(str)
+            
+            def __init__(self, url, logger):
+                super().__init__()
+                self.url = url
+                self.logger = logger
+            
+            def run(self):
+                try:
+                    termbase = fetch_termbase_from_url(self.url, self.logger)
+                    if termbase:
+                        self.finished.emit(termbase)
+                    else:
+                        self.error.emit("Failed to fetch termbase from URL. Please check the URL and try again.")
+                except Exception as e:
+                    self.error.emit(f"Error fetching termbase: {str(e)}")
+        
+        self.fetch_thread = QThread()
+        self.fetch_worker = FetchWorker(url, self.logger)
+        self.fetch_worker.moveToThread(self.fetch_thread)
+        
+        self.fetch_thread.started.connect(self.fetch_worker.run)
+        self.fetch_worker.finished.connect(self.on_termbase_fetched)
+        self.fetch_worker.error.connect(self.on_fetch_error)
+        self.fetch_worker.finished.connect(self.fetch_thread.quit)
+        self.fetch_worker.error.connect(self.fetch_thread.quit)
+        self.fetch_thread.finished.connect(self.fetch_worker.deleteLater)
+        self.fetch_thread.finished.connect(self.fetch_thread.deleteLater)
+        
+        # Save URL for future use
+        self.settings_manager.save_termbase_url(url)
+        
+        self.fetch_thread.start()
+
+    def fetch_dnt_from_url(self):
+        """Fetch DNT terms from a URL"""
+        url = self.ai_config_section.get_dnt_url()
+        
+        if not url:
+            QMessageBox.warning(
+                self,
+                "No URL",
+                "Please enter a DNT terms URL in the input field.",
+            )
+            return
+        
+        # Validate URL format
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                raise ValueError("Invalid URL format")
+        except Exception:
+            QMessageBox.warning(
+                self,
+                "Invalid URL",
+                "Please enter a valid URL (e.g., https://example.com/dnt_terms.json).",
+            )
+            return
+        
+        # Show progress
+        self.ai_config_section.show_progress(True)
+        self.ai_config_section.update_progress(f"Fetching DNT terms from {url}...")
+        
+        # Fetch in a separate thread to avoid blocking UI
+        class FetchWorker(QObject):
+            finished = Signal(list)
+            error = Signal(str)
+            
+            def __init__(self, url, logger):
+                super().__init__()
+                self.url = url
+                self.logger = logger
+            
+            def run(self):
+                try:
+                    dnt_terms = fetch_dnt_terms_from_url(self.url, self.logger)
+                    if dnt_terms:
+                        self.finished.emit(dnt_terms)
+                    else:
+                        self.error.emit("Failed to fetch DNT terms from URL. Please check the URL and try again.")
+                except Exception as e:
+                    self.error.emit(f"Error fetching DNT terms: {str(e)}")
+        
+        self.fetch_dnt_thread = QThread()
+        self.fetch_dnt_worker = FetchWorker(url, self.logger)
+        self.fetch_dnt_worker.moveToThread(self.fetch_dnt_thread)
+        
+        self.fetch_dnt_thread.started.connect(self.fetch_dnt_worker.run)
+        self.fetch_dnt_worker.finished.connect(self.on_dnt_fetched)
+        self.fetch_dnt_worker.error.connect(self.on_fetch_error)
+        self.fetch_dnt_worker.finished.connect(self.fetch_dnt_thread.quit)
+        self.fetch_dnt_worker.error.connect(self.fetch_dnt_thread.quit)
+        self.fetch_dnt_thread.finished.connect(self.fetch_dnt_worker.deleteLater)
+        self.fetch_dnt_thread.finished.connect(self.fetch_dnt_thread.deleteLater)
+        
+        # Save URL for future use
+        self.settings_manager.save_dnt_url(url)
+        
+        self.fetch_dnt_thread.start()
+
+    def on_termbase_fetched(self, termbase: dict[str, dict[str, str]]):
+        """Handle successful termbase fetch from URL"""
+        self.ai_config_section.show_progress(False)
+        
+        # Save user-provided termbase
+        self.settings_manager.save_user_termbase(termbase)
+        
+        # If we already have AI-generated config, merge and update
+        ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+        if ai_tb:
+            merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
+            self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
+            self.ai_config_section.update_termbase_display(merged)
+            QMessageBox.information(
+                self,
+                "Termbase Fetched",
+                f"Successfully fetched termbase with {len(termbase)} languages.\n"
+                f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                f"The termbase has been merged with existing AI-generated settings.",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Termbase Fetched",
+                f"Successfully fetched termbase with {len(termbase)} languages.\n"
+                f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                f"The termbase will be merged when you generate Translation Settings.",
+            )
+
+    def on_dnt_fetched(self, dnt_terms: list[str]):
+        """Handle successful DNT terms fetch from URL"""
+        self.ai_config_section.show_progress(False)
+        
+        # Save user-provided DNT terms
+        self.settings_manager.save_user_dnt_terms(dnt_terms)
+        
+        # If we already have AI-generated config, merge and update
+        ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+        if ai_dnt:
+            merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
+            self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
+            self.ai_config_section.update_dnt_display(merged)
+            QMessageBox.information(
+                self,
+                "DNT Terms Fetched",
+                f"Successfully fetched {len(dnt_terms)} DNT terms.\n\n"
+                f"The terms have been merged with existing AI-generated settings.",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "DNT Terms Fetched",
+                f"Successfully fetched {len(dnt_terms)} DNT terms.\n\n"
+                f"The terms will be merged when you generate Translation Settings.",
+            )
+
+    def on_fetch_error(self, error_message: str):
+        """Handle fetch errors"""
+        self.ai_config_section.show_progress(False)
+        QMessageBox.warning(
+            self,
+            "Fetch Failed",
+            error_message,
+        )
 
     def view_translation_settings_details(self):
         """View detailed Translation Settings"""

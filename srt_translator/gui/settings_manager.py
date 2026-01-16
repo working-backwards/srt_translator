@@ -299,3 +299,47 @@ class SettingsManager:
 
         current_hash = self._calculate_file_hash()
         return stored_hash != current_hash
+
+    def save_user_termbase(self, termbase: dict[str, dict[str, str]]) -> None:
+        """Save user-provided termbase that will be merged with AI-generated termbase"""
+        self.settings.setValue("user_termbase", termbase)
+        self.logger.info("Saved user-provided termbase: %s languages", len(termbase))
+
+    def load_user_termbase(self) -> dict[str, dict[str, str]]:
+        """Load user-provided termbase"""
+        value = self.settings.value("user_termbase", {})
+        if isinstance(value, dict):
+            return value
+        return {}
+
+    def save_user_dnt_terms(self, dnt_terms: list[str]) -> None:
+        """Save user-provided DNT terms that will be merged with AI-generated DNT terms"""
+        self.settings.setValue("user_dnt_terms", dnt_terms)
+        self.logger.info("Saved user-provided DNT terms: %s terms", len(dnt_terms))
+
+    def load_user_dnt_terms(self) -> list[str]:
+        """Load user-provided DNT terms"""
+        value = self.settings.value("user_dnt_terms", [])
+        if isinstance(value, list):
+            return value
+        return []
+
+    def save_termbase_url(self, url: str) -> None:
+        """Save termbase URL for automatic fetching"""
+        self.settings.setValue("termbase_url", url)
+        self.logger.info("Saved termbase URL: %s", url)
+
+    def load_termbase_url(self) -> str:
+        """Load termbase URL"""
+        value = self.settings.value("termbase_url", "")
+        return str(value) if value else ""
+
+    def save_dnt_url(self, url: str) -> None:
+        """Save DNT terms URL for automatic fetching"""
+        self.settings.setValue("dnt_url", url)
+        self.logger.info("Saved DNT URL: %s", url)
+
+    def load_dnt_url(self) -> str:
+        """Load DNT terms URL"""
+        value = self.settings.value("dnt_url", "")
+        return str(value) if value else ""
