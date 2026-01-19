@@ -40,7 +40,12 @@
       ],
       "family": "rtl",
       "script": "arabic",
-      "cps_cap": 18
+      "cps_cap": 18,
+      "tone_hint": {
+        "casual": "Use conversational, friendly phrasing with simpler sentence structures.",
+        "neutral": "Use Modern Standard Arabic polite phrasing suitable for business training.",
+        "formal": "Use formal, deferential MSA phrasing appropriate for official or external contexts."
+      }
     },
     "hy": {
       "name": "Armenian",
@@ -62,7 +67,12 @@
       "script": "latin",
       "cps_cap": 20,
       "target_batch_size": 4,
-      "allow_placeholder_apostrophe": true
+      "allow_placeholder_apostrophe": true,
+      "tone_hint": {
+        "casual": "Use conversational, informal phrasing where natural.",
+        "neutral": "Use professional, clear phrasing suitable for business training.",
+        "formal": "Use polite and deferential phrasing appropriate for external or VIP audiences."
+      }
     },
     "eu": {
       "name": "Basque",
@@ -113,7 +123,12 @@
       "script": "cjk",
       "script_blocks": [
         "CJK"
-      ]
+      ],
+      "tone_hint": {
+        "casual": "Use conversational phrasing and '你' for addressing the viewer.",
+        "neutral": "Prefer '你' for addressing the viewer in neutral business training; avoid '您'.",
+        "formal": "Prefer '您' for polite/viewer-address in formal contexts."
+      }
     },
     "zh-Hant": {
       "name": "Chinese (Traditional)",
@@ -123,7 +138,12 @@
       "script_blocks": [
         "CJK"
       ],
-      "cps_cap": 15
+      "cps_cap": 15,
+      "tone_hint": {
+        "casual": "Use conversational phrasing and '你' for addressing the viewer (traditional script).",
+        "neutral": "Prefer '你' for addressing the viewer in neutral business training; avoid '您' unless external/VIP.",
+        "formal": "Prefer '您' for polite/viewer-address in formal contexts (traditional script)."
+      }
     },
     "hr": {
       "name": "Croatian",
@@ -151,7 +171,12 @@
       "popular": true,
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "tone_hint": {
+        "casual": "Use informal, conversational phrasing where natural.",
+        "neutral": "Use professional and clear wording suitable for training; prefer 'u' for polite address when needed.",
+        "formal": "Use formal/deferential phrasing and appropriate titles for external audiences."
+      }
     },
     "en": {
       "name": "English",
@@ -170,7 +195,12 @@
       ],
       "family": "latin",
       "cps_cap": 20,
-      "script": "latin"
+      "script": "latin",
+      "tone_hint": {
+        "casual": "Use conversational, friendly phrasing and contractions where natural.",
+        "neutral": "Use professional, clear phrasing suitable for business training.",
+        "formal": "Use more formal, polite wording appropriate to external or executive audiences."
+      }
     },
     "en-US": {
       "name": "English (US)",
@@ -189,7 +219,12 @@
       ],
       "family": "latin",
       "cps_cap": 20,
-      "script": "latin"
+      "script": "latin",
+      "tone_hint": {
+        "casual": "Use conversational, friendly US-English phrasing and contractions where natural.",
+        "neutral": "Use professional, clear US-English phrasing suitable for business training.",
+        "formal": "Use formal US-English phrasing appropriate for external or executive audiences."
+      }
     },
     "en-GB": {
       "name": "English (UK)",
@@ -236,7 +271,12 @@
       "popular": true,
       "family": "latin",
       "cps_cap": 22,
-      "script": "latin"
+      "script": "latin",
+      "tone_hint": {
+        "casual": "Use informal conversational phrasing (tu) where natural.",
+        "neutral": "Use professional wording; prefer 'vous' for polite address in training.",
+        "formal": "Use formal/deferential phrasing (vous and polite constructions) for external audiences."
+      }
     },
     "gl": {
       "name": "Galician",
@@ -257,7 +297,12 @@
       "popular": true,
       "family": "latin",
       "cps_cap": 22,
-      "script": "latin"
+      "script": "latin",
+      "tone_hint": {
+        "casual": "Use informal phrasing (du) where natural.",
+        "neutral": "Use professional phrasing; prefer 'Sie' for polite address in business training.",
+        "formal": "Use formal address (Sie) and deferential phrasing for official or external contexts."
+      }
     },
     "el": {
       "name": "Greek",
@@ -292,7 +337,12 @@
       "popular": true,
       "family": "indic",
       "script": "devanagari",
-      "cps_cap": 18
+      "cps_cap": 18,
+      "tone_hint": {
+        "casual": "Use conversational, friendly phrasing and simpler sentence structures.",
+        "neutral": "Use professional, clear Hindi phrasing appropriate for training (use common polite forms).",
+        "formal": "Use respectful/formal Hindi (aap and more formal wording) appropriate for external/VIP audiences."
+      }
     },
     "hu": {
       "name": "Hungarian",
@@ -320,7 +370,12 @@
       "popular": true,
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "tone_hint": {
+        "casual": "Use conversational, friendly phrasing and simpler sentences.",
+        "neutral": "Use professional, approachable wording suitable for business training.",
+        "formal": "Use polite and deferential phrasing appropriate for external audiences."
+      }
     },
     "ga": {
       "name": "Irish",
@@ -334,7 +389,12 @@
       "popular": true,
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "tone_hint": {
+        "casual": "Use informal conversational phrasing (tu) where natural.",
+        "neutral": "Use professional phrasing appropriate for training; prefer formal address for business audiences when needed.",
+        "formal": "Use formal and deferential phrasing for external/VIP audiences."
+      }
     },
     "ja": {
       "name": "Japanese",
@@ -369,7 +429,12 @@
         "や",
         "わ"
       ],
-      "cps_cap": 15
+      "cps_cap": 15,
+      "tone_hint": {
+        "casual": "Use plain / casual verb forms (dictionary/plain endings).",
+        "neutral": "Use 丁寧語 (です／ます) — polite but not honorific.",
+        "formal": "Keigo (敬語) is appropriate for formal/external contexts; prefer human review for keigo."
+      }
     },
     "kn": {
       "name": "Kannada",
@@ -420,7 +485,12 @@
         "만",
         "도"
       ],
-      "cps_cap": 15
+      "cps_cap": 15,
+      "tone_hint": {
+        "casual": "Use conversational/plain forms common in casual Korean.",
+        "neutral": "Use polite endings (요/습니다) appropriate for business training.",
+        "formal": "Use honorific / higher-politeness forms for formal audiences; consider review."
+      }
     },
     "ky": {
       "name": "Kyrgyz",
@@ -518,7 +588,12 @@
       "popular": true,
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "tone_hint": {
+        "casual": "Use conversational/informal phrasing (tu/ você depending on region).",
+        "neutral": "Use professional phrasing; prefer você for training clarity in many contexts.",
+        "formal": "Use formal/deferential phrasing for external audiences."
+      }
     },
     "pt-PT": {
       "name": "Portuguese (Portugal)",
@@ -574,7 +649,12 @@
       "popular": true,
       "family": "latin",
       "cps_cap": 22,
-      "script": "latin"
+      "script": "latin",
+      "tone_hint": {
+        "casual": "Use informal conversational phrasing (tú) where natural.",
+        "neutral": "Use professional phrasing; prefer polite 2nd-person (usted) in business training contexts.",
+        "formal": "Use formal second-person (usted) and more deferential phrasing for external/VIP audiences."
+      }
     },
     "sr": {
       "name": "Serbian",
@@ -638,7 +718,12 @@
       "script": "latin",
       "cps_cap": 24,
       "target_batch_size": 4,
-      "allow_placeholder_apostrophe": true
+      "allow_placeholder_apostrophe": true,
+      "tone_hint": {
+        "casual": "Use conversational informal phrasing where natural.",
+        "neutral": "Use clear, professional phrasing appropriate for training.",
+        "formal": "Use polite/deferential phrasing for formal or external contexts."
+      }
     },
     "tk": {
       "name": "Turkmen",
@@ -679,7 +764,12 @@
       ],
       "family": "latin",
       "script": "latin",
-      "cps_cap": 20
+      "cps_cap": 20,
+      "tone_hint": {
+        "casual": "Use conversational phrasing and common informal forms.",
+        "neutral": "Use professional, clear phrasing appropriate for business training.",
+        "formal": "Use more deferential or honorific phrasing suitable for external/VIP audiences."
+      }
     },
     "cy": {
       "name": "Welsh",
