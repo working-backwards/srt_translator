@@ -19,15 +19,21 @@
 ## 4) Choose target languages
 - Select target languages in **Languages**.
 
-## 5) Translate
+## 5) (Optional) Choose Tone
+- Select your preferred translation tone: **Casual**, **Neutral (recommended)**, or **Formal**.
+- **Casual**: Informal, conversational style for vlogs, personal content.
+- **Neutral**: Professional and approachable — recommended for business training.
+- **Formal**: Polite, official style (may use honorifics in some languages like Japanese).
+
+## 6) Translate
 - Click **Translate**. The app produces translated `.srt` files per language.
 
-## 6) Evaluate & Report
+## 7) Evaluate & Report
 - The app writes both **`eval_report.html`** and **`eval_report.md`** with the same guidance:
   - A **Ready / Review / Fix** banner
   - **What to do next** checklist
   - **KPIs** (files, languages, issues, warnings, source language, DNT/Termbase coverage)
 
-## 7) Fix (if needed) & Publish
+## 8) Fix (if needed) & Publish
 - If the report says **✅ Ready**, you're done—publish.
 - If **⚠️ Review** or **❌ Fix**, follow the "What to do next" steps at the top of the report.

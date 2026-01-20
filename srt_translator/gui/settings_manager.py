@@ -63,7 +63,6 @@ class SettingsManager:
         file_hash = self._calculate_file_hash()
         self.settings.setValue("ai_config_file_hash", file_hash)
 
-
     def load_ai_config(self) -> tuple[list[str], dict[str, dict[str, str]], dict[str, Any]]:
         """Load AI-generated configuration as a stable 3-tuple.
         Returns:
@@ -343,3 +342,20 @@ class SettingsManager:
         """Load DNT terms URL"""
         value = self.settings.value("dnt_url", "")
         return str(value) if value else ""
+
+    def save_tone(self, tone: str) -> None:
+        """Save translation tone setting (casual, neutral, or formal)"""
+        # Normalize to lowercase and validate
+        tone_lower = (tone or "neutral").lower().strip()
+        if tone_lower not in ("casual", "neutral", "formal"):
+            tone_lower = "neutral"
+        self.settings.setValue("tone", tone_lower)
+
+    def load_tone(self) -> str:
+        """Load translation tone setting (defaults to 'neutral')"""
+        value = self.settings.value("tone", "neutral")
+        tone = str(value).lower().strip() if value else "neutral"
+        # Validate and return
+        if tone in ("casual", "neutral", "formal"):
+            return tone
+        return "neutral"

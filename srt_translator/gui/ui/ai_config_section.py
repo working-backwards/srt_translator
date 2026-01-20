@@ -4,6 +4,7 @@ AI Configuration Section for the SRT Translator GUI.
 """
 
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QDialog,
     QDialogButtonBox,
     QFrame,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QProgressBar,
     QPushButton,
+    QRadioButton,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -84,19 +86,19 @@ class AIConfigSection(QGroupBox):
         self.import_termbase_btn.setObjectName("secondaryButton")
         self.import_termbase_btn.setToolTip(
             "Import your own termbase JSON file.\n"
-            "Format: {\"lang_code\": {\"source_term\": \"translation\", ...}, ...}\n"
+            'Format: {"lang_code": {"source_term": "translation", ...}, ...}\n'
             "User-provided entries will take precedence over AI-generated ones."
         )
-        
+
         self.import_dnt_btn = QPushButton("Import DNT Terms")
         self.import_dnt_btn.setObjectName("secondaryButton")
         self.import_dnt_btn.setToolTip(
             "Import your own DNT (Do Not Translate) terms.\n"
-            "Supports JSON array format: [\"term1\", \"term2\", ...]\n"
+            'Supports JSON array format: ["term1", "term2", ...]\n'
             "Or text file: one term per line.\n"
             "User-provided terms will take precedence over AI-generated ones."
         )
-        
+
         import_layout.addWidget(self.import_termbase_btn)
         import_layout.addWidget(self.import_dnt_btn)
         import_layout.addStretch()
@@ -104,10 +106,10 @@ class AIConfigSection(QGroupBox):
         # URL fetch section
         url_layout = QVBoxLayout()
         url_layout.setSpacing(8)
-        
+
         url_label = QLabel("Or fetch from URL:")
         url_label.setStyleSheet("color: #6B7280; font-size: 12px; font-weight: 500;")
-        
+
         # Termbase URL
         termbase_url_layout = QHBoxLayout()
         termbase_url_label = QLabel("Termbase URL:")
@@ -122,11 +124,11 @@ class AIConfigSection(QGroupBox):
         self.fetch_termbase_btn.setObjectName("secondaryButton")
         self.fetch_termbase_btn.setFixedWidth(80)
         self.fetch_termbase_btn.setToolTip("Fetch termbase from the URL above")
-        
+
         termbase_url_layout.addWidget(termbase_url_label)
         termbase_url_layout.addWidget(self.termbase_url_input)
         termbase_url_layout.addWidget(self.fetch_termbase_btn)
-        
+
         # DNT URL
         dnt_url_layout = QHBoxLayout()
         dnt_url_label = QLabel("DNT Terms URL:")
@@ -142,14 +144,46 @@ class AIConfigSection(QGroupBox):
         self.fetch_dnt_btn.setObjectName("secondaryButton")
         self.fetch_dnt_btn.setFixedWidth(80)
         self.fetch_dnt_btn.setToolTip("Fetch DNT terms from the URL above")
-        
+
         dnt_url_layout.addWidget(dnt_url_label)
         dnt_url_layout.addWidget(self.dnt_url_input)
         dnt_url_layout.addWidget(self.fetch_dnt_btn)
-        
+
         url_layout.addWidget(url_label)
         url_layout.addLayout(termbase_url_layout)
         url_layout.addLayout(dnt_url_layout)
+
+        # Tone selection (horizontal radio button group)
+        tone_layout = QHBoxLayout()
+        tone_layout.setSpacing(15)
+
+        tone_label = QLabel("Tone:")
+        tone_label.setStyleSheet("font-weight: 500; color: #374151;")
+        tone_layout.addWidget(tone_label)
+
+        self.tone_button_group = QButtonGroup(self)
+
+        self.tone_casual = QRadioButton("Casual")
+        self.tone_casual.setToolTip("Informal, conversational style")
+        self.tone_casual.setObjectName("toneRadio")
+
+        self.tone_neutral = QRadioButton("Neutral (recommended)")
+        self.tone_neutral.setToolTip("Professional and approachable — recommended for business training.")
+        self.tone_neutral.setObjectName("toneRadio")
+        self.tone_neutral.setChecked(True)  # Default selection
+
+        self.tone_formal = QRadioButton("Formal")
+        self.tone_formal.setToolTip("Polite, official style (may use honorifics in some languages)")
+        self.tone_formal.setObjectName("toneRadio")
+
+        self.tone_button_group.addButton(self.tone_casual, 0)
+        self.tone_button_group.addButton(self.tone_neutral, 1)
+        self.tone_button_group.addButton(self.tone_formal, 2)
+
+        tone_layout.addWidget(self.tone_casual)
+        tone_layout.addWidget(self.tone_neutral)
+        tone_layout.addWidget(self.tone_formal)
+        tone_layout.addStretch()
 
         # Action buttons for configured state
         self.action_buttons = QHBoxLayout()
@@ -162,16 +196,12 @@ class AIConfigSection(QGroupBox):
         self.regenerate_btn = QPushButton("Regenerate")
         self.regenerate_btn.setObjectName("secondaryButton")
         self.regenerate_btn.setEnabled(False)  # Will be enabled when config is generated
-        self.regenerate_btn.setToolTip(
-            "Generate new translation settings based on current file selection"
-        )
+        self.regenerate_btn.setToolTip("Generate new translation settings based on current file selection")
 
         self.view_details_btn = QPushButton("View Details")
         self.view_details_btn.setObjectName("secondaryButton")
         self.view_details_btn.setEnabled(False)  # Will be enabled when config is generated
-        self.view_details_btn.setToolTip(
-            "View detailed information about current translation settings"
-        )
+        self.view_details_btn.setToolTip("View detailed information about current translation settings")
 
         self.action_buttons.addWidget(self.edit_btn)
         self.action_buttons.addWidget(self.regenerate_btn)
@@ -227,6 +257,7 @@ class AIConfigSection(QGroupBox):
         content_layout.addWidget(self.generate_btn)
         content_layout.addLayout(import_layout)
         content_layout.addLayout(url_layout)
+        content_layout.addLayout(tone_layout)
         content_layout.addLayout(self.action_buttons)
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
@@ -371,6 +402,29 @@ class AIConfigSection(QGroupBox):
             self.regenerate_btn.setVisible(False)
             self.view_details_btn.setVisible(False)
 
+    def get_tone(self) -> str:
+        """Get the currently selected tone"""
+        if self.tone_casual.isChecked():
+            return "casual"
+        elif self.tone_formal.isChecked():
+            return "formal"
+        else:
+            return "neutral"
+
+    def set_tone(self, tone: str) -> None:
+        """Set the tone selection"""
+        tone_lower = (tone or "neutral").lower().strip()
+        if tone_lower == "casual":
+            self.tone_casual.setChecked(True)
+        elif tone_lower == "formal":
+            self.tone_formal.setChecked(True)
+        else:
+            self.tone_neutral.setChecked(True)
+
+    def connect_tone_changed(self, callback) -> None:
+        """Connect a callback to be called when tone selection changes"""
+        self.tone_button_group.buttonClicked.connect(lambda: callback(self.get_tone()))
+
 
 class EditConfigurationDialog(QDialog):
     """Dialog for editing AI-generated configuration."""
@@ -422,9 +476,7 @@ class EditConfigurationDialog(QDialog):
         layout.addWidget(self.tab_widget)
 
         # Buttons
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
@@ -441,10 +493,7 @@ class EditConfigurationDialog(QDialog):
     def on_termbase_changed(self, termbase: dict):
         """Handle termbase changes."""
         self.modified_termbase = termbase
-        self.settings_manager.save_ai_config(
-            dnt_terms=self.modified_terms,
-            termbase=self.modified_termbase
-        )
+        self.settings_manager.save_ai_config(dnt_terms=self.modified_terms, termbase=self.modified_termbase)
 
     def get_modified_config(self) -> tuple:
         """Get the modified configuration."""
@@ -452,6 +501,4 @@ class EditConfigurationDialog(QDialog):
 
     def has_changes(self) -> bool:
         """Check if any changes were made."""
-        return self.terms_editor.is_modified(self.dnt_terms) or self.termbase_editor.is_modified(
-            self.termbase
-        )
+        return self.terms_editor.is_modified(self.dnt_terms) or self.termbase_editor.is_modified(self.termbase)

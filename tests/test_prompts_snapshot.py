@@ -31,6 +31,19 @@ def _mk_translator():
     # Minimal config; we will stub .client afterwards
     logger = logging.getLogger("test")
     logger.setLevel(logging.DEBUG)
+    # Include French with tone_hint to test LANG_HINT insertion
+    language_data = {
+        "languages": {
+            "fr": {
+                "name": "French",
+                "tone_hint": {
+                    "casual": "Use informal conversational phrasing (tu) where natural.",
+                    "neutral": "Use professional wording; prefer 'vous' for polite address in training.",
+                    "formal": "Use formal/deferential phrasing (vous and polite constructions) for external audiences.",
+                },
+            }
+        }
+    }
     t = SRTTranslator(
         dnt_terms=[],
         termbase={"fr": {"Amazon": "Amazon"}},
@@ -38,20 +51,17 @@ def _mk_translator():
         logger=logger,
         batch_size=5,
         error_policy="STRICT",
-        language_config=LanguageConfig({"languages": {}}),
+        language_config=LanguageConfig(language_data),
+        tone="neutral",  # Explicitly set tone for snapshot consistency
     )
     # Inject dummy client
     dc = _DummyClient()
 
     def _create(**kwargs):
         dc.last_kwargs = kwargs
-        return _DummyClient._Resp(
-            content=json.dumps({"items": [{"id": 1, "tgt": "x"}, {"id": 2, "tgt": "y"}]})
-        )
+        return _DummyClient._Resp(content=json.dumps({"items": [{"id": 1, "tgt": "x"}, {"id": 2, "tgt": "y"}]}))
 
-    t.client = types.SimpleNamespace(
-        chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=_create))
-    )
+    t.client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=_create)))
     return t, dc
 
 
@@ -70,9 +80,7 @@ def test_prompts_non_strict_snapshot():
     system = messages[0]["content"]
     user = messages[1]["content"]
 
-    expected_system = (
-        "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
-    )
+    expected_system = "You are a professional subtitle translator. Return valid JSON ONLY, never prose."
     assert system == expected_system
 
     termbase_block = "- Amazon \u2192 Amazon"
@@ -95,6 +103,8 @@ def test_prompts_non_strict_snapshot():
         "- Natural, fluent translation.\n"
         "- Numbers: keep digits; localize formatting where normal. No rounding.\n"
         "- No added/removed content.\n\n"
+        "TONE: neutral\n\n"
+        "LANG_HINT (fr): Use professional wording; prefer 'vous' for polite address in training.\n\n"
         "INPUT ITEMS:\n"
         "1) Hello Amazon\n"
         "2) World\n"
@@ -144,6 +154,8 @@ def test_prompts_strict_snapshot():
         "- Natural, fluent translation.\n"
         "- Numbers: keep digits; localize formatting where normal. No rounding.\n"
         "- No added/removed content.\n\n"
+        "TONE: neutral\n\n"
+        "LANG_HINT (fr): Use professional wording; prefer 'vous' for polite address in training.\n\n"
         "INPUT ITEMS:\n"
         "1) Hello Amazon\n"
         "2) World\n"

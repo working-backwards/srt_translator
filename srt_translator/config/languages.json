@@ -126,7 +126,7 @@
       ],
       "tone_hint": {
         "casual": "Use conversational phrasing and '你' for addressing the viewer.",
-        "neutral": "Prefer '你' for addressing the viewer in neutral business training; avoid '您'.",
+        "neutral": "ALWAYS use '你' (NEVER '您') for second-person address; this is internal business training.",
         "formal": "Prefer '您' for polite/viewer-address in formal contexts."
       }
     },
@@ -141,7 +141,7 @@
       "cps_cap": 15,
       "tone_hint": {
         "casual": "Use conversational phrasing and '你' for addressing the viewer (traditional script).",
-        "neutral": "Prefer '你' for addressing the viewer in neutral business training; avoid '您' unless external/VIP.",
+        "neutral": "ALWAYS use '你' (NEVER '您') for second-person address; this is internal business training.",
         "formal": "Prefer '您' for polite/viewer-address in formal contexts (traditional script)."
       }
     },

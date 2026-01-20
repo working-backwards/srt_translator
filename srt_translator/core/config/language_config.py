@@ -194,6 +194,49 @@ class LanguageConfig:
         lang_info = languages.get(code, {})
         return lang_info.get("sentence_endings", [".", "!", "?"])
 
+    def get_tone_hint(self, lang_code: str, tone: str) -> str | None:
+        """
+        Return a single-line tone hint for lang_code and tone, or None if not present.
+
+        Lookup is case-insensitive; the method returns the hint string exactly as stored.
+
+        Behavior:
+        - If lang_code is not present in the catalog, return None (do not raise).
+        - If lang_code exists but has no tone_hint field, return None.
+        - If tone_hint exists but is empty or missing the requested tone key, return None.
+        - Normalize lang_code and tone to lowercase for lookup.
+        """
+        # Normalize inputs
+        lang_code_lower = (lang_code or "").strip().lower()
+        tone_lower = (tone or "").strip().lower()
+
+        if not lang_code_lower or not tone_lower:
+            return None
+
+        languages = self.get_all_languages()
+
+        # Find language entry (case-insensitive lookup)
+        lang_info = None
+        for code, info in languages.items():
+            if code.lower() == lang_code_lower:
+                lang_info = info
+                break
+
+        if lang_info is None:
+            return None
+
+        # Get tone_hint dict
+        tone_hint = lang_info.get("tone_hint")
+        if not tone_hint or not isinstance(tone_hint, dict):
+            return None
+
+        # Look for the specific tone (case-insensitive)
+        for key, value in tone_hint.items():
+            if key.lower() == tone_lower:
+                return value if isinstance(value, str) else None
+
+        return None
+
     # ---------- Script helpers (unchanged design; now fed by JSON) ----------
     _UNICODE_BLOCKS = {
         "CJK": [("\u4e00", "\u9fff")],

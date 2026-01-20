@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 
 import psutil
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -21,8 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.gui.ai_config import AIConfigGenerator
@@ -181,9 +181,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def connect_signals(self):
         """Connect all component signals to their handlers"""
         # API Section signals
-        self.api_section.connect_signals(
-            self.test_api_connection, self.show_api_input, self.toggle_api_configuration
-        )
+        self.api_section.connect_signals(self.test_api_connection, self.show_api_input, self.toggle_api_configuration)
 
         # File Section signals
         self.file_section.connect_signals(
@@ -245,7 +243,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.update_termbase_display(termbase)
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
-        
+
         # Load saved URLs
         termbase_url = self.settings_manager.load_termbase_url()
         dnt_url = self.settings_manager.load_dnt_url()
@@ -253,6 +251,15 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.set_termbase_url(termbase_url)
         if dnt_url:
             self.ai_config_section.set_dnt_url(dnt_url)
+
+        # Load saved tone setting and connect change handler
+        saved_tone = self.settings_manager.load_tone()
+        self.ai_config_section.set_tone(saved_tone)
+        self.ai_config_section.connect_tone_changed(self.on_tone_changed)
+
+    def on_tone_changed(self, tone: str) -> None:
+        """Handle tone selection change"""
+        self.settings_manager.save_tone(tone)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""
@@ -280,24 +287,20 @@ class SRTTranslatorMainWindow(QMainWindow):
         if ok:
             self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
-            QMessageBox.information(
-                self,
-                "API Connection Successful",
-                "✅ API connected successfully."
-            )
+            QMessageBox.information(self, "API Connection Successful", "✅ API connected successfully.")
         else:
             self.api_section.set_connected_status(False)
             self.api_section.show_error(error)
 
     def _validate_openai_key(self, api_key: str) -> tuple[bool, str | None]:
-                try:
-                    client = OpenAI(api_key=api_key)
-                    client.models.list()
-                    return True, None
-                except AuthenticationError:
-                    return False, "Invalid OpenAI API key."
-                except Exception as e:
-                    return False, str(e)
+        try:
+            client = OpenAI(api_key=api_key)
+            client.models.list()
+            return True, None
+        except AuthenticationError:
+            return False, "Invalid OpenAI API key."
+        except Exception as e:
+            return False, str(e)
 
     def show_api_input(self):
         """Show the API input field when Edit Settings is clicked"""
@@ -394,9 +397,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Validate inputs
         if not selected_files:
-            show_validation_error(
-                self, "No Files Selected", "Please select SRT files for AI analysis."
-            )
+            show_validation_error(self, "No Files Selected", "Please select SRT files for AI analysis.")
             return
 
         if not api_key:
@@ -420,11 +421,11 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Load user-provided termbase and DNT terms if they exist
         user_termbase = self.settings_manager.load_user_termbase()
         user_dnt_terms = self.settings_manager.load_user_dnt_terms()
-        
+
         # Also fetch from URLs if configured
         termbase_url = self.settings_manager.load_termbase_url()
         dnt_url = self.settings_manager.load_dnt_url()
-        
+
         if termbase_url:
             self.logger.info("Fetching termbase from URL: %s", termbase_url)
             url_termbase = fetch_termbase_from_url(termbase_url, self.logger)
@@ -432,7 +433,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 # Merge URL termbase with existing user termbase (URL takes precedence)
                 user_termbase = merge_termbase(ai_generated=user_termbase, user_provided=url_termbase)
                 self.logger.info("Fetched termbase from URL: %s languages", len(url_termbase))
-        
+
         if dnt_url:
             self.logger.info("Fetching DNT terms from URL: %s", dnt_url)
             url_dnt_terms = fetch_dnt_terms_from_url(dnt_url, self.logger)
@@ -440,7 +441,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 # Merge URL DNT terms with existing user DNT terms (URL takes precedence)
                 user_dnt_terms = merge_dnt_terms(ai_generated=user_dnt_terms, user_provided=url_dnt_terms)
                 self.logger.info("Fetched DNT terms from URL: %s terms", len(url_dnt_terms))
-        
+
         if user_termbase:
             self.logger.info("User-provided termbase will be merged: %s languages", len(user_termbase))
         if user_dnt_terms:
@@ -474,9 +475,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             def run(self):
                 try:
-                    self.progress.emit(
-                        "AI Config Worker: Starting batch-level AI config generation"
-                    )
+                    self.progress.emit("AI Config Worker: Starting batch-level AI config generation")
                     self.logger.info("AI Config Worker: Starting batch-level AI config generation")
 
                     # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
@@ -629,9 +628,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 suggestion = error_details.get("suggestion", "")
 
                 # Show detailed error message
-                QMessageBox.warning(
-                    self, title, f"{message}\n\n{suggestion}" if suggestion else message
-                )
+                QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
                 return
             except Exception as e:
                 # Fallback to simple error message
@@ -661,7 +658,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(self.settings_manager,dnt_terms, termbase)
+        dialog = EditConfigurationDialog(self.settings_manager, dnt_terms, termbase)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
@@ -670,9 +667,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             if dialog.has_changes():
                 # Save the modified configuration (preserve existing source language)
                 dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-                self.settings_manager.save_ai_config(
-                    modified_terms, modified_termbase, source_language
-                )
+                self.settings_manager.save_ai_config(modified_terms, modified_termbase, source_language)
 
                 # Update displays
                 self.ai_config_section.update_dnt_display(modified_terms)
@@ -703,26 +698,26 @@ class SRTTranslatorMainWindow(QMainWindow):
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
         file_dialog.setNameFilter("JSON Files (*.json);;All Files (*)")
-        
+
         last_dir = self.settings_manager.load_last_input_directory()
         if last_dir and os.path.exists(last_dir):
             file_dialog.setDirectory(last_dir)
         else:
             file_dialog.setDirectory(os.getcwd())
-        
+
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             if selected_files:
                 file_path = selected_files[0]
                 self.logger.info("Importing termbase from %s", file_path)
-                
+
                 # Load termbase from file
                 termbase = load_termbase_from_file(file_path, self.logger)
-                
+
                 if termbase:
                     # Save user-provided termbase
                     self.settings_manager.save_user_termbase(termbase)
-                    
+
                     # If we already have AI-generated config, merge and update
                     ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
                     if ai_tb:
@@ -758,26 +753,26 @@ class SRTTranslatorMainWindow(QMainWindow):
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
         file_dialog.setNameFilter("JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
-        
+
         last_dir = self.settings_manager.load_last_input_directory()
         if last_dir and os.path.exists(last_dir):
             file_dialog.setDirectory(last_dir)
         else:
             file_dialog.setDirectory(os.getcwd())
-        
+
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             if selected_files:
                 file_path = selected_files[0]
                 self.logger.info("Importing DNT terms from %s", file_path)
-                
+
                 # Load DNT terms from file
                 dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
-                
+
                 if dnt_terms:
                     # Save user-provided DNT terms
                     self.settings_manager.save_user_dnt_terms(dnt_terms)
-                    
+
                     # If we already have AI-generated config, merge and update
                     ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
                     if ai_dnt:
@@ -803,14 +798,14 @@ class SRTTranslatorMainWindow(QMainWindow):
                         "Import Failed",
                         "Failed to load DNT terms from the selected file.\n"
                         "Please ensure the file is either:\n"
-                        "- JSON array: [\"term1\", \"term2\", ...]\n"
+                        '- JSON array: ["term1", "term2", ...]\n'
                         "- Text file: one term per line",
                     )
 
     def fetch_termbase_from_url(self):
         """Fetch termbase from a URL"""
         url = self.ai_config_section.get_termbase_url()
-        
+
         if not url:
             QMessageBox.warning(
                 self,
@@ -818,10 +813,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Please enter a termbase URL in the input field.",
             )
             return
-        
+
         # Validate URL format
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError("Invalid URL format")
@@ -832,21 +828,21 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Please enter a valid URL (e.g., https://example.com/termbase.json).",
             )
             return
-        
+
         # Show progress
         self.ai_config_section.show_progress(True)
         self.ai_config_section.update_progress(f"Fetching termbase from {url}...")
-        
+
         # Fetch in a separate thread to avoid blocking UI
         class FetchWorker(QObject):
             finished = Signal(dict)
             error = Signal(str)
-            
+
             def __init__(self, url, logger):
                 super().__init__()
                 self.url = url
                 self.logger = logger
-            
+
             def run(self):
                 try:
                     termbase = fetch_termbase_from_url(self.url, self.logger)
@@ -856,11 +852,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                         self.error.emit("Failed to fetch termbase from URL. Please check the URL and try again.")
                 except Exception as e:
                     self.error.emit(f"Error fetching termbase: {str(e)}")
-        
+
         self.fetch_thread = QThread()
         self.fetch_worker = FetchWorker(url, self.logger)
         self.fetch_worker.moveToThread(self.fetch_thread)
-        
+
         self.fetch_thread.started.connect(self.fetch_worker.run)
         self.fetch_worker.finished.connect(self.on_termbase_fetched)
         self.fetch_worker.error.connect(self.on_fetch_error)
@@ -868,16 +864,16 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.fetch_worker.error.connect(self.fetch_thread.quit)
         self.fetch_thread.finished.connect(self.fetch_worker.deleteLater)
         self.fetch_thread.finished.connect(self.fetch_thread.deleteLater)
-        
+
         # Save URL for future use
         self.settings_manager.save_termbase_url(url)
-        
+
         self.fetch_thread.start()
 
     def fetch_dnt_from_url(self):
         """Fetch DNT terms from a URL"""
         url = self.ai_config_section.get_dnt_url()
-        
+
         if not url:
             QMessageBox.warning(
                 self,
@@ -885,10 +881,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Please enter a DNT terms URL in the input field.",
             )
             return
-        
+
         # Validate URL format
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError("Invalid URL format")
@@ -899,21 +896,21 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Please enter a valid URL (e.g., https://example.com/dnt_terms.json).",
             )
             return
-        
+
         # Show progress
         self.ai_config_section.show_progress(True)
         self.ai_config_section.update_progress(f"Fetching DNT terms from {url}...")
-        
+
         # Fetch in a separate thread to avoid blocking UI
         class FetchWorker(QObject):
             finished = Signal(list)
             error = Signal(str)
-            
+
             def __init__(self, url, logger):
                 super().__init__()
                 self.url = url
                 self.logger = logger
-            
+
             def run(self):
                 try:
                     dnt_terms = fetch_dnt_terms_from_url(self.url, self.logger)
@@ -923,11 +920,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                         self.error.emit("Failed to fetch DNT terms from URL. Please check the URL and try again.")
                 except Exception as e:
                     self.error.emit(f"Error fetching DNT terms: {str(e)}")
-        
+
         self.fetch_dnt_thread = QThread()
         self.fetch_dnt_worker = FetchWorker(url, self.logger)
         self.fetch_dnt_worker.moveToThread(self.fetch_dnt_thread)
-        
+
         self.fetch_dnt_thread.started.connect(self.fetch_dnt_worker.run)
         self.fetch_dnt_worker.finished.connect(self.on_dnt_fetched)
         self.fetch_dnt_worker.error.connect(self.on_fetch_error)
@@ -935,19 +932,19 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.fetch_dnt_worker.error.connect(self.fetch_dnt_thread.quit)
         self.fetch_dnt_thread.finished.connect(self.fetch_dnt_worker.deleteLater)
         self.fetch_dnt_thread.finished.connect(self.fetch_dnt_thread.deleteLater)
-        
+
         # Save URL for future use
         self.settings_manager.save_dnt_url(url)
-        
+
         self.fetch_dnt_thread.start()
 
     def on_termbase_fetched(self, termbase: dict[str, dict[str, str]]):
         """Handle successful termbase fetch from URL"""
         self.ai_config_section.show_progress(False)
-        
+
         # Save user-provided termbase
         self.settings_manager.save_user_termbase(termbase)
-        
+
         # If we already have AI-generated config, merge and update
         ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
         if ai_tb:
@@ -973,10 +970,10 @@ class SRTTranslatorMainWindow(QMainWindow):
     def on_dnt_fetched(self, dnt_terms: list[str]):
         """Handle successful DNT terms fetch from URL"""
         self.ai_config_section.show_progress(False)
-        
+
         # Save user-provided DNT terms
         self.settings_manager.save_user_dnt_terms(dnt_terms)
-        
+
         # If we already have AI-generated config, merge and update
         ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
         if ai_dnt:
@@ -1124,9 +1121,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Debug logging to track language selection
         target_codes = list(target_languages.values())
-        self.logger.info(
-            "Translation requested with %s languages: %s", len(target_codes), target_codes
-        )
+        self.logger.info("Translation requested with %s languages: %s", len(target_codes), target_codes)
 
         # Get API key from settings manager
         api_key = self.settings_manager.load_api_key()
@@ -1285,11 +1280,11 @@ class SRTTranslatorMainWindow(QMainWindow):
             # Warn if memory growth exceeds 1GB
             # === Preventive Mitigation for High Memory ===
             if growth_mb > 1000 and not self._memory_warning_shown:  # Over 1 GB growth
-                 if not getattr(self, "_memory_warning_shown", False):
+                if not getattr(self, "_memory_warning_shown", False):
                     self._memory_warning_shown = True
                     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
-                # Show warning to user
+                    # Show warning to user
                     QMessageBox.warning(
                         self,
                         "High Memory Usage",
