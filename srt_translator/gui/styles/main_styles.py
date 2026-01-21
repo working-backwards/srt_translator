@@ -355,4 +355,17 @@ MAIN_STYLESHEET = """
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
         height: 0px;
     }
+    
+    /* Tone radio buttons */
+    QRadioButton {
+        color: #111827;          
+        font-size: 13px;
+        spacing: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    QRadioButton::indicator {
+        width: 14px;
+        height: 14px;
+    }
 """
