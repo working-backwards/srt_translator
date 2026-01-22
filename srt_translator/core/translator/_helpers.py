@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -16,6 +17,17 @@ if TYPE_CHECKING:
     from srt_translator.core.translator.translator import (
         SRTTranslator,  # type-only; no runtime import
     )
+
+
+def _is_invalid_translation(text: str) -> bool:
+    if not text:
+        return True
+    t = text.strip()
+    if not t:
+        return True
+    if re.fullmatch(r"[\W\d_]+", t):
+        return True
+    return False
 
 
 def _create_batches_with_logging(
@@ -70,9 +82,7 @@ def _translate_batch_and_extract(
                 target_lang,
                 len(src_items),
             )
-        raise  # Re-raise the exception to maintain the original behavior
-
-    # Extract and validate placeholder usage
+        raise
     tgt_texts = [it.get("tgt", "") for it in items]
     return tgt_texts
 
