@@ -116,6 +116,7 @@ class TermbaseEditor(QWidget):
         self.languages = list(termbase.keys()) if termbase else []
         self.refresh_table()
         self.update_count_label()
+        self.update_button_states()
         # Emit signal to notify of changes
         if not self._updating_table:
             self.termbase_changed.emit(self.termbase)
