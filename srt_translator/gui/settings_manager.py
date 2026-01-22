@@ -323,23 +323,3 @@ class SettingsManager:
         if isinstance(value, list):
             return value
         return []
-
-    def save_termbase_url(self, url: str) -> None:
-        """Save termbase URL for automatic fetching"""
-        self.settings.setValue("termbase_url", url)
-        self.logger.info("Saved termbase URL: %s", url)
-
-    def load_termbase_url(self) -> str:
-        """Load termbase URL"""
-        value = self.settings.value("termbase_url", "")
-        return str(value) if value else ""
-
-    def save_dnt_url(self, url: str) -> None:
-        """Save DNT terms URL for automatic fetching"""
-        self.settings.setValue("dnt_url", url)
-        self.logger.info("Saved DNT URL: %s", url)
-
-    def load_dnt_url(self) -> str:
-        """Load DNT terms URL"""
-        value = self.settings.value("dnt_url", "")
-        return str(value) if value else ""
