@@ -35,8 +35,6 @@ from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.translation_section import TranslationSection
 from srt_translator.gui.utils.termbase_merger import (
-    fetch_dnt_terms_from_url,
-    fetch_termbase_from_url,
     load_dnt_terms_from_file,
     load_termbase_from_file,
     merge_dnt_terms,
@@ -407,27 +405,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Load user-provided termbase and DNT terms if they exist
         user_termbase = self.settings_manager.load_user_termbase()
         user_dnt_terms = self.settings_manager.load_user_dnt_terms()
-        
-        # Also fetch from URLs if configured
-        termbase_url = self.settings_manager.load_termbase_url()
-        dnt_url = self.settings_manager.load_dnt_url()
-        
-        if termbase_url:
-            self.logger.info("Fetching termbase from URL: %s", termbase_url)
-            url_termbase = fetch_termbase_from_url(termbase_url, self.logger)
-            if url_termbase:
-                # Merge URL termbase with existing user termbase (URL takes precedence)
-                user_termbase = merge_termbase(ai_generated=user_termbase, user_provided=url_termbase)
-                self.logger.info("Fetched termbase from URL: %s languages", len(url_termbase))
-        
-        if dnt_url:
-            self.logger.info("Fetching DNT terms from URL: %s", dnt_url)
-            url_dnt_terms = fetch_dnt_terms_from_url(dnt_url, self.logger)
-            if url_dnt_terms:
-                # Merge URL DNT terms with existing user DNT terms (URL takes precedence)
-                user_dnt_terms = merge_dnt_terms(ai_generated=user_dnt_terms, user_provided=url_dnt_terms)
-                self.logger.info("Fetched DNT terms from URL: %s terms", len(url_dnt_terms))
-        
+
         if user_termbase:
             self.logger.info("User-provided termbase will be merged: %s languages", len(user_termbase))
         if user_dnt_terms:
