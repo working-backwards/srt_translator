@@ -16,6 +16,7 @@ from srt_translator.core.config.models import SummaryDict, TranslationConfig
 from srt_translator.core.translator.fixer import SRTFixer
 from srt_translator.core.translator.translator import SRTTranslator
 
+
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().
 
@@ -210,7 +211,16 @@ def translate_srt_files(
         manifest_path = os.path.join(artifacts_dir, "ai_config.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f, ensure_ascii=False, indent=2)
-        logger.info("Wrote AI config to artifacts: ai_config.json")
+
+        with open(os.path.join(artifacts_dir, "dnt.json"), "w", encoding="utf-8") as f:
+            json.dump(list(config.dnt_terms), f, ensure_ascii=False, indent=2)
+
+        with open(os.path.join(artifacts_dir, "termbase.json"), "w", encoding="utf-8") as f:
+            json.dump({lang: dict(entries) for lang, entries in config.termbase.items()},
+                f,ensure_ascii=False,indent=2)
+
+        logger.info("Wrote artifacts: ai_config.json, dnt.json, termbase.json")
+
     except Exception as e:
         logger.warning("Failed to write AI config manifest: %s", e)
 

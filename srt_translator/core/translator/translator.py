@@ -30,7 +30,6 @@ from openai.types.chat import (
 
 # Core imports
 from srt_translator.core.config.language_config import LanguageConfig
-
 # Helper imports
 from srt_translator.core.translator._helpers import (
     _create_batches_with_logging,
@@ -49,6 +48,7 @@ from srt_translator.core.translator.diagnostics import (
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.log_types import LoggerLike
+
 
 # ---------------------------
 # Data models
@@ -760,6 +760,17 @@ class SRTTranslator:
 
         # The translation rules here preserve the core behavior you've tuned:
         user_prompt = f"""Translate each item to {mapped_target_lang}. Keep 1:1 count and order.
+
+IMPORTANT SUBTITLE TRANSLATION RULES (MUST FOLLOW):
+- Each item is an independent subtitle fragment.
+- DO NOT use context from previous or next items.
+- DO NOT complete or rewrite broken sentences.
+- If a sentence is cut off in the input, it MUST be cut off in the translation.
+- If a sentence starts mid-thought, keep it mid-thought.
+- Preserve meaning ONLY of the visible text in that item.
+- Do NOT add or remove information.
+- Do NOT improve grammar beyond what is necessary for understanding.
+- Keep translation length close to the input (no expansion).
 
 TERMINOLOGY:
 Use these business term mappings when present (source → target). If "(none)", ignore:

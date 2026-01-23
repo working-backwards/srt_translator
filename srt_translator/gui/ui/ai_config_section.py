@@ -11,12 +11,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QTabWidget,
-    QTextEdit,
     QVBoxLayout,
 )
 
@@ -103,56 +101,6 @@ class AIConfigSection(QGroupBox):
         import_layout.addWidget(self.import_dnt_btn)
         import_layout.addStretch()
 
-        # URL fetch section
-        url_layout = QVBoxLayout()
-        url_layout.setSpacing(8)
-
-        url_label = QLabel("Or fetch from URL:")
-        url_label.setStyleSheet("color: #6B7280; font-size: 12px; font-weight: 500;")
-
-        # Termbase URL
-        termbase_url_layout = QHBoxLayout()
-        termbase_url_label = QLabel("Termbase URL:")
-        termbase_url_label.setMinimumWidth(100)
-        self.termbase_url_input = QLineEdit()
-        self.termbase_url_input.setPlaceholderText("https://example.com/termbase.json")
-        self.termbase_url_input.setToolTip(
-            "Enter a URL to fetch termbase JSON from.\n"
-            "The URL will be saved and fetched automatically when generating settings."
-        )
-        self.fetch_termbase_btn = QPushButton("Fetch")
-        self.fetch_termbase_btn.setObjectName("secondaryButton")
-        self.fetch_termbase_btn.setFixedWidth(80)
-        self.fetch_termbase_btn.setToolTip("Fetch termbase from the URL above")
-
-        termbase_url_layout.addWidget(termbase_url_label)
-        termbase_url_layout.addWidget(self.termbase_url_input)
-        termbase_url_layout.addWidget(self.fetch_termbase_btn)
-
-        # DNT URL
-        dnt_url_layout = QHBoxLayout()
-        dnt_url_label = QLabel("DNT Terms URL:")
-        dnt_url_label.setMinimumWidth(100)
-        self.dnt_url_input = QLineEdit()
-        self.dnt_url_input.setPlaceholderText("https://example.com/dnt_terms.json")
-        self.dnt_url_input.setToolTip(
-            "Enter a URL to fetch DNT terms from.\n"
-            "Supports JSON array or text format.\n"
-            "The URL will be saved and fetched automatically when generating settings."
-        )
-        self.fetch_dnt_btn = QPushButton("Fetch")
-        self.fetch_dnt_btn.setObjectName("secondaryButton")
-        self.fetch_dnt_btn.setFixedWidth(80)
-        self.fetch_dnt_btn.setToolTip("Fetch DNT terms from the URL above")
-
-        dnt_url_layout.addWidget(dnt_url_label)
-        dnt_url_layout.addWidget(self.dnt_url_input)
-        dnt_url_layout.addWidget(self.fetch_dnt_btn)
-
-        url_layout.addWidget(url_label)
-        url_layout.addLayout(termbase_url_layout)
-        url_layout.addLayout(dnt_url_layout)
-
         # Tone selection (horizontal radio button group)
         tone_layout = QHBoxLayout()
         tone_layout.setSpacing(15)
@@ -188,7 +136,7 @@ class AIConfigSection(QGroupBox):
         # Action buttons for configured state
         self.action_buttons = QHBoxLayout()
 
-        self.edit_btn = QPushButton("Edit Settings")
+        self.edit_btn = QPushButton("Edit/View Settings")
         self.edit_btn.setObjectName("secondaryButton")
         self.edit_btn.setEnabled(False)  # Will be enabled when config is generated
         self.edit_btn.setToolTip("Review and modify the AI-generated translation settings")
@@ -198,14 +146,8 @@ class AIConfigSection(QGroupBox):
         self.regenerate_btn.setEnabled(False)  # Will be enabled when config is generated
         self.regenerate_btn.setToolTip("Generate new translation settings based on current file selection")
 
-        self.view_details_btn = QPushButton("View Details")
-        self.view_details_btn.setObjectName("secondaryButton")
-        self.view_details_btn.setEnabled(False)  # Will be enabled when config is generated
-        self.view_details_btn.setToolTip("View detailed information about current translation settings")
-
         self.action_buttons.addWidget(self.edit_btn)
         self.action_buttons.addWidget(self.regenerate_btn)
-        self.action_buttons.addWidget(self.view_details_btn)
 
         # Help button
         self.help_btn = QPushButton("?")
@@ -228,43 +170,12 @@ class AIConfigSection(QGroupBox):
         self.progress_label.setWordWrap(True)
         self.progress_label.setStyleSheet("color: #6B7280; font-size: 12px;")
 
-        # DNT (Do Not Translate) display
-        dnt_label = QLabel("🚫 Do Not Translate (DNT) - Terms that stay in original language:")
-        self.dnt_display = QTextEdit()
-        self.dnt_display.setObjectName("dntDisplay")
-        self.dnt_display.setReadOnly(True)
-        self.dnt_display.setPlaceholderText("DNT terms will appear here...")
-        self.dnt_display.setMaximumHeight(80)
-        self.dnt_display.setToolTip(
-            "These terms will remain in the original language in all translated subtitles.\n"
-            "Includes company names, people, technical acronyms, and branded terms.\n"
-            'Example: "Amazon" stays "Amazon" instead of being translated.'
-        )
-
-        # Termbase display
-        termbase_label = QLabel("📚 Termbase - Consistent professional translations:")
-        self.termbase_display = QTextEdit()
-        self.termbase_display.setObjectName("termbaseDisplay")
-        self.termbase_display.setToolTip(
-            "These business terms will be translated consistently across all your course materials.\n"
-            "Professional terminology appropriate for business and educational contexts.\n"
-            'Example: "operating plan" → "plan operativo" (Spanish) throughout entire course.'
-        )
-        self.termbase_display.setReadOnly(True)
-        self.termbase_display.setPlaceholderText("Termbase will appear here...")
-        self.termbase_display.setMaximumHeight(120)
-
         content_layout.addWidget(self.generate_btn)
         content_layout.addLayout(import_layout)
-        content_layout.addLayout(url_layout)
         content_layout.addLayout(tone_layout)
         content_layout.addLayout(self.action_buttons)
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
-        content_layout.addWidget(dnt_label)
-        content_layout.addWidget(self.dnt_display)
-        content_layout.addWidget(termbase_label)
-        content_layout.addWidget(self.termbase_display)
 
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
@@ -275,40 +186,18 @@ class AIConfigSection(QGroupBox):
         generate_callback,
         edit_callback,
         regenerate_callback,
-        view_details_callback,
         help_callback,
         import_termbase_callback,
         import_dnt_callback,
-        fetch_termbase_callback,
-        fetch_dnt_callback,
     ):
         """Connect button signals to callbacks"""
         self.toggle_btn.clicked.connect(toggle_callback)
         self.generate_btn.clicked.connect(generate_callback)
         self.edit_btn.clicked.connect(edit_callback)
         self.regenerate_btn.clicked.connect(regenerate_callback)
-        self.view_details_btn.clicked.connect(view_details_callback)
         self.help_btn.clicked.connect(help_callback)
         self.import_termbase_btn.clicked.connect(import_termbase_callback)
         self.import_dnt_btn.clicked.connect(import_dnt_callback)
-        self.fetch_termbase_btn.clicked.connect(fetch_termbase_callback)
-        self.fetch_dnt_btn.clicked.connect(fetch_dnt_callback)
-
-    def get_termbase_url(self) -> str:
-        """Get the termbase URL from the input field"""
-        return self.termbase_url_input.text().strip()
-
-    def set_termbase_url(self, url: str) -> None:
-        """Set the termbase URL in the input field"""
-        self.termbase_url_input.setText(url)
-
-    def get_dnt_url(self) -> str:
-        """Get the DNT URL from the input field"""
-        return self.dnt_url_input.text().strip()
-
-    def set_dnt_url(self, url: str) -> None:
-        """Set the DNT URL in the input field"""
-        self.dnt_url_input.setText(url)
 
     def toggle_expansion(self):
         """Toggle the Translation Settings section expansion"""
@@ -325,19 +214,6 @@ class AIConfigSection(QGroupBox):
         # Animate the toggle button
         self.toggle_btn.set_expanded_state(self.is_expanded)
 
-    def set_dnt_display(self, dnt_text: str):
-        """Set the DNT display text"""
-        self.dnt_display.setText(dnt_text)
-
-    def set_termbase_display(self, termbase_text: str):
-        """Set the termbase display text"""
-        self.termbase_display.setText(termbase_text)
-
-    def clear_displays(self):
-        """Clear both DNT and termbase displays"""
-        self.dnt_display.clear()
-        self.termbase_display.clear()
-
     def set_generate_button_enabled(self, enabled: bool):
         """Enable or disable the generate configuration button"""
         self.generate_btn.setEnabled(enabled)
@@ -346,7 +222,6 @@ class AIConfigSection(QGroupBox):
         """Enable or disable all action buttons"""
         self.edit_btn.setEnabled(enabled)
         self.regenerate_btn.setEnabled(enabled)
-        self.view_details_btn.setEnabled(enabled)
         self.help_btn.setEnabled(enabled)
 
     def show_progress(self, show: bool):
@@ -360,28 +235,6 @@ class AIConfigSection(QGroupBox):
         self.progress_label.setText(message)
         self.progress_label.setVisible(True)
 
-    def update_dnt_display(self, terms: list):
-        """Update the DNT display with a list of terms"""
-        if terms:
-            terms_text = ", ".join(terms)
-            self.dnt_display.setText(terms_text)
-        else:
-            self.dnt_display.setText("No DNT terms generated")
-
-    def update_termbase_display(self, termbase: dict):
-        """Update the termbase display with termbase data"""
-        if termbase:
-            # Show a summary of the termbase
-            total_terms = sum(len(lang_termbase) for lang_termbase in termbase.values())
-            languages = list(termbase.keys())
-            summary = f"Generated for {len(languages)} languages: {', '.join(languages[:3])}"
-            if len(languages) > 3:
-                summary += f" (+{len(languages) - 3} more)"
-            summary += f"\nTotal terms: {total_terms}"
-            self.termbase_display.setText(summary)
-        else:
-            self.termbase_display.setText("No termbase generated")
-
     def set_configured_status(self, configured: bool):
         """Set the configured status and update UI accordingly"""
         self.is_configured = configured
@@ -392,7 +245,6 @@ class AIConfigSection(QGroupBox):
             self.generate_btn.setVisible(False)
             self.edit_btn.setVisible(True)
             self.regenerate_btn.setVisible(True)
-            self.view_details_btn.setVisible(True)
         else:
             self.status_indicator.setText("⏳ Not Configured")
             self.status_indicator.setStyleSheet("color: #6B7280; font-weight: 500;")
@@ -400,7 +252,6 @@ class AIConfigSection(QGroupBox):
             self.generate_btn.setVisible(True)
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
-            self.view_details_btn.setVisible(False)
 
     def get_tone(self) -> str:
         """Get the currently selected tone"""
@@ -454,11 +305,6 @@ class EditConfigurationDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
-
-        # Header
-        header_label = QLabel("Edit Translation Settings")
-        header_label.setObjectName("subHeaderLabel")
-        layout.addWidget(header_label)
 
         # Tab widget for organizing editors
         self.tab_widget = QTabWidget()
