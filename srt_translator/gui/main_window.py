@@ -207,7 +207,6 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.generate_translation_settings,
             self.edit_translation_settings,
             self.regenerate_translation_settings,
-            self.view_translation_settings_details,
             self.show_ai_config_help,
             self.import_termbase_file,
             self.import_dnt_file
@@ -239,8 +238,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Load and display existing Translation Settings if available
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if dnt_terms or termbase:
-            self.ai_config_section.update_dnt_display(dnt_terms)
-            self.ai_config_section.update_termbase_display(termbase)
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
 
@@ -584,10 +581,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         target_languages = self._target_langs_from_ui()
         self.settings_manager.save_target_languages(target_languages)
 
-        # Update displays
-        self.ai_config_section.update_dnt_display(dnt_terms)
-        self.ai_config_section.update_termbase_display(termbase)
-
         # Enable action buttons and set configured status
         self.ai_config_section.set_action_buttons_enabled(True)
         self.ai_config_section.set_configured_status(True)
@@ -664,10 +657,6 @@ class SRTTranslatorMainWindow(QMainWindow):
                     modified_terms, modified_termbase, source_language
                 )
 
-                # Update displays
-                self.ai_config_section.update_dnt_display(modified_terms)
-                self.ai_config_section.update_termbase_display(modified_termbase)
-
                 # Show confirmation
                 QMessageBox.information(
                     self,
@@ -718,7 +707,6 @@ class SRTTranslatorMainWindow(QMainWindow):
                     if ai_tb:
                         merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
                         self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
-                        self.ai_config_section.update_termbase_display(merged)
                         QMessageBox.information(
                             self,
                             "Termbase Imported",
@@ -773,7 +761,6 @@ class SRTTranslatorMainWindow(QMainWindow):
                     if ai_dnt:
                         merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
                         self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
-                        self.ai_config_section.update_dnt_display(merged)
                         QMessageBox.information(
                             self,
                             "DNT Terms Imported",
@@ -796,39 +783,6 @@ class SRTTranslatorMainWindow(QMainWindow):
                         "- JSON array: [\"term1\", \"term2\", ...]\n"
                         "- Text file: one term per line",
                     )
-
-    def view_translation_settings_details(self):
-        """View detailed Translation Settings"""
-        # Get current configuration
-        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
-
-        if not dnt_terms and not termbase:
-            QMessageBox.warning(
-                self,
-                "No Translation Settings",
-                "No Translation Settings have been generated yet.\nPlease generate settings first.",
-            )
-            return
-
-        # Expand the section to show details
-        if not self.ai_config_section.is_expanded:
-            self.ai_config_section.toggle_expansion()
-
-        # Show detailed information
-        dnt_text = ", ".join(dnt_terms) if dnt_terms else "No DNT terms"
-        termbase_text = ""
-        if termbase:
-            for language, terms in termbase.items():
-                termbase_text += f"{language}:\n"
-                for source_term, translation in terms.items():
-                    termbase_text += f"  • {source_term} → {translation}\n"
-                termbase_text += "\n"
-        else:
-            termbase_text = "No termbase entries"
-
-        # Update displays with full details
-        self.ai_config_section.set_dnt_display(dnt_text)
-        self.ai_config_section.set_termbase_display(termbase_text)
 
     def show_ai_config_help(self):
         """Show help dialog for AI Configuration"""
