@@ -3,11 +3,13 @@
 DNT Terms Editor for the SRT Translator GUI.
 """
 
+import json
 import logging
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QInputDialog,
@@ -196,6 +198,34 @@ class DNTTermsEditor(QWidget):
         )
         buttons_layout.addWidget(self.clear_button)
 
+        # Export button
+        self.export_button = QPushButton("Export")
+        self.export_button.setMinimumWidth(80)
+        self.export_button.setEnabled(False)
+        self.export_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #7B1FA2;
+            }
+            QPushButton:pressed {
+                background-color: #6A1B9A;
+            }
+            QPushButton:disabled {
+                background-color: #BDBDBD;
+                color: #757575;
+            }
+        """
+        )
+        buttons_layout.addWidget(self.export_button)
+
         layout.addWidget(buttons_frame)
 
         # Set size policy
@@ -207,6 +237,7 @@ class DNTTermsEditor(QWidget):
         self.edit_button.clicked.connect(self.edit_selected_term)
         self.remove_button.clicked.connect(self.remove_selected_term)
         self.clear_button.clicked.connect(self.clear_all_terms)
+        self.export_button.clicked.connect(self.export_terms)
         self.terms_list_widget.itemSelectionChanged.connect(self.update_button_states)
 
     def set_terms(self, terms: list[str]):
@@ -247,6 +278,7 @@ class DNTTermsEditor(QWidget):
         self.edit_button.setEnabled(has_selection)
         self.remove_button.setEnabled(has_selection)
         self.clear_button.setEnabled(has_terms)
+        self.export_button.setEnabled(has_terms)
 
     def add_term(self):
         """Add a new term to the list."""
@@ -380,6 +412,45 @@ class DNTTermsEditor(QWidget):
                 return False
 
         return True
+
+    def export_terms(self):
+        """Export DNT terms to a JSON file."""
+        if not self.terms_list:
+            QMessageBox.warning(
+                self,
+                "No Terms to Export",
+                "There are no DNT terms to export.",
+            )
+            return
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+        file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+        file_dialog.setNameFilter("JSON Files (*.json)")
+        file_dialog.setDefaultSuffix("json")
+
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+
+            try:
+                # Export as JSON array format: ["term1", "term2", ...]
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(sorted(self.terms_list, key=str.lower), f, indent=2, ensure_ascii=False)
+
+                QMessageBox.information(
+                    self,
+                    "Export Successful",
+                    f"Exported {len(self.terms_list)} DNT terms to:\n{file_path}",
+                )
+                self.logger.info("Exported %s DNT terms to %s", len(self.terms_list), file_path)
+
+            except Exception as e:
+                self.logger.error("Failed to export DNT terms: %s", e)
+                QMessageBox.critical(
+                    self,
+                    "Export Failed",
+                    f"Failed to export DNT terms:\n{str(e)}",
+                )
 
     def is_modified(self, original_terms: list[str]) -> bool:
         """Check if the terms have been modified from the original list."""

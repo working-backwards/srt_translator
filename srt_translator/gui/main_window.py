@@ -211,6 +211,55 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Translation Section signals
         self.translation_section.connect_signals(self.start_translation, self._open_html_report)
 
+    def import_dnt_file(self):
+        """Import DNT terms from a JSON or text file"""
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
+
+        last_dir = self.settings_manager.load_last_input_directory()
+        if last_dir and os.path.exists(last_dir):
+            file_dialog.setDirectory(last_dir)
+        else:
+            file_dialog.setDirectory(os.getcwd())
+
+        if not file_dialog.exec():
+            return
+
+        file_path = file_dialog.selectedFiles()[0]
+        self.logger.info("Importing DNT terms from %s", file_path)
+
+        try:
+            dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
+
+            # save user DNT
+            self.settings_manager.save_user_dnt_terms(dnt_terms)
+
+            # merge with AI config if exists
+            ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+            if ai_dnt:
+                merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
+                self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
+
+            QMessageBox.information(
+                self,
+                "DNT Terms Imported",
+                f"Successfully imported {len(dnt_terms)} DNT terms.",
+            )
+
+        except Exception as e:
+            self.logger.error("DNT import failed: %s", e, exc_info=True)
+            QMessageBox.warning(
+                self,
+                "Invalid DNT file",
+                "Invalid DNT file.\n\n"
+                "Expected:\n"
+                "• JSON array of strings\n"
+                "• OR text file (one term per line)",
+            )
+
+    # Load DNT terms from file dnt_terms = load_dnt_terms_from_file(file_path, self.logger) if dnt_terms: # Save user-provided DNT terms self.settings_manager.save_user_dnt_terms(dnt_terms) # If we already have AI-generated config, merge and update ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config() if ai_dnt: merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms) self.settings_manager.save_ai_config(merged, ai_tb, source_lang) self.ai_config_section.update_dnt_display(merged) QMessageBox.information( self, "DNT Terms Imported", f"Successfully imported {len(dnt_terms)} DNT terms.\n\n" f"The terms have been merged with existing AI-generated settings.", ) else: QMessageBox.information( self, "DNT Terms Imported", f"Successfully imported {len(dnt_terms)} DNT terms.\n\n" f"The terms will be merged when you generate Translation Settings.", ) else: QMessageBox.warning( self, "Import Failed", "Failed to load DNT terms from the selected file.\n" "Please ensure the file is either:\n" "- JSON array: [\"term1\", \"term2\", ...]\n" "- Text file: one term per line", )
     def load_previous_settings(self):
         """Load previous settings from storage"""
         # Load API key and set connection status
@@ -654,108 +703,59 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Import termbase from a JSON file"""
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFile)
-        file_dialog.setNameFilter("JSON Files (*.json);;All Files (*)")
-
-        last_dir = self.settings_manager.load_last_input_directory()
-        if last_dir and os.path.exists(last_dir):
-            file_dialog.setDirectory(last_dir)
-        else:
-            file_dialog.setDirectory(os.getcwd())
+        file_dialog.setNameFilter("JSON Files (*.json)")
 
         if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            if selected_files:
-                file_path = selected_files[0]
-                self.logger.info("Importing termbase from %s", file_path)
+            file_path = file_dialog.selectedFiles()[0]
 
-                # Load termbase from file
+            try:
                 termbase = load_termbase_from_file(file_path, self.logger)
 
-                if termbase:
-                    # Save user-provided termbase
-                    self.settings_manager.save_user_termbase(termbase)
+                if not self._validate_termbase_structure(termbase):
+                    raise ValueError("Invalid termbase structure")
 
-                    # If we already have AI-generated config, merge and update
-                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
-                    if ai_tb:
-                        merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
-                        self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
-                        QMessageBox.information(
-                            self,
-                            "Termbase Imported",
-                            f"Successfully imported termbase with {len(termbase)} languages.\n"
-                            f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
-                            f"The termbase has been merged with existing AI-generated settings.",
-                        )
-                    else:
-                        QMessageBox.information(
-                            self,
-                            "Termbase Imported",
-                            f"Successfully imported termbase with {len(termbase)} languages.\n"
-                            f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
-                            f"The termbase will be merged when you generate Translation Settings.",
-                        )
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Import Failed",
-                        "Failed to load termbase from the selected file.\n"
-                        "Please ensure the file is valid JSON with the format:\n"
-                        '{"lang_code": {"source_term": "translation", ...}, ...}',
-                    )
+                self.settings_manager.save_user_termbase(termbase)
 
-    def import_dnt_file(self):
-        """Import DNT terms from a JSON or text file"""
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFile)
-        file_dialog.setNameFilter("JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
+                QMessageBox.information(
+                    self,
+                    "Termbase Imported",
+                    f"Imported {len(termbase)} languages successfully",
+                )
 
-        last_dir = self.settings_manager.load_last_input_directory()
-        if last_dir and os.path.exists(last_dir):
-            file_dialog.setDirectory(last_dir)
-        else:
-            file_dialog.setDirectory(os.getcwd())
+            except Exception as e:
+                self.logger.error("Termbase import failed: %s", e)
+                QMessageBox.critical(
+                    self,
+                    "Invalid Termbase File",
+                    "Termbase format is invalid.\n\n"
+                    "Expected:\n"
+                    "{ 'lang': { 'source': 'translation' } }"
+                )
 
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            if selected_files:
-                file_path = selected_files[0]
-                self.logger.info("Importing DNT terms from %s", file_path)
 
-                # Load DNT terms from file
-                dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
+    def _validate_dnt_structure(self, dnt_terms: list) -> bool:
+        if not isinstance(dnt_terms, list):
+            return False
+        if len(dnt_terms) == 0:
+            return False
+        for term in dnt_terms:
+            if not isinstance(term, str) or not term.strip():
+                return False
+        return True
 
-                if dnt_terms:
-                    # Save user-provided DNT terms
-                    self.settings_manager.save_user_dnt_terms(dnt_terms)
+    def _validate_termbase_structure(self, termbase: dict) -> bool:
+        if not isinstance(termbase, dict):
+            return False
 
-                    # If we already have AI-generated config, merge and update
-                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
-                    if ai_dnt:
-                        merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
-                        self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
-                        QMessageBox.information(
-                            self,
-                            "DNT Terms Imported",
-                            f"Successfully imported {len(dnt_terms)} DNT terms.\n\n"
-                            f"The terms have been merged with existing AI-generated settings.",
-                        )
-                    else:
-                        QMessageBox.information(
-                            self,
-                            "DNT Terms Imported",
-                            f"Successfully imported {len(dnt_terms)} DNT terms.\n\n"
-                            f"The terms will be merged when you generate Translation Settings.",
-                        )
-                else:
-                    QMessageBox.warning(
-                        self,
-                        "Import Failed",
-                        "Failed to load DNT terms from the selected file.\n"
-                        "Please ensure the file is either:\n"
-                        '- JSON array: ["term1", "term2", ...]\n'
-                        "- Text file: one term per line",
-                    )
+        for lang, entries in termbase.items():
+            if not isinstance(lang, str):
+                return False
+            if not isinstance(entries, dict):
+                return False
+            for k, v in entries.items():
+                if not isinstance(k, str) or not isinstance(v, str):
+                    return False
+        return True
 
     def show_ai_config_help(self):
         """Show help dialog for AI Configuration"""

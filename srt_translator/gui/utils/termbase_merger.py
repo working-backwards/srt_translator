@@ -103,115 +103,117 @@ def merge_termbase(
     
     return merged
 
-
 def load_termbase_from_file(file_path: str, logger: logging.Logger | None = None) -> dict[str, dict[str, str]]:
     """
-    Load termbase from a JSON file.
-    
-    Expected format:
-    {
-      "lang_code": {
-        "source_term": "translation",
-        ...
-      },
-      ...
-    }
-    
-    Args:
-        file_path: Path to termbase JSON file
-        logger: Optional logger for error reporting
-        
-    Returns:
-        Termbase dictionary, or empty dict if loading fails
-    """
+        Load termbase from a JSON file.
+
+        Expected format:
+        {
+          "lang_code": {
+            "source_term": "translation",
+            ...
+          },
+          ...
+        }
+
+        Args:
+            file_path: Path to termbase JSON file
+            logger: Optional logger for error reporting
+
+        Returns:
+            Termbase dictionary, or empty dict if loading fails
+        """
     log = logger or logging.getLogger(__name__)
-    
+
     try:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
-        
+
         if not isinstance(data, dict):
-            log.error("Termbase file must contain a JSON object, got %s", type(data).__name__)
-            return {}
-        
-        # Validate structure: each value should be a dict
+            raise ValueError("Termbase must be a JSON object")
+
         validated = {}
+
         for lang_code, term_map in data.items():
-            if isinstance(term_map, dict):
-                # Ensure all values are strings
-                validated[lang_code] = {
-                    str(k).strip(): str(v).strip()
-                    for k, v in term_map.items()
-                    if k and v
-                }
-            else:
-                log.warning("Skipping invalid termbase entry for language %s: expected dict, got %s", lang_code, type(term_map).__name__)
-        
-        log.info("Loaded termbase from %s: %s languages, %s total entries", 
-                 file_path, len(validated), sum(len(tb) for tb in validated.values()))
+            if not isinstance(lang_code, str):
+                raise ValueError("Language code must be string")
+
+            if not isinstance(term_map, dict):
+                raise ValueError(f"Entries for '{lang_code}' must be an object")
+
+            clean = {}
+            for k, v in term_map.items():
+                if not isinstance(k, str) or not isinstance(v, str):
+                    raise ValueError(f"Invalid term entry in '{lang_code}'")
+
+                clean[k.strip()] = v.strip()
+
+            validated[lang_code] = clean
+
+        if not validated:
+            raise ValueError("Termbase is empty")
+
+        log.info(
+            "Loaded termbase from %s: %s languages, %s total entries",
+            file_path,
+            len(validated),
+            sum(len(tb) for tb in validated.values()),
+        )
+
         return validated
-        
-    except FileNotFoundError:
-        log.error("Termbase file not found: %s", file_path)
-        return {}
-    except json.JSONDecodeError as e:
-        log.error("Invalid JSON in termbase file %s: %s", file_path, e)
-        return {}
-    except Exception as e:
-        log.error("Error loading termbase from %s: %s", file_path, e)
-        return {}
+
+    except Exception:
+        log.exception("Invalid termbase file: %s", file_path)
+        raise
 
 
 def load_dnt_terms_from_file(file_path: str, logger: logging.Logger | None = None) -> list[str]:
     """
-    Load DNT terms from a JSON file or text file.
-    
-    Supports:
-    - JSON array: ["term1", "term2", ...]
-    - Text file: one term per line
-    
-    Args:
-        file_path: Path to DNT terms file
-        logger: Optional logger for error reporting
-        
-    Returns:
-        List of DNT terms, or empty list if loading fails
-    """
+     Load DNT terms from a JSON file or text file.
+
+     Supports:
+     - JSON array: ["term1", "term2", ...]
+     - Text file: one term per line
+
+     Args:
+         file_path: Path to DNT terms file
+         logger: Optional logger for error reporting
+
+     Returns:
+         List of DNT terms, or empty list if loading fails
+     """
     log = logger or logging.getLogger(__name__)
-    
     try:
         with open(file_path, encoding="utf-8") as f:
             content = f.read().strip()
-        
-        # Try JSON first
-        try:
+
+        # If file looks like JSON, it MUST be valid JSON list
+        if content.startswith("["):
             data = json.loads(content)
-            if isinstance(data, list):
-                terms = [str(term).strip() for term in data if term]
-                log.info("Loaded %s DNT terms from JSON file %s", len(terms), file_path)
-                return terms
-            else:
-                log.warning("JSON file does not contain an array, trying as text file")
-        except json.JSONDecodeError:
-            # Not JSON, treat as text file
-            pass
-        
-        # Treat as text file (one term per line)
-        terms = []
-        for line in content.split("\n"):
-            term = line.strip()
-            if term and not term.startswith("#"):  # Ignore comment lines
-                terms.append(term)
-        
-        log.info("Loaded %s DNT terms from text file %s", len(terms), file_path)
+
+            if not isinstance(data, list):
+                raise ValueError("DNT JSON must be a list")
+
+            terms = [str(term).strip() for term in data if str(term).strip()]
+
+        else:
+            # Text file
+            terms = [
+                line.strip()
+                for line in content.splitlines()
+                if line.strip() and not line.startswith("#")
+            ]
+
+        if not terms:
+            raise ValueError("No valid DNT terms found")
+
+        log.info("Loaded %s DNT terms from %s", len(terms), file_path)
         return terms
-        
-    except FileNotFoundError:
-        log.error("DNT terms file not found: %s", file_path)
-        return []
-    except Exception as e:
-        log.error("Error loading DNT terms from %s: %s", file_path, e)
-        return []
+
+    except Exception:
+        log.exception("Invalid DNT file: %s", file_path)
+        raise
+
 
 
 def fetch_termbase_from_url(url: str, logger: logging.Logger | None = None, timeout: int = 30) -> dict[str, dict[str, str]]:
