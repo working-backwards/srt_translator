@@ -30,12 +30,12 @@ from openai.types.chat import (
 
 # Core imports
 from srt_translator.core.config.language_config import LanguageConfig
-
 # Helper imports
 from srt_translator.core.translator._helpers import (
     _create_batches_with_logging,
     _handle_mid_batch_empty_retries,
-    _translate_batch_and_extract, _is_invalid_translation,
+    _is_invalid_translation,
+    _translate_batch_and_extract,
 )
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
@@ -48,6 +48,7 @@ from srt_translator.core.translator.diagnostics import (
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.log_types import LoggerLike
+
 
 # ---------------------------
 # Data models
@@ -202,6 +203,7 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
 # Stage 1A Helper Methods (stay in translator.py)
 # ---------------------------
 
+
 def _load_and_parse_file(input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
     with open(input_filepath, encoding="utf-8") as f:
@@ -267,6 +269,7 @@ class SRTTranslator:
         batch_size: int,
         error_policy: str = "STRICT",
         language_config: LanguageConfig,
+        tone: str = "neutral",
     ) -> None:
         if logger is None:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
@@ -277,6 +280,13 @@ class SRTTranslator:
         self.model_name = model_name
         self.batch_size = max(1, int(batch_size))
         self.error_policy = error_policy.upper()
+        self.tone = tone.lower() if tone else "neutral"
+
+        # Log the tone setting for debugging
+        if isinstance(logger, logging.LoggerAdapter):
+            logger.logger.debug("SRTTranslator initialized with tone: '%s'", self.tone)
+        else:
+            logger.debug("SRTTranslator initialized with tone: '%s'", self.tone)
 
         # Make a namespaced child for clarity in logs
         if isinstance(logger, logging.LoggerAdapter):
@@ -331,7 +341,7 @@ class SRTTranslator:
         }
 
     def _setup_file_logging(
-            self: SRTTranslator, input_filepath: str, target_lang: str
+        self: SRTTranslator, input_filepath: str, target_lang: str
     ) -> logging.LoggerAdapter[logging.Logger]:
         """Setup file-scoped logging with file/lang context."""
 
@@ -352,11 +362,11 @@ class SRTTranslator:
         return file_logger
 
     def _validate_and_repair_placeholders(
-            self,
-            src_items: list[str],
-            tgt_texts: list[str],
-            batch_ids: list[int],
-            batch_logger: LoggerLike,
+        self,
+        src_items: list[str],
+        tgt_texts: list[str],
+        batch_ids: list[int],
+        batch_logger: LoggerLike,
     ) -> list[str]:
         """Validate and repair placeholder integrity."""
         # Log input/output for troubleshooting placeholder issues
@@ -531,7 +541,7 @@ class SRTTranslator:
         self._consecutive_decode_failures = 0
 
         # 1) Setup file logging and load/parse SRT
-        file_logger = self._setup_file_logging( input_filepath, target_lang)
+        file_logger = self._setup_file_logging(input_filepath, target_lang)
         file_logger.info(
             "Using subtitle-based translation system for %s → %s",
             os.path.basename(input_filepath),
@@ -574,13 +584,11 @@ class SRTTranslator:
                     head = batch[0]
                     pair_src = [
                         deferred_tail_retry["source_text_with_placeholders"],
-                        self.term_handler.apply_dnt_placeholders(
-                            self.term_handler.apply_termbase(head.text)
-                        ),
+                        self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(head.text)),
                     ]
                     pair_ids = [deferred_tail_retry["cue_index"], head.idx]
                     batch_logger.debug(
-                        "Empty target at idx=%s; attempting pair retry with next cue across batch boundary (pair_ids=%s).",
+                        "Empty target at idx=%s; pair retry across batch boundary (pair_ids=%s).",
                         deferred_tail_retry["cue_index"],
                         pair_ids,
                     )
@@ -640,10 +648,7 @@ class SRTTranslator:
 
             # Preprocess: apply DNT placeholders on a per-subtitle basis
             src_items = [
-                self.term_handler.apply_dnt_placeholders(
-                    self.term_handler.apply_termbase(s.text)
-                )
-                for s in batch
+                self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(s.text)) for s in batch
             ]
 
             # Log source items being sent to AI for troubleshooting
@@ -735,6 +740,24 @@ class SRTTranslator:
                 " do not pad, chant, or fill with repeated fragments."
             )
 
+        # Add tone-critical instruction to system prompt for languages with strong formality distinctions
+        lang_hint = self.language_config.get_tone_hint(target_lang, self.tone)
+        if lang_hint and target_lang.lower().startswith("zh"):
+            # Chinese has critical 你/您 distinction - add to system prompt for higher priority
+            system_prompt += f" CRITICAL for {target_lang}: {lang_hint}"
+
+        # Build TONE and optional LANG_HINT section
+        tone_section = f"TONE: {self.tone}\n"
+        lang_hint = self.language_config.get_tone_hint(target_lang, self.tone)
+        if lang_hint:
+            tone_section += f"\nLANG_HINT ({target_lang}): {lang_hint}\n"
+            self.logger.debug("Tone hint found for %s (%s): %s", target_lang, self.tone, lang_hint)
+        else:
+            self.logger.debug("No tone hint found for %s (%s)", target_lang, self.tone)
+
+        # Log the complete tone section being inserted into prompt
+        self.logger.debug("Prompt tone section for %s:\n%s", target_lang, tone_section.strip())
+
         # The translation rules here preserve the core behavior you've tuned:
         user_prompt = f"""Translate each item to {mapped_target_lang}. Keep 1:1 count and order.
 
@@ -769,6 +792,7 @@ STYLE:
 - Numbers: keep digits; localize formatting where normal. No rounding.
 - No added/removed content.
 
+{tone_section}
 INPUT ITEMS:
 {self._render_items_for_prompt(batch_ids, src_items)}
 """
@@ -1095,7 +1119,7 @@ TARGET ITEMS (TO FIX):
     @staticmethod
     def _render_items_for_prompt(ids: list[int], texts: list[str]) -> str:
         rows = []
-        for i, t in zip(ids, texts):
+        for i, t in zip(ids, texts, strict=False):
             clean = (t or "").replace("\n", " ").replace("{", "{{").replace("}", "}}").strip()
             rows.append(f"{i}) {clean}")
         return "\n".join(rows)
@@ -1240,9 +1264,7 @@ TARGET ITEMS (TO FIX):
                     tgt = (obj.get("tgt") or "").strip()
 
                     if _is_invalid_translation(tgt):
-                        raise RuntimeError(
-                            f"Invalid translation at cue id={seg_ids[offset]}: {tgt!r}"
-                        )
+                        raise RuntimeError(f"Invalid translation at cue id={seg_ids[offset]}: {tgt!r}")
                     results[start + offset] = {
                         "id": obj.get("id"),
                         "tgt": obj.get("tgt", ""),

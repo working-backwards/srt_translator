@@ -179,9 +179,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def connect_signals(self):
         """Connect all component signals to their handlers"""
         # API Section signals
-        self.api_section.connect_signals(
-            self.test_api_connection, self.show_api_input, self.toggle_api_configuration
-        )
+        self.api_section.connect_signals(self.test_api_connection, self.show_api_input, self.toggle_api_configuration)
 
         # File Section signals
         self.file_section.connect_signals(
@@ -287,6 +285,15 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
 
+        # Load saved tone setting and connect change handler
+        saved_tone = self.settings_manager.load_tone()
+        self.ai_config_section.set_tone(saved_tone)
+        self.ai_config_section.connect_tone_changed(self.on_tone_changed)
+
+    def on_tone_changed(self, tone: str) -> None:
+        """Handle tone selection change"""
+        self.settings_manager.save_tone(tone)
+
     def apply_styles(self):
         """Apply the complete style guide to the application"""
         self.setStyleSheet(MAIN_STYLESHEET)
@@ -313,24 +320,20 @@ class SRTTranslatorMainWindow(QMainWindow):
         if ok:
             self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
-            QMessageBox.information(
-                self,
-                "API Connection Successful",
-                "✅ API connected successfully."
-            )
+            QMessageBox.information(self, "API Connection Successful", "✅ API connected successfully.")
         else:
             self.api_section.set_connected_status(False)
             self.api_section.show_error(error)
 
     def _validate_openai_key(self, api_key: str) -> tuple[bool, str | None]:
-                try:
-                    client = OpenAI(api_key=api_key)
-                    client.models.list()
-                    return True, None
-                except AuthenticationError:
-                    return False, "Invalid OpenAI API key."
-                except Exception as e:
-                    return False, str(e)
+        try:
+            client = OpenAI(api_key=api_key)
+            client.models.list()
+            return True, None
+        except AuthenticationError:
+            return False, "Invalid OpenAI API key."
+        except Exception as e:
+            return False, str(e)
 
     def show_api_input(self):
         """Show the API input field when Edit Settings is clicked"""
@@ -427,9 +430,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Validate inputs
         if not selected_files:
-            show_validation_error(
-                self, "No Files Selected", "Please select SRT files for AI analysis."
-            )
+            show_validation_error(self, "No Files Selected", "Please select SRT files for AI analysis.")
             return
 
         if not api_key:
@@ -487,9 +488,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             def run(self):
                 try:
-                    self.progress.emit(
-                        "AI Config Worker: Starting batch-level AI config generation"
-                    )
+                    self.progress.emit("AI Config Worker: Starting batch-level AI config generation")
                     self.logger.info("AI Config Worker: Starting batch-level AI config generation")
 
                     # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
@@ -638,9 +637,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 suggestion = error_details.get("suggestion", "")
 
                 # Show detailed error message
-                QMessageBox.warning(
-                    self, title, f"{message}\n\n{suggestion}" if suggestion else message
-                )
+                QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
                 return
             except Exception as e:
                 # Fallback to simple error message
@@ -670,7 +667,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(self.settings_manager,dnt_terms, termbase)
+        dialog = EditConfigurationDialog(self.settings_manager, dnt_terms, termbase)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
@@ -679,9 +676,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             if dialog.has_changes():
                 # Save the modified configuration (preserve existing source language)
                 dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-                self.settings_manager.save_ai_config(
-                    modified_terms, modified_termbase, source_language
-                )
+                self.settings_manager.save_ai_config(modified_terms, modified_termbase, source_language)
 
                 # Show confirmation
                 QMessageBox.information(
@@ -846,9 +841,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Debug logging to track language selection
         target_codes = list(target_languages.values())
-        self.logger.info(
-            "Translation requested with %s languages: %s", len(target_codes), target_codes
-        )
+        self.logger.info("Translation requested with %s languages: %s", len(target_codes), target_codes)
 
         # Get API key from settings manager
         api_key = self.settings_manager.load_api_key()
@@ -1007,11 +1000,11 @@ class SRTTranslatorMainWindow(QMainWindow):
             # Warn if memory growth exceeds 1GB
             # === Preventive Mitigation for High Memory ===
             if growth_mb > 1000 and not self._memory_warning_shown:  # Over 1 GB growth
-                 if not getattr(self, "_memory_warning_shown", False):
+                if not getattr(self, "_memory_warning_shown", False):
                     self._memory_warning_shown = True
                     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
-                # Show warning to user
+                    # Show warning to user
                     QMessageBox.warning(
                         self,
                         "High Memory Usage",

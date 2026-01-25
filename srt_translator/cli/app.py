@@ -71,6 +71,12 @@ Examples:
             "both (HTML then MD), none (no reports)"
         ),
     )
+    parser.add_argument(
+        "--tone",
+        choices=["casual", "neutral", "formal"],
+        default=None,
+        help="Translation tone/register: casual, neutral (default), or formal",
+    )
     args = parser.parse_args(argv)
 
     # Handle version flag first
@@ -98,6 +104,10 @@ Examples:
         from srt_translator.core.config.models import TranslationConfig
 
         raw_config = collect_cli_raw()
+
+        # Override tone from CLI argument if provided (takes precedence over env)
+        if args.tone:
+            raw_config["tone"] = args.tone
 
         # Architecture note: Filter same-language targets at CLI boundary
         # before constructing TranslationConfig. The core engine receives

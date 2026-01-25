@@ -71,6 +71,9 @@ class TranslationConfig:
     # Language policies injected by GUI/CLI loaders
     language_policies: dict[str, dict[str, Any]] | None = None
 
+    # Translation tone/register: casual, neutral, or formal
+    tone: str = "neutral"
+
     def run(self) -> SummaryDict:
         """Run the translation with this configuration and return summary."""
         from srt_translator.core.main import translate_srt_files
@@ -149,6 +152,16 @@ class TranslationConfig:
             errors.append(f"Invalid error_policy: {error_policy}")
             error_policy = "BOUNDED"
 
+        # Validate tone (case-insensitive, normalize to lowercase)
+        tone_raw = raw.get("tone", "neutral")
+        if tone_raw is None:
+            tone = "neutral"
+        else:
+            tone = str(tone_raw).lower().strip()
+            if tone not in ("casual", "neutral", "formal"):
+                errors.append(f"Invalid tone: '{tone_raw}'. Must be one of: casual, neutral, formal")
+                tone = "neutral"
+
         if errors:
             raise ValueError(f"Configuration validation failed: {'; '.join(errors)}")
 
@@ -187,4 +200,5 @@ class TranslationConfig:
             files=raw.get("files"),
             source_language=raw.get("source_language"),
             language_policies=raw.get("language_policies"),
+            tone=tone,
         )

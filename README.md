@@ -582,7 +582,23 @@ BATCH_SIZE=5
 DNT_TERMS=["YourName", "YourCompany", "YourProduct"]
 OUTPUT_DIRECTORY=translated_srt_files
 FIX_AGGRESSIVENESS=0.75
+TONE=neutral  # casual, neutral, or formal
 ```
+
+### Tone Setting
+
+The **Tone** setting controls the translation register/formality:
+
+- **casual**: Informal, conversational style suitable for vlogs, personal channels
+- **neutral** (default): Professional and approachable — recommended for business training
+- **formal**: Polite, official style for corporate communications (may use honorifics in some languages like Japanese)
+
+**CLI usage:**
+```bash
+srtx-cli --tone formal
+```
+
+Some languages have automatic language-specific hints applied based on tone (e.g., Chinese 你/您 pronoun selection, Japanese politeness levels). These hints are automatic and not user-configurable.
 
 ---
 
@@ -605,6 +621,7 @@ The CLI reads configuration from `.env` files only. OS environment variables are
 - `LOG_MODE`: Logging verbosity (Standard/Verbose, default: Standard)
 - `OUTPUT_DIRECTORY`: Where to save translations (default: translated_srt_files)
 - `TERMBASE_PATH`: Path to termbase file (default: termbase.json)
+- `TONE`: Translation register — `casual`, `neutral` (default), or `formal`
 
 **Format Examples:**
 - `TARGET_LANGUAGES`: `{"Spanish": "es", "French": "fr"}` or `Spanish,French`

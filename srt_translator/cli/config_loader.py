@@ -137,4 +137,5 @@ def collect_cli_raw() -> dict[str, Any]:
         "dnt_terms": env_file.get("DNT_TERMS", "[]"),
         "termbase": termbase_data,  # Actual data, not file path
         "language_policies": language_policies,
+        "tone": env_file.get("TONE", "neutral"),  # Translation tone: casual, neutral, formal
     }

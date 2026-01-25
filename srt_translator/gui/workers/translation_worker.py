@@ -244,6 +244,14 @@ class TranslationWorker(QObject):
                     safe_tb_outer[lang] = MappingProxyType(dict(inner))
             termbase_proxy = MappingProxyType(safe_tb_outer)
 
+            # Load tone from settings (default to "neutral" if not set)
+            tone = "neutral"
+            if self.settings_manager:
+                tone = self.settings_manager.load_tone()
+                self.logger.debug("Loaded tone from settings: '%s'", tone)
+            else:
+                self.logger.debug("No settings manager, using default tone: '%s'", tone)
+
             # Construct the immutable, complete TranslationConfig
             api_cfg = TranslationConfig(
                 files=[Path(p) for p in self.selected_files],
@@ -258,6 +266,7 @@ class TranslationWorker(QObject):
                 mode="GUI",
                 language_policies=lang_policies,
                 source_language=source_language,
+                tone=tone,
             )
 
             self.logger.info(

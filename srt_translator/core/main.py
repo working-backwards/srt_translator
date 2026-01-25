@@ -16,6 +16,7 @@ from srt_translator.core.config.models import SummaryDict, TranslationConfig
 from srt_translator.core.translator.fixer import SRTFixer
 from srt_translator.core.translator.translator import SRTTranslator
 
+
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().
 
@@ -139,14 +140,16 @@ def translate_srt_files(
                 logger=logger,
                 error_policy=config.error_policy,  # Pass error policy
                 language_config=language_config,  # Pass language configuration
+                tone=config.tone,  # Pass tone setting
             )
             logger.info(
-                "Language run: %s (%s) batch_size=%d cps_cap=%s apostrophe_allowed=%s",
+                "Language run: %s (%s) batch_size=%d cps_cap=%s apostrophe_allowed=%s tone=%s",
                 lang_name,
                 lang_code,
                 batch_size_for_lang,
                 language_config.get_cps_cap(lang_code),
                 language_config.allows_placeholder_apostrophe(lang_code),
+                config.tone,
             )
 
             # Translate files for this language
@@ -199,6 +202,7 @@ def translate_srt_files(
             "termbase": {lang: dict(entries) for lang, entries in config.termbase.items()},
             "language_batch_sizes": language_batch_sizes,
             "aggressiveness": config.aggressiveness,
+            "tone": config.tone,
         }
 
         # Write ai_config.json directly to artifacts directory

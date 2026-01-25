@@ -90,7 +90,17 @@ Here you can control how the translator handles **terminology**:
 **Good news:**
 - You don’t need to create these yourself — the SRT app can provide sensible defaults that can you can view and edit. If you want to the SRT app to generate a DNT or Termbases for you, choose your original language SRT files, the target languages, then click on the "Regenerate" button. The SRT app will send the first 12,500 tokens (about 9,000 - 10,000 English words) to the AI translator. When finished, click on the "Edit Settings" button to view and/or change them.
 
-While DNT and Termbases are optional, using them will typically yield a higher quality translation.
+While DNT, Termbases, and Tone are optional, using them will typically yield a higher quality translation.
+
+### Tone
+
+Choose the translation register for your content:
+
+- **Casual**: Informal, conversational style suitable for vlogs, personal channels
+- **Neutral (recommended)**: Professional and approachable — recommended for business training
+- **Formal**: Polite, official style for corporate communications (may use honorifics in some languages like Japanese)
+
+The Tone setting affects how the translator approaches formality and politeness. Some languages (like Chinese, Japanese, German, French) have automatic language-specific hints applied based on tone selection. These hints are automatic and not user-configurable.
 
 ---
 
