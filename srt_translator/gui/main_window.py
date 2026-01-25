@@ -259,7 +259,6 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "• OR text file (one term per line)",
             )
 
-    # Load DNT terms from file dnt_terms = load_dnt_terms_from_file(file_path, self.logger) if dnt_terms: # Save user-provided DNT terms self.settings_manager.save_user_dnt_terms(dnt_terms) # If we already have AI-generated config, merge and update ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config() if ai_dnt: merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms) self.settings_manager.save_ai_config(merged, ai_tb, source_lang) self.ai_config_section.update_dnt_display(merged) QMessageBox.information( self, "DNT Terms Imported", f"Successfully imported {len(dnt_terms)} DNT terms.\n\n" f"The terms have been merged with existing AI-generated settings.", ) else: QMessageBox.information( self, "DNT Terms Imported", f"Successfully imported {len(dnt_terms)} DNT terms.\n\n" f"The terms will be merged when you generate Translation Settings.", ) else: QMessageBox.warning( self, "Import Failed", "Failed to load DNT terms from the selected file.\n" "Please ensure the file is either:\n" "- JSON array: [\"term1\", \"term2\", ...]\n" "- Text file: one term per line", )
     def load_previous_settings(self):
         """Load previous settings from storage"""
         # Load API key and set connection status
