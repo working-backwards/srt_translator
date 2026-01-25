@@ -24,22 +24,6 @@ def _dedup_preserve_order(items: list[str]) -> list[str]:
             out.append(x)
     return out
 
-def _expand_name_variants(terms: list[str]) -> list[str]:
-    """
-    Expand full-name DNT terms into first-name and last-name variants.
-    """
-    expanded: list[str] = []
-
-    for term in terms or []:
-        expanded.append(term)
-
-        parts = term.split()
-        if len(parts) >= 2:
-            expanded.append(parts[0])
-            expanded.append(parts[-1])
-    return _dedup_preserve_order(expanded)
-
-
 def _compile_word_safe_pattern(term: str) -> re.Pattern:
     """
     Compile a regex that matches `term` as a token without
@@ -93,8 +77,7 @@ class TermHandler:
 
         # Build stable placeholder map once per file/language
 
-        self._ordered_terms: list[str] = _expand_name_variants(dnt_terms or [])
-
+        self._ordered_terms: list[str] = _dedup_preserve_order(dnt_terms or [])
         # Expose dnt_terms for backward compatibility with core/main.py
         self.dnt_terms = self._ordered_terms
         self.placeholder_map: dict[str, str] = {term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)}
