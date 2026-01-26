@@ -205,7 +205,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.regenerate_translation_settings,
             self.show_ai_config_help,
             self.import_termbase_file,
-            self.import_dnt_file
+            self.import_dnt_file,
         )
 
         # Translation Section signals
@@ -251,7 +251,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             )
 
         except Exception as e:
-            self.logger.error("DNT import failed: %s", e, exc_info=True)
+            self.logger.exception("DNT import failed: %s", e)
             QMessageBox.warning(
                 self,
                 "Invalid DNT file",
@@ -537,14 +537,18 @@ class SRTTranslatorMainWindow(QMainWindow):
                         def __init__(self, worker):
                             super().__init__()
                             self.worker = worker
+                            self._emission_failed_logged = False
 
                         def emit(self, record):
                             try:
                                 msg = self.format(record)
                                 self.worker.progress.emit(msg)
                             except Exception as e:
-                                # Progress emission failed, but don't break logging
-                                print(f"Warning: Progress emission failed: {e}")  # noqa: T201
+                                # Log once at debug level, then swallow silently.
+                                # Worker threads may outlive handlers during shutdown.
+                                if not self._emission_failed_logged:
+                                    self.worker.logger.debug("Progress emission failed (ignored): %s", e)
+                                    self._emission_failed_logged = True
 
                     # Set up the handler for AI config logs
                     progress_handler = ProgressLogHandler(self)
@@ -744,11 +748,8 @@ class SRTTranslatorMainWindow(QMainWindow):
                 QMessageBox.critical(
                     self,
                     "Invalid Termbase File",
-                    "Termbase format is invalid.\n\n"
-                    "Expected:\n"
-                    "{ 'lang': { 'source': 'translation' } }"
+                    "Termbase format is invalid.\n\nExpected:\n{ 'lang': { 'source': 'translation' } }",
                 )
-
 
     def _validate_dnt_structure(self, dnt_terms: list) -> bool:
         if not isinstance(dnt_terms, list):
