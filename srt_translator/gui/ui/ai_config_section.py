@@ -93,7 +93,6 @@ class AIConfigSection(QGroupBox):
         self.import_dnt_btn.setToolTip(
             "Import your own DNT (Do Not Translate) terms.\n"
             'Supports JSON array format: ["term1", "term2", ...]\n'
-            "Or text file: one term per line.\n"
             "User-provided terms will take precedence over AI-generated ones."
         )
 

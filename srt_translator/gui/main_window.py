@@ -233,14 +233,16 @@ class SRTTranslatorMainWindow(QMainWindow):
         try:
             dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
 
+            if not self._validate_dnt_structure(dnt_terms):
+                raise ValueError("Invalid termbase structure")
+
             # save user DNT
             self.settings_manager.save_user_dnt_terms(dnt_terms)
 
             # merge with AI config if exists
             ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
-            if ai_dnt:
-                merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
-                self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
+            merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
+            self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
 
             QMessageBox.information(
                 self,
@@ -255,8 +257,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 "Invalid DNT file",
                 "Invalid DNT file.\n\n"
                 "Expected:\n"
-                "• JSON array of strings\n"
-                "• OR text file (one term per line)",
+                "• JSON array of strings\n",
             )
 
     def load_previous_settings(self):
@@ -713,13 +714,30 @@ class SRTTranslatorMainWindow(QMainWindow):
                 if not self._validate_termbase_structure(termbase):
                     raise ValueError("Invalid termbase structure")
 
-                self.settings_manager.save_user_termbase(termbase)
+                if termbase:
+                    # Save user-provided termbase
+                    self.settings_manager.save_user_termbase(termbase)
 
-                QMessageBox.information(
-                    self,
-                    "Termbase Imported",
-                    f"Imported {len(termbase)} languages successfully",
-                )
+                    # If we already have AI-generated config, merge and update
+                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+                    merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
+                    self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
+
+                    QMessageBox.information(
+                        self,
+                        "Termbase Imported",
+                        f"Successfully imported termbase with {len(termbase)} languages.\n"
+                        f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                        f"The termbase has been merged with existing AI-generated settings.",
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Import Failed",
+                        "Failed to load termbase from the selected file.\n"
+                        "Please ensure the file is valid JSON with the format:\n"
+                        '{"lang_code": {"source_term": "translation", ...}, ...}',
+                    )
 
             except Exception as e:
                 self.logger.error("Termbase import failed: %s", e)
