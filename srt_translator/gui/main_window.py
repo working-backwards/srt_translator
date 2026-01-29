@@ -7,8 +7,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -23,6 +21,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.gui.ai_config import AIConfigGenerator
@@ -34,6 +34,12 @@ from srt_translator.gui.ui.api_section import APISection
 from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.translation_section import TranslationSection
+from srt_translator.gui.utils.termbase_merger import (
+    load_dnt_terms_from_file,
+    load_termbase_from_file,
+    merge_dnt_terms,
+    merge_termbase,
+)
 from srt_translator.gui.utils.validation import (
     show_translation_error,
     show_translation_results,
@@ -173,9 +179,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def connect_signals(self):
         """Connect all component signals to their handlers"""
         # API Section signals
-        self.api_section.connect_signals(
-            self.test_api_connection, self.show_api_input, self.toggle_api_configuration
-        )
+        self.api_section.connect_signals(self.test_api_connection, self.show_api_input, self.toggle_api_configuration)
 
         # File Section signals
         self.file_section.connect_signals(
@@ -199,12 +203,62 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.generate_translation_settings,
             self.edit_translation_settings,
             self.regenerate_translation_settings,
-            self.view_translation_settings_details,
             self.show_ai_config_help,
+            self.import_termbase_file,
+            self.import_dnt_file,
         )
 
         # Translation Section signals
         self.translation_section.connect_signals(self.start_translation, self._open_html_report)
+
+    def import_dnt_file(self):
+        """Import DNT terms from a JSON or text file"""
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("JSON Files (*.json);;Text Files (*.txt);;All Files (*)")
+
+        last_dir = self.settings_manager.load_last_input_directory()
+        if last_dir and os.path.exists(last_dir):
+            file_dialog.setDirectory(last_dir)
+        else:
+            file_dialog.setDirectory(os.getcwd())
+
+        if not file_dialog.exec():
+            return
+
+        file_path = file_dialog.selectedFiles()[0]
+        self.logger.info("Importing DNT terms from %s", file_path)
+
+        try:
+            dnt_terms = load_dnt_terms_from_file(file_path, self.logger)
+
+            if not self._validate_dnt_structure(dnt_terms):
+                raise ValueError("Invalid termbase structure")
+
+            # save user DNT
+            self.settings_manager.save_user_dnt_terms(dnt_terms)
+
+            # merge with AI config if exists
+            ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+            merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
+            self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
+
+            QMessageBox.information(
+                self,
+                "DNT Terms Imported",
+                f"Successfully imported {len(dnt_terms)} DNT terms.",
+            )
+
+        except Exception as e:
+            self.logger.exception("DNT import failed: %s", e)
+            QMessageBox.warning(
+                self,
+                "Invalid DNT file",
+                "Invalid DNT file.\n\n"
+                "Expected:\n"
+                "• JSON array of strings\n",
+            )
 
     def load_previous_settings(self):
         """Load previous settings from storage"""
@@ -229,10 +283,17 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Load and display existing Translation Settings if available
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if dnt_terms or termbase:
-            self.ai_config_section.update_dnt_display(dnt_terms)
-            self.ai_config_section.update_termbase_display(termbase)
             self.ai_config_section.set_action_buttons_enabled(True)
             self.ai_config_section.set_configured_status(True)
+
+        # Load saved tone setting and connect change handler
+        saved_tone = self.settings_manager.load_tone()
+        self.ai_config_section.set_tone(saved_tone)
+        self.ai_config_section.connect_tone_changed(self.on_tone_changed)
+
+    def on_tone_changed(self, tone: str) -> None:
+        """Handle tone selection change"""
+        self.settings_manager.save_tone(tone)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""
@@ -260,24 +321,20 @@ class SRTTranslatorMainWindow(QMainWindow):
         if ok:
             self.settings_manager.save_api_key(api_key)
             self.api_section.set_connected_status(True)
-            QMessageBox.information(
-                self,
-                "API Connection Successful",
-                "✅ API connected successfully."
-            )
+            QMessageBox.information(self, "API Connection Successful", "✅ API connected successfully.")
         else:
             self.api_section.set_connected_status(False)
             self.api_section.show_error(error)
 
     def _validate_openai_key(self, api_key: str) -> tuple[bool, str | None]:
-                try:
-                    client = OpenAI(api_key=api_key)
-                    client.models.list()
-                    return True, None
-                except AuthenticationError:
-                    return False, "Invalid OpenAI API key."
-                except Exception as e:
-                    return False, str(e)
+        try:
+            client = OpenAI(api_key=api_key)
+            client.models.list()
+            return True, None
+        except AuthenticationError:
+            return False, "Invalid OpenAI API key."
+        except Exception as e:
+            return False, str(e)
 
     def show_api_input(self):
         """Show the API input field when Edit Settings is clicked"""
@@ -374,9 +431,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Validate inputs
         if not selected_files:
-            show_validation_error(
-                self, "No Files Selected", "Please select SRT files for AI analysis."
-            )
+            show_validation_error(self, "No Files Selected", "Please select SRT files for AI analysis.")
             return
 
         if not api_key:
@@ -397,6 +452,15 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         self.logger.info("Selected files: %s", [os.path.basename(f) for f in selected_files])
 
+        # Load user-provided termbase and DNT terms if they exist
+        user_termbase = self.settings_manager.load_user_termbase()
+        user_dnt_terms = self.settings_manager.load_user_dnt_terms()
+
+        if user_termbase:
+            self.logger.info("User-provided termbase will be merged: %s languages", len(user_termbase))
+        if user_dnt_terms:
+            self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
+
         # Initialize AI config generator if not already done
         if not self.ai_config_generator:
             self.ai_config_generator = AIConfigGenerator(api_key, self.language_config)
@@ -411,11 +475,13 @@ class SRTTranslatorMainWindow(QMainWindow):
             error = Signal(str)
             progress = Signal(str)  # Add progress signal for GUI updates
 
-            def __init__(self, ai_generator, files, languages):
+            def __init__(self, ai_generator, files, languages, user_termbase, user_dnt_terms):
                 super().__init__()
                 self.ai_generator = ai_generator
                 self.files = files
                 self.languages = languages
+                self.user_termbase = user_termbase
+                self.user_dnt_terms = user_dnt_terms
                 self.logger = logging.getLogger(__name__)
 
                 # Set up logging bridge to capture AI config logs
@@ -423,9 +489,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             def run(self):
                 try:
-                    self.progress.emit(
-                        "AI Config Worker: Starting batch-level AI config generation"
-                    )
+                    self.progress.emit("AI Config Worker: Starting batch-level AI config generation")
                     self.logger.info("AI Config Worker: Starting batch-level AI config generation")
 
                     # Generate ONE batch-level DNT list and ONE termbase for ALL target languages
@@ -433,14 +497,28 @@ class SRTTranslatorMainWindow(QMainWindow):
                         source_file_paths=self.files, target_lang_codes=self.languages
                     )
 
-                    progress_msg = f"AI Config Worker: Generated {len(batch_config.dnt_terms)} DNT terms and termbase for {len(batch_config.termbase)} languages (batch-level)"
+                    # Merge user-provided termbase and DNT terms with AI-generated ones
+                    merged_dnt = merge_dnt_terms(
+                        ai_generated=batch_config.dnt_terms,
+                        user_provided=self.user_dnt_terms,
+                    )
+                    merged_termbase = merge_termbase(
+                        ai_generated=batch_config.termbase,
+                        user_provided=self.user_termbase,
+                    )
+
+                    progress_msg = (
+                        f"AI Config Worker: Generated {len(batch_config.dnt_terms)} AI DNT terms "
+                        f"(merged to {len(merged_dnt)} total) and termbase for {len(batch_config.termbase)} languages "
+                        f"(merged to {len(merged_termbase)} languages)"
+                    )
                     self.progress.emit(progress_msg)
                     self.logger.info(progress_msg)
 
                     self.finished.emit(
                         (
-                            batch_config.dnt_terms,
-                            batch_config.termbase,
+                            merged_dnt,
+                            merged_termbase,
                             batch_config.source_language,
                         )
                     )
@@ -459,14 +537,18 @@ class SRTTranslatorMainWindow(QMainWindow):
                         def __init__(self, worker):
                             super().__init__()
                             self.worker = worker
+                            self._emission_failed_logged = False
 
                         def emit(self, record):
                             try:
                                 msg = self.format(record)
                                 self.worker.progress.emit(msg)
                             except Exception as e:
-                                # Progress emission failed, but don't break logging
-                                print(f"Warning: Progress emission failed: {e}")  # noqa: T201
+                                # Log once at debug level, then swallow silently.
+                                # Worker threads may outlive handlers during shutdown.
+                                if not self._emission_failed_logged:
+                                    self.worker.logger.debug("Progress emission failed (ignored): %s", e)
+                                    self._emission_failed_logged = True
 
                     # Set up the handler for AI config logs
                     progress_handler = ProgressLogHandler(self)
@@ -491,7 +573,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Create and start worker thread
         self.ai_config_thread = QThread()
         self.ai_config_worker = AIConfigWorker(
-            self.ai_config_generator, selected_files, target_codes
+            self.ai_config_generator, selected_files, target_codes, user_termbase, user_dnt_terms
         )
         self.ai_config_worker.moveToThread(self.ai_config_thread)
 
@@ -529,10 +611,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         target_languages = self._target_langs_from_ui()
         self.settings_manager.save_target_languages(target_languages)
 
-        # Update displays
-        self.ai_config_section.update_dnt_display(dnt_terms)
-        self.ai_config_section.update_termbase_display(termbase)
-
         # Enable action buttons and set configured status
         self.ai_config_section.set_action_buttons_enabled(True)
         self.ai_config_section.set_configured_status(True)
@@ -564,9 +642,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 suggestion = error_details.get("suggestion", "")
 
                 # Show detailed error message
-                QMessageBox.warning(
-                    self, title, f"{message}\n\n{suggestion}" if suggestion else message
-                )
+                QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
                 return
             except Exception as e:
                 # Fallback to simple error message
@@ -596,7 +672,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         from srt_translator.gui.ui.ai_config_section import EditConfigurationDialog
 
         # Create and show the edit dialog
-        dialog = EditConfigurationDialog(self.settings_manager,dnt_terms, termbase)
+        dialog = EditConfigurationDialog(self.settings_manager, dnt_terms, termbase)
 
         if dialog.exec():
             # User clicked OK, get modified configuration
@@ -605,13 +681,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             if dialog.has_changes():
                 # Save the modified configuration (preserve existing source language)
                 dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-                self.settings_manager.save_ai_config(
-                    modified_terms, modified_termbase, source_language
-                )
-
-                # Update displays
-                self.ai_config_section.update_dnt_display(modified_terms)
-                self.ai_config_section.update_termbase_display(modified_termbase)
+                self.settings_manager.save_ai_config(modified_terms, modified_termbase, source_language)
 
                 # Show confirmation
                 QMessageBox.information(
@@ -633,38 +703,77 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.ai_config_section.toggle_expansion()  # Ensure section is expanded
         self.generate_translation_settings()
 
-    def view_translation_settings_details(self):
-        """View detailed Translation Settings"""
-        # Get current configuration
-        dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
+    def import_termbase_file(self):
+        """Import termbase from a JSON file"""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("JSON Files (*.json)")
 
-        if not dnt_terms and not termbase:
-            QMessageBox.warning(
-                self,
-                "No Translation Settings",
-                "No Translation Settings have been generated yet.\nPlease generate settings first.",
-            )
-            return
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
 
-        # Expand the section to show details
-        if not self.ai_config_section.is_expanded:
-            self.ai_config_section.toggle_expansion()
+            try:
+                termbase = load_termbase_from_file(file_path, self.logger)
 
-        # Show detailed information
-        dnt_text = ", ".join(dnt_terms) if dnt_terms else "No DNT terms"
-        termbase_text = ""
-        if termbase:
-            for language, terms in termbase.items():
-                termbase_text += f"{language}:\n"
-                for source_term, translation in terms.items():
-                    termbase_text += f"  • {source_term} → {translation}\n"
-                termbase_text += "\n"
-        else:
-            termbase_text = "No termbase entries"
+                if not self._validate_termbase_structure(termbase):
+                    raise ValueError("Invalid termbase structure")
 
-        # Update displays with full details
-        self.ai_config_section.set_dnt_display(dnt_text)
-        self.ai_config_section.set_termbase_display(termbase_text)
+                if termbase:
+                    # Save user-provided termbase
+                    self.settings_manager.save_user_termbase(termbase)
+
+                    # If we already have AI-generated config, merge and update
+                    ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
+                    merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
+                    self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
+
+                    QMessageBox.information(
+                        self,
+                        "Termbase Imported",
+                        f"Successfully imported termbase with {len(termbase)} languages.\n"
+                        f"Total entries: {sum(len(tb) for tb in termbase.values())}\n\n"
+                        f"The termbase has been merged with existing AI-generated settings.",
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Import Failed",
+                        "Failed to load termbase from the selected file.\n"
+                        "Please ensure the file is valid JSON with the format:\n"
+                        '{"lang_code": {"source_term": "translation", ...}, ...}',
+                    )
+
+            except Exception as e:
+                self.logger.error("Termbase import failed: %s", e)
+                QMessageBox.critical(
+                    self,
+                    "Invalid Termbase File",
+                    "Termbase format is invalid.\n\nExpected:\n{ 'lang': { 'source': 'translation' } }",
+                )
+
+    def _validate_dnt_structure(self, dnt_terms: list) -> bool:
+        if not isinstance(dnt_terms, list):
+            return False
+        if len(dnt_terms) == 0:
+            return False
+        for term in dnt_terms:
+            if not isinstance(term, str) or not term.strip():
+                return False
+        return True
+
+    def _validate_termbase_structure(self, termbase: dict) -> bool:
+        if not isinstance(termbase, dict):
+            return False
+
+        for lang, entries in termbase.items():
+            if not isinstance(lang, str):
+                return False
+            if not isinstance(entries, dict):
+                return False
+            for k, v in entries.items():
+                if not isinstance(k, str) or not isinstance(v, str):
+                    return False
+        return True
 
     def show_ai_config_help(self):
         """Show help dialog for AI Configuration"""
@@ -751,9 +860,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Debug logging to track language selection
         target_codes = list(target_languages.values())
-        self.logger.info(
-            "Translation requested with %s languages: %s", len(target_codes), target_codes
-        )
+        self.logger.info("Translation requested with %s languages: %s", len(target_codes), target_codes)
 
         # Get API key from settings manager
         api_key = self.settings_manager.load_api_key()
@@ -912,11 +1019,11 @@ class SRTTranslatorMainWindow(QMainWindow):
             # Warn if memory growth exceeds 1GB
             # === Preventive Mitigation for High Memory ===
             if growth_mb > 1000 and not self._memory_warning_shown:  # Over 1 GB growth
-                 if not getattr(self, "_memory_warning_shown", False):
+                if not getattr(self, "_memory_warning_shown", False):
                     self._memory_warning_shown = True
                     self.logger.warning("High memory usage detected: %.1f MB growth", growth_mb)
 
-                # Show warning to user
+                    # Show warning to user
                     QMessageBox.warning(
                         self,
                         "High Memory Usage",

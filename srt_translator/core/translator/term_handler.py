@@ -24,7 +24,6 @@ def _dedup_preserve_order(items: list[str]) -> list[str]:
             out.append(x)
     return out
 
-
 def _compile_word_safe_pattern(term: str) -> re.Pattern:
     """
     Compile a regex that matches `term` as a token without

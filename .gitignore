@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *.pyc
@@ -84,3 +84,12 @@ THIRD_PARTY_LICENSES.txt
 
 SRTTranslator.spec
 SRT-Translator.spec
+
+# Claude AI local settings
+.claude/
+
+# Debug scripts
+debug_*.py
+
+# JIRA notes (local documentation)
+JIRA_*.md

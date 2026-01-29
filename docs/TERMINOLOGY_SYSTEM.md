@@ -103,6 +103,9 @@ srtx-cli --generate-terminology input.srt
 
 # Translate with custom terminology
 srtx-cli --dnt-terms dnt.json --termbase termbase.json input.srt
+
+# Translate with specific tone (casual, neutral, or formal)
+srtx-cli --tone formal input.srt
 ```
 
 ### Programmatic Usage

@@ -3,6 +3,7 @@
 Termbase Editor for the SRT Translator GUI.
 """
 
+import json
 import logging
 
 from PySide6.QtCore import Qt, Signal
@@ -10,6 +11,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -79,11 +81,14 @@ class TermbaseEditor(QWidget):
         self.remove_term_btn.setObjectName("dangerButton")
         self.clear_btn = QPushButton("Clear All")
         self.clear_btn.setObjectName("dangerButton")
+        self.export_btn = QPushButton("Export")
+        self.export_btn.setObjectName("secondaryButton")
 
         button_layout.addWidget(self.add_term_btn)
         button_layout.addWidget(self.edit_term_btn)
         button_layout.addWidget(self.remove_term_btn)
         button_layout.addStretch()
+        button_layout.addWidget(self.export_btn)
         button_layout.addWidget(self.clear_btn)
         layout.addLayout(button_layout)
 
@@ -107,6 +112,7 @@ class TermbaseEditor(QWidget):
         self.edit_term_btn.clicked.connect(self.edit_selected_term)
         self.remove_term_btn.clicked.connect(self.remove_selected_term)
         self.clear_btn.clicked.connect(self.clear_all_terms)
+        self.export_btn.clicked.connect(self.export_termbase)
         self.table.itemSelectionChanged.connect(self.update_button_states)
         self.table.itemChanged.connect(self.on_table_item_changed)
 
@@ -116,6 +122,7 @@ class TermbaseEditor(QWidget):
         self.languages = list(termbase.keys()) if termbase else []
         self.refresh_table()
         self.update_count_label()
+        self.update_button_states()
         # Emit signal to notify of changes
         if not self._updating_table:
             self.termbase_changed.emit(self.termbase)
@@ -199,6 +206,7 @@ class TermbaseEditor(QWidget):
         self.edit_term_btn.setEnabled(has_selection)
         self.remove_term_btn.setEnabled(has_selection)
         self.clear_btn.setEnabled(has_data)
+        self.export_btn.setEnabled(has_data)
 
     def add_term(self):
         """Add a new term to the termbase."""
@@ -368,6 +376,52 @@ class TermbaseEditor(QWidget):
                 self.termbase[language][source_term] = translation.strip()
             elif source_term in self.termbase[language]:
                 del self.termbase[language][source_term]
+
+    def export_termbase(self):
+        """Export termbase to a JSON file."""
+        if not self.termbase:
+            QMessageBox.warning(
+                self,
+                "No Termbase to Export",
+                "There is no termbase data to export.",
+            )
+            return
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+        file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+        file_dialog.setNameFilter("JSON Files (*.json)")
+        file_dialog.setDefaultSuffix("json")
+
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+
+            try:
+                # Export as JSON object format: {"lang_code": {"source_term": "translation", ...}, ...}
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(self.termbase, f, indent=2, ensure_ascii=False)
+
+                total_entries = sum(len(lang_termbase) for lang_termbase in self.termbase.values())
+                QMessageBox.information(
+                    self,
+                    "Export Successful",
+                    f"Exported termbase with {len(self.termbase)} language(s) "
+                    f"and {total_entries} total entries to:\n{file_path}",
+                )
+                self.logger.info(
+                    "Exported termbase: %s languages, %s entries to %s",
+                    len(self.termbase),
+                    total_entries,
+                    file_path,
+                )
+
+            except Exception as e:
+                self.logger.error("Failed to export termbase: %s", e)
+                QMessageBox.critical(
+                    self,
+                    "Export Failed",
+                    f"Failed to export termbase:\n{str(e)}",
+                )
 
     def is_modified(self, original_termbase: dict) -> bool:
         """Check if the termbase has been modified from the original."""

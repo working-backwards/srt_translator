@@ -591,13 +591,18 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
         if batch_dnt_terms:
             # NOTE: audit mirror only — not used by evaluation in v1.0
             (out_dir / "dnt_summary.json").write_text(
-                json.dumps({"terms": batch_dnt_terms}, ensure_ascii=False, indent=2),
+                json.dumps(batch_dnt_terms, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
         if tb_per_lang:
             # NOTE: audit mirror only — not used by evaluation in v1.0
+            tb_final_dict = {
+                lang_code: {t["source"]: t["target"] for t in tb_list}
+                for lang_code, tb_list in tb_per_lang.items()
+            }
+
             (out_dir / "termbase_summary.json").write_text(
-                json.dumps({"languages": tb_per_lang}, ensure_ascii=False, indent=2),
+                json.dumps(tb_final_dict, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
 
