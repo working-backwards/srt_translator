@@ -13,7 +13,7 @@ repos:
     rev: v0.12.11
     hooks:
       - id: ruff
-        args: ["--fix", "--select", "E,F,I,B,TID,G,ARG,UP"]
+        args: ["--fix", "--select", "E,F,I,B,TID,G,ARG,UP", "--ignore", "E501"]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy

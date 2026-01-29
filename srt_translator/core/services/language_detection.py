@@ -1,5 +1,7 @@
 # srt_translator/core/services/language_detection.py
 
+from srt_translator.prompts.detection import build_language_detection_prompt
+
 
 def detect_source_language(
     text: str,
@@ -30,20 +32,7 @@ def detect_source_language(
             "mixed": False,
         }
 
-    prompt = f"""
-Detect the primary source language of TEXT and answer in JSON only.
-If multiple languages are present, set "mixed": true and choose the dominant one.
-
-Output JSON:
-{{
-  "detected_code": "<IETF BCP-47 guess, e.g., en, es, zh-Hans, pt-BR>",
-  "confidence": 0.0,
-  "mixed": false
-}}
-
-TEXT:
-{text}
-""".strip()
+    prompt = build_language_detection_prompt(text)
 
     try:
         resp = chat.chat.completions.create(
