@@ -1,8 +1,14 @@
 import re
 from collections import defaultdict
-from collections.abc import Sequence
 from re import Pattern
 from typing import TYPE_CHECKING
+
+from srt_translator.prompts.diagnostics import (
+    build_malformed_json_probe,
+)
+from srt_translator.prompts.diagnostics import (
+    build_oversize_probe_question as build_oversize_probe_question,
+)
 
 if TYPE_CHECKING:
     from srt_translator.core.translator.translator import (
@@ -42,53 +48,8 @@ def snip(text: str, limit: int = 400) -> str:
     return t if len(t) <= limit else t[:limit] + "…"
 
 
-# -- Build a focused diagnostic question for the LLM ---------------------------
-def build_oversize_probe_question(
-    *,
-    lang_code: str,
-    batch_ids: Sequence[int],
-    source_items: Sequence[str],
-    response_preview: str,
-    prompt_token_estimate: int,
-    response_token_estimate: int,
-    repetitive_loop_detected: bool,
-) -> str:
-    # Format the source items as a numbered list; keep it compact (max ~8 lines typical)
-    src_lines: list[str] = []
-    for i, s in enumerate(source_items, start=1):
-        if s is None:
-            continue
-        src_lines.append(f"{i}) {s}")
-    src_block = "\n".join(src_lines)
-
-    loop_note = "YES" if repetitive_loop_detected else "NO"
-
-    # Keep question direct and short; ask for 1–2 sentence reason only.
-    # We do not ask for a fix; this is purely advisory logging.
-    question = (
-        "You are a diagnostic assistant. The last *translation* call produced an abnormally "
-        "large output (and possibly repetitive text), which violated the expected response "
-        "shape. Please explain briefly (1–2 sentences) why a translation model might do this."
-        "\n\n"
-        f"LANGUAGE: {lang_code}\n"
-        f"BATCH IDs: {list(batch_ids)}\n"
-        "\n"
-        "SOURCE EXCERPT:\n"
-        f"{src_block}\n"
-        "\n"
-        "RESPONSE EXCERPT (truncated):\n"
-        f"{response_preview}\n"
-        "\n"
-        "TOKEN ESTIMATES:\n"
-        f"- Prompt: ~{prompt_token_estimate} tokens\n"
-        f"- Response: ~{response_token_estimate} tokens\n"
-        f"- Repetitive loop detected: {loop_note}\n"
-        "\n"
-        "QUESTION: What likely caused the model to output an oversized/malformed translation "
-        "response here (e.g., confusion about task, prompt/formatting, context length, or "
-        "other failure mode)? Keep it concise."
-    )
-    return question
+# build_oversize_probe_question is imported from srt_translator.prompts.diagnostics
+# and re-exported here for backward compatibility (translator.py imports from this module).
 
 
 class MalformedProbeBudget:
@@ -134,24 +95,16 @@ def probe_malformed_json_with_translator(
 
         # Create the diagnostic probe question for the AI
         source_content = source_text if source_text else f"[Source text for {len(batch_ids)} items - not available]"
-        probe_question = (
-            f"You are a diagnostic AI that analyzes translation failures. "
-            f"Explain why the AI translator failed in this specific case.\n\n"
-            f"LANGUAGE: {lang}\n"
-            f"FILE: {file_base}\n"
-            f"BATCH IDs: {batch_ids[:8]}\n"
-            f"HINT CLASS: {hint_class}\n\n"
-            f"ORIGINAL TEXT ({len(batch_ids)} items):\n"
-            f"{source_content}\n\n"
-            f"RESPONSE RECEIVED (first 500 chars):\n"
-            f"{raw_excerpt[:500] if raw_excerpt else 'None'}\n\n"
-            f"TOKEN COUNTS:\n"
-            f"- Original prompt: ~{estimate_tokens(raw_excerpt or '')} tokens\n"
-            f"- Response received: ~{len(raw_excerpt or '') // 4} tokens\n"
-            f"- Repetitive loop detected: {'YES' if looks_like_repetitive_loop(raw_excerpt or '') else 'NO'}\n\n"
-            f"QUESTION: Why did you generate such a malformed/large response? "
-            f"Were you confused about the task, trying to be too detailed, "
-            f"or did something else go wrong? Please explain briefly in 1-2 sentences."
+        probe_question = build_malformed_json_probe(
+            lang=lang,
+            file_base=file_base,
+            batch_ids=batch_ids,
+            hint_class=hint_class,
+            source_content=source_content,
+            raw_excerpt=raw_excerpt,
+            token_estimate=estimate_tokens(raw_excerpt or ""),
+            response_token_estimate=len(raw_excerpt or "") // 4,
+            repetitive_loop_detected=looks_like_repetitive_loop(raw_excerpt or ""),
         )
 
         # Make direct AI call using the translator's OpenAI client

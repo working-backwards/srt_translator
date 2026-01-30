@@ -125,6 +125,7 @@ class FileSection(QGroupBox):
         item = QListWidgetItem(os.path.basename(file_path))
         item.setData(Qt.UserRole, file_path)
         self.file_list.addItem(item)
+        item.setSelected(True)
 
     def select_all_files(self):
         """Select all files in the list"""

@@ -86,6 +86,16 @@ def test_prompts_non_strict_snapshot():
     termbase_block = "- Amazon \u2192 Amazon"
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
+        "IMPORTANT SUBTITLE TRANSLATION RULES (MUST FOLLOW):\n"
+        "- Each item is an independent subtitle fragment.\n"
+        "- DO NOT use context from previous or next items.\n"
+        "- DO NOT complete or rewrite broken sentences.\n"
+        "- If a sentence is cut off in the input, it MUST be cut off in the translation.\n"
+        "- If a sentence starts mid-thought, keep it mid-thought.\n"
+        "- Preserve meaning ONLY of the visible text in that item.\n"
+        "- Do NOT add or remove information.\n"
+        "- Do NOT improve grammar beyond what is necessary for understanding.\n"
+        "- Keep translation length close to the input (no expansion).\n\n"
         "TERMINOLOGY:\n"
         "Use these business term mappings when present (source \u2192 target). "
         'If "(none)", ignore:\n'
@@ -137,6 +147,16 @@ def test_prompts_strict_snapshot():
     termbase_block = "- Amazon \u2192 Amazon"
     expected_user = (
         "Translate each item to fr. Keep 1:1 count and order.\n\n"
+        "IMPORTANT SUBTITLE TRANSLATION RULES (MUST FOLLOW):\n"
+        "- Each item is an independent subtitle fragment.\n"
+        "- DO NOT use context from previous or next items.\n"
+        "- DO NOT complete or rewrite broken sentences.\n"
+        "- If a sentence is cut off in the input, it MUST be cut off in the translation.\n"
+        "- If a sentence starts mid-thought, keep it mid-thought.\n"
+        "- Preserve meaning ONLY of the visible text in that item.\n"
+        "- Do NOT add or remove information.\n"
+        "- Do NOT improve grammar beyond what is necessary for understanding.\n"
+        "- Keep translation length close to the input (no expansion).\n\n"
         "TERMINOLOGY:\n"
         "Use these business term mappings when present (source \u2192 target). "
         'If "(none)", ignore:\n'
