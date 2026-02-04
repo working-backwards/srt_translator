@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 # Evaluation imports (config-gated)
+from srt_translator.cli.boundary_review import generate_boundary_review
 from srt_translator.eval.runner import run_batch_evaluation
 
 
@@ -58,10 +59,12 @@ Examples:
   srt-cli                 # Run with default settings
   srt-cli --debug         # Enable debug logging
   srt-cli --version       # Show version information
+  srt-cli --boundary-review  #Generate Markdown report before translation
         """,
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--version", action="store_true", help="Show version information")
+    parser.add_argument("--boundary-review",action="store_true",help="Generate Markdown report before translation")
     parser.add_argument(
         "--report",
         choices=["html", "md", "both", "none"],
@@ -172,6 +175,20 @@ Examples:
             logger.info("No .srt files found in %s", input_dir)
             return 0
         logger.info("Found %s .srt files to translate", len(files))
+
+        if args.boundary_review:
+            for f in files:
+                review_output = Path(f"{f.stem}_review.md")
+
+                generate_boundary_review([f], review_output)
+
+                logger.info(
+                    "Boundary review report generated: %s",
+                    review_output.resolve()
+                )
+
+            return 0
+
         cfg_with_files = api_cfg.__class__(**{**api_cfg.__dict__, "files": files})
         # Run translation and get results including batch directory
         results = Translator(cfg_with_files).run()
