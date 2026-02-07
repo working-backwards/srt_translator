@@ -248,6 +248,20 @@ extra:
 - [x] **Delete obsolete files**
 - [x] **Update `mkdocs.yml`**
 - [x] **Update internal links** in all docs
-- [ ] **Check accuracy** against codebase
+- [x] **Check accuracy** against codebase (4 files corrected)
+- [ ] **Fix README.md issues** (see below)
 - [ ] **Test with `mkdocs serve`**
 - [ ] **Commit and push**
+
+## README.md Issues (Next Chat)
+
+| Line | Issue | Fix |
+|------|-------|-----|
+| 26 | Dead link `/docs/ai-config.md` | Remove or update |
+| 40 | Wrong CLI command `srtx` | Change to `srtx-cli` |
+| 73 | Wrong path `config/translation_rubric.yaml` | `srt_translator/config/translation_rubric.yaml` |
+| 95-98 | Non-existent `st-eval` command | Remove or add to pyproject.toml |
+| 149 | Dead link `docs/TRANSLATION_QUALITY_GUIDE.md` | Remove |
+| 248-263 | Wrong path `srt_translator/core/config/` | `srt_translator/config/` |
+| 571 | Wrong: "CLI (`srtx`)" | srtx is GUI, CLI is `srtx-cli` |
+| 661 | Wrong command `srt-cli` | `srtx-cli` |
