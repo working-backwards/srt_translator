@@ -58,14 +58,14 @@ python scripts/build_gui.py
    - Windows:
      ```bash
      pyinstaller --noconsole --name SRT-Translator \
-       --add-data "config/languages.json;config" \
+       --add-data "srt_translator/config/languages.json;config" \
        srt_translator/gui/main_window.py
      ```
    - macOS:
      ```bash
       # Build a Finder app (.app bundle)
       pyinstaller --windowed --name SRT-Translator \
-        --add-data "config/languages.json:config" \
+        --add-data "srt_translator/config/languages.json:config" \
         srt_translator/gui/main_window.py
 
       # Build/update only the single-file console-launchable binary
@@ -75,7 +75,7 @@ python scripts/build_gui.py
    - Linux:
      ```bash
      pyinstaller --windowed --name SRT-Translator \
-       --add-data "config/languages.json:config" \
+       --add-data "srt_translator/config/languages.json:config" \
        srt_translator/gui/main_window.py
      ```
 5. **Find executables** in the `dist/` folder
@@ -86,7 +86,7 @@ python scripts/build_gui.py
 For users who want command-line functionality without GUI dependencies:
 ```bash
 pip install srt-translator
-srtx --help
+srtx-cli --help
 ```
 
 ### With GUI Support
@@ -183,7 +183,7 @@ Use these depending on what you need to refresh:
   rm -rf dist/SRT-Translator.app build
        pyinstaller --windowed --name SRT-Translator \
        --clean --noconfirm \
-       --add-data "config/languages.json:config" \
+       --add-data "srt_translator/config/languages.json:config" \
        srt_translator/gui/main_window.py
   # Open it
   open dist/SRT-Translator.app
@@ -395,4 +395,4 @@ srt_translator/
 └── api.py          # High-level API for both interfaces
 ```
 
-**Need help?** Check the [documentation](index.md) for detailed usage instructions or open an issue on GitHub.
+**Need help?** Check the [documentation](../index.md) for detailed usage instructions or open an issue on GitHub.

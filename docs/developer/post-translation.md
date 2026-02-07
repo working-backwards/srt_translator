@@ -38,10 +38,9 @@ The system creates a timestamped batch directory:
 ```
 translation-batch-20240115_143022_+0000/
 ├── originals/           # Source files (created here)
-├── targets/            # Translated files (created during translation)
-│   ├── fr/             # French translations
-│   ├── ja/             # Japanese translations
-│   └── es/             # Spanish translations
+├── fr/                  # French translations
+├── ja/                  # Japanese translations
+├── es/                  # Spanish translations
 ├── artifacts/          # Evaluation outputs (created here)
 └── translation_issues_20240115_143022_+0000.log
 ```
@@ -77,9 +76,9 @@ rollup = run_batch_evaluation(
 #### 2.2 Batch Evaluation Process
 **Location**: `srt_translator/eval/runner.py:run_batch_evaluation()`
 
-For each language directory in `targets/`:
+For each language directory (e.g., `fr/`, `ja/`, `es/`):
 
-1. **File Pair Discovery**: Matches source files in `originals/` with translated files in `targets/{lang}/`
+1. **File Pair Discovery**: Matches source files in `originals/` with translated files in `{lang}/`
 2. **Per-Pair Evaluation**: Calls `evaluate_pair()` for each source/target file pair
 3. **Issue Detection and Organization**: Identifies individual issues and arranges them by type:
 
@@ -179,6 +178,15 @@ The compiler classifies issues into two categories:
 **WARNINGS** (fix items in punch list):
 - `missing_translation` - Cues with no translation (only when both neighbors are empty and source is substantial)
 - `parity_issue` - Cue count mismatch between source and target files
+
+##### Issue Types and Suggested Fixes
+
+| Code | Level | Description | Suggested Fix |
+|------|-------|-------------|---------------|
+| `missing_translation` | Warning | Target cue is empty with empty neighbors and substantial source (≥12 chars) | Copy the target and source contexts into your AI assistant; ask to translate; merge/adjust as needed |
+| `timing_fail` | Error | Subtitle timing overlaps or exceeds limits | Use your subtitle editor to adjust timing so cues don't overlap |
+| `parity_issue` | Warning | Target length/pace mismatches source | Rephrase target to similar idea density; keep terms consistent with termbase |
+| `placeholder_mismatch` | Error | Placeholder indices mismatched between source and target | Fix placeholder indices to match source numbering |
 
 ##### Decision Logic
 - **`fail`** - If any errors exist (must be fixed before publishing)
@@ -319,16 +327,15 @@ translation-batch-20240115_143022_+0000/
 │   ├── file1.srt                                # Original English subtitles
 │   ├── file2.srt
 │   └── file3.srt
-├── targets/                                      # Translated files
-│   ├── fr/                                      # French translations
-│   │   ├── file1.srt
-│   │   └── file2.srt
-│   ├── ja/                                      # Japanese translations
-│   │   ├── file1.srt
-│   │   └── file3.srt
-│   └── es/                                      # Spanish translations
-│       ├── file1.srt
-│       └── file2.srt
+├── fr/                                          # French translations
+│   ├── file1.srt
+│   └── file2.srt
+├── ja/                                          # Japanese translations
+│   ├── file1.srt
+│   └── file3.srt
+├── es/                                          # Spanish translations
+│   ├── file1.srt
+│   └── file2.srt
 ├── manifest.json                                # Batch metadata and version info
 ├── artifacts/                                   # Evaluation outputs
 │   ├── ai_config.json                           # Translation configuration used

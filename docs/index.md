@@ -8,15 +8,15 @@ description: Free MIT-licensed SRT translation tool for content creators and dev
 Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to use.
 
 > Are you a content creator? Start here:
-- **Use the App** → [GUI User Manual](GUI_USER_MANUAL.md)
-- **Installation Help** → [Quick Start](INSTALLATION.md)
+- **Use the App** → [GUI User Manual](user-guide/gui-manual.md)
+- **Installation Help** → [Quick Start](getting-started/installation.md)
 
 > Are you a developer? Start here:
-- **Dev Installation** → [Installation](INSTALLATION.md)
-- **Contribute** → [Coding Standards](CODING_STANDARDS.md)
-- **Architecture** → [Dependency Injection Refactor](DEPENDENCY_INJECTION_REFACTOR.md)
-- **Technical Flow** → [Technical Flow Example](TECHNICAL_FLOW_EXAMPLE.md)
-- **Security** → [Security Quick Reference](SECURITY_QUICK_REFERENCE.md)
+- **Dev Installation** → [Installation](getting-started/installation.md)
+- **Contribute** → [Coding Standards](developer/coding-standards.md)
+- **Architecture** → [Architecture Overview](developer/architecture.md)
+- **Technical Flow** → [Technical Flow Example](developer/technical-flow.md)
+- **Security** → [GitHub Security](developer/github-security.md)
 
 ---
 
@@ -38,9 +38,9 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 3. **Select** your SRT files and target languages
 4. **Translate** with one click
 
-**📖 Need detailed instructions?** → [GUI User Manual](GUI_USER_MANUAL.md)
-**🧠 Want to understand translation?** → [Translation Concepts](GUI_USER_MANUAL.md#understanding-translation-advanced-concepts)
-**🔤 Learn about terminology?** → [Terminology System](TERMINOLOGY_SYSTEM.md)
+**Need detailed instructions?** → [GUI User Manual](user-guide/gui-manual.md)
+**Want to understand translation?** → [Translation Concepts](user-guide/gui-manual.md#understanding-translation-advanced-concepts)
+**Learn about terminology?** → [Terminology System](user-guide/terminology.md)
 
 ## Features
 
@@ -67,7 +67,7 @@ Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to
 
 ## Contributing
 
-We welcome contributions! See our [Coding Standards](CODING_STANDARDS.md) for development guidelines and [Security](SECURITY.md) for our security practices.
+We welcome contributions! See our [Coding Standards](developer/coding-standards.md) for development guidelines and [GitHub Security](developer/github-security.md) for our security practices.
 
 ---
 

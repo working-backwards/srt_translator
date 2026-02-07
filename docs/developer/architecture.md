@@ -34,9 +34,9 @@ The evaluation subsystem provides post-translation quality analysis and reportin
 The evaluator reads **only** files on disk from the batch directory:
 
 **REQUIRED inputs:**
-- `batch_root/ai_config.json` - Schema-versioned configuration snapshot
+- `batch_root/artifacts/ai_config.json` - Schema-versioned configuration snapshot
 - `batch_root/originals/` - Source SRT files
-- `batch_root/targets/<lang>/` - Translated SRT files for each target language
+- `batch_root/<lang>/` - Translated SRT files for each target language (e.g., `batch_root/es/`, `batch_root/fr/`)
 
 **OPTIONAL inputs (inside ai_config.json):**
 - `dnt_terms` - Batch-wide "Do Not Translate" terms list
