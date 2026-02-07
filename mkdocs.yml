@@ -1,7 +1,7 @@
 site_name: SRT Translator
 site_description: Free MIT-licensed SRT translation tool for creators and developers
-site_url: https://workingbackwards.github.io/srt_translator/
-repo_url: https://github.com/workingbackwards/srt_translator
+site_url: https://working-backwards.github.io/srt_translator/
+repo_url: https://github.com/working-backwards/srt_translator
 
 theme:
   name: material
@@ -57,4 +57,4 @@ nav:
 extra:
   social:
     - icon: simple/github
-      link: https://github.com/workingbackwards/srt_translator
+      link: https://github.com/working-backwards/srt_translator

@@ -23,7 +23,7 @@ The **SRT Translator** is a tool that uses AI to translate subtitle files while 
 2) **Translate** — choose target languages.
 3) **Evaluate** — open `eval_report.html` and follow the "What to do next".
 
-See `/docs/ai-config.md` for the creator-first workflow and plain-language guidance.
+See [Creator Guide](docs/user-guide/creator-guide.md) for the creator-first workflow and plain-language guidance.
 
 ---
 
@@ -37,7 +37,7 @@ See `/docs/ai-config.md` for the creator-first workflow and plain-language guida
 
 ### For CLI Users
 - Install with `pip install srt-translator`
-- Run `srtx` after configuring your `.env` file
+- Run `srtx-cli` after configuring your `.env` file
 
 See **INSTALLATION.md** for building per‑platform and packaging details.
 
@@ -70,38 +70,24 @@ After each translation, the evaluator runs automatically and writes artifacts to
 
 ### Where config is discovered
 
-- **Rubric:** `config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
-- **DNT / Termbase:** the **client writes** these to the **batch root**:
+- **Rubric:** `srt_translator/config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
+- **DNT / Termbase:** written to `artifacts/<lang>/` per-language:
   - `dnt_summary.json` — **audit mirror** of DNT terms (optional; not used by eval).
   - `termbase_summary.json` — **audit mirror** of termbase (optional; not used by eval).
 
-> The evaluator **does not** fall back to `ai_config.json`. If you want DNT/TB coverage, ensure those two JSON files are written to the batch root.
+> The evaluator reads DNT/TB from `artifacts/ai_config.json` for coverage checks.
 
 ### What the evaluator writes
 
-At the batch root:
+In the `artifacts/` directory:
 
 - `eval_report.md` — creator-friendly, consolidated punch list (shows **all** issues).
-- `artifacts/<lang>/…` — per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
-  - DNT/TB snapshots **may** be copied into each `artifacts/<lang>/` as `dnt_summary.json` / `termbase_summary.json` for auditing. Evaluation does **not** read them.
+- `eval_report.html` — same content, viewable in browser.
+- `eval_report.json` — machine-readable evaluation results.
+- `<lang>/…` — per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments).
+  - DNT/TB snapshots are written to each `<lang>/` as `dnt_summary.json` / `termbase_summary.json` for auditing. Evaluation does **not** read them.
   - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`).
 
-### Re-running evaluation
-
-After translation is complete, you can re-run the evaluator to regenerate artifacts:
-
-```bash
-# From within the batch directory
-st-eval
-
-# From anywhere, specifying the batch path
-st-eval --batch-root "path/to/translation-batch-YYYYMMDD_HHMMSS"
-
-# With verbose logging
-st-eval -v
-```
-
-This rewrites only the evaluation artifacts (CSV/JSON/MD under `artifacts/…`) and leaves your translated SRT files untouched.
 
 ### Reporting behavior
 
@@ -146,7 +132,6 @@ Works across all supported language families with configurable rules:
 - **CJK scripts**: Chinese, Japanese, Korean
 - **Other families**: Cyrillic, RTL, Indic languages
 
-See [TRANSLATION_QUALITY_GUIDE.md](docs/TRANSLATION_QUALITY_GUIDE.md) for detailed configuration options.
 
 ### Source Language Assumptions
 
@@ -173,7 +158,6 @@ After installation, you can use these simple commands from any terminal:
 
 - **GUI**: `srtx` - Launches the graphical interface (default, requires `pip install srt-translator[gui]`)
 - **CLI**: `srtx-cli` - Launches the command-line interface
-- **Evaluation**: `st-eval` - Re-runs evaluation on completed translation batches
 
 ### For Content Creators (Executable)
 
@@ -245,21 +229,21 @@ python scripts/build_gui.py
 - Windows (no console window):
 ```
 pyinstaller --noconsole --name SRT-Translator \
-  --add-data "srt_translator/core/config/languages.json;srt_translator/core/config" \
+  --add-data "srt_translator/config/languages.json;srt_translator/config" \
   srt_translator/gui/main_window.py
 ```
 
 - macOS (GUI app bundle):
 ```
 pyinstaller --windowed --name SRT-Translator \
-  --add-data "srt_translator/core/config/languages.json:srt_translator/core/config" \
+  --add-data "srt_translator/config/languages.json:srt_translator/config" \
   srt_translator/gui/main_window.py
 ```
 
 - Linux (one-folder recommended for Qt apps):
 ```
 pyinstaller --windowed --name SRT-Translator \
-  --add-data "srt_translator/core/config/languages.json:config" \
+  --add-data "srt_translator/config/languages.json:config" \
   srt_translator/gui/main_window.py
 ```
 
@@ -325,7 +309,7 @@ The SRT Translator includes advanced quality improvements that automatically enh
 - Detailed filtering logs showing what was removed and why
 - Per-language processing summaries for quality validation
 
-### 4. Example Output Structure
+### 5. Example Output Structure
 
 By default, outputs are written to your OS’s standard application data directory:
 macOS ~/Library/Application Support/srt-translator/translated_files/,
@@ -334,25 +318,29 @@ Linux ~/.local/share/srt-translator/translated_files/.
 
 You can override this location in the GUI or in your .env file for the CLI.
 
-After translation, your files will be organized in batch-specific directories with enhanced output files:
+After translation, your files will be organized in batch-specific directories:
 
 ```
 Your Selected Output Directory/
 ├── translation-batch-20250810_111157-0700/
+│   ├── manifest.json                    # Batch metadata (versions, source language)
 │   ├── translation_issues_20250810_111157-0700.log
-│   ├── artifacts/                       # Per-language artifacts
-│   │   ├── es/                         # Spanish artifacts
-│   │   │   ├── dnt_summary.json       # (audit mirror) optional; not used by eval
-│   │   │   ├── termbase_summary.json  # (audit mirror) optional; not used by eval
-│   │   │   └── manifest.json          # Language-specific manifest
-│   │   ├── fr/                         # French artifacts
-│   │   │   ├── dnt_summary.json       # (audit mirror)
-│   │   │   ├── termbase_summary.json  # (audit mirror)
-│   │   │   └── manifest.json
-│   │   └── de/                         # German artifacts
-│   │       ├── dnt_summary.json       # (audit mirror)
-│   │       ├── termbase_summary.json  # (audit mirror)
-│   │       └── manifest.json
+│   ├── artifacts/                       # Evaluation and config artifacts
+│   │   ├── ai_config.json              # DNT terms and termbase used
+│   │   ├── dnt.json                    # Raw DNT terms list
+│   │   ├── termbase.json               # Raw termbase
+│   │   ├── eval_report.json            # Evaluation results (machine-readable)
+│   │   ├── eval_report.md              # Evaluation report (markdown)
+│   │   ├── eval_report.html            # Evaluation report (viewable in browser)
+│   │   ├── es/                         # Spanish evaluation artifacts
+│   │   │   ├── dnt_summary.json       # (audit mirror) DNT terms snapshot
+│   │   │   └── termbase_summary.json  # (audit mirror) Termbase snapshot
+│   │   ├── fr/                         # French evaluation artifacts
+│   │   │   ├── dnt_summary.json
+│   │   │   └── termbase_summary.json
+│   │   └── de/                         # German evaluation artifacts
+│   │       ├── dnt_summary.json
+│   │       └── termbase_summary.json
 │   ├── ES/                              # Spanish translations
 │   │   └── video1 - ES.srt
 │   ├── FR/                              # French translations
@@ -360,59 +348,17 @@ Your Selected Output Directory/
 │   └── DE/                              # German translations
 │       └── video1 - DE.srt
 └── translation-batch-20250810_143022-0700/
-    ├── translation_issues_20250810_143022-0700.log
-    └── ... (translated files)
+    └── ... (same structure)
 ```
 
-**Enhanced Output Files:**
-- **`artifacts/<lang>/dnt_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file
-- **`artifacts/<lang>/termbase_summary.json`**: (audit mirror) optional snapshot; eval does **not** use this file
-- **`artifacts/<lang>/manifest.json`**: Language-specific manifest with complete metadata
+**Key Output Files:**
+- **`manifest.json`**: Batch-level metadata including app version and source language
+- **`artifacts/ai_config.json`**: Complete translation configuration (DNT terms, termbase)
+- **`artifacts/eval_report.html`**: Open this to review translation quality and suggested fixes
+- **`artifacts/<lang>/dnt_summary.json`**: (audit mirror) Per-language DNT snapshot
+- **`artifacts/<lang>/termbase_summary.json`**: (audit mirror) Per-language termbase snapshot
 
-**Note:** Each translation session creates a new batch directory with logs and configuration files, making it easier to track and manage translation sessions. The GUI shows a "Files & Output" section where you can browse and select SRT files, then choose where to save the translated versions.
-
-### Enhanced Output Format
-
-The SRT Translator now provides complete transparency into the translation process:
-
-**Processing Summary (in artifacts/<lang>/manifest.json):**
-```json
-{
-  "processing_summary": {
-    "dnt_terms": {
-      "provided": 25,
-      "used": 22,
-      "filtered": 3
-    },
-    "termbase": {
-      "provided_entries": 45,
-      "used_entries": 38,
-      "collisions_resolved": 7
-    },
-    "quality_improvements": [
-      "Numeric DNT terms automatically filtered",
-      "DNT precedence enforced over termbase",
-      "Relevant-only termbase injection"
-    ]
-  }
-}
-```
-
-**DNT Terms Details (in artifacts/<lang>/dnt_summary.json):**
-- **User provided**: Your original DNT terms
-- **Filtered for translation**: Terms actually used (numeric items removed)
-- **Filtering details**: What was removed and why
-
-**Termbase Details (in artifacts/<lang>/termbase_summary.json):**
-- **User provided**: Your original termbase
-- **Filtered for translation**: Termbase actually used (DNT collisions resolved)
-- **Collision details**: What was removed due to DNT conflicts
-
-This transparency helps you:
-- **Validate quality improvements** applied during translation
-- **Debug configuration issues** by seeing exactly what was used
-- **Track changes** across different translation runs
-- **Share results** with reviewers or other team members
+**Note:** Each translation session creates a new batch directory with logs and configuration files, making it easier to track and manage translation sessions. The GUI shows a "Files & Output" section where you can browse and select SRT files, then choose where to save the translated versions
 
 ---
 
@@ -523,8 +469,7 @@ The SRT Translator requires these parameters to function:
 |-----------|---------|------------|------------|---------------|
 | `OPENAI_API_KEY` | Your OpenAI API key for translation | Settings → API Configuration | `.env` file | ✅ Yes |
 | `TARGET_LANGUAGES` | Languages to translate to | Language Selection UI | `.env` file | ✅ Yes |
-| `OPENAI_MODEL` | AI model to use | Settings → Translation Settings | `.env` file | ✅ Yes |
-| `BATCH_SIZE` | Translation batch size | Settings → Translation Settings | `.env` file | ✅ Yes |
+| `OPENAI_MODEL` | AI model to use | Hardcoded to gpt-4o-mini | `.env` file | ❌ CLI only |
 
 ### Optional Parameters
 
@@ -532,7 +477,7 @@ The SRT Translator requires these parameters to function:
 |-----------|---------|------------|------------|---------------|
 | `DNT_TERMS` | Terms not to translate (JSON array format) | AI Configuration Generation | `.env` file | ✅ Yes |
 | `OUTPUT_DIRECTORY` | Where to save translations | File Selection UI | `.env` file | ✅ Yes |
-| `FIX_AGGRESSIVENESS` | Auto-fix level (0-1) | Hardcoded to 0.75 | `.env` file | ❌ GUI only |
+| `AGGRESSIVENESS` | Auto-fix level (0-1) | Hardcoded to 0.75 | `.env` file | ❌ CLI only |
 
 ### Parameter Sources by Mode
 
@@ -544,11 +489,11 @@ The SRT Translator requires these parameters to function:
 - **Environment Variables**: **No longer used for runtime state** - all configuration passed explicitly
 
 #### **CLI Mode (Updated)**
-- **Settings Storage**: Uses `ConfigResolver` to load from `.env` file
+- **Settings Storage**: Loaded from `.env` file via `config_loader`
 - **Language Selection**: Must be configured in `.env` file
-- **File Selection**: Configured via `INPUT_DIRECTORY=` in `.env` file (defaults to `./original_captions/` relative to project root)
+- **File Selection**: Configured via `INPUT_DIRECTORY=` in `.env` file (defaults to `original_captions` relative to project root)
 - **AI Configuration**: Manual setup of DNT terms and termbase.json
-- **Environment Variables**: Loaded from `.env` file via `ConfigResolver`
+- **Environment Variables**: Loaded from `.env` file only (OS env ignored except for `OPENAI_API_KEY`)
 
 ### Quick Configuration Guide
 
@@ -564,11 +509,11 @@ The SRT Translator requires these parameters to function:
    - **Windows/Linux/macOS:** `cp examples/env_example .env`
    - **Windows (PowerShell):** `Copy-Item examples/env_example .env`
 2. **Edit the `.env` file** with your actual values
-3. **Configure input directory** with `INPUT_DIRECTORY=path/to/your/srt/files` (optional, defaults to `./original_captions/` relative to project root)
+3. **Configure input directory** with `INPUT_DIRECTORY=path/to/your/srt/files` (optional, defaults to `original_captions` relative to project root)
 4. **Configure languages** in `TARGET_LANGUAGES` environment variable
 5. **Set up DNT terms** and termbase.json manually (optional)
 
-**Note**: The CLI (`srtx`) works independently of the GUI and can be installed on headless servers without GUI dependencies.
+**Note**: The CLI (`srtx-cli`) works independently of the GUI and can be installed on headless servers without GUI dependencies.
 
 ### Example CLI Configuration (.env file)
 ```bash
@@ -576,12 +521,11 @@ The SRT Translator requires these parameters to function:
 OPENAI_API_KEY=your_api_key_here
 TARGET_LANGUAGES={"Spanish": "es", "French": "fr", "German": "de"}
 OPENAI_MODEL=gpt-4o-mini
-BATCH_SIZE=5
 
 # Optional parameters
 DNT_TERMS=["YourName", "YourCompany", "YourProduct"]
 OUTPUT_DIRECTORY=translated_srt_files
-FIX_AGGRESSIVENESS=0.75
+AGGRESSIVENESS=0.75
 TONE=neutral  # casual, neutral, or formal
 ```
 
@@ -613,19 +557,19 @@ The CLI reads configuration from `.env` files only. OS environment variables are
 - `OPENAI_API_KEY`: Your OpenAI API key (may also be set via OS environment)
 
 **Optional (`.env` only):**
-- `TARGET_LANGUAGES`: Dictionary of target languages (JSON or CSV format)
-- `DNT_TERMS`: Terms not to translate (JSON array or CSV format)
+- `TARGET_LANGUAGES`: Dictionary of target languages (JSON format)
+- `DNT_TERMS`: Terms not to translate (JSON array format)
 - `OPENAI_MODEL`: AI model to use (default: gpt-4o-mini)
-- `BATCH_SIZE`: Translation batch size (default: 5)
 - `AGGRESSIVENESS`: Auto-fix level 0-1 (default: 0.75)
 - `LOG_MODE`: Logging verbosity (Standard/Verbose, default: Standard)
 - `OUTPUT_DIRECTORY`: Where to save translations (default: translated_srt_files)
+- `INPUT_DIRECTORY`: Where to read source SRT files (default: original_captions)
 - `TERMBASE_PATH`: Path to termbase file (default: termbase.json)
 - `TONE`: Translation register — `casual`, `neutral` (default), or `formal`
 
 **Format Examples:**
-- `TARGET_LANGUAGES`: `{"Spanish": "es", "French": "fr"}` or `Spanish,French`
-- `DNT_TERMS`: `["YourName", "YourCompany"]` or `YourName,YourCompany`
+- `TARGET_LANGUAGES`: `{"Spanish": "es", "French": "fr"}` (JSON object format)
+- `DNT_TERMS`: `["YourName", "YourCompany"]` (JSON array format)
 
 ### Termbase Configuration
 
@@ -658,7 +602,7 @@ The termbase is a JSON file that ensures consistent translations for important b
 
 **CLI Mode Usage:**
 - Place your `termbase.json` file in the project root directory
-- The CLI will automatically load it when you run `srt-cli`
+- The CLI will automatically load it when you run `srtx-cli`
 - No environment variable configuration needed for the termbase
 
 ### Example Configuration
@@ -674,7 +618,7 @@ INPUT_DIRECTORY=./my_subtitle_files
 ---
 
 ## Supported Languages
-**Total Available:** 78 languages including regional variants
+**Total Available:** 80 languages including regional variants
 
 ---
 
