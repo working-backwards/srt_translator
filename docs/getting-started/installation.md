@@ -58,14 +58,14 @@ python scripts/build_gui.py
    - Windows:
      ```bash
      pyinstaller --noconsole --name SRT-Translator \
-       --add-data "srt_translator/config/languages.json;config" \
+       --add-data "srt_translator/config/languages.json;srt_translator/config" \
        srt_translator/gui/main_window.py
      ```
    - macOS:
      ```bash
       # Build a Finder app (.app bundle)
       pyinstaller --windowed --name SRT-Translator \
-        --add-data "srt_translator/config/languages.json:config" \
+        --add-data "srt_translator/config/languages.json:srt_translator/config" \
         srt_translator/gui/main_window.py
 
       # Build/update only the single-file console-launchable binary
@@ -75,7 +75,7 @@ python scripts/build_gui.py
    - Linux:
      ```bash
      pyinstaller --windowed --name SRT-Translator \
-       --add-data "srt_translator/config/languages.json:config" \
+       --add-data "srt_translator/config/languages.json:srt_translator/config" \
        srt_translator/gui/main_window.py
      ```
 5. **Find executables** in the `dist/` folder
@@ -118,7 +118,7 @@ pip install -e .[gui]  # Includes GUI dependencies
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-repo/srt_translator.git
+   git clone https://github.com/working-backwards/srt_translator.git
    cd srt_translator
    ```
 
@@ -168,6 +168,8 @@ For multi‑hour jobs, use `caffeinate` to keep the system awake while allowing 
 
 ```bash
 caffeinate -imsu srtx
+```
+
 ## 🔁 Rebuilding (macOS)
 
 Use these depending on what you need to refresh:
@@ -181,9 +183,9 @@ Use these depending on what you need to refresh:
 - Rebuild a fresh Finder app (.app bundle):
   ```bash
   rm -rf dist/SRT-Translator.app build
-       pyinstaller --windowed --name SRT-Translator \
+  pyinstaller --windowed --name SRT-Translator \
        --clean --noconfirm \
-       --add-data "srt_translator/config/languages.json:config" \
+       --add-data "srt_translator/config/languages.json:srt_translator/config" \
        srt_translator/gui/main_window.py
   # Open it
   open dist/SRT-Translator.app
@@ -194,10 +196,7 @@ Use these depending on what you need to refresh:
    srtx
    ```
 
-```
-
-Flags:
-- `-i` prevent idle sleep, `-m` prevent disk sleep, `-s` prevent system sleep on AC, `-u` user activity. Omit `-d` so the display may turn off.
+**Flags:** `-i` prevent idle sleep, `-m` prevent disk sleep, `-s` prevent system sleep on AC, `-u` user activity. Omit `-d` so the display may turn off.
 
 ## 📋 System Requirements
 
@@ -261,7 +260,7 @@ Flags:
 
 2. **Run translation**:
    ```bash
-   srt-cli
+   srtx-cli
    ```
 
 3. **Check output** in `translated_srt_files/` directory
@@ -297,7 +296,7 @@ Flags:
 
 ### Getting Help
 
-1. **Check the logs** in `translation_logs/` directory
+1. **Check the logs** in the batch directory (e.g., `translation-batch-YYYYMMDD_HHMMSS/`)
 2. **Review the documentation** for detailed information
 3. **Open an issue** on GitHub with:
    - Your operating system and version
@@ -367,8 +366,8 @@ scripts/
 3. **Test the installation**:
    ```bash
    # Test the console scripts
-   srtx --help
-   srtx-cli --help  # if installed with CLI extras
+   srtx-cli --help  # CLI help
+   srtx              # Launch GUI
 
    # Run tests if available
    python -m pytest tests/  # or your test command
