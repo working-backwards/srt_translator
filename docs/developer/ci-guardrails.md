@@ -1,107 +1,98 @@
-# CI Guardrails Setup Guide
+# CI Guardrails
 
-This guide explains how to set up the Stage 0 guardrails in GitHub to prevent accidental changes to the translator behavior.
+This document explains the Stage 0 guardrails that protect the translator from accidental regressions.
 
-## Overview
+## Why These Guardrails Exist
 
-The Stage 0 Guardrails workflow runs two critical checks:
-1. **Stage 0 Tests**: Ensures prompt snapshots and parity tests pass unchanged
-2. **Prompt Integrity Check**: Detects any modifications to prompt strings in `translator.py`
+AI prompts are the most critical code in this application. A small, unintended change can:
 
-## Setup Steps
+- Silently break translations across all languages
+- Introduce subtle quality regressions that only appear in production
+- Cause inconsistent behavior that's hard to diagnose
+- Violate the "byte-for-byte identical" output guarantee the codebase depends on
 
-### 1. Enable the Workflow
+The guardrails catch these problems before they reach the main branch.
 
-The workflow file `.github/workflows/stage0-guardrails.yml` is already created and will run automatically on:
-- Pull requests to `main`/`master`
-- Direct pushes to `main`/`master`
+## How the Guardrails Work
 
-### 2. Configure Branch Protection
+The Stage 0 workflow runs prompt snapshot tests on every PR to main/master.
 
-1. Go to your GitHub repository
-2. Navigate to **Settings** → **Branches**
-3. Click **Add rule** for the `main` branch
-4. Configure the following:
+### Prompt Snapshot Tests
 
-#### Basic Settings
-- **Branch name pattern**: `main` (or `master`)
-- ✅ **Require a pull request before merging**
-- ✅ **Require approvals**: Set to at least 1
-- ✅ **Dismiss stale PR approvals when new commits are pushed**
+These tests capture the exact output of each prompt and compare it against a known-good "golden" snapshot. If a prompt change alters the output in any way, the test fails.
 
-#### Status Checks
-- ✅ **Require status checks to pass before merging**
-- ✅ **Require branches to be up to date before merging**
-- In the search box, type: `Stage 0 Guardrails`
-- Select the workflow when it appears
+This catches:
+- Intentional changes that need review
+- Accidental edits (typos, whitespace, formatting)
+- Regressions from refactoring
 
-#### Additional Settings
-- ✅ **Restrict pushes that create files that match the specified pattern**
-- ✅ **Require linear history** (optional, but recommended)
+## Making Changes
 
-### 3. Test the Setup
+Changes to prompts or translator code are allowed as long as:
 
-1. Create a test branch
-2. Make a small change to `translator.py`
-3. Create a PR against `main`
-4. Verify the Stage 0 Guardrails workflow runs
-5. Verify the PR cannot be merged until the workflow passes
+1. All tests pass (or snapshots are intentionally updated)
+2. A reviewer approves the PR
 
-## What Happens When Guardrails Fail
+### Changing a Prompt
 
-### Stage 0 Tests Fail
-- The workflow will show which specific test failed
-- Check the test output for details
-- Fix the issue and push again
-- The workflow will re-run automatically
+1. Create a feature branch
+2. Edit the prompt file in `srt_translator/prompts/`
+3. Run tests locally—they will fail (this is expected)
+4. Update the snapshots:
+   ```bash
+   pytest tests/test_prompts_snapshot.py --snapshot-update
+   ```
+5. Verify tests now pass:
+   ```bash
+   pytest tests/test_prompts_snapshot.py -q
+   ```
+6. In your PR description, explain:
+   - What changed and why
+   - Which languages or scenarios are affected
+   - How you verified the new behavior
 
-### Prompt String Changes Detected
-- The workflow will fail with a message about changes in `translator.py`
-- Review the changes to ensure they don't modify AI prompts
-- If changes are intentional and safe, you may need to update the Stage 0 tests
-- If changes are accidental, revert them
+Reviewers can examine the snapshot diff to evaluate whether the change is appropriate.
+
+### Changing Translator Code
+
+The same process applies to `translator.py` or other translator code. Make your changes, ensure the snapshot tests pass, and document the change in your PR.
 
 ## Local Testing
 
 Before pushing, run the guardrails locally:
 
 ```bash
-# Run Stage 0 tests
 pytest tests/test_prompts_snapshot.py -q
-pytest tests/test_parity_io.py -q
-
-# Check for prompt changes (if you have the base commit)
-git diff --exit-code -w -- srt_translator/core/translator/translator.py <base-commit>
 ```
+
+## GitHub Setup
+
+### Enable the Workflow
+
+The workflow file `.github/workflows/stage0-guardrails.yml` runs automatically on:
+- Pull requests to `main`/`master`
+- Direct pushes to `main`/`master`
+
+### Configure Branch Protection
+
+1. Go to **Settings** → **Branches**
+2. Add a rule for `main`:
+   - **Require a pull request before merging**
+   - **Require approvals**: At least 1
+   - **Require status checks to pass**: Select `Stage 0 Guardrails`
 
 ## Troubleshooting
 
-### Workflow Not Appearing in Status Checks
-- Ensure the workflow file is in the correct location: `.github/workflows/`
-- Check that the workflow has run at least once
-- Verify the workflow file syntax is correct
+### Tests Pass Locally but Fail in CI
 
-### Tests Passing Locally but Failing in CI
 - Check Python version compatibility
 - Verify all dependencies are installed in CI
-- Check for environment-specific issues
+- Check for environment-specific issues (line endings, locale)
 
-### False Positives in Prompt Check
-- The `-w` flag ignores whitespace changes
-- Only actual content changes will trigger failures
-- Review the git diff output to understand what changed
+### Snapshot Differences You Don't Understand
 
-## Maintenance
+Run with verbose output to see the exact diff:
 
-### Updating Stage 0 Tests
-If you need to modify the Stage 0 tests (e.g., after intentional prompt changes):
-1. Update the test files
-2. Ensure they pass locally
-3. Push and verify CI passes
-4. Update this documentation if needed
-
-### Workflow Updates
-The workflow file can be updated as needed, but ensure:
-- Stage 0 tests continue to run
-- Prompt integrity check remains in place
-- All existing protections are maintained
+```bash
+pytest tests/test_prompts_snapshot.py -v
+```
