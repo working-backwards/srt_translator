@@ -30,22 +30,20 @@ markdown_extensions:
 nav:
   - Home: index.md
 
-  - Getting Started:
-      - Installation: getting-started/installation.md
-      - Quick Start: getting-started/quickstart.md
-
   - User Guide:
       - Overview: user-guide/index.md
+      - Installation: user-guide/installation.md
+      - Quick Start: user-guide/quickstart.md
       - GUI Manual: user-guide/gui-manual.md
       - For Creators: user-guide/creator-guide.md
       - Custom Termbases: user-guide/customizing-termbase.md
       - Terminology System: user-guide/terminology.md
       - Quality Features: user-guide/quality-features.md
       - Understanding Reports: user-guide/reports.md
-      - Executable Safety: user-guide/executable-safety.md
 
   - Developer Guide:
       - Overview: developer/index.md
+      - Setup: developer/setup.md
       - Architecture: developer/architecture.md
       - Translation Core: developer/translation-core.md
       - Technical Flow: developer/technical-flow.md

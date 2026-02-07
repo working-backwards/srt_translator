@@ -6,8 +6,8 @@ Welcome to the SRT Translator User Guide. This section is for **content creators
 
 If you just downloaded the app, start here:
 
-1. **[Installation](../getting-started/installation.md)** - Download and install the application
-2. **[Quick Start](../getting-started/quickstart.md)** - Translate your first subtitle file
+1. **[Installation](installation.md)** - Download and install the application
+2. **[Quick Start](quickstart.md)** - Translate your first subtitle file
 
 ## Using the App
 
@@ -20,7 +20,3 @@ If you just downloaded the app, start here:
 - **[Terminology System](terminology.md)** - How Do-Not-Translate and termbase features work
 - **[Quality Features](quality-features.md)** - Built-in quality checks and safeguards
 - **[Understanding Reports](reports.md)** - How to read evaluation reports
-
-## Distribution Safety
-
-- **[Executable Safety](executable-safety.md)** - What's included (and excluded) in the downloadable app

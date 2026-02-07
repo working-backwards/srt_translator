@@ -108,11 +108,12 @@ The evaluator **MUST NOT** import or depend on `TranslationConfig` objects. It r
 ## Security Considerations
 
 ### Configuration Isolation
-- No runtime environment variable access
-- All configuration frozen in batch artifacts
+- CLI reads API key from environment or .env file
+- GUI stores API key using OS-native secure storage (QSettings)
+- All translation configuration frozen in batch artifacts
 - No external API calls during evaluation
 
 ### Data Handling
-- SRT content processed in memory only
-- No persistent storage of sensitive content
-- Logs sanitized of personal information
+- SRT content processed in memory during translation
+- Translated files written to batch output directory
+- API key persisted locally (not included in batch artifacts)

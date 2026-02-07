@@ -4,7 +4,7 @@ Welcome to the SRT Translator Developer Guide. This section is for **developers*
 
 ## Getting Started
 
-1. **[Installation](../getting-started/installation.md)** - Set up your development environment
+1. **[Setup](setup.md)** - Set up your development environment
 2. **[Coding Standards](coding-standards.md)** - Code style and conventions
 
 ## Architecture
@@ -27,6 +27,6 @@ Welcome to the SRT Translator Developer Guide. This section is for **developers*
 
 Before submitting a PR, please review:
 
-1. [CONTRIBUTING.md](https://github.com/workingbackwards/srt_translator/blob/main/CONTRIBUTING.md) - Contribution guidelines
+1. [CONTRIBUTING.md](https://github.com/working-backwards/srt_translator/blob/main/CONTRIBUTING.md) - Contribution guidelines
 2. [Coding Standards](coding-standards.md) - Code style requirements
 3. [CI Guardrails](ci-guardrails.md) - What checks your PR must pass

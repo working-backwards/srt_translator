@@ -8,11 +8,12 @@ description: Free MIT-licensed SRT translation tool for content creators and dev
 Translate `.srt` subtitle files quickly and accurately. MIT-licensed and free to use.
 
 > Are you a content creator? Start here:
-- **Use the App** → [GUI User Manual](user-guide/gui-manual.md)
-- **Installation Help** → [Quick Start](getting-started/installation.md)
+- **Installation** → [Download & Install](user-guide/installation.md)
+- **Quick Start** → [Quick Start Guide](user-guide/quickstart.md)
+- **Full Manual** → [GUI User Manual](user-guide/gui-manual.md)
 
 > Are you a developer? Start here:
-- **Dev Installation** → [Installation](getting-started/installation.md)
+- **Dev Setup** → [Developer Setup](developer/setup.md)
 - **Contribute** → [Coding Standards](developer/coding-standards.md)
 - **Architecture** → [Architecture Overview](developer/architecture.md)
 - **Technical Flow** → [Technical Flow Example](developer/technical-flow.md)
