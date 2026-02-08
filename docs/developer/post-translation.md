@@ -83,7 +83,6 @@ For each language directory (e.g., `fr/`, `ja/`, `es/`):
 3. **Issue Detection and Organization**: Identifies individual issues and arranges them by type:
 
    **Individual Issue Detection**:
-   - Reads CSV files created by `evaluate_pair()` (e.g., `untranslated_{lang}_{batch}.csv`)
    - Analyzes SRT files directly for missing translations
    - Calculates timing statistics from source/target cue comparisons
 
@@ -124,8 +123,7 @@ For each file pair, creates detailed CSV files in `artifacts/{lang}/`:
 - **`timing_{lang}_{batch}.csv`**: Timing differences between source and target
 - **`cps_{lang}_{batch}.csv`**: Characters per second analysis
 - **`dnt_coverage_{lang}_{batch}.csv`**: DNT term preservation statistics
-- **`termbase_coverage_{lang}_{batch}.csv`**: Termbase usage statistics
-- **`untranslated_{lang}_{batch}.csv`**: DNT violation details
+- **`tb_coverage_{lang}_{batch}.csv`**: Termbase usage statistics
 - **`source_fragments_{lang}_{batch}.csv`**: Untranslated Latin script fragments (assumes English source language)
   - **Content**: Cues where target text contains Latin script sequences (A-Za-z) of 6+ characters
   - **Limitation**: Hardcoded regex `[A-Za-z]{6,}` assumes English source language
@@ -137,23 +135,26 @@ For each file pair, creates detailed CSV files in `artifacts/{lang}/`:
 #### 3.1 Raw Data Compilation
 **Location**: `srt_translator/eval/report.py:_write_json_report()`
 
-Converts detailed evaluation data into standardized `eval_report.json`:
+Converts detailed evaluation data into standardized `eval_report.json` (v2 format):
 ```json
 {
-  "files_total": 3,
-  "languages_total": 2,
-  "issues_total": 4,
-  "source_language": "en",
-  "languages": {
+  "version": "2.0.0",
+  "totals": {
+    "files_total": 3,
+    "languages_total": 2,
+    "issues_total": 4
+  },
+  "per_language": {
     "fr": {
       "files": {
-        "file1.srt": {
-          "missing_translation": 1,
-          "timing_fail": 0
+        "fr/file1.srt": {
+          "issues_counts": {"missing_translation": 1, "timing_fail": 0},
+          "issues_detail": {"missing_translation": [...], "timing_fail": []}
         }
       }
     }
-  }
+  },
+  "lexicons": {...}
 }
 ```
 
@@ -250,31 +251,34 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
 **Example of report_v1.json structure:**
 ```json
 {
-  "decision": "REVIEW",
-  "one_liner": "3 files need review due to DNT violations",
+  "decision": "review",
+  "one_liner": "We found 3 warnings. Fix the items in the Punch List below.",
   "punch_list": {
-    "errors": [
+    "errors": [],
+    "warnings": [
       {
-        "issue_type": "timing_fail",
-        "file": "file1.srt",
         "language": "fr",
+        "file": "fr/file1.srt",
+        "cue_index": 5,
+        "type": "missing_translation",
+        "desc": "Some subtitles look blank in the translation...",
+        "suggested_fix": "1) Quick verify: Back-translate the Target context...",
         "context": {
-          "source": {"cur": "API key", "idx": 5},
-          "target": {"cur": "clé API", "idx": 5}
+          "source": {"prev2": "", "prev1": "", "cur": "API key", "next1": "", "next2": ""},
+          "target": {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""}
         }
       }
-    ],
-    "warnings": []
+    ]
   },
   "file_status": {
-    "fr": {"file1.srt": "review", "file2.srt": "pass"},
-    "ja": {"file1.srt": "pass", "file3.srt": "pass"}
+    "fr": {"fr/file1.srt": "review", "fr/file2.srt": "ready"},
+    "ja": {"ja/file1.srt": "ready", "ja/file3.srt": "ready"}
   },
   "kpis": {
     "files_total": 3,
     "languages_total": 2,
     "issues_total": 1,
-    "by_type": {"timing_fail": 1}
+    "by_type": {"missing_translation": 1, "timing_fail": 0, "placeholder_mismatch": 0, "parity_issue": 0}
   },
   "lexicons": {
     "dnt": {"count": 5, "sample": ["API", "GPU", "NASA"]},
@@ -311,7 +315,7 @@ self.eval_report_ready.emit({k: str(v) for k, v in paths.items()})
 ```
 
 #### 4.2 GUI Response
-**Location**: `srt_translator/gui/main_window.py:_after_eval_finished()`
+**Location**: `srt_translator/gui/main_window.py` — `_after_eval_finished()`
 
 The GUI:
 - Logs all report paths
@@ -339,7 +343,9 @@ translation-batch-20240115_143022_+0000/
 ├── manifest.json                                # Batch metadata and version info
 ├── artifacts/                                   # Evaluation outputs
 │   ├── ai_config.json                           # Translation configuration used
-│   ├── eval_report.json                         # Raw evaluation data
+│   ├── dnt.json                                 # DNT terms snapshot
+│   ├── termbase.json                            # Termbase snapshot
+│   ├── eval_report.json                         # Raw evaluation data (v2 format)
 │   ├── report_v1.json                           # Compiled human-friendly data
 │   ├── eval_report.md                           # Markdown report
 │   ├── eval_report.html                         # HTML report for content creators
@@ -347,24 +353,21 @@ translation-batch-20240115_143022_+0000/
 │   │   ├── timing_fr_batch.csv                  # Timing analysis
 │   │   ├── cps_fr_batch.csv                     # Characters per second
 │   │   ├── dnt_coverage_fr_batch.csv            # DNT preservation stats
-│   │   ├── termbase_coverage_fr_batch.csv       # Termbase usage stats
-│   │   ├── untranslated_fr_batch.csv            # DNT violations
+│   │   ├── tb_coverage_fr_batch.csv             # Termbase usage stats
 │   │   ├── source_fragments_fr_batch.csv        # Untranslated fragments
 │   │   └── eval_summary_fr_batch.md             # Per-language summary
 │   ├── ja/                                      # Japanese evaluation details
 │   │   ├── timing_ja_batch.csv
 │   │   ├── cps_ja_batch.csv
 │   │   ├── dnt_coverage_ja_batch.csv
-│   │   ├── termbase_coverage_ja_batch.csv
-│   │   ├── untranslated_ja_batch.csv
+│   │   ├── tb_coverage_ja_batch.csv
 │   │   ├── source_fragments_ja_batch.csv
 │   │   └── eval_summary_ja_batch.md
 │   └── es/                                      # Spanish evaluation details
 │       ├── timing_es_batch.csv
 │       ├── cps_es_batch.csv
 │       ├── dnt_coverage_es_batch.csv
-│       ├── termbase_coverage_es_batch.csv
-│       ├── untranslated_es_batch.csv
+│       ├── tb_coverage_es_batch.csv
 │       ├── source_fragments_es_batch.csv
 │       └── eval_summary_es_batch.md
 └── translation_issues_20240115_143022_+0000.log # Translation process log
@@ -376,12 +379,14 @@ translation-batch-20240115_143022_+0000/
 Contains batch metadata and version information:
 ```json
 {
+  "batch_label": "20240115_143022_+0000",
+  "created_at": "2024-01-15T14:30:22Z",
   "app_version": "1.0.0",
   "evaluator_version": "1.0.0",
-  "original_language": {
-    "code": "en",
-    "name": "English"
-  }
+  "original_language": {"code": "en", "name": "English"},
+  "languages": ["fr", "ja", "es"],
+  "files": {"fr": ["file1.srt"], "ja": ["file1.srt"]},
+  "rubric_snapshot": {"caps": {...}, "fragments": {...}}
 }
 ```
 
@@ -389,15 +394,19 @@ Contains batch metadata and version information:
 Translation configuration snapshot used for this batch:
 ```json
 {
-  "version": "1.0",
+  "version": "1.0.0",
   "timestamp": "2024-01-15T14:30:22+00:00",
+  "mode": "batch",
   "source_files": ["file1.srt", "file2.srt", "file3.srt"],
   "target_languages": ["fr", "ja", "es"],
   "dnt_terms": ["API", "GPU", "NASA"],
   "termbase": {
     "fr": {"input metrics": "métriques d'entrée"},
     "ja": {"input metrics": "入力指標"}
-  }
+  },
+  "language_batch_sizes": {"fr": 5, "ja": 5, "es": 5},
+  "aggressiveness": 0.5,
+  "tone": "neutral"
 }
 ```
 
@@ -437,7 +446,7 @@ Translation configuration snapshot used for this batch:
 #### `artifacts/report_v1.json`
 **Purpose**: Human-friendly compiled evaluation data
 **Contents**:
-- Decision level (pass/review/fix)
+- Decision level (pass/review/fail)
 - One-liner summary
 - Detailed punch list with context
 - File status indicators
@@ -487,14 +496,12 @@ Translation configuration snapshot used for this batch:
 - How many were preserved in target
 - Preservation percentage per term
 
-#### `artifacts/{lang}/termbase_coverage_{lang}_batch.csv`
+#### `artifacts/{lang}/tb_coverage_{lang}_batch.csv`
 **Purpose**: Termbase usage analysis
 **Contents**:
 - Which termbase entries were used
 - Usage frequency
 - Coverage statistics
-
-#### `artifacts/{lang}/untranslated_{lang}_batch.csv`
 
 #### `artifacts/{lang}/source_fragments_{lang}_batch.csv`
 **Purpose**: Untranslated English fragments
@@ -514,7 +521,7 @@ Translation configuration snapshot used for this batch:
 
 ### 1. Primary Review: HTML Report
 The content creator opens `artifacts/eval_report.html` which provides:
-- **Clear decision**: Pass, Review, or Fix required
+- **Clear decision**: Pass, Review, or Fail
 - **Issue summary**: Number of errors and warnings
 - **Actionable items**: Specific files and lines to check
 - **Suggested fixes**: Clear instructions for each issue
@@ -523,9 +530,10 @@ The content creator opens `artifacts/eval_report.html` which provides:
 ### 2. Technical Deep Dive: CSV Files
 For detailed analysis, the creator can examine:
 - **Timing issues**: Check `timing_{lang}_batch.csv` for synchronization problems
-- **DNT violations**: Review `untranslated_{lang}_batch.csv` for terms that shouldn't be translated
 - **Reading speed**: Analyze `cps_{lang}_batch.csv` for subtitle pacing
-- **Coverage gaps**: Check `dnt_coverage_{lang}_batch.csv` for missing term preservation
+- **DNT coverage**: Check `dnt_coverage_{lang}_batch.csv` for term preservation
+- **Termbase coverage**: Check `tb_coverage_{lang}_batch.csv` for termbase usage
+- **Untranslated fragments**: Review `source_fragments_{lang}_batch.csv` for Latin script left in target
 
 ### 3. Batch-Level Analysis: JSON Files
 For programmatic analysis or integration:
@@ -576,21 +584,9 @@ If report compilation fails:
 ### Where In-Memory Data is Written to Output Directories
 
 1. **Translation Configuration** (`srt_translator/core/main.py:translate_srt_files()`):
-   ```python
-   # Writes in-memory TranslationConfig to artifacts/ai_config.json
-   ai_config_path = batch_root / "artifacts" / "ai_config.json"
-   with ai_config_path.open("w", encoding="utf-8") as f:
-       json.dump({
-           "version": "1.0",
-           "timestamp": datetime.now().isoformat(),
-           "source_files": [str(f) for f in config.files],
-           "target_languages": config.target_languages,
-           "dnt_terms": config.dnt_terms,
-           "termbase": config.termbase,
-           "batch_sizes": {lang: policy.get("target_batch_size") for lang, policy in config.language_policies.items()},
-           "aggressiveness": config.aggressiveness
-       }, f, indent=2)
-   ```
+   - Writes `artifacts/ai_config.json` with translation settings
+   - Also writes `artifacts/dnt.json` and `artifacts/termbase.json`
+   - See source for exact structure
 
 2. **Evaluation Results** (`srt_translator/eval/runner.py:run_batch_evaluation()`):
    ```python
