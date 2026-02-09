@@ -34,9 +34,9 @@ The evaluation subsystem provides post-translation quality analysis and reportin
 The evaluator reads **only** files on disk from the batch directory:
 
 **REQUIRED inputs:**
-- `batch_root/ai_config.json` - Schema-versioned configuration snapshot
+- `batch_root/artifacts/ai_config.json` - Schema-versioned configuration snapshot
 - `batch_root/originals/` - Source SRT files
-- `batch_root/targets/<lang>/` - Translated SRT files for each target language
+- `batch_root/<lang>/` - Translated SRT files for each target language (e.g., `batch_root/es/`, `batch_root/fr/`)
 
 **OPTIONAL inputs (inside ai_config.json):**
 - `dnt_terms` - Batch-wide "Do Not Translate" terms list
@@ -108,11 +108,12 @@ The evaluator **MUST NOT** import or depend on `TranslationConfig` objects. It r
 ## Security Considerations
 
 ### Configuration Isolation
-- No runtime environment variable access
-- All configuration frozen in batch artifacts
+- CLI reads API key from environment or .env file
+- GUI stores API key using OS-native secure storage (QSettings)
+- All translation configuration frozen in batch artifacts
 - No external API calls during evaluation
 
 ### Data Handling
-- SRT content processed in memory only
-- No persistent storage of sensitive content
-- Logs sanitized of personal information
+- SRT content processed in memory during translation
+- Translated files written to batch output directory
+- API key persisted locally (not included in batch artifacts)
