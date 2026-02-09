@@ -31,6 +31,9 @@ class TranslationSection(QGroupBox):
         # Cost estimation
         cost_layout = QHBoxLayout()
         cost_label = QLabel("Estimated Cost:")
+        cost_label.setToolTip(
+            "Estimated cost is approximate value."
+        )
         cost_label.setObjectName("costLabel")
         self.cost_estimate = QLabel("$0.00")
         self.cost_estimate.setObjectName("costEstimate")

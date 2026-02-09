@@ -106,6 +106,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.setup_ui()
         self.connect_signals()
         self.load_previous_settings()
+        self.update_cost_estimate()
         self.apply_styles()
 
         # Set up memory monitoring timer (paused by default; started on run)
@@ -828,12 +829,24 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.translation_section.cost_estimate.setVisible(True)
             return
 
-        # Simple cost estimation: $0.002 per 1K tokens
-        # Assume average of 1000 tokens per SRT file per language
-        total_files = len(selected_files)
+        total_bytes = 0
+
+        for f in selected_files:
+            try:
+                total_bytes += Path(f).stat().st_size
+            except Exception:
+                continue
+
+        estimated_tokens = total_bytes * 0.25
+
         total_languages = len(target_languages)
-        estimated_tokens = total_files * total_languages * 1000
-        estimated_cost = (estimated_tokens / 1000) * 0.002
+        estimated_tokens *= total_languages
+
+        OVERHEAD_FACTOR = 2.3
+        estimated_tokens *= OVERHEAD_FACTOR
+
+        PRICE_PER_1K = 0.00015
+        estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K
 
         # Add AI configuration cost if not already generated
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
