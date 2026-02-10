@@ -57,7 +57,7 @@ The app treats that JSON as authoritative. It does not attempt to fetch evidence
 
 A content creator following this design will perform the following high-level steps:
 
-1. Use the srt_translator to generate and download an initial `termbase.json` for the target language(s). This gives a baseline of the app’s suggested mappings.
+1. Use the srt_translator to generate and export an initial `termbase.json` for the target language(s). This gives a baseline of the app's suggested mappings.
 2. Collect supplemental bilingual content — for example, official company pages, translated slides, previous subtitles, or glossary documents. The Amazon Leadership Principles zh-Hans page is a strong example of an authoritative source.
 3. Run an external customization step with an AI agent. The customization step reviews the original `termbase.json` and the supplemental content, and produces a `termbase.patch.json` — a JSON file in the exact srt_translator schema that includes additions and suggested changes.
 4. Review the patch in a text editor. If you see a change you don't like, manually remove it from `termbase.patch.json`.
@@ -73,9 +73,9 @@ This flow keeps the srt_translator unchanged, minimizes technical demands on the
 
 Create a short list of URLs and files that contain authoritative original content and its official translations. For example, if a course references Amazon-specific concepts, gather the original-language Leadership Principles page and the official translated versions (for example, zh-Hans), along with relevant internal glossaries, translated slide decks, and any previously translated subtitles. Put these links and files in a single folder or a simple text manifest so they are easy to hand to an AI agent or a helper tool.
 
-### 2. Download the seed termbase from the srt_translator
+### 2. Export the seed termbase from the srt_translator
 
-Use the app’s “Download termbase” or export button to get the current `termbase.json`. This file is your working seed. If the app produces termbase snapshots per batch, download the snapshot that corresponds to the course you are translating.
+Use the app's **Export** button in the termbase editor to get the current `termbase.json`. This file is your working seed. If the app produces termbase snapshots per batch, export the snapshot that corresponds to the course you are translating.
 
 ### 3. Run an external customization step (patch-first workflow)
 

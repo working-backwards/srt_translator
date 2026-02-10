@@ -37,13 +37,14 @@ When you open the application, the main window guides you through these steps (i
 
 ## 1. Original Language SRT Files
 
-- First, choose a **folder** that contains your `.srt` files.
-- After selecting the folder, the app will show you all available SRT files.
-- You can:
-  - Select individual files
-  - Or click **Select All**
+- Click **Browse Files** to select your `.srt` files directly.
+- You can select multiple files at once using your system's file dialog.
+- After adding files, you can:
+  - Click individual files to select/deselect them
+  - Click **Select All** to select all loaded files
+  - Click **Clear All** to remove all files
 
-This ensures you’re working with the right source files before translation.
+This ensures you're working with the right source files before translation.
 
 ---
 

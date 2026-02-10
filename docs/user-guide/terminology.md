@@ -14,7 +14,6 @@ The SRT Translator uses an intelligent terminology system that combines **Do Not
 
 ### 📚 **AI-Generated Termbase**
 - **Script Validation**: Ensures translations use proper writing systems for each language
-- **Confidence Filtering**: Only accepts translations with confidence ≥0.90
 - **Identity Prevention**: Rejects translations that are identical to source terms
 - **Context-Aware**: Analyzes transcript content to identify key terminology
 
@@ -36,19 +35,23 @@ Transcript Analysis → AI Identifies Terms → Hard-Preserve Filtering → Fina
 
 ### 2. **Termbase Generation**
 ```
-Transcript Analysis → AI Extracts 30 Key Terms → Script Validation → Confidence Filtering → Final Termbase
+Transcript Analysis → AI Extracts Key Terms → Script Validation → Final Termbase
 ```
 
-**Termbase Entry Format:**
+**Termbase Format:**
 ```json
 {
-  "source": "machine learning",
-  "target": "机器学习",
-  "language": "zh-Hans",
-  "category": "technical",
-  "confidence": 0.95
+  "zh-Hans": {
+    "machine learning": "机器学习",
+    "cloud computing": "云计算"
+  },
+  "es": {
+    "machine learning": "aprendizaje automático"
+  }
 }
 ```
+
+The termbase uses a simple `{language: {source: target}}` structure.
 
 ### 3. **Script Validation**
 The system validates that translations use the correct writing system:
@@ -98,15 +101,17 @@ The system automatically detects script requirements from `languages.json`:
 
 ### CLI Usage
 ```bash
-# Generate terminology from transcript
-srtx-cli --generate-terminology input.srt
+# Run CLI with specific tone (casual, neutral, or formal)
+srtx-cli --tone formal
 
-# Translate with custom terminology
-srtx-cli --dnt-terms dnt.json --termbase termbase.json input.srt
+# Run with debug logging
+srtx-cli --debug
 
-# Translate with specific tone (casual, neutral, or formal)
-srtx-cli --tone formal input.srt
+# Run with report generation (html, md, both, or none)
+srtx-cli --report both
 ```
+
+Note: The CLI reads DNT terms and termbase from configuration files in the project directory. See the CLI documentation for configuration details.
 
 ### Programmatic Usage
 ```python
@@ -116,28 +121,26 @@ from srt_translator.core.translator.term_handler import TermHandler
 # Build effective DNT with precedence
 effective_dnt = build_effective_dnt(dnt_terms, termbase)
 
-# Create term handler
+# Create term handler for translation
 handler = TermHandler(dnt_terms, termbase, target_lang="es")
 effective_dnt = handler.get_effective_dnt()
-stats = handler.get_dnt_precedence_stats()
 ```
 
 ## Quality Metrics
 
-### DNT Preservation Rate
-- **Target**: ≥90% of DNT terms preserved
-- **Measurement**: Count of preserved terms / total DNT terms
-- **Hard-Preserve**: Always 100% preserved
+### DNT Preservation
+- **Hard-Preserve**: Always preserved (acronyms, tech codes)
+- **Soft-Preserve**: Preserved unless termbase provides translation
+- **Measurement**: Reported in evaluation artifacts
 
 ### Termbase Usage
-- **Accepted Translations**: High-confidence, script-valid translations
-- **Rejected Reasons**: Low confidence, script mismatch, identity
-- **Quality Score**: Percentage of accepted vs. total generated
+- **Script Validation**: Translations must use correct writing system
+- **Identity Filtering**: Identical source/target pairs are rejected
+- **Coverage**: Reported per-language in evaluation
 
-### Script Validation Success
-- **Target**: 100% script compliance
-- **Measurement**: Script-valid translations / total translations
-- **Fallback**: Latin languages have no script restrictions
+### Script Validation
+- **Non-Latin scripts**: Must contain appropriate Unicode blocks (CJK, Arabic, etc.)
+- **Latin scripts**: No restrictions (default behavior)
 
 ## Troubleshooting
 

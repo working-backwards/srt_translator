@@ -54,10 +54,10 @@ The report shows how many custom terms you have for each language:
 ## Reading Quality Reports
 
 ### What to Look For
-1. **Overall Score**: Higher is better
+1. **Decision Banner**: Shows pass (✅), review (⚠️), or fail (❌)
 2. **Coverage**: Make sure DNT and termbase coverage match your expectations
-3. **Issues**: Review any flagged problems
-4. **Language-specific**: Check performance for each target language
+3. **Issues**: Review any flagged problems in the punch list
+4. **Language-specific**: Check file status for each target language
 
 ### Common Issues and Solutions
 
@@ -137,7 +137,7 @@ The report shows how many custom terms you have for each language:
 
 ### Key Commands
 - **GUI**: Run `srtx` from command line
-- **CLI**: Run `srt-cli` with appropriate flags
+- **CLI**: Run `srtx-cli` with appropriate flags
 - **Evaluation**: Automatically runs after translation
 
 ### Success Indicators
