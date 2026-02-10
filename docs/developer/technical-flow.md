@@ -30,11 +30,11 @@ This page documents the **actual** end-to-end pipeline the app runs **today** us
             │
             ▼
   5) Post Checks (Fixer)
-     - Phantom placeholders, structure checks
+     - Placeholder restoration (__DNT_TERM_N__ → original terms)
             │
             ▼
   6) Artifacts + Output SRT
-     - Per-language artifacts, logs
+     - ai_config.json, dnt.json, termbase.json
      - Final SRT with original timings/subtitle count
 ```
 
@@ -109,16 +109,16 @@ The system preserves the model's translation output exactly as returned. CPS vio
 
 ## Post-Translation Checks
 
-- **Fixer** runs (phantom placeholders, structural sanity) — none found in this run.
-- **Artifacts** saved (per language): raw/parsed outputs, logs, the final SRT.
+- **Fixer** runs (placeholder restoration) — replaces `__DNT_TERM_N__` placeholders with original DNT terms.
+- **Artifacts** saved: `ai_config.json`, `dnt.json`, `termbase.json`, and the final SRT files.
 
 ---
 
 ## What to Watch in Logs
 
-- `JSON batch input:` — the JSON payload we send with subtitle items
-- `JSON batch raw output:` — the model's JSON response
-- `JSON batch parsed N items:` — count integrity (should match input count)
+- `Sending batch N/M to AI (lang=…):` — the batch payload sent to the model
+- `AI response for batch (lang=…, items=N):` — the model's response
+- `Parsed N items from AI response:` — count integrity (should match input count)
 - `CPS over cap (lang=…)` — warning when subtitle exceeds CPS limit
 - `=== Translation Summary ===` — totals + artifact paths
 
