@@ -10,16 +10,14 @@ translate_file()
 ├─ parse input SRT → List[Subtitle] (start, end, text)
 ├─ build sentence-aware batches (size ≈ 5–8 items)
 ├─ for each batch:
-│ ├─ _translate_batch_json(src_items, target_lang, termbase, batch_ids)
+│ ├─ _translate_with_simple_shape_lock(src_items, ...) → handles retries/splits
 │ ├─ restore DNT placeholders back into the model output
 │ ├─ guard: in-batch empty target → one-shot pair-retry with next cue
-│ ├─ if last item still empty → defer cross-batch pair-retry
-│ ├─ append batch outputs to global result
-│ └─ fulfill any deferred cross-batch pair-retry using head of next batch
+│ └─ append batch outputs to global result
 └─ render_srt(all target texts, original timings)
 
 
-**Important:** `_translate_batch_json()` may call a private salvage helper to coerce a *non-JSON* model response back into valid JSON. It must **not** change item counts; 1:1 parity with the batch is non-negotiable.
+**Important:** `_translate_with_simple_shape_lock()` wraps `_translate_batch_json()` and handles retries, splits, and backoff. It must **not** change item counts; 1:1 parity with the batch is non-negotiable.
 
 ---
 
@@ -36,39 +34,36 @@ translate_file()
 
 - Pre-translation: source cue text is passed through DNT placeholder application (`__DNT_TERM_n__`).
 - Post-translation: placeholders are restored back into the translated text.
-- Pair-retry (in-batch or cross-batch) always uses **placeholder-applied** source strings.
+- Pair-retry (in-batch) always uses **placeholder-applied** source strings.
 
 ---
 
 ## Batching & retries
 
-### In-batch pair-retry (existing)
-When cue `i` is empty and `i+1` exists **in the same batch**, make one retry with the pair `(i, i+1)`. If the first returned item is non-empty, fill `i`. Else:
-- **STRICT**: raise
-- **BOUNDED/DEV**: leave empty (evaluator flags it)
+The translator has two layers of resilience for empty or invalid translations:
 
-### Cross-batch pair-retry (new)
-The model sometimes under-runs on the **last item of a batch**. When the last item is empty:
-1) **Defer** a one-shot pair retry into a small structure `{ cue_index, source_text_with_placeholders, out_index }`.
-2) After translating the **next** batch, perform a two-item call with the deferred source and the **first** cue of the new batch. If non-empty, patch the output at `out_index`. Otherwise treat as above (STRICT → raise, BOUNDED/DEV → leave empty).
+1. **Shape-lock** (first line): Catches invalid JSON, shape mismatches, and empty translations. Splits batches and retries with backoff.
+2. **In-batch pair-retry** (fallback): If shape-lock exhausts its budget and an item is still empty, pairs it with the next cue for one more attempt.
 
-> We only keep **one** deferred slot at a time, resolved immediately on the next batch.
-
-### Iterative shape-lock with exponential backoff (new)
+### Iterative shape-lock with exponential backoff
 When JSON parsing or shape validation fails, the system uses a bounded, iterative approach instead of recursion:
 
 - **Maximum depth**: 3 split levels per segment
-- **Retry budget**: 2 retries per single-item segment
-- **Exponential backoff**: 250ms → 500ms → 1000ms (capped)
+- **Retry budget**: 2 retries per single-item segment (retry 0 and retry 1)
+- **Exponential backoff**: 250ms → 500ms
 - **Circuit breaker**: Stops after 8 consecutive failures per file/lang
 
 **Backoff progression:**
 - **Retry 0**: 250ms base delay
 - **Retry 1**: 500ms (2× base)
-- **Retry 2**: 1000ms (4× base, capped at maximum)
-- **Retry 3+**: Not allowed (segment marked as empty)
+- **Retry 2+**: Not allowed (segment marked as empty)
 
-The backoff gradually speeds up initially but then plateaus at 1 second maximum to prevent runaway delays. Each new segment gets a fresh retry budget, so backoff doesn't compound across the entire file.
+Each new segment gets a fresh retry budget, so backoff doesn't compound across the entire file.
+
+### In-batch pair-retry
+When cue `i` is empty after shape-lock and `i+1` exists **in the same batch**, make one retry with the pair `(i, i+1)`. If the first returned item is non-empty, fill `i`. Else:
+- **STRICT**: raise
+- **BOUNDED/DEV**: leave empty (evaluator flags it)
 
 ---
 
@@ -82,13 +77,12 @@ An empty line for the text is intentional and correct. It preserves structure, a
 
 ## Logging lexicon
 
-- `INFO Processing <n> subtitles in batch <k>/<K>`
-- `INFO Empty target at idx=<id>; attempting pair retry with next cue.`
-- `INFO Pair retry filled idx=<id> successfully.`
-- `WARNING Pair retry failed for idx=<id>: <err>`
-- `INFO Deferred cross-batch pair retry for end-of-batch empty at idx=<id>.`
-- `INFO Empty target at idx=<id>; attempting pair retry with next cue across batch boundary.`
-- `ERROR Empty translation for subtitle idx=<id>; leaving empty for evaluator.`
+- `INFO Processing <n> subtitles for <filename>`
+- `INFO Batch <k>/<K>: processing <n> subtitles (file=<filename> ids=[...])`
+- `DEBUG Empty target at idx=<id>; attempting pair retry with next cue.`
+- `DEBUG Pair retry filled idx=<id> successfully.`
+- `DEBUG Pair retry failed for idx=<id>: <err>`
+- `WARNING Empty translation for subtitle idx=<id>; leaving empty for evaluator.`
 
 **Shape-lock and backoff logs:**
 - `INFO Shape-lock failure (size=<n> depth=<d> retries=<r>): <error>`
@@ -103,6 +97,7 @@ These lines are intentionally specific so you can search logs and quickly spot w
 ## Troubleshooting checklist
 
 - **Missing translations spike?**
-  - Check for boundary empties (8th item of a batch). Look for `Deferred cross-batch pair retry…` followed by cross-batch logs.
+  - Check for shape-lock failures: look for `Shape-lock failure` or `Giving up on cue` logs.
+  - Check for in-batch retry failures: look for `Pair retry failed` logs.
 - **Cue count mismatch?**
-  - Should never happen post-fix. If it does, fail fast—do not attempt to invent or drop cues.
+  - Should never happen. If it does, fail fast—do not attempt to invent or drop cues.
