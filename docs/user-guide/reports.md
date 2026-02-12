@@ -10,7 +10,7 @@ After each translation, the evaluator runs automatically and writes artifacts to
 - **AI Config:** `artifacts/ai_config.json` (single source of truth). Contains DNT terms, termbase, and target languages.
 - **Unified Pipeline:** The evaluator orchestrates all report generation in one pass:
   1. **Evaluator** writes `eval_report.json` (raw evaluation data with issue details)
-  2. **Compiler** creates `report_v1.json` (single source of truth for presenters)
+  2. **Compiler** creates `report.json` (single source of truth for presenters)
   3. **Presenters** render `eval_report.md` and `eval_report.html` from compiled data only
 - **No Double Rendering:** GUI and CLI call the orchestrator; no direct presenter calls elsewhere.
 
@@ -19,7 +19,7 @@ After each translation, the evaluator runs automatically and writes artifacts to
 In the `artifacts/` directory:
 
 - `eval_report.json` — Raw evaluation data (internal format)
-- `report_v1.json` — Compiled report data (single source of truth for presenters)
+- `report.json` — Compiled report data (single source of truth for presenters)
 - `eval_report.md` — Creator-friendly Markdown report
 - `eval_report.html` — Interactive HTML report
 - `ai_config.json` — Configuration snapshot used for evaluation

@@ -18,7 +18,7 @@ For most workflows, this is all you need. The sections below explain how to dig 
 | Situation | What to check |
 |-----------|---------------|
 | Debugging a specific cue | Per-language CSVs in `artifacts/{lang}/` |
-| Programmatic access | `eval_report.json` (raw) or `report_v1.json` (structured) |
+| Programmatic access | `eval_report.json` (raw) or `report.json` (structured) |
 | Audit trail | `ai_config.json` for settings used |
 | Timing problems | `timing_{lang}_batch.csv` |
 | Untranslated fragments | `source_fragments_{lang}_batch.csv` |
@@ -66,8 +66,8 @@ translation-batch-{timestamp}/
     ├── ai_config.json              # Translation settings used
     ├── dnt.json                    # DNT terms snapshot
     ├── termbase.json               # Termbase snapshot
-    ├── eval_report.json            # Raw evaluation data (v2)
-    ├── report_v1.json              # Compiled report data
+    ├── eval_report.json            # Raw evaluation data
+    ├── report.json                 # Compiled report data
     ├── eval_report.md              # Markdown report
     ├── eval_report.html            # HTML report (primary output)
     └── {lang}/                     # Per-language analysis
@@ -98,8 +98,8 @@ translation-batch-{timestamp}/
 
 | File | Purpose |
 |------|---------|
-| `eval_report.json` | Raw evaluation data (v2 format). Machine-readable. |
-| `report_v1.json` | Compiled data with decision, punch list, file status. Used by presenters. |
+| `eval_report.json` | Raw evaluation data. Machine-readable. |
+| `report.json` | Compiled data with decision, punch list, file status. Used by presenters. |
 | `eval_report.md` | Markdown version of HTML report |
 
 ### Per-Language CSVs
@@ -131,7 +131,7 @@ For developers working on the evaluation pipeline.
 
 3. **Report Generation** (`eval/report.py:emit_all_reports`)
    - Writes `eval_report.json`
-   - Compiles `report_v1.json` via `report/compiler.py`
+   - Compiles `report.json` via `report/compiler.py`
    - Renders HTML and Markdown via presenters
 
 4. **GUI Integration** (`gui/workers/translation_worker.py`)
@@ -139,7 +139,7 @@ For developers working on the evaluation pipeline.
 
 ### Architecture
 
-- **File-based presenters**: HTML and Markdown presenters read from `report_v1.json`, not in-memory data
+- **File-based presenters**: HTML and Markdown presenters read from `report.json`, not in-memory data
 - **Strict schema validation**: Compiler validates eval_report.json structure before processing
 - **Fail-fast**: Missing or malformed files raise exceptions immediately
 
