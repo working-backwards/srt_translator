@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "totals": {
+    "files_total": 2,
+    "languages_total": 1,
+    "issues_total": 0
+  },
+  "per_language": {
+    "es": {
+      "files": {
+        "test1.srt": {
+          "issues_counts": {
+            "missing_translation": 0,
+            "timing_fail": 0,
+            "placeholder_mismatch": 0,
+            "parity_issue": 0
+          },
+          "issues_detail": {
+            "missing_translation": [],
+            "timing_fail": [],
+            "placeholder_mismatch": [],
+            "parity_issue": []
+          }
+        },
+        "test2.srt": {
+          "issues_counts": {
+            "missing_translation": 0,
+            "timing_fail": 0,
+            "placeholder_mismatch": 0,
+            "parity_issue": 0
+          },
+          "issues_detail": {
+            "missing_translation": [],
+            "timing_fail": [],
+            "placeholder_mismatch": [],
+            "parity_issue": []
+          }
+        }
+      }
+    }
+  }
+}

@@ -61,7 +61,7 @@ class TestOrchestratorPipeline:
         paths = emit_all_reports(artifacts_dir, rollup)
 
         # Verify all 4 paths are returned
-        expected_keys = {"eval_report_json", "report_v1_json", "eval_report_md", "eval_report_html"}
+        expected_keys = {"eval_report_json", "report_json", "eval_report_md", "eval_report_html"}
         assert set(paths.keys()) == expected_keys
 
         # Verify all paths exist
@@ -122,7 +122,7 @@ class TestOrchestratorPipeline:
 
                 # Verify the call was made with correct arguments
                 html_call_args = mock_html.call_args
-                assert html_call_args[0][0] == paths["report_v1_json"]  # report_v1_path
+                assert html_call_args[0][0] == paths["report_json"]  # report_path
                 assert html_call_args[0][1] == artifacts_dir / "eval_report.html"  # out_path
 
     def test_emit_all_reports_logs_single_generation(self, tmp_path, caplog):
@@ -217,8 +217,8 @@ class TestOrchestratorPipeline:
         with pytest.raises(ValueError, match="ai_config.json not found"):
             emit_all_reports(tmp_path, rollup)
 
-    def test_emit_all_reports_compiles_report_v1_correctly(self, tmp_path):
-        """Test that report_v1.json is compiled correctly by the orchestrator."""
+    def test_emit_all_reports_compiles_report_correctly(self, tmp_path):
+        """Test that report.json is compiled correctly by the orchestrator."""
         # Create mock rollup data with issues
         rollup = {
             "issues_total": 2,
@@ -296,39 +296,39 @@ class TestOrchestratorPipeline:
         # Run emit_all_reports
         paths = emit_all_reports(artifacts_dir, rollup)
 
-        # Load and verify report_v1.json
-        with open(paths["report_v1_json"], encoding="utf-8") as f:
-            report_v1 = json.load(f)
+        # Load and verify report.json
+        with open(paths["report_json"], encoding="utf-8") as f:
+            report = json.load(f)
 
         # Test structure (according to rulebook)
-        assert "decision" in report_v1
-        assert "one_liner" in report_v1
-        assert "kpis" in report_v1
-        assert "file_status" in report_v1
-        assert "punch_list" in report_v1
-        assert "lexicons" in report_v1
+        assert "decision" in report
+        assert "one_liner" in report
+        assert "kpis" in report
+        assert "file_status" in report
+        assert "punch_list" in report
+        assert "lexicons" in report
 
         # Test decision
-        assert report_v1["decision"] == "fail"
-        assert "errors that must be fixed" in report_v1["one_liner"]
+        assert report["decision"] == "fail"
+        assert "errors that must be fixed" in report["one_liner"]
 
         # Test KPIs
-        assert report_v1["kpis"]["files_total"] == 2
-        assert report_v1["kpis"]["languages_total"] == 1
-        assert report_v1["kpis"]["issues_total"] == 2
-        assert report_v1["kpis"]["by_type"]["missing_translation"] == 1
-        assert report_v1["kpis"]["by_type"]["timing_fail"] == 1
+        assert report["kpis"]["files_total"] == 2
+        assert report["kpis"]["languages_total"] == 1
+        assert report["kpis"]["issues_total"] == 2
+        assert report["kpis"]["by_type"]["missing_translation"] == 1
+        assert report["kpis"]["by_type"]["timing_fail"] == 1
 
         # Test file status
-        assert "ja" in report_v1["file_status"]
-        assert report_v1["file_status"]["ja"]["file1.srt"] == "review"
-        assert report_v1["file_status"]["ja"]["file2.srt"] == "blocked"
+        assert "ja" in report["file_status"]
+        assert report["file_status"]["ja"]["file1.srt"] == "review"
+        assert report["file_status"]["ja"]["file2.srt"] == "blocked"
 
         # Test punch_list
-        assert len(report_v1["punch_list"]["errors"]) == 1
-        assert len(report_v1["punch_list"]["warnings"]) == 1
+        assert len(report["punch_list"]["errors"]) == 1
+        assert len(report["punch_list"]["warnings"]) == 1
 
         # Test lexicons
-        assert report_v1["lexicons"]["dnt"]["count"] == 2
-        assert "ja" in report_v1["lexicons"]["termbase"]
-        assert report_v1["lexicons"]["termbase"]["ja"]["count"] == 2
+        assert report["lexicons"]["dnt"]["count"] == 2
+        assert "ja" in report["lexicons"]["termbase"]
+        assert report["lexicons"]["termbase"]["ja"]["count"] == 2

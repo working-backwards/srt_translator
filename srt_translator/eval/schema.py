@@ -21,7 +21,7 @@ TIMING = "timing_fail"
 REQUIRED_CATEGORIES = {MISSING, TIMING}
 
 
-def validate_eval_report_v1(obj: dict) -> None:
+def validate_eval_report(obj: dict) -> None:
     """Validate that obj matches EvalReportV1 schema.
 
     Raises ValueError with clear message on any violation.
@@ -36,9 +36,7 @@ def validate_eval_report_v1(obj: dict) -> None:
     }
     missing_top_keys = required_top_keys - set(obj.keys())
     if missing_top_keys:
-        raise ValueError(
-            f"eval_report.json missing required keys: {', '.join(sorted(missing_top_keys))}"
-        )
+        raise ValueError(f"eval_report.json missing required keys: {', '.join(sorted(missing_top_keys))}")
 
     # Validate top-level types
     if not isinstance(obj["files_total"], int):
@@ -58,9 +56,7 @@ def validate_eval_report_v1(obj: dict) -> None:
         if not isinstance(lang_code, str):
             raise ValueError(f"Language code must be string, got {type(lang_code).__name__}")
         if not isinstance(lang_data, dict):
-            raise ValueError(
-                f"Language data for '{lang_code}' must be dictionary, got {type(lang_data).__name__}"
-            )
+            raise ValueError(f"Language data for '{lang_code}' must be dictionary, got {type(lang_data).__name__}")
 
         # Check if lang_data has "files" key
         if "files" not in lang_data:
@@ -68,18 +64,14 @@ def validate_eval_report_v1(obj: dict) -> None:
 
         files = lang_data["files"]
         if not isinstance(files, dict):
-            raise ValueError(
-                f"Files data for language '{lang_code}' must be dictionary, got {type(files).__name__}"
-            )
+            raise ValueError(f"Files data for language '{lang_code}' must be dictionary, got {type(files).__name__}")
 
         # Validate each file's issue counts
         for file_path, file_data in files.items():
             if not isinstance(file_path, str):
                 raise ValueError(f"File path must be string, got {type(file_path).__name__}")
             if not isinstance(file_data, dict):
-                raise ValueError(
-                    f"File data for '{file_path}' must be dictionary, got {type(file_data).__name__}"
-                )
+                raise ValueError(f"File data for '{file_path}' must be dictionary, got {type(file_data).__name__}")
 
             # Check that all required categories exist and are integers
             missing_categories = REQUIRED_CATEGORIES - set(file_data.keys())

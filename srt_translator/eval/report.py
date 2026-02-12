@@ -83,7 +83,7 @@ def _write_json_report(batch_root: Path, rollup: dict[str, Any], logger) -> Path
 
     # Build the v2 report according to rulebook structure
     json_report = {
-        "version": "2.0.0",
+        "version": "1.0",
         "totals": {
             "files_total": files_total,
             "languages_total": languages_total,
@@ -103,7 +103,7 @@ def _write_json_report(batch_root: Path, rollup: dict[str, Any], logger) -> Path
             json.dump(json_report, f, ensure_ascii=False, indent=2)
 
         log.info(
-            "Wrote eval_report.json v2: files=%d, langs=%d, issues=%d",
+            "Wrote eval_report.json: files=%d, langs=%d, issues=%d",
             json_report["totals"]["files_total"],
             json_report["totals"]["languages_total"],
             json_report["totals"]["issues_total"],
@@ -111,7 +111,7 @@ def _write_json_report(batch_root: Path, rollup: dict[str, Any], logger) -> Path
         return json_path
 
     except Exception as e:
-        log.error("Failed to build v2 eval_report.json: %s", e)
+        log.error("Failed to build eval_report.json: %s", e)
         raise
 
 
@@ -132,7 +132,7 @@ def write_evaluator_json(artifacts_dir: Path, rollup: dict) -> Path:
 
 
 def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
-    """Orchestrator: write eval_report.json, compile report_v1.json, render MD/HTML."""
+    """Orchestrator: write eval_report.json, compile report.json, render MD/HTML."""
     logger = logging.getLogger(__name__)
 
     # Ensure artifacts directory exists
@@ -146,28 +146,28 @@ def emit_all_reports(artifacts_dir: Path, rollup: dict) -> dict[str, Path]:
     if not ai_config_path.exists():
         raise ValueError(f"ai_config.json not found in artifacts directory: {ai_config_path}")
 
-    # Step 3: Compile report_v1.json
+    # Step 3: Compile report.json
     from srt_translator.report import compile_report
 
-    report_v1_path = compile_report(artifacts_dir)
-    logger.info("Compiled report_v1.json: %s", report_v1_path)
+    report_path = compile_report(artifacts_dir)
+    logger.info("Compiled report.json: %s", report_path)
 
     # Step 4: Render markdown and HTML
     from srt_translator.presenters.eval_html.build import build_eval_html
     from srt_translator.presenters.eval_md.build import build_eval_md
 
-    md_path = build_eval_md(report_v1_path, artifacts_dir / "eval_report.md")
-    html_path = build_eval_html(report_v1_path, artifacts_dir / "eval_report.html")
+    md_path = build_eval_md(report_path, artifacts_dir / "eval_report.md")
+    html_path = build_eval_html(report_path, artifacts_dir / "eval_report.html")
 
     # Log all generated files
     logger.info("Wrote eval_report.json: %s", eval_json_path)
-    logger.info("Compiled report_v1.json: %s", report_v1_path)
+    logger.info("Compiled report.json: %s", report_path)
     logger.info("Wrote eval_report.md: %s", md_path)
     logger.info("Wrote eval_report.html: %s", html_path)
 
     return {
         "eval_report_json": eval_json_path,
-        "report_v1_json": report_v1_path,
+        "report_json": report_path,
         "eval_report_md": md_path,
         "eval_report_html": html_path,
     }

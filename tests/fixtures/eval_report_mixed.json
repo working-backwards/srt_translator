@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "totals": {
+    "files_total": 2,
+    "languages_total": 1,
+    "issues_total": 3
+  },
+  "per_language": {
+    "es": {
+      "files": {
+        "test1.srt": {
+          "issues_counts": {
+            "missing_translation": 1,
+            "timing_fail": 0,
+            "placeholder_mismatch": 0,
+            "parity_issue": 0
+          },
+          "issues_detail": {
+            "missing_translation": [
+              {
+                "cue_index": 1,
+                "source_text": "Hello world",
+                "target_text": "",
+                "context": {
+                  "source": {"prev2": "", "prev1": "", "cur": "Hello world", "next1": "", "next2": ""},
+                  "target": {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""}
+                }
+              }
+            ],
+            "timing_fail": [],
+            "placeholder_mismatch": [],
+            "parity_issue": []
+          }
+        },
+        "test2.srt": {
+          "issues_counts": {
+            "missing_translation": 1,
+            "timing_fail": 1,
+            "placeholder_mismatch": 0,
+            "parity_issue": 0
+          },
+          "issues_detail": {
+            "missing_translation": [
+              {
+                "cue_index": 3,
+                "source_text": "Goodbye world",
+                "target_text": "",
+                "context": {
+                  "source": {"prev2": "", "prev1": "", "cur": "Goodbye world", "next1": "", "next2": ""},
+                  "target": {"prev2": "", "prev1": "", "cur": "", "next1": "", "next2": ""}
+                }
+              }
+            ],
+            "timing_fail": [
+              {
+                "file_level": true,
+                "median_start_ms": 250,
+                "median_end_ms": 240,
+                "p95_start_ms": 550,
+                "p95_end_ms": 560
+              }
+            ],
+            "placeholder_mismatch": [],
+            "parity_issue": []
+          }
+        }
+      }
+    }
+  }
+}

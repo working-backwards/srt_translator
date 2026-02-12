@@ -18,9 +18,7 @@ def _validate_punch_list_context(punch_list: dict) -> None:
                 source_context = context.get("source", {})
                 target_context = context.get("target", {})
                 if not source_context.get("cur") and not target_context.get("cur"):
-                    log.warning(
-                        "Punch list item missing context.cur: %s", item.get("issue_type", "unknown")
-                    )
+                    log.warning("Punch list item missing context.cur: %s", item.get("issue_type", "unknown"))
 
 
 def _load(path: Path) -> dict:
@@ -33,11 +31,11 @@ def _load(path: Path) -> dict:
     return data
 
 
-def build_eval_md(report_v1_path: Path, out_path: Path | None = None) -> Path:
-    """Render Markdown report from compiled report_v1.json."""
-    data = _load(report_v1_path)
+def build_eval_md(report_path: Path, out_path: Path | None = None) -> Path:
+    """Render Markdown report from compiled report.json."""
+    data = _load(report_path)
     if out_path is None:
-        out_path = report_v1_path.with_name("eval_report.md")
+        out_path = report_path.with_name("eval_report.md")
 
     # Validate context structure in punch list items
     _validate_punch_list_context(data["punch_list"])
@@ -103,9 +101,7 @@ def build_eval_md(report_v1_path: Path, out_path: Path | None = None) -> Path:
         lines.append("## ⚠️ Warnings")
         if warnings:
             for warning in warnings:
-                lines.append(
-                    f"### {warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}"
-                )
+                lines.append(f"### {warning.get('file', 'Unknown')}: {warning.get('type', 'Warning')}")
                 lines.append(f"**Language:** {warning.get('language', 'Unknown')}")
                 if warning.get("cue_index") is not None:
                     lines.append(f"**Cue Index:** {warning.get('cue_index')}")

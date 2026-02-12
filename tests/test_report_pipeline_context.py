@@ -131,10 +131,10 @@ def test_standardized_issue_schema_validation():
 
 
 def test_compiler_passes_through_context():
-    """Test that compiler passes context through from eval_report.json to report_v1.json."""
+    """Test that compiler passes context through from eval_report.json to report.json."""
     # Create a minimal eval_report.json with context
     eval_data = {
-        "version": "2.0.0",
+        "version": "1.0",
         "timestamp": "2024-01-01T00:00:00Z",
         "totals": {"files_total": 1, "languages_total": 1, "issues_total": 1},
         "per_language": {
@@ -192,15 +192,15 @@ def test_compiler_passes_through_context():
         with open(ai_config_path, "w", encoding="utf-8") as f:
             json.dump(ai_config, f, indent=2)
 
-        # Compile to report_v1.json
-        report_v1_path = compile_report(artifacts_dir)
+        # Compile to report.json
+        report_path = compile_report(artifacts_dir)
 
         # Load and verify context was passed through
-        with open(report_v1_path, encoding="utf-8") as f:
-            report_v1 = json.load(f)
+        with open(report_path, encoding="utf-8") as f:
+            report = json.load(f)
 
         # Check that context is in the punch list
-        errors = report_v1["punch_list"]["errors"]
+        errors = report["punch_list"]["errors"]
         assert len(errors) == 1
 
         error = errors[0]

@@ -3,11 +3,11 @@
 from srt_translator.eval.schema import (
     MISSING,
     TIMING,
-    validate_eval_report_v1,
+    validate_eval_report,
 )
 
 
-def build_eval_report_v1(
+def build_eval_report(
     *,
     per_language_file_counts: dict[str, dict[str, dict[str, int]]],
     source_language: str | None,
@@ -75,6 +75,6 @@ def build_eval_report_v1(
     }
 
     # Validate before returning
-    validate_eval_report_v1(report)
+    validate_eval_report(report)
 
     return report

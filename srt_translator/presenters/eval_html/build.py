@@ -57,10 +57,10 @@ def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, 
     return data  # type: ignore[no-any-return]
 
 
-def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
-    """Generate HTML report from compiled report_v1.json.
+def build_eval_html(report_path: Path, out_path: Path | None = None) -> Path:
+    """Generate HTML report from compiled report.json.
 
-    Reads report_v1.json with strict validation.
+    Reads report.json with strict validation.
     Fails fast on missing/invalid inputs.
     """
     # Set up logging if available
@@ -68,34 +68,34 @@ def build_eval_html(report_v1_path: Path, out_path: Path | None = None) -> Path:
 
     # Default output path
     if out_path is None:
-        out_path = report_v1_path.with_suffix(".html")
+        out_path = report_path.with_suffix(".html")
 
     try:
         # Load CSS resource
         css_text = _load_eval_css()
 
-        # Load and validate report_v1.json with strict schema
+        # Load and validate report.json with strict schema
         report_data = _load_json_or_raise(
-            report_v1_path,
+            report_path,
             ["decision", "one_liner", "punch_list", "file_status", "kpis", "lexicons"],
         )
 
         # Validate required structure
         if not isinstance(report_data.get("decision"), str):
-            raise ValueError("report_v1.json decision must be a string")
+            raise ValueError("report.json decision must be a string")
         if not isinstance(report_data.get("one_liner"), str):
-            raise ValueError("report_v1.json one_liner must be a string")
+            raise ValueError("report.json one_liner must be a string")
         if not isinstance(report_data.get("punch_list"), dict):
-            raise ValueError("report_v1.json punch_list must be a dict")
+            raise ValueError("report.json punch_list must be a dict")
         if not isinstance(report_data.get("file_status"), dict):
-            raise ValueError("report_v1.json file_status must be a dict")
+            raise ValueError("report.json file_status must be a dict")
 
         # Validate context structure in punch list items
         _validate_punch_list_context(report_data["punch_list"])
         if not isinstance(report_data.get("kpis"), dict):
-            raise ValueError("report_v1.json kpis must be a dict")
+            raise ValueError("report.json kpis must be a dict")
         if not isinstance(report_data.get("lexicons"), dict):
-            raise ValueError("report_v1.json lexicons must be a dict")
+            raise ValueError("report.json lexicons must be a dict")
 
         # Extract data
         decision = report_data["decision"]

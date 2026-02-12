@@ -1,4 +1,4 @@
-"""Report compiler that creates report_v1.json from v2 eval_report.json and ai_config.json."""
+"""Report compiler that creates report.json from eval_report.json and ai_config.json."""
 
 import json
 import logging
@@ -8,13 +8,13 @@ from typing import Any
 
 def compile_report(artifacts_dir: Path) -> Path:
     """
-    Compile report_v1.json from v2 eval_report.json and ai_config.json.
+    Compile report.json from eval_report.json and ai_config.json.
 
     Args:
         artifacts_dir: Path to the artifacts directory containing eval_report.json and ai_config.json
 
     Returns:
-        Path to the generated report_v1.json
+        Path to the generated report.json
 
     Raises:
         ValueError: If required files are missing or malformed
@@ -44,9 +44,9 @@ def compile_report(artifacts_dir: Path) -> Path:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {ai_path}: {e}") from e
 
-    # Validate v2 format
-    if eval_data.get("version") != "2.0.0":
-        raise ValueError(f"Expected eval_report.json version 2.0.0, got: {eval_data.get('version')}")
+    # Validate format version
+    if eval_data.get("version") != "1.0":
+        raise ValueError(f"Expected eval_report.json version 1.0, got: {eval_data.get('version')}")
 
     required_eval_keys = {"totals", "per_language"}
     missing_keys = required_eval_keys - set(eval_data.keys())
@@ -130,7 +130,7 @@ def compile_report(artifacts_dir: Path) -> Path:
     punch_list = _extract_punch_list(eval_data)
 
     # Build the compiled report with exact schema
-    report_v1 = {
+    report = {
         "decision": decision_level,
         "one_liner": one_liner,
         "punch_list": {
@@ -148,14 +148,14 @@ def compile_report(artifacts_dir: Path) -> Path:
     }
 
     # Enforce invariants (fail fast)
-    _enforce_invariants(report_v1)
+    _enforce_invariants(report)
 
     # Write the compiled report
-    output_path = artifacts_dir / "report_v1.json"
+    output_path = artifacts_dir / "report.json"
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(report_v1, f, ensure_ascii=False, indent=2)
+        json.dump(report, f, ensure_ascii=False, indent=2)
 
-    logger.info("Compiled report_v1.json → %s", output_path)
+    logger.info("Compiled report.json: %s", output_path)
     return output_path
 
 
@@ -353,11 +353,11 @@ def _extract_lexicons(ai_data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _enforce_invariants(report_v1: dict[str, Any]) -> None:
+def _enforce_invariants(report: dict[str, Any]) -> None:
     """Enforce invariants and fail fast if violated."""
-    kpis = report_v1["kpis"]
-    punch_list = report_v1["punch_list"]
-    file_status = report_v1["file_status"]
+    kpis = report["kpis"]
+    punch_list = report["punch_list"]
+    file_status = report["file_status"]
 
     # Invariant 1: issues_total == sum of by_type counts
     by_type = kpis["by_type"]

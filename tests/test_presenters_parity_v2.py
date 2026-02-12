@@ -10,11 +10,11 @@ from srt_translator.presenters.eval_md.build import build_eval_md
 def test_presenters_parity_v2():
     """Test that HTML and Markdown presenters produce identical content."""
     # Use our golden fixture
-    report_v1_path = Path("tests/fixtures/report_v1_mixed.json")
+    report_path = Path("tests/fixtures/report_mixed.json")
 
     # Generate both reports
-    md_path = build_eval_md(report_v1_path)
-    html_path = build_eval_html(report_v1_path)
+    md_path = build_eval_md(report_path)
+    html_path = build_eval_html(report_path)
 
     # Read content
     md_content = md_path.read_text(encoding="utf-8")
