@@ -26,21 +26,24 @@ The SRT Translator includes advanced quality hardening features that automatical
 - Improved readability in target languages
 - Maintains important non-numeric DNT terms (brands, names, acronyms)
 
-### 2. DNT Precedence Enforcement
+### 2. DNT/Termbase Precedence
 
 **Problem**: Conflicts between DNT terms and termbase entries can cause inconsistent behavior.
 
-**Solution**: DNT terms always take priority over termbase entries.
+**Solution**: The system uses intelligent precedence based on term type:
+
+- **Hard-preserve terms** (acronyms, tech codes like "API", "GPU", "NASA") always remain untranslated
+- **Soft-preserve terms** can be overridden by termbase entries when a translation is specified
 
 **Example**:
-- **DNT term**: "S-Team" (should stay in English)
-- **Termbase entry**: "S-Team" → "Equipo S" (Spanish)
-- **Result**: "S-Team" stays untranslated, termbase entry is ignored
+- **Hard-preserve DNT term**: "API" → always stays "API" (termbase cannot override)
+- **Soft-preserve DNT term**: "machine learning" with termbase entry "机器学习" → uses termbase translation
+- **DNT-only term**: "S-Team" with no termbase entry → stays untranslated
 
 **Benefits**:
 - Consistent behavior across all languages
-- No confusion about which terms should be preserved
-- Clear hierarchy: DNT > Termbase > Default translation
+- Flexibility to translate domain terms while protecting technical codes
+- Clear hierarchy: Hard-preserve DNT > Termbase > Soft-preserve DNT > Default translation
 
 ### 3. Relevant Termbase Injection
 
@@ -62,7 +65,7 @@ The SRT Translator includes advanced quality hardening features that automatical
 
 **Problem**: Very large termbases can overwhelm the AI and reduce translation quality.
 
-**Solution**: Automatic capping at 50 terms per language, prioritizing shorter/more important terms.
+**Solution**: Automatic capping at 30 terms per language, prioritizing important terms.
 
 **Benefits**:
 - Consistent translation quality

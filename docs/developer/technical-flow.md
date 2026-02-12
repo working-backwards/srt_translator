@@ -24,19 +24,17 @@ This page documents the **actual** end-to-end pipeline the app runs **today** us
      - Strict ID matching ensures 1:1 subtitle mapping
             │
             ▼
-  4) Smart Subtitle Formatter (per subtitle)
-     - Word-boundary trimming with ellipsis
-     - Tiny-window exceptions (+20% for <1s subtitles)
-     - 2-line wrapping with orphan prevention
-     - CPS enforcement with overshoot policy
+  4) Subtitle Formatter (per subtitle)
+     - Space normalization
+     - CPS cap warning (warn-only, no trimming)
             │
             ▼
   5) Post Checks (Fixer)
-     - Phantom placeholders, structure checks
+     - Placeholder restoration (__DNT_TERM_N__ → original terms)
             │
             ▼
   6) Artifacts + Output SRT
-     - Per-language artifacts, logs
+     - ai_config.json, dnt.json, termbase.json
      - Final SRT with original timings/subtitle count
 ```
 
@@ -90,53 +88,47 @@ At this point, **translation quality is intact** and the 1:1 mapping is preserve
 
 ---
 
-## Smart Subtitle Formatter — How Text Is Formatted Per Subtitle
+## Subtitle Formatter — How Text Is Formatted Per Subtitle
 
-For each subtitle *i*, the smart formatter **applies intelligent formatting** to the translated text within the **original subtitle i's** timing window:
+For each subtitle *i*, the formatter applies minimal formatting to the translated text:
 
-- **CPS caps** from `languages.json` (per language):
-  - `cps_soft`: soft reading limit
-  - `cps_hard`: hard limit the subtitle should not exceed
-- **Overshoot tolerance**: a small cushion (≈ **+10%** over `cps_hard`) is allowed **before** trimming.
-- **Tiny-window exception**: For subtitles under 1 second, an additional **+20%** allowance is added to preserve important short phrases.
-- **Word-boundary trimming**: Never cuts mid-word; adds ellipsis "…" when trimming is required.
-- **Smart line wrapping**: Wraps long text to max 2 lines with language-specific orphan prevention.
+- **Space normalization**: Collapses multiple whitespace characters into single spaces
+- **CPS cap check**: Compares characters-per-second against the language's `cps_cap` from `languages.json`
+- **Warn-only policy**: If CPS exceeds the cap, a warning is logged but **no trimming or modification occurs**
 
-### Why the Smart Formatter Preserves Quality
-- **Subtitle 3**: Original duration 0.96 seconds (very short)
-- **Without tiny-window exception**: Would be trimmed to ~19 characters → "como su jefe de…"
-- **With tiny-window exception**: Gets +20% allowance → ~25 characters → "como su jefe de personal." ✅
-- **Result**: Complete meaningful phrase preserved instead of awkward mid-word cut
+The formatter intentionally does **not** perform:
+- Text trimming or truncation
+- Line wrapping or reflow
+- Any content modification beyond space normalization
 
-This is **working as designed**: we preserve important short phrases while maintaining readability and sync. The system intelligently balances timing constraints with content preservation.
+### Design Philosophy
+
+The system preserves the model's translation output exactly as returned. CPS violations are surfaced as warnings in logs and flagged by the evaluator, allowing human review rather than automated text mutation.
 
 ---
 
 ## Post-Translation Checks
 
-- **Fixer** runs (phantom placeholders, structural sanity) — none found in this run.
-- **Artifacts** saved (per language): raw/parsed outputs, logs, the final SRT.
+- **Fixer** runs (placeholder restoration) — replaces `__DNT_TERM_N__` placeholders with original DNT terms.
+- **Artifacts** saved: `ai_config.json`, `dnt.json`, `termbase.json`, and the final SRT files.
 
 ---
 
 ## What to Watch in Logs
 
-- `JSON batch input:` — the JSON payload we send with subtitle items
-- `JSON batch raw output:` — the model's JSON response
-- `JSON batch parsed N items:` — count integrity (should match input count)
-- `Subtitle trim (lang=…)` — smart trimming occurred with tiny-window exception info
+- `Sending batch N/M to AI (lang=…):` — the batch payload sent to the model
+- `AI response for batch (lang=…, items=N):` — the model's response
+- `Parsed N items from AI response:` — count integrity (should match input count)
+- `CPS over cap (lang=…)` — warning when subtitle exceeds CPS limit
 - `=== Translation Summary ===` — totals + artifact paths
 
 ---
 
 ## Notes on Design Trade-offs
 
-- If a translated line is **too long** for its time window, the smart formatter **trims on word boundaries** rather than stretching timing or changing counts. This preserves sync and readability while avoiding mid-word cuts.
-- **Tiny-window exception**: Short subtitles (under 1 second) get extra allowance to preserve meaningful phrases.
-- In Spanish intros, a **leading speaker label** can push otherwise fine lines over the cap. The system intelligently handles this with:
-  - Smart word-boundary trimming with ellipsis
-  - Tiny-window exceptions for very short subtitles
-  - 2-line wrapping when beneficial
+- If a translated line is **too long** for its time window, the formatter **logs a warning** but does not modify the text. This preserves the model's output exactly while surfacing issues for human review.
+- The evaluator flags CPS violations in the evaluation report, allowing creators to manually adjust problematic subtitles if needed.
+- This warn-only approach prioritizes translation accuracy over automated text mutation.
 
 ---
 
@@ -144,6 +136,5 @@ This is **working as designed**: we preserve important short phrases while maint
 
 - **Subtitle**: One timed on-screen text block (start → end).
 - **Subtitle-based processing**: Translation system that processes each subtitle individually while maintaining exact timing alignment.
-- **Smart formatting**: Intelligent text formatting with word-boundary trimming, line wrapping, and tiny-window exceptions.
 - **CPS**: Characters per second; a simple proxy for readability within a duration.
-- **Tiny-window exception**: Additional CPS allowance (+20%) for subtitles under 1 second to preserve important short phrases.
+- **CPS cap**: Per-language character-per-second limit defined in `languages.json`.

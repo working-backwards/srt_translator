@@ -6,7 +6,7 @@
 - Download the latest macOS/Windows build (coming soon), then launch the app.
 
 ## 2) Add your source `.srt` files
-- Click **Add files** and choose the subtitle files in the **original language**.
+- Click **Browse Files** and choose the subtitle files in the **original language**.
 
 ## 3) Create AI Config (required for creators)
 - Click **Generate Translation Settings**.
@@ -17,7 +17,7 @@
 - If you later add/change files or languages, click **Regenerate**.
 
 ## 4) Choose target languages
-- Select target languages in **Languages**.
+- Select target languages in **Target Languages**.
 
 ## 5) (Optional) Choose Tone
 - Select your preferred translation tone: **Casual**, **Neutral (recommended)**, or **Formal**.
@@ -30,10 +30,10 @@
 
 ## 7) Evaluate & Report
 - The app writes both **`eval_report.html`** and **`eval_report.md`** with the same guidance:
-  - A **Ready / Review / Fix** banner
+  - A **decision banner** (✅ pass, ⚠️ review, or ❌ fail)
   - **What to do next** checklist
-  - **KPIs** (files, languages, issues, warnings, source language, DNT/Termbase coverage)
+  - **KPIs** (files, languages, issues)
 
 ## 8) Fix (if needed) & Publish
-- If the report says **✅ Ready**, you're done—publish.
-- If **⚠️ Review** or **❌ Fix**, follow the "What to do next" steps at the top of the report.
+- If the report says **✅ pass**, you're done—publish.
+- If **⚠️ review** or **❌ fail**, follow the "What to do next" steps at the top of the report.

@@ -172,6 +172,7 @@ Examples:
             logger.info("No .srt files found in %s", input_dir)
             return 0
         logger.info("Found %s .srt files to translate", len(files))
+
         cfg_with_files = api_cfg.__class__(**{**api_cfg.__dict__, "files": files})
         # Run translation and get results including batch directory
         results = Translator(cfg_with_files).run()

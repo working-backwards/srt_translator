@@ -3,9 +3,8 @@
 
 ## Required Status Checks
 - **Stage 0 Guardrails** must pass before merging
-  - Runs Stage 0 tests (prompt snapshots + parity)
-  - Checks for prompt string changes in translator.py
-  - Blocks merge if either fails
+  - Runs prompt snapshot tests
+  - Blocks merge if tests fail
 
 ## What This Protects Against
 1. **Accidental prompt modifications** that could change AI behavior
@@ -21,10 +20,5 @@
 ## Local Testing
 Before pushing, run locally to ensure CI will pass:
 ```bash
-# Run Stage 0 tests
 pytest tests/test_prompts_snapshot.py -q
-pytest tests/test_parity_io.py -q
-
-# Check for prompt changes (if you have the base commit)
-git diff --exit-code -w -- srt_translator/core/translator/translator.py <base-commit>
 ```

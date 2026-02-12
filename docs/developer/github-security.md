@@ -2,23 +2,41 @@
 
 This guide walks you through setting up comprehensive security features for your SRT Translator repository using GitHub's built-in security tools.
 
-## 🎯 What We're Setting Up
+## Quick Reference
+
+| Feature | Purpose | Frequency | Location |
+|---------|---------|-----------|----------|
+| **CodeQL** | Security vulnerability detection | Every push/PR | Security tab |
+| **Dependabot** | Dependency vulnerability monitoring | Weekly (Monday 9 AM) | Security tab |
+| **Security Workflows** | Automated security checks | Every push/PR | Actions tab |
+| **Security Policy** | Vulnerability reporting guidelines | Always | Security tab |
+
+### Key Configuration Files
+
+- `.github/workflows/codeql-analysis.yml` - CodeQL scanning
+- `.github/workflows/security-and-quality.yml` - Security pipeline
+- `.github/dependabot.yml` - Dependency updates
+- `.github/SECURITY.md` - Security policy
+
+---
+
+## What We're Setting Up
 
 1. **GitHub Code Scanning (CodeQL)** - Automated security vulnerability detection
 2. **GitHub Dependabot** - Automatic dependency vulnerability monitoring
 3. **Security and Quality Workflows** - Comprehensive CI/CD security pipeline
 4. **Security Policy** - Clear vulnerability reporting guidelines
 
-## 🌿 Branch Strategy
+## Branch Strategy
 
 **Use the `develop` branch for these security enhancements:**
 
-- ✅ **develop** - Active development, security improvements, testing
-- 🔒 **main** - Stable, production-ready code (keep clean)
+- **develop** - Active development, security improvements, testing
+- **main** - Stable, production-ready code (keep clean)
 
 This follows Git Flow and gives you a safety net while implementing security features.
 
-## 🚀 Step-by-Step Setup
+## Step-by-Step Setup
 
 ### 1. Push Your Changes to GitHub
 
@@ -31,7 +49,6 @@ git checkout develop
 # Add the new security files
 git add .github/
 git add pyproject.toml
-git add GITHUB_SECURITY_SETUP.md
 
 # Commit with a descriptive message
 git commit -m "feat: Add comprehensive GitHub security features
@@ -48,12 +65,12 @@ git push origin develop
 
 ### 2. Enable GitHub Code Scanning
 
-1. **Go to your repository on GitHub**
-2. **Click the "Security" tab**
-3. **Click "Set up code scanning"**
-4. **Choose "CodeQL Analysis"**
-5. **Select "Default" setup**
-6. **Click "Enable CodeQL"**
+1. Go to your repository on GitHub
+2. Click the "Security" tab
+3. Click "Set up code scanning"
+4. Choose "CodeQL Analysis"
+5. Select "Default" setup
+6. Click "Enable CodeQL"
 
 GitHub will automatically:
 - Create the workflow file (we already have it)
@@ -62,11 +79,11 @@ GitHub will automatically:
 
 ### 3. Enable GitHub Dependabot
 
-1. **Go to your repository on GitHub**
-2. **Click the "Security" tab**
-3. **Click "Dependabot" in the left sidebar**
-4. **Click "Enable Dependabot"**
-5. **Configure alerts** (optional but recommended)
+1. Go to your repository on GitHub
+2. Click the "Security" tab
+3. Click "Dependabot" in the left sidebar
+4. Click "Enable Dependabot"
+5. Configure alerts (optional but recommended)
 
 ### 4. Review and Customize
 
@@ -84,7 +101,7 @@ The workflow will automatically:
 - **Automatic PR creation** for vulnerable packages
 - **Grouped updates** to reduce PR noise
 
-## 🔍 What You'll See
+## What You'll See
 
 ### Security Tab
 - **Code scanning alerts** from CodeQL
@@ -101,7 +118,7 @@ The workflow will automatically:
 - **Dependency update PRs** from Dependabot
 - **Blocking** of PRs with security issues (configurable)
 
-## 🛡️ Security Features in Action
+## Security Features in Action
 
 ### Automated Scanning
 - **Every commit** triggers security analysis
@@ -120,11 +137,12 @@ The workflow will automatically:
 - **Type checking** with MyPy
 - **Security linting** with Bandit
 
-## 📊 Monitoring and Maintenance
+## Monitoring and Maintenance
 
-### Daily
-- Check GitHub Security tab for new alerts
-- Review any failed workflow runs
+### Daily Checklist
+- [ ] Check GitHub Security tab for new alerts
+- [ ] Review any failed workflow runs
+- [ ] Check Dependabot for new PRs
 
 ### Weekly
 - Review Dependabot PRs
@@ -136,28 +154,37 @@ The workflow will automatically:
 - Update security tools and configurations
 - Analyze security metrics and trends
 
-## 🚨 Responding to Security Issues
+## Responding to Security Issues
 
 ### CodeQL Alerts
-1. **Review the alert** in the Security tab
-2. **Understand the vulnerability** and its impact
-3. **Fix the issue** in your code
-4. **Test the fix** thoroughly
-5. **Push the fix** to trigger a new scan
+1. Review the alert in the Security tab
+2. Understand the vulnerability and its impact
+3. Fix the issue in your code
+4. Test the fix thoroughly
+5. Push the fix to trigger a new scan
 
 ### Dependabot Alerts
-1. **Review the vulnerability** details
-2. **Test the update** in your environment
-3. **Merge the PR** if tests pass
-4. **Monitor** for any issues after deployment
+1. Review the vulnerability details
+2. Test the update in your environment
+3. Merge the PR if tests pass
+4. Monitor for any issues after deployment
 
 ### Security Policy Violations
-1. **Follow the reporting process** in SECURITY.md
-2. **Investigate** the reported issue
-3. **Develop and test** a fix
-4. **Deploy the fix** following security best practices
+1. Follow the reporting process in `.github/SECURITY.md`
+2. Investigate the reported issue
+3. Develop and test a fix
+4. Deploy the fix following security best practices
 
-## 🔧 Customization Options
+### Emergency Response
+
+If a security vulnerability is found:
+1. **DO NOT** create a public issue
+2. **Email** security details privately
+3. **Fix** in develop branch
+4. **Test** thoroughly
+5. **Merge** to main after verification
+
+## Customization Options
 
 ### CodeQL Queries
 You can customize security rules by:
@@ -179,7 +206,7 @@ Modify when workflows run:
 - Add manual triggers
 - Configure path filters
 
-## 📈 Benefits You'll See
+## Benefits
 
 ### Immediate
 - **Security visibility** across your codebase
@@ -197,7 +224,7 @@ Modify when workflows run:
 - **Improved development workflow**
 - **Better dependency management**
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -221,23 +248,9 @@ Modify when workflows run:
 - **Dependabot Docs**: [Dependabot](https://docs.github.com/en/code-security/dependabot)
 - **GitHub Support**: Available for GitHub Pro/Team accounts
 
-## 🎉 Next Steps
-
-After setting up these security features:
-
-1. **Monitor** the first few scans and updates
-2. **Customize** configurations based on your needs
-3. **Train** your team on security best practices
-4. **Integrate** security into your development workflow
-5. **Expand** to additional security tools as needed
-
-## 🔗 Additional Resources
+## Additional Resources
 
 - [GitHub Security Best Practices](https://docs.github.com/en/github/getting-started-with-github/learning-about-github/github-security)
 - [Python Security Tools](https://python-security.readthedocs.io/)
 - [OWASP Security Guidelines](https://owasp.org/)
 - [GitHub Advanced Security](https://github.com/features/security)
-
----
-
-**Remember**: Security is an ongoing process, not a one-time setup. Regular monitoring and updates are key to maintaining a secure codebase! 🛡️

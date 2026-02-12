@@ -6,8 +6,8 @@ After each translation, the evaluator runs automatically and writes artifacts to
 
 ## Configuration and Pipeline
 
-- **Rubric:** `config/translation_rubric.yaml` (project-level). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
-- **AI Config:** `_artifacts/ai_config.json` (single source of truth). Contains DNT terms, termbase, and target languages.
+- **Rubric:** `srt_translator/config/translation_rubric.yaml` (packaged with the app). This defines thresholds and reporting behavior. It is **not** overridden at runtime.
+- **AI Config:** `artifacts/ai_config.json` (single source of truth). Contains DNT terms, termbase, and target languages.
 - **Unified Pipeline:** The evaluator orchestrates all report generation in one pass:
   1. **Evaluator** writes `eval_report.json` (raw evaluation data with issue details)
   2. **Compiler** creates `report_v1.json` (single source of truth for presenters)
@@ -16,7 +16,7 @@ After each translation, the evaluator runs automatically and writes artifacts to
 
 ## What the evaluator writes
 
-In the `_artifacts/` directory:
+In the `artifacts/` directory:
 
 - `eval_report.json` — Raw evaluation data (internal format)
 - `report_v1.json` — Compiled report data (single source of truth for presenters)
@@ -24,26 +24,28 @@ In the `_artifacts/` directory:
 - `eval_report.html` — Interactive HTML report
 - `ai_config.json` — Configuration snapshot used for evaluation
 
-In `_artifacts/<lang>/` directories:
+In `artifacts/<lang>/` directories:
 - Per-language CSVs and summaries (DNT coverage, termbase coverage, untranslated after DNT, optional fragments)
 - **Fragments CSV** is only written when non-empty and the rubric's fragments policy applies (e.g., non-Latin scripts under `auto_non_latin`)
 
 ## Re-running evaluation
 
-After translation is complete, you can re-run the evaluator to regenerate artifacts:
+Evaluation runs automatically after translation completes. The artifacts are written to the `artifacts/` directory within your batch folder.
+
+If you need to regenerate reports, you can use the CLI:
 
 ```bash
-# From within the batch directory
-st-eval
+# Run CLI with report generation
+srtx-cli --report both
 
-# From anywhere, specifying the batch path
-st-eval --batch-root "path/to/translation-batch-YYYYMMDD_HHMMSS"
+# Generate HTML report only
+srtx-cli --report html
 
-# With verbose logging
-st-eval -v
+# Generate Markdown report only
+srtx-cli --report md
 ```
 
-This rewrites only the evaluation artifacts (CSV/JSON/MD under `artifacts/…`) and leaves your translated SRT files untouched.
+This rewrites only the evaluation artifacts (CSV/JSON/MD under `artifacts/`) and leaves your translated SRT files untouched.
 
 ## Reporting behavior
 
