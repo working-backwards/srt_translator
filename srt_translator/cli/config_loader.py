@@ -13,6 +13,8 @@ from typing import Any
 from dotenv import dotenv_values, find_dotenv
 
 from srt_translator.config import load_language_catalog
+from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.gui.utils.termbase_merger import normalize_termbase_keys
 
 DEFAULT_LANGS = {
     "Spanish": "es",
@@ -102,6 +104,9 @@ def collect_cli_raw() -> dict[str, Any]:
         try:
             with open(termbase_path, encoding="utf-8") as f:
                 termbase_data = json.load(f)
+            # Normalize language-name keys to codes
+            lang_config = LanguageConfig(load_language_catalog())
+            termbase_data = normalize_termbase_keys(termbase_data, lang_config)
         except Exception as e:
             # Log warning but continue with empty termbase
             print(f"Warning: Failed to load termbase from {termbase_path}: {e}")

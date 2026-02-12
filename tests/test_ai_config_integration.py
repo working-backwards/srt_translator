@@ -31,32 +31,30 @@ def test_settings_manager():
     # Test saving and loading AI config
     test_terms = ["API", "CEO", "CFO", "Amazon"]
     test_termbase = {
-        "Spanish": {"API": "API", "CEO": "CEO", "CFO": "CFO"},
-        "French": {"API": "API", "CEO": "PDG", "CFO": "DF"},
+        "es": {"API": "API", "CEO": "CEO", "CFO": "CFO"},
+        "fr": {"API": "API", "CEO": "PDG", "CFO": "DF"},
     }
 
     # Save AI config
     settings_manager.save_ai_config(test_terms, test_termbase)
-    logger.info(f"✓ Saved AI config: {len(test_terms)} terms, {len(test_termbase)} languages")
+    logger.info("Saved AI config: %s terms, %s languages", len(test_terms), len(test_termbase))
 
     # Load AI config (returns 3 values)
     loaded_terms, loaded_termbase, loaded_source_lang = settings_manager.load_ai_config()
-    logger.info(f"✓ Loaded AI config: {len(loaded_terms)} terms, {len(loaded_termbase)} languages")
+    logger.info("Loaded AI config: %s terms, %s languages", len(loaded_terms), len(loaded_termbase))
 
     # Verify data integrity
     assert loaded_terms == test_terms, f"Terms mismatch: {loaded_terms} != {test_terms}"
-    assert loaded_termbase == test_termbase, (
-        f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
-    )
-    logger.info("✓ Data integrity verified")
+    assert loaded_termbase == test_termbase, f"Termbase mismatch: {loaded_termbase} != {test_termbase}"
+    logger.info("Data integrity verified")
 
     # Test freshness check
     has_recent = settings_manager.has_recent_ai_config(max_age_days=30)
-    logger.info(f"✓ Has recent config: {has_recent}")
+    logger.info("Has recent config: %s", has_recent)
 
     # Test config age
     age_days = settings_manager.get_ai_config_age_days()
-    logger.info(f"✓ Config age: {age_days} days")
+    logger.info("Config age: %s days", age_days)
 
     logger.info("SettingsManager tests passed!\n")
 
@@ -72,23 +70,23 @@ def test_config_manager():
 
     # Test getting DNT terms (should prioritize AI config)
     dnt_terms = config_manager.get_dnt_terms()
-    logger.info(f"✓ DNT terms: {dnt_terms}")
+    logger.info("DNT terms: %s", dnt_terms)
 
     # Test getting termbase
-    spanish_termbase = config_manager.get_termbase("Spanish")
-    logger.info(f"✓ Spanish termbase: {spanish_termbase}")
+    spanish_termbase = config_manager.get_termbase("es")
+    logger.info("Spanish termbase: %s", spanish_termbase)
 
     # Test getting all termbases
     all_termbases = config_manager.get_all_termbases()
-    logger.info(f"✓ All termbases: {len(all_termbases)} languages")
+    logger.info("All termbases: %s languages", len(all_termbases))
 
     # Test config source info
     source_info = config_manager.get_config_source_info()
-    logger.info(f"✓ Config source: {source_info}")
+    logger.info("Config source: %s", source_info)
 
     # Test config summary
     summary = config_manager.get_config_summary()
-    logger.info(f"✓ Config summary: {summary}")
+    logger.info("Config summary: %s", summary)
 
     logger.info("GUIConfigManager tests passed!\n")
 
@@ -102,13 +100,13 @@ def test_ai_config_generator():
     try:
         # Test instantiation (without API key)
         generator = AIConfigGenerator("test-key")
-        logger.info("✓ AIConfigGenerator instantiated successfully")
+        logger.info("AIConfigGenerator instantiated successfully")
 
         # Test supported languages
-        logger.info(f"✓ Supported languages: {len(generator.get_supported_languages())}")
+        logger.info("Supported languages: %s", len(generator.get_supported_languages()))
 
     except Exception as e:
-        logger.info(f"⚠ AIConfigGenerator test skipped: {e}")
+        logger.info("AIConfigGenerator test skipped: %s", e)
 
     logger.info("AIConfigGenerator tests completed!\n")
 
@@ -126,11 +124,11 @@ def main():
         test_ai_config_generator()
 
         logger.info("=" * 50)
-        logger.info("All tests passed! ✅")
+        logger.info("All tests passed!")
         logger.info("=" * 50)
 
     except Exception as e:
-        logger.error(f"❌ Test failed: {e}")
+        logger.error("Test failed: %s", e)
 
         traceback.print_exc()
         return 1

@@ -3,25 +3,29 @@
 Utility functions for merging user-provided termbase and DNT terms with AI-generated ones.
 """
 
+from __future__ import annotations
+
 import json
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from srt_translator.core.config.language_config import LanguageConfig
 
 
-def merge_dnt_terms(
-    ai_generated: list[str], user_provided: list[str] | None = None
-) -> list[str]:
+def merge_dnt_terms(ai_generated: list[str], user_provided: list[str] | None = None) -> list[str]:
     """
     Merge AI-generated DNT terms with user-provided DNT terms.
-    
+
     Strategy:
     - User-provided terms take precedence (added first)
     - AI-generated terms are added if not already present (case-insensitive)
     - Returns sorted, deduplicated list
-    
+
     Args:
         ai_generated: List of AI-generated DNT terms
         user_provided: Optional list of user-provided DNT terms
-        
+
     Returns:
         Merged and deduplicated list of DNT terms
     """
@@ -31,11 +35,11 @@ def merge_dnt_terms(
 
     if not user_provided:
         return sorted(set(ai_generated), key=str.lower)
-    
+
     # Start with user-provided terms (they take precedence)
     merged = []
     seen_lower = set()
-    
+
     # Add user-provided terms first
     for term in user_provided:
         if term and term.strip():
@@ -44,7 +48,7 @@ def merge_dnt_terms(
             if term_lower not in seen_lower:
                 merged.append(term_clean)
                 seen_lower.add(term_lower)
-    
+
     # Add AI-generated terms that aren't duplicates
     for term in ai_generated:
         if term and term.strip():
@@ -53,7 +57,7 @@ def merge_dnt_terms(
             if term_lower not in seen_lower:
                 merged.append(term_clean)
                 seen_lower.add(term_lower)
-    
+
     return sorted(merged, key=str.lower)
 
 
@@ -63,16 +67,16 @@ def merge_termbase(
 ) -> dict[str, dict[str, str]]:
     """
     Merge AI-generated termbase with user-provided termbase.
-    
+
     Strategy:
     - For each language, user-provided entries take precedence
     - AI-generated entries are added if the source term doesn't exist in user termbase
     - User-provided translations override AI-generated ones for the same source term
-    
+
     Args:
         ai_generated: AI-generated termbase {lang_code: {source_term: translation}}
         user_provided: Optional user-provided termbase {lang_code: {source_term: translation}}
-        
+
     Returns:
         Merged termbase dictionary
     """
@@ -84,17 +88,17 @@ def merge_termbase(
         return ai_generated.copy()
 
     merged = {}
-    
+
     # Get all unique language codes from both sources
     all_languages = set(ai_generated.keys()) | set(user_provided.keys())
-    
+
     for lang_code in all_languages:
         user_tb = user_provided.get(lang_code, {})
         ai_tb = ai_generated.get(lang_code, {})
-        
+
         # Start with user-provided entries (they take precedence)
         merged_tb = user_tb.copy()
-        
+
         # Add AI-generated entries that don't conflict
         for source_term, translation in ai_tb.items():
             if source_term and translation:
@@ -102,32 +106,71 @@ def merge_termbase(
                 # User-provided takes precedence, so only add if not present
                 if source_clean not in merged_tb:
                     merged_tb[source_clean] = translation.strip()
-        
+
         if merged_tb:
             merged[lang_code] = merged_tb
-    
+
     return merged
 
-def load_termbase_from_file(file_path: str, logger: logging.Logger | None = None) -> dict[str, dict[str, str]]:
+
+def normalize_termbase_keys(
+    termbase: dict[str, dict[str, str]],
+    language_config: LanguageConfig,
+) -> dict[str, dict[str, str]]:
+    """Normalize termbase outer keys from language names to codes.
+
+    Keys that are already valid codes are kept as-is.  Keys that match a known
+    language name are remapped to the corresponding code (merging entries when
+    the code already exists).  Unknown keys pass through unchanged.
     """
-        Load termbase from a JSON file.
+    log = logging.getLogger(__name__)
+    # {name: code} lookup
+    name_to_code = language_config.get_target_languages_dict()
 
-        Expected format:
-        {
-          "lang_code": {
-            "source_term": "translation",
-            ...
-          },
-          ...
-        }
+    normalized: dict[str, dict[str, str]] = {}
+    for key, entries in termbase.items():
+        if language_config.validate_language_code(key):
+            resolved = key
+        elif key in name_to_code:
+            resolved = name_to_code[key]
+            log.debug("Termbase key normalized: %r -> %r", key, resolved)
+        else:
+            resolved = key  # unknown, pass through
 
-        Args:
-            file_path: Path to termbase JSON file
-            logger: Optional logger for error reporting
+        if resolved in normalized:
+            # Merge: existing entries take precedence (first-seen wins)
+            for term, translation in entries.items():
+                normalized[resolved].setdefault(term, translation)
+        else:
+            normalized[resolved] = dict(entries)
 
-        Returns:
-            Termbase dictionary, or empty dict if loading fails
-        """
+    return normalized
+
+
+def load_termbase_from_file(
+    file_path: str,
+    logger: logging.Logger | None = None,
+    language_config: LanguageConfig | None = None,
+) -> dict[str, dict[str, str]]:
+    """
+    Load termbase from a JSON file.
+
+    Expected format:
+    {
+      "lang_code": {
+        "source_term": "translation",
+        ...
+      },
+      ...
+    }
+
+    Args:
+        file_path: Path to termbase JSON file
+        logger: Optional logger for error reporting
+
+    Returns:
+        Termbase dictionary, or empty dict if loading fails
+    """
     log = logger or logging.getLogger(__name__)
 
     try:
@@ -158,6 +201,9 @@ def load_termbase_from_file(file_path: str, logger: logging.Logger | None = None
         if not validated:
             raise ValueError("Termbase is empty")
 
+        if language_config is not None:
+            validated = normalize_termbase_keys(validated, language_config)
+
         log.info(
             "Loaded termbase from %s: %s languages, %s total entries",
             file_path,
@@ -174,18 +220,18 @@ def load_termbase_from_file(file_path: str, logger: logging.Logger | None = None
 
 def load_dnt_terms_from_file(file_path: str, logger: logging.Logger | None = None) -> list[str]:
     """
-     Load DNT terms from a JSON file or text file.
+    Load DNT terms from a JSON file or text file.
 
-     Supports:
-     - JSON array: ["term1", "term2", ...]
+    Supports:
+    - JSON array: ["term1", "term2", ...]
 
-     Args:
-         file_path: Path to DNT terms file
-         logger: Optional logger for error reporting
+    Args:
+        file_path: Path to DNT terms file
+        logger: Optional logger for error reporting
 
-     Returns:
-         List of DNT terms, or empty list if loading fails
-     """
+    Returns:
+        List of DNT terms, or empty list if loading fails
+    """
     log = logger or logging.getLogger(__name__)
     try:
         with open(file_path, encoding="utf-8") as f:

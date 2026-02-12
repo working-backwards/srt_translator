@@ -5,6 +5,7 @@ Handles persistent storage of user preferences and configuration.
 """
 
 import hashlib
+import json
 import logging
 import os
 from datetime import datetime
@@ -13,6 +14,7 @@ from typing import Any
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.gui.utils.termbase_merger import normalize_termbase_keys
 
 
 class SettingsManager:
@@ -25,6 +27,25 @@ class SettingsManager:
 
     # NOTE: All former 'current_state' APIs have been removed.
     # AI Config stored in QSettings is the single source of truth.
+
+    def _save_json(self, key: str, value) -> None:
+        """Serialize complex types as JSON strings to avoid QSettings/Registry corruption."""
+        self.settings.setValue(key, json.dumps(value, ensure_ascii=False))
+
+    def _load_json(self, key: str, default):
+        """Deserialize JSON strings stored by _save_json, with backward compat for old native format."""
+        raw = self.settings.value(key, None)
+        if raw is None:
+            return default
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                return default
+        # Backward compat: old format stored native Python objects
+        if isinstance(raw, type(default)):
+            return raw
+        return default
 
     def load_last_input_directory(self) -> str:
         """Load last used input directory"""
@@ -40,11 +61,11 @@ class SettingsManager:
 
     def save_selected_files(self, file_paths: list[str]) -> None:
         """Save list of selected files"""
-        self.settings.setValue("selected_files", file_paths)
+        self._save_json("selected_files", file_paths)
 
     def load_selected_files(self) -> list[str]:
         """Load list of selected files"""
-        return self.settings.value("selected_files", [])
+        return self._load_json("selected_files", [])
 
     def save_ai_config(
         self,
@@ -54,9 +75,9 @@ class SettingsManager:
     ) -> None:
         """Save AI-generated configuration"""
         # Save AI configuration
-        self.settings.setValue("ai_dnt_terms", dnt_terms)
-        self.settings.setValue("ai_termbase", termbase)
-        self.settings.setValue("ai_source_language", source_language or {})
+        self._save_json("ai_dnt_terms", dnt_terms)
+        self._save_json("ai_termbase", termbase)
+        self._save_json("ai_source_language", source_language or {})
         self.settings.setValue("ai_config_timestamp", datetime.now().isoformat())
 
         # Calculate and store file hash for change detection
@@ -69,17 +90,12 @@ class SettingsManager:
             tuple(dnt_terms, termbase, source_language)
         """
 
-        dnt_terms = self.settings.value("ai_dnt_terms", [])
-        termbase = self.settings.value("ai_termbase", {})
-        source_language = self.settings.value("ai_source_language", {})
+        dnt_terms = self._load_json("ai_dnt_terms", [])
+        termbase = self._load_json("ai_termbase", {})
+        source_language = self._load_json("ai_source_language", {})
 
-        # Defensive normalization: QSettings may hand back unexpected types
-        if not isinstance(dnt_terms, list):
-            dnt_terms = []
-        if not isinstance(termbase, dict):
-            termbase = {}
-        if not isinstance(source_language, dict):
-            source_language = {}
+        if termbase:
+            termbase = normalize_termbase_keys(termbase, self.language_config)
 
         return dnt_terms, termbase, source_language
 
@@ -133,7 +149,7 @@ class SettingsManager:
 
     def save_target_languages(self, languages: dict[str, str]) -> None:
         """Save target languages dictionary"""
-        self.settings.setValue("target_languages", languages)
+        self._save_json("target_languages", languages)
 
     # --- UI compatibility shims (keep SSOT in QSettings) ---
     def update_target_languages(self, languages: dict[str, str]) -> None:
@@ -144,10 +160,7 @@ class SettingsManager:
 
     def load_target_languages(self) -> dict[str, str]:
         """Load target languages dictionary"""
-        value = self.settings.value("target_languages", {})
-        if isinstance(value, dict):
-            return value
-        return {}
+        return self._load_json("target_languages", {})
 
     def save_target_languages_from_codes(self, language_codes: list[str]) -> None:
         """Save target languages from list of language codes using unified config"""
@@ -209,16 +222,13 @@ class SettingsManager:
             # Cap to configured limit
             limit = self.language_config.get_popular_limit()
             capped = deduped[:limit]
-            self.settings.setValue("user_popular_languages", capped)
+            self._save_json("user_popular_languages", capped)
         except Exception as e:
             self.logger.warning("Failed to save user popular languages: %s", e)
 
     def load_user_popular_languages(self) -> list[str]:
         """Load user's preferred popular languages"""
-        value = self.settings.value("user_popular_languages", [])
-        if isinstance(value, list):
-            return value
-        return []
+        return self._load_json("user_popular_languages", [])
 
     def reset_adaptive_popular_languages(self) -> None:
         """Reset adaptive popular languages to default values"""
@@ -240,11 +250,11 @@ class SettingsManager:
 
     def load_language_usage_data(self) -> dict[str, dict]:
         """Load language usage tracking data"""
-        return self.settings.value("language_usage_data", {})
+        return self._load_json("language_usage_data", {})
 
     def save_language_usage_data(self, usage_data: dict[str, dict]) -> None:
         """Save language usage tracking data"""
-        self.settings.setValue("language_usage_data", usage_data)
+        self._save_json("language_usage_data", usage_data)
 
     def _update_adaptive_popular_languages(self, usage_data: dict[str, dict]) -> None:
         """Update adaptive popular languages based on usage data"""
@@ -301,27 +311,24 @@ class SettingsManager:
 
     def save_user_termbase(self, termbase: dict[str, dict[str, str]]) -> None:
         """Save user-provided termbase that will be merged with AI-generated termbase"""
-        self.settings.setValue("user_termbase", termbase)
+        self._save_json("user_termbase", termbase)
         self.logger.info("Saved user-provided termbase: %s languages", len(termbase))
 
     def load_user_termbase(self) -> dict[str, dict[str, str]]:
         """Load user-provided termbase"""
-        value = self.settings.value("user_termbase", {})
-        if isinstance(value, dict):
-            return value
-        return {}
+        termbase = self._load_json("user_termbase", {})
+        if termbase:
+            termbase = normalize_termbase_keys(termbase, self.language_config)
+        return termbase
 
     def save_user_dnt_terms(self, dnt_terms: list[str]) -> None:
         """Save user-provided DNT terms that will be merged with AI-generated DNT terms"""
-        self.settings.setValue("user_dnt_terms", dnt_terms)
+        self._save_json("user_dnt_terms", dnt_terms)
         self.logger.info("Saved user-provided DNT terms: %s terms", len(dnt_terms))
 
     def load_user_dnt_terms(self) -> list[str]:
         """Load user-provided DNT terms"""
-        value = self.settings.value("user_dnt_terms", [])
-        if isinstance(value, list):
-            return value
-        return []
+        return self._load_json("user_dnt_terms", [])
 
     def save_tone(self, tone: str) -> None:
         """Save translation tone setting (casual, neutral, or formal)"""

@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 
 import psutil
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -21,8 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.gui.ai_config import AIConfigGenerator
@@ -256,9 +256,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Invalid DNT file",
-                "Invalid DNT file.\n\n"
-                "Expected:\n"
-                "• JSON array of strings\n",
+                "Invalid DNT file.\n\nExpected:\n• JSON array of strings\n",
             )
 
     def load_previous_settings(self):
@@ -714,7 +712,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             file_path = file_dialog.selectedFiles()[0]
 
             try:
-                termbase = load_termbase_from_file(file_path, self.logger)
+                termbase = load_termbase_from_file(file_path, self.logger, language_config=self.language_config)
 
                 if not self._validate_termbase_structure(termbase):
                     raise ValueError("Invalid termbase structure")
@@ -834,7 +832,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         for f in selected_files:
             try:
                 total_bytes += Path(f).stat().st_size
-            except Exception:
+            except OSError:
                 continue
 
         estimated_tokens = total_bytes * 0.25

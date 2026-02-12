@@ -33,11 +33,11 @@ def test_ai_config_system():
     # Test saving and loading AI config
     test_dnt_terms = ["API", "CEO", "CFO", "Amazon"]
     test_termbase = {
-        "Spanish": {
+        "es": {
             "operating plan": "plan operativo",
             "business review": "revisión de negocio",
         },
-        "French": {
+        "fr": {
             "operating plan": "plan opérationnel",
             "business review": "revue d'affaires",
         },
@@ -46,14 +46,13 @@ def test_ai_config_system():
     settings_manager.save_ai_config(test_dnt_terms, test_termbase)
     loaded_terms, loaded_termbase, loaded_source_lang = settings_manager.load_ai_config()
 
+    logger.info("Saved DNT terms: %s", test_dnt_terms)
+    logger.info("Loaded DNT terms: %s", loaded_terms)
+    logger.info("Terms match: %s", test_dnt_terms == loaded_terms)
 
-    logger.info(f"Saved DNT terms: {test_dnt_terms}")
-    logger.info(f"Loaded DNT terms: {loaded_terms}")
-    logger.info(f"Terms match: {test_dnt_terms == loaded_terms}")
-
-    logger.info(f"Saved termbase languages: {list(test_termbase.keys())}")
-    logger.info(f"Loaded termbase languages: {list(loaded_termbase.keys())}")
-    logger.info(f"Termbase match: {test_termbase == loaded_termbase}")
+    logger.info("Saved termbase languages: %s", list(test_termbase.keys()))
+    logger.info("Loaded termbase languages: %s", list(loaded_termbase.keys()))
+    logger.info("Termbase match: %s", test_termbase == loaded_termbase)
 
     # Test 2: Config Manager
     logger.info("2. Testing Config Manager...")
@@ -61,15 +60,15 @@ def test_ai_config_system():
 
     # Test getting DNT terms (should return AI-generated ones)
     dnt_terms = config_manager.get_dnt_terms()
-    logger.info(f"Config manager DNT terms: {dnt_terms}")
+    logger.info("Config manager DNT terms: %s", dnt_terms)
 
     # Test getting termbase
-    spanish_termbase = config_manager.get_termbase("Spanish")
-    logger.info(f"Spanish termbase: {spanish_termbase}")
+    spanish_termbase = config_manager.get_termbase("es")
+    logger.info("Spanish termbase: %s", spanish_termbase)
 
     # Test config summary
     summary = config_manager.get_config_summary()
-    logger.info(f"Config summary: {summary}")
+    logger.info("Config summary: %s", summary)
 
     # Test 3: AI Config Generator (without API key)
     logger.info("3. Testing AI Config Generator structure...")
@@ -77,10 +76,10 @@ def test_ai_config_system():
         # This should fail without a valid API key, but we can test the structure
         ai_generator = AIConfigGenerator("test-key")
         logger.info("AI Config Generator created successfully")
-        logger.info(f"Max content length: {ai_generator.MAX_CONTENT_LENGTH}")
-        logger.info(f"Supported languages: {len(ai_generator.get_supported_languages())}")
+        logger.info("Max content length: %s", ai_generator.MAX_CONTENT_LENGTH)
+        logger.info("Supported languages: %s", len(ai_generator.get_supported_languages()))
     except Exception as e:
-        logger.info(f"AI Config Generator test (expected error): {e}")
+        logger.info("AI Config Generator test (expected error): %s", e)
 
     logger.info("AI Configuration System test completed!")
 
