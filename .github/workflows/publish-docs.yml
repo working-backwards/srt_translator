@@ -1,4 +1,4 @@
-name: Publish MkDocs to Public Docs Repo
+name: Publish Docs to docs.workingbackwards.com
 
 on:
   push:
@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 env:
-  # ⬇️ Your public docs repo (owner/repo)
-  PUBLIC_DOCS_REPO: working-backwards/srt_translator_docs
+  # Shared docs hub — each project publishes to its own subdirectory
+  PUBLIC_DOCS_REPO: working-backwards/docs
 
 jobs:
   build-and-publish:
@@ -37,12 +37,14 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build --clean
 
-      # Push the built site/ to the separate public repo's gh-pages branch
-      - name: Publish to public docs repo gh-pages
+      # Push built site/ into the srt-translator subdirectory of the shared docs repo
+      - name: Publish to docs hub (srt-translator subdirectory)
         uses: peaceiris/actions-gh-pages@v3
         with:
           personal_token: ${{ secrets.DOCS_PUBLISH_TOKEN }}
           external_repository: ${{ env.PUBLIC_DOCS_REPO }}
           publish_dir: ./site
           publish_branch: gh-pages
-          keep_files: false
+          destination_dir: srt-translator
+          keep_files: true
+          cname: docs.workingbackwards.com
