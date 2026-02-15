@@ -19,7 +19,7 @@ authors = [
     {name = "Working Backwards LLC", email = "ColinB-WB@users.noreply.github.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "openai == 2.12.0",
     "jiter == 0.12.0",

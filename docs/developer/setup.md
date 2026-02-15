@@ -4,7 +4,7 @@ This guide covers installation for **developers** who want to work with the sour
 
 ## Prerequisites
 
-- **Python 3.9+**
+- **Python 3.11+**
 - **Git**
 - **pip**
 

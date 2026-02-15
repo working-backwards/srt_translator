@@ -32,8 +32,6 @@ Describe what you've already tried or researched:
 - [ ] Linux (specify distribution)
 
 **Python Version:**
-- [ ] 3.9
-- [ ] 3.10
 - [ ] 3.11
 - [ ] 3.12
 

@@ -148,10 +148,10 @@ logging.basicConfig(level=logging.INFO)  # NO!
 - Document any breaking changes
 
 ### Documentation Deployment
-- **MkDocs is deployed to a separate public repository**: `srt_translator_docs`
-- **Deploy command**: `mkdocs gh-deploy --remote-name docs --remote-branch gh-pages`
-- **Never deploy to the main repository's gh-pages branch** - use the separate docs repo
-- The main repository's gh-pages branch should remain deleted/empty
+- **Docs are published to `docs.workingbackwards.com`** via the shared `working-backwards/docs` repo
+- **The `publish-docs.yml` workflow** builds MkDocs and pushes to the `srt-translator/` subdirectory of the `docs` repo's `gh-pages` branch
+- **Never deploy to the main repository's gh-pages branch** — the workflow handles deployment automatically
+- Manual deploys are not needed; pushing changes to `mkdocs.yml` or `docs/` on `main` triggers the workflow
 
 ## ⚡ Performance
 - Use lazy loading for heavy dependencies
@@ -161,7 +161,7 @@ logging.basicConfig(level=logging.INFO)  # NO!
 ## 💻 Platform Compatibility
 - Ensure code works on Windows, macOS, and Linux
 - Use platform-agnostic path handling
-- Test on Python 3.9-3.12
+- Test on Python 3.11-3.12
 
 ## 🧠 Remember
 - **Logging over print() - ALWAYS**

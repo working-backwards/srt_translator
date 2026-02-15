@@ -33,8 +33,6 @@ A clear and concise description of what actually happened.
 - [ ] Linux (specify distribution)
 
 **Python Version:**
-- [ ] 3.9
-- [ ] 3.10
 - [ ] 3.11
 - [ ] 3.12
 

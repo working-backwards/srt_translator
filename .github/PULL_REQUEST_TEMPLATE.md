@@ -53,7 +53,7 @@ Related to #[issue number]
 ## Environment
 
 - **Operating System:** [Windows/macOS/Linux]
-- **Python Version:** [3.9/3.10/3.11/3.12]
+- **Python Version:** [3.11/3.12]
 - **Package Manager:** [pip/conda/other]
 
 ## Additional Notes
