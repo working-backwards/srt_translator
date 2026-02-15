@@ -161,7 +161,7 @@ def compile_report(artifacts_dir: Path) -> Path:
 
 def _compute_file_status(eval_data: dict[str, Any]) -> dict[str, dict[str, str]]:
     """Compute per-file status (ready/review/blocked) in format {lang: {file: status}}."""
-    file_status = {}
+    file_status: dict[str, dict[str, str]] = {}
 
     for lang_code, lang_data in eval_data["per_language"].items():
         file_status[lang_code] = {}

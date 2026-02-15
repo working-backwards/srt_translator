@@ -23,13 +23,15 @@ def _read_text(fname: str) -> str:
 @lru_cache
 def load_language_catalog() -> dict[str, Any]:
     """Parsed languages.json (read-only)."""
-    return json.loads(_read_text(_LANGS))
+    result: dict[str, Any] = json.loads(_read_text(_LANGS))
+    return result
 
 
 @lru_cache
 def load_evaluation_rubric() -> dict[str, Any]:
     """Parsed translation_rubric.yaml (read-only)."""
-    return yaml.safe_load(_read_text(_RUBRIC))
+    result: dict[str, Any] = yaml.safe_load(_read_text(_RUBRIC))
+    return result
 
 
 def sanity_check() -> None:

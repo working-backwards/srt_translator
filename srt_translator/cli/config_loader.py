@@ -52,7 +52,7 @@ def _load_language_policies(selected_codes: list[str]) -> dict[str, Any]:
             missing[code] = need
     if missing:
         raise RuntimeError(f"languages.json missing required keys: {missing}")
-    return raw  # type: ignore[no-any-return]
+    return raw
 
 
 def collect_cli_raw() -> dict[str, Any]:

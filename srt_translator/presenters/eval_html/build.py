@@ -28,7 +28,7 @@ def _load_eval_css() -> str:
         return ""
 
 
-def _validate_punch_list_context(punch_list: dict) -> None:
+def _validate_punch_list_context(punch_list: dict[str, Any]) -> None:
     """Validate that punch list items have proper context structure."""
     for category in ["errors", "warnings"]:
         for item in punch_list.get(category, []):
@@ -46,7 +46,7 @@ def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, 
         raise ValueError(f"Required file not found: {file_path}")
 
     try:
-        data = json.loads(file_path.read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(file_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in {file_path}: {e}") from e
 
@@ -54,7 +54,7 @@ def _load_json_or_raise(file_path: Path, required_keys: list[str]) -> dict[str, 
     if missing_keys:
         raise ValueError(f"{file_path.name} missing required keys: {', '.join(missing_keys)}")
 
-    return data  # type: ignore[no-any-return]
+    return data
 
 
 def build_eval_html(report_path: Path, out_path: Path | None = None) -> Path:
@@ -124,10 +124,10 @@ def build_eval_html(report_path: Path, out_path: Path | None = None) -> Path:
 def _generate_html(
     icon: str,
     one_liner: str,
-    punch_list: dict,
-    file_status: dict,
-    kpis: dict,
-    lexicons: dict,
+    punch_list: dict[str, Any],
+    file_status: dict[str, Any],
+    kpis: dict[str, Any],
+    lexicons: dict[str, Any],
     css_text: str,
 ) -> str:
     """Generate the complete HTML content."""

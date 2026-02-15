@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 _REQUIRED = {"decision", "one_liner", "punch_list", "file_status", "kpis", "lexicons"}
 
 
-def _validate_punch_list_context(punch_list: dict) -> None:
+def _validate_punch_list_context(punch_list: dict[str, Any]) -> None:
     """Validate that punch list items have proper context structure."""
     for category in ["errors", "warnings"]:
         for item in punch_list.get(category, []):
@@ -21,10 +22,10 @@ def _validate_punch_list_context(punch_list: dict) -> None:
                     log.warning("Punch list item missing context.cur: %s", item.get("issue_type", "unknown"))
 
 
-def _load(path: Path) -> dict:
+def _load(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"{path.name} not found at: {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     missing = sorted(_REQUIRED - data.keys())
     if missing:
         raise ValueError(f"{path.name} missing required keys: {', '.join(missing)}")

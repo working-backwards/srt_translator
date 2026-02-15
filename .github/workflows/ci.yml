@@ -93,7 +93,7 @@ jobs:
       - name: Install tools
         shell: bash
         run: |
-          python -m pip install -U pip
+          python -m pip install -U pip setuptools
           python -m pip install bandit pip-audit
           python -m pip install -e ".[dev]"
       - name: Bandit (SAST)
