@@ -207,7 +207,7 @@ If the AI output is not clearly formatted, ask it to reply again using the requi
 
 ### Prompt 1 — Produce `termbase.patch.json`
 
-```text
+````text
 You are an assistant that proposes conservative improvements to a termbase used by the srt_translator.
 
 IMPORTANT — Original vs. Translated Sources
@@ -275,7 +275,7 @@ OTHER CONSTRAINTS
 When I provide inputs, follow the rules exactly and output only the REVIEW block, the `--- FILE` line, and the fenced JSON block containing `termbase.patch.json`.
 
 --- END OF PROMPT ---
-```
+````
 
 ---
 
