@@ -32,7 +32,9 @@ def main():
         # Check what's currently stored
         dnt_terms, termbase, _ = settings_manager.load_ai_config()
         logger.info(
-            f"Current AI config: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
+            "Current AI config: %d DNT terms, %d languages in termbase",
+            len(dnt_terms),
+            len(termbase),
         )
 
         # Clear the AI configuration
@@ -53,17 +55,19 @@ def main():
         # Verify it's cleared
         dnt_terms, termbase, _ = settings_manager.load_ai_config()
         logger.info(
-            f"After clearing: {len(dnt_terms)} DNT terms, {len(termbase)} languages in termbase"
+            "After clearing: %d DNT terms, %d languages in termbase",
+            len(dnt_terms),
+            len(termbase),
         )
 
         logger.info("✅ AI configuration cleared successfully!")
 
     except ImportError as e:
-        logger.error(f"❌ Import error: {e}")
+        logger.error("Import error: %s", e)
         logger.error("Make sure you're running this from the project root directory")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"❌ Error: {e}")
+        logger.error("Error: %s", e)
         sys.exit(1)
 
 

@@ -48,7 +48,7 @@ def build_eval_md(report_path: Path, out_path: Path | None = None) -> Path:
     lexicons = data["lexicons"]
 
     # Map decision level to emoji
-    icon = {"pass": "✅", "review": "⚠️", "fail": "❌"}.get(decision, "⚠️")
+    icon = {"pass": "✅", "review": "⚠️", "fail": "❌"}.get(decision, "⚠️")  # nosec B105
 
     lines: list[str] = []
 

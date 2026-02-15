@@ -16,7 +16,6 @@ from srt_translator.core.config.models import SummaryDict, TranslationConfig
 from srt_translator.core.translator.fixer import SRTFixer
 from srt_translator.core.translator.translator import SRTTranslator
 
-
 # Do not configure logging at import time. The caller (GUI worker or CLI entrypoint)
 # is responsible for initializing logging via setup_logging().
 

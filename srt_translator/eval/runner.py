@@ -253,7 +253,7 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
         config = json.loads(config_path.read_text(encoding="utf-8"))
     except Exception as e:
         logger.error("Failed to parse ai_config.json: %s", e)
-        raise ValueError("Invalid ai_config.json: %s" % e) from e
+        raise ValueError(f"Invalid ai_config.json: {e}") from e
 
     # Normalize the data structure
     normalized = {
@@ -270,14 +270,16 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
         if isinstance(term_map, dict):
             normalized["termbase"][lang] = [{"source": src, "target": tgt} for src, tgt in term_map.items()]
         else:
-            logger.warning(f"Invalid termbase format for {lang}, skipping")
+            logger.warning("Invalid termbase format for %s, skipping", lang)
             normalized["termbase"][lang] = []
 
     logger.info(
-        f"Loaded config from ai_config.json: version={normalized['version']}, "
-        f"target_languages={len(normalized['target_languages'])}, "
-        f"dnt_terms={len(normalized['dnt_terms'])}, "
-        f"termbase_languages={len(normalized['termbase'])}"
+        "Loaded config from ai_config.json: version=%s, "
+        "target_languages=%d, dnt_terms=%d, termbase_languages=%d",
+        normalized["version"],
+        len(normalized["target_languages"]),
+        len(normalized["dnt_terms"]),
+        len(normalized["termbase"]),
     )
 
     return normalized
@@ -321,7 +323,7 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
             missing_langs.append(f"{lang} (no SRT files)")
 
     if missing_langs:
-        logger.error(f"Missing or empty target language directories: {missing_langs}")
+        logger.error("Missing or empty target language directories: %s", missing_langs)
         return False
 
     logger.info("Batch structure validation passed")
@@ -448,9 +450,9 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-        logger.debug(f"Added batch log file handler: {log_file.name}")
+        logger.debug("Added batch log file handler: %s", log_file.name)
     except Exception as e:
-        logger.warning(f"Failed to add batch log file handler: {e}")
+        logger.warning("Failed to add batch log file handler: %s", e)
 
 
 def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None = None) -> dict[str, Any] | None:
@@ -549,7 +551,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
     try:
         batch_config = _load_batch_config(batch_root, log)
     except (FileNotFoundError, ValueError) as e:
-        log.error(f"Failed to load batch configuration: {e}")
+        log.error("Failed to load batch configuration: %s", e)
         return None
 
     # Validate batch structure
@@ -565,7 +567,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
         log.info("No termbase provided; continuing without termbase coverage")
     else:
         covered_langs = [lang for lang, entries in termbase.items() if entries]
-        log.debug(f"Termbase  coverage: {len(covered_langs)} languages with custom terms")
+        log.debug("Termbase coverage: %d languages with custom terms", len(covered_langs))
 
     rollup: dict[str, Any] = {
         "batch_label": batch_label,
@@ -707,7 +709,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
                     timing_delta_end_ms.append(delta_end_ms)
                 except Exception as e:
                     # Log any errors and skip this cue in drift stats
-                    log.warning(f"Error calculating timing drift for cue {cue_idx + 1}, skipping: {e}")
+                    log.warning("Error calculating timing drift for cue %d, skipping: %s", cue_idx + 1, e)
                     continue
 
             # Convert to float lists for percentile function

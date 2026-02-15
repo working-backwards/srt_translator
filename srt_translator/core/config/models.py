@@ -5,13 +5,13 @@ Typed configuration models for SRT Translator.
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, TypedDict
 
 
-class LogMode(str, Enum):
+class LogMode(StrEnum):
     """Logging mode for the translation system."""
 
     STANDARD = "Standard"

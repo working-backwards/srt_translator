@@ -121,7 +121,7 @@ class TermHandler:
         return self.placeholder_map
 
     def load_dnt_terms(self, file_path: str, lang_code: str) -> list[str]:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             all_terms = json.load(f)
         return all_terms.get(lang_code, [])
 

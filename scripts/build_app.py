@@ -1,7 +1,8 @@
 import os
 import platform
-import PyInstaller.__main__
 from pathlib import Path
+
+import PyInstaller.__main__
 
 # ------------------------------
 # Project root
