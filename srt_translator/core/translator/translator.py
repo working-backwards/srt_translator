@@ -28,16 +28,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
-# Core imports
 from srt_translator.core.config.language_config import LanguageConfig
-
-# Helper imports
-from srt_translator.core.translator._helpers import (
-    _create_batches_with_logging,
-    _handle_mid_batch_empty_retries,
-    _is_invalid_translation,
-    _translate_batch_and_extract,
-)
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
     build_oversize_probe_question,
@@ -205,6 +196,17 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
     return ph_regex.sub(_sub, text or "")
 
 
+def _is_invalid_translation(text: str) -> bool:
+    if not text:
+        return True
+    t = text.strip()
+    if not t:
+        return True
+    if re.fullmatch(r"[\W\d_]+", t):
+        return True
+    return False
+
+
 # ---------------------------
 # Stage 1A Helper Methods (stay in translator.py)
 # ---------------------------
@@ -221,12 +223,10 @@ def _load_and_parse_file(input_filepath: str) -> list[Subtitle]:
 
 
 def _format_and_append_subtitles(
-    _self: SRTTranslator,
     batch: list[Subtitle],
     tgt_texts: list[str],
     target_lang: str,
     cps_cap: int | None,
-    _file_logger: LoggerLike,
 ) -> list[Subtitle]:
     """Format subtitles with CPS and append to global list."""
     formatted_subs = []
@@ -534,6 +534,114 @@ class SRTTranslator:
 
     # ---------- Stage 1A Helper Methods ----------
 
+    def _create_batches_with_logging(
+        self,
+        src_subs: list[Subtitle],
+        target_lang: str,
+        file_logger: LoggerLike,
+    ) -> list[list[Subtitle]]:
+        """Create sentence-aware batches with logging setup."""
+        batches = self._create_batches(
+            subtitles=src_subs,
+            target_size=int(self.batch_size),
+            max_size=self.MAX_BATCH_SIZE,
+            target_lang=target_lang,
+        )
+
+        file_logger.info(
+            "Using sentence-aware batching for %s → %s (%d subtitles → %d batches; target=%d, max=%d)",
+            os.path.basename(getattr(file_logger, "extra", {}).get("file", "unknown")),
+            target_lang,
+            len(src_subs),
+            len(batches),
+            self.batch_size,
+            self.MAX_BATCH_SIZE,
+        )
+        return batches
+
+    def _translate_batch_and_extract(
+        self,
+        src_items: list[str],
+        batch_ids: list[int],
+        target_lang: str,
+        batch_logger: LoggerLike,
+    ) -> list[str]:
+        """Translate batch and extract target texts."""
+        try:
+            items = self._translate_with_simple_shape_lock(
+                src_items,
+                target_lang,
+                self.termbase,
+                batch_ids,
+                logger=batch_logger,
+            )
+        except Exception:
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(
+                    "Main batch translation failure - Payload sent (lang=%s, items=%d).",
+                    target_lang,
+                    len(src_items),
+                )
+            raise
+        tgt_texts = [it.get("tgt", "") for it in items]
+        return tgt_texts
+
+    def _handle_mid_batch_empty_retries(
+        self,
+        batch: list[Subtitle],
+        tgt_texts: list[str],
+        target_lang: str,
+        batch_logger: LoggerLike,
+    ) -> list[str]:
+        """Handle mid-batch empty translation retries."""
+        for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=False)):
+            if tgt_raw.strip():
+                continue
+            sid = batch[i].idx
+            filled = False
+            if i + 1 < len(batch):
+                try:
+                    batch_logger.debug(
+                        "Empty target at idx=%s; attempting pair retry with next cue.",
+                        sid,
+                    )
+                    pair_src = [
+                        self.term_handler.apply_dnt_placeholders(
+                            self.term_handler.apply_termbase(batch[i].text)
+                        ),
+                        self.term_handler.apply_dnt_placeholders(
+                            self.term_handler.apply_termbase(batch[i + 1].text)
+                        ),
+                    ]
+
+                    pair_ids = [batch[i].idx, batch[i + 1].idx]
+                    pair_items = self._translate_batch_json(
+                        src_items=pair_src,
+                        target_lang=target_lang,
+                        termbase=self.termbase,
+                        batch_ids=pair_ids,
+                        strict=True,
+                    )
+                    if isinstance(pair_items, list) and len(pair_items) >= 1:
+                        candidate = pair_items[0].get("tgt", "")
+                        if candidate and candidate.strip():
+                            tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
+                            tgt_texts[i] = self.term_handler.restore_termbase(tgt_texts[i], target_lang)
+                            batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
+                            filled = True
+                except Exception as ex:
+                    # SANCTIONED DIAGNOSTICS HOOK: strict pair-retry failure
+                    # Probes/logs may be added here (and ONLY here) with tests. Do not add probes elsewhere.
+                    batch_logger.debug("Pair retry failed for idx=%s: %s", sid, ex)
+            if not filled:
+                if self.error_policy == "STRICT":
+                    raise RuntimeError(f"Empty translation for subtitle idx={sid}")
+                batch_logger.warning(
+                    "Empty translation for subtitle idx=%s; leaving empty for evaluator.",
+                    sid,
+                )
+        return tgt_texts
+
     # ---------- Public API ----------
 
     def translate_file(
@@ -562,7 +670,7 @@ class SRTTranslator:
         )
 
         # 2) Create batches with logging
-        batches = _create_batches_with_logging(self, src_subs, target_lang, file_logger)
+        batches = self._create_batches_with_logging(src_subs, target_lang, file_logger)
         all_tgt_subs: list[Subtitle] = []
 
         # === Cross-batch pair-retry state ===================================
@@ -667,8 +775,7 @@ class SRTTranslator:
             )
 
             # 3) Translate batch and validate placeholders
-            tgt_texts = _translate_batch_and_extract(
-                self,
+            tgt_texts = self._translate_batch_and_extract(
                 src_items=src_items,
                 batch_ids=[s.idx for s in batch],
                 target_lang=target_lang,
@@ -683,8 +790,7 @@ class SRTTranslator:
             )
 
             # 3a) Handle mid-batch empty retries
-            tgt_texts = _handle_mid_batch_empty_retries(
-                self,
+            tgt_texts = self._handle_mid_batch_empty_retries(
                 batch=batch,
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
@@ -693,12 +799,10 @@ class SRTTranslator:
 
             # 4) Format and append subtitles
             formatted_subs = _format_and_append_subtitles(
-                self,
                 batch=batch,
                 tgt_texts=tgt_texts,
                 target_lang=target_lang,
                 cps_cap=cps_cap,
-                _file_logger=file_logger,
             )
             all_tgt_subs.extend(formatted_subs)
 
