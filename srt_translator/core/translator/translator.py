@@ -19,6 +19,7 @@ from typing import (
 )
 
 # OpenAI client
+from openai import NotFoundError as OpenAINotFoundError
 from openai import OpenAI
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -271,7 +272,7 @@ class SRTTranslator:
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
-        model_name: str = "gpt-4o-mini",
+        model_name: str,
         batch_size: int,
         error_policy: str = "STRICT",
         language_config: LanguageConfig,
@@ -327,6 +328,7 @@ class SRTTranslator:
         self._probe_budget_langs: set[str] = set()
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
+        self._model_invalid = False
 
     def _strict_retry_kwargs(self, src_items: list[str]) -> dict[str, Any]:
         """
@@ -469,10 +471,8 @@ class SRTTranslator:
                             self.term_handler.placeholder_regex,
                         )
 
-        # Restore DNT placeholders to originals
-        tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
-
-        tgt_texts = [self.term_handler.restore_termbase(t, target_lang) for t in tgt_texts]
+        # Restore DNT placeholders and termbase substitutions
+        tgt_texts = [self.term_handler.restore_all(t, target_lang) for t in tgt_texts]
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
@@ -606,12 +606,8 @@ class SRTTranslator:
                         sid,
                     )
                     pair_src = [
-                        self.term_handler.apply_dnt_placeholders(
-                            self.term_handler.apply_termbase(batch[i].text)
-                        ),
-                        self.term_handler.apply_dnt_placeholders(
-                            self.term_handler.apply_termbase(batch[i + 1].text)
-                        ),
+                        self.term_handler.apply_all(batch[i].text),
+                        self.term_handler.apply_all(batch[i + 1].text),
                     ]
 
                     pair_ids = [batch[i].idx, batch[i + 1].idx]
@@ -625,8 +621,7 @@ class SRTTranslator:
                     if isinstance(pair_items, list) and len(pair_items) >= 1:
                         candidate = pair_items[0].get("tgt", "")
                         if candidate and candidate.strip():
-                            tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
-                            tgt_texts[i] = self.term_handler.restore_termbase(tgt_texts[i], target_lang)
+                            tgt_texts[i] = self.term_handler.restore_all(candidate, target_lang)
                             batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                             filled = True
                 except Exception as ex:
@@ -698,7 +693,7 @@ class SRTTranslator:
                     head = batch[0]
                     pair_src = [
                         deferred_tail_retry["source_text_with_placeholders"],
-                        self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(head.text)),
+                        self.term_handler.apply_all(head.text),
                     ]
                     pair_ids = [deferred_tail_retry["cue_index"], head.idx]
                     batch_logger.debug(
@@ -716,10 +711,7 @@ class SRTTranslator:
                         )
                         fixed = pair_tgts[0].get("text", "") if pair_tgts else ""
                         if fixed:
-                            # Restore DNT placeholders first
-                            fixed = self.term_handler.restore_dnt_placeholders(fixed)
-                            # Then restore termbase for the target language
-                            fixed = self.term_handler.restore_termbase(fixed, target_lang)
+                            fixed = self.term_handler.restore_all(fixed, target_lang)
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
                             batch_logger.debug(
@@ -760,10 +752,8 @@ class SRTTranslator:
                 [s.idx for s in batch],
             )
 
-            # Preprocess: apply DNT placeholders on a per-subtitle basis
-            src_items = [
-                self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(s.text)) for s in batch
-            ]
+            # Preprocess: apply termbase + DNT placeholders on a per-subtitle basis
+            src_items = [self.term_handler.apply_all(s.text) for s in batch]
 
             # Log source items being sent to AI for troubleshooting
             file_logger.debug(
@@ -1284,6 +1274,14 @@ class SRTTranslator:
                         results[i] = {"id": cue_id, "tgt": ""}
                 break
 
+            # Fast-exit: if model was already flagged invalid, emit empties for all remaining work
+            if self._model_invalid:
+                while work_q:
+                    s, e, _, _ = work_q.popleft()
+                    for i, cue_id in enumerate(batch_ids[s:e], start=s):
+                        results[i] = {"id": cue_id, "tgt": ""}
+                break
+
             start, end, depth, retries = work_q.popleft()
             seg_src = src_items[start:end]
             seg_ids = batch_ids[start:end]
@@ -1311,6 +1309,18 @@ class SRTTranslator:
                     }
                 self._consecutive_decode_failures = 0  # reset breaker on success
                 continue
+
+            except OpenAINotFoundError as ex:
+                self._model_invalid = True
+                logger.error(
+                    "Invalid model '%s': %s. Check the model name in your settings.",
+                    self.model_name,
+                    ex,
+                )
+                raise RuntimeError(
+                    f"Invalid model '{self.model_name}'. Check the model name in your settings. "
+                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini"
+                ) from ex
 
             except Exception as ex:
                 self._consecutive_decode_failures += 1

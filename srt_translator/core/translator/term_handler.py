@@ -199,6 +199,14 @@ class TermHandler:
             out = pat.sub(tgt_term, out)
         return out
 
+    def apply_all(self, text: str) -> str:
+        """Apply termbase substitutions then DNT placeholders (correct order)."""
+        return self.apply_dnt_placeholders(self.apply_termbase(text))
+
+    def restore_all(self, text: str, lang_code: str) -> str:
+        """Restore DNT placeholders then termbase substitutions (correct order)."""
+        return self.restore_termbase(self.restore_dnt_placeholders(text), lang_code)
+
     # Optional artifacts/metrics helpers
     def placeholder_count(self) -> int:
         return len(self.placeholder_map)

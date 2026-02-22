@@ -346,3 +346,26 @@ class SettingsManager:
         if tone in ("casual", "neutral", "formal"):
             return tone
         return "neutral"
+
+    def save_model_name(self, model_name: str) -> None:
+        """Save the OpenAI model name."""
+        self.settings.setValue("model_name", model_name.strip() or "gpt-4o-mini")
+
+    def load_model_name(self) -> str:
+        """Load the OpenAI model name (defaults to 'gpt-4o-mini')."""
+        value = self.settings.value("model_name", "gpt-4o-mini")
+        return str(value).strip() if value else "gpt-4o-mini"
+
+    def save_aggressiveness(self, value: float) -> None:
+        """Save the fix aggressiveness setting (clamped 0.0-1.0)."""
+        clamped = max(0.0, min(1.0, float(value)))
+        self.settings.setValue("aggressiveness", clamped)
+
+    def load_aggressiveness(self) -> float:
+        """Load the fix aggressiveness setting (defaults to 0.75)."""
+        raw = self.settings.value("aggressiveness", 0.75)
+        try:
+            val = float(raw)
+            return max(0.0, min(1.0, val))
+        except (ValueError, TypeError):
+            return 0.75

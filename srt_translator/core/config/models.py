@@ -46,12 +46,12 @@ class TranslationConfig:
     target_languages: dict[str, str]  # e.g., {"Spanish": "es", ...}
     output_directory: Path
     api_key: str
-    model_name: str
-    aggressiveness: float  # Aggressiveness of automatic placeholder fixes
     log_mode: LogMode
     mode: Literal["CLI", "GUI"]
 
     # Optional fields with defaults - must come after required fields
+    model_name: str = "gpt-4o-mini"
+    aggressiveness: float = 0.75  # Aggressiveness of automatic placeholder fixes
     # Immutable sequence of DNT (Do Not Translate) terms.
     # Empty tuple if none provided - never None to avoid Optional handling in core.
     dnt_terms: tuple[str, ...] = ()
@@ -127,11 +127,12 @@ class TranslationConfig:
             api_key = ""
 
         # Validate model name (handle both openai_model and model_name)
-        model_name = raw.get("openai_model") or raw.get("model_name", "gpt-4o-mini")
+        model_name = raw.get("openai_model") or raw.get("model_name") or "gpt-4o-mini"
 
         # Validate aggressiveness
+        raw_agg = raw.get("aggressiveness")
         try:
-            aggressiveness = float(raw.get("aggressiveness", 0.75))
+            aggressiveness = float(raw_agg) if raw_agg is not None else 0.75
             if not 0.0 <= aggressiveness <= 1.0:
                 errors.append("aggressiveness must be between 0.0 and 1.0")
                 aggressiveness = 0.75

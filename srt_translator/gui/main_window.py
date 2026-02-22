@@ -209,6 +209,14 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.import_dnt_file,
         )
 
+        # Advanced Settings signals
+        self.ai_config_section.adv_toggle_btn.clicked.connect(
+            self.ai_config_section.toggle_advanced_expansion
+        )
+        self.ai_config_section.model_name_edit.editingFinished.connect(self._on_model_name_changed)
+        self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
+        self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
+
         # Translation Section signals
         self.translation_section.connect_signals(self.start_translation, self._open_html_report)
 
@@ -290,9 +298,27 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.set_tone(saved_tone)
         self.ai_config_section.connect_tone_changed(self.on_tone_changed)
 
+        # Load advanced settings (model name & aggressiveness)
+        self.ai_config_section.set_model_name(self.settings_manager.load_model_name())
+        self.ai_config_section.set_aggressiveness(self.settings_manager.load_aggressiveness())
+
     def on_tone_changed(self, tone: str) -> None:
         """Handle tone selection change"""
         self.settings_manager.save_tone(tone)
+
+    def _on_model_name_changed(self) -> None:
+        """Persist model name when editing finishes."""
+        self.settings_manager.save_model_name(self.ai_config_section.get_model_name())
+
+    def _on_aggressiveness_changed(self) -> None:
+        """Persist aggressiveness when slider value changes."""
+        self.settings_manager.save_aggressiveness(self.ai_config_section.get_aggressiveness())
+
+    def _on_reset_advanced_defaults(self) -> None:
+        """Reset advanced settings to defaults and persist."""
+        self.ai_config_section._on_reset_advanced_defaults()
+        self.settings_manager.save_model_name("gpt-4o-mini")
+        self.settings_manager.save_aggressiveness(0.75)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""

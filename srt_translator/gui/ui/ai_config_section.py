@@ -3,6 +3,7 @@
 AI Configuration Section for the SRT Translator GUI.
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -11,9 +12,11 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QSlider,
     QTabWidget,
     QVBoxLayout,
 )
@@ -176,6 +179,66 @@ class AIConfigSection(QGroupBox):
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
 
+        # --- Advanced Settings (collapsible) ---
+        adv_separator = QFrame()
+        adv_separator.setFrameShape(QFrame.Shape.HLine)
+        adv_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        content_layout.addWidget(adv_separator)
+
+        adv_header = QHBoxLayout()
+        adv_label = QLabel("Advanced Settings")
+        adv_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.adv_toggle_btn = AnimatedToggleButton()
+        adv_header.addWidget(adv_label)
+        adv_header.addStretch()
+        adv_header.addWidget(self.adv_toggle_btn)
+        content_layout.addLayout(adv_header)
+
+        self.adv_content = QFrame()
+        self.adv_content.setVisible(False)
+        adv_layout = QVBoxLayout(self.adv_content)
+        adv_layout.setSpacing(8)
+
+        # Model row
+        model_row = QHBoxLayout()
+        model_label = QLabel("Model:")
+        model_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.model_name_edit = QLineEdit()
+        self.model_name_edit.setPlaceholderText("gpt-4o-mini")
+        self.model_name_edit.setToolTip(
+            "OpenAI model used for translation. Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini"
+        )
+        model_row.addWidget(model_label)
+        model_row.addWidget(self.model_name_edit)
+        adv_layout.addLayout(model_row)
+
+        # Aggressiveness row
+        agg_row = QHBoxLayout()
+        agg_label = QLabel("Fix Aggressiveness:")
+        agg_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
+        self.aggressiveness_slider.setRange(0, 100)
+        self.aggressiveness_slider.setValue(75)
+        self.aggressiveness_slider.setToolTip(
+            "How aggressively the system fixes placeholder issues. "
+            "0.0 = lenient, 1.0 = strict. Recommended: 0.75"
+        )
+        self.aggressiveness_value_label = QLabel("0.75")
+        self.aggressiveness_value_label.setFixedWidth(35)
+        self.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
+        agg_row.addWidget(agg_label)
+        agg_row.addWidget(self.aggressiveness_slider)
+        agg_row.addWidget(self.aggressiveness_value_label)
+        adv_layout.addLayout(agg_row)
+
+        # Reset to Defaults button
+        self.reset_advanced_btn = QPushButton("Reset to Defaults")
+        self.reset_advanced_btn.setObjectName("secondaryButton")
+        self.reset_advanced_btn.setToolTip("Reset model and aggressiveness to default values")
+        adv_layout.addWidget(self.reset_advanced_btn)
+
+        content_layout.addWidget(self.adv_content)
+
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
 
@@ -274,6 +337,40 @@ class AIConfigSection(QGroupBox):
     def connect_tone_changed(self, callback) -> None:
         """Connect a callback to be called when tone selection changes"""
         self.tone_button_group.buttonClicked.connect(lambda: callback(self.get_tone()))
+
+    def toggle_advanced_expansion(self) -> None:
+        """Toggle the Advanced Settings subsection visibility."""
+        visible = not self.adv_content.isVisible()
+        self.adv_content.setVisible(visible)
+        self.adv_toggle_btn.set_expanded_state(visible)
+
+    def get_model_name(self) -> str:
+        """Get the current model name from the text field."""
+        return self.model_name_edit.text().strip() or "gpt-4o-mini"
+
+    def set_model_name(self, name: str) -> None:
+        """Set the model name in the text field."""
+        self.model_name_edit.setText(name)
+
+    def get_aggressiveness(self) -> float:
+        """Get the current aggressiveness value (0.0-1.0)."""
+        return self.aggressiveness_slider.value() / 100.0
+
+    def set_aggressiveness(self, value: float) -> None:
+        """Set the aggressiveness slider value (0.0-1.0)."""
+        int_val = max(0, min(100, int(round(value * 100))))
+        self.aggressiveness_slider.setValue(int_val)
+        self.aggressiveness_value_label.setText(f"{value:.2f}")
+
+    def _on_aggressiveness_changed(self, value: int) -> None:
+        """Update the value display label when slider moves."""
+        self.aggressiveness_value_label.setText(f"{value / 100.0:.2f}")
+
+    def _on_reset_advanced_defaults(self) -> None:
+        """Reset both advanced fields to defaults."""
+        self.model_name_edit.setText("gpt-4o-mini")
+        self.aggressiveness_slider.setValue(75)
+        self.aggressiveness_value_label.setText("0.75")
 
 
 class EditConfigurationDialog(QDialog):

@@ -246,11 +246,17 @@ class TranslationWorker(QObject):
 
             # Load tone from settings (default to "neutral" if not set)
             tone = "neutral"
+            model_name = "gpt-4o-mini"
+            aggressiveness = 0.75
             if self.settings_manager:
                 tone = self.settings_manager.load_tone()
+                model_name = self.settings_manager.load_model_name()
+                aggressiveness = self.settings_manager.load_aggressiveness()
                 self.logger.debug("Loaded tone from settings: '%s'", tone)
+                self.logger.debug("Loaded model_name from settings: '%s'", model_name)
+                self.logger.debug("Loaded aggressiveness from settings: %s", aggressiveness)
             else:
-                self.logger.debug("No settings manager, using default tone: '%s'", tone)
+                self.logger.debug("No settings manager, using defaults: tone='%s', model='%s'", tone, model_name)
 
             # Construct the immutable, complete TranslationConfig
             api_cfg = TranslationConfig(
@@ -259,8 +265,8 @@ class TranslationWorker(QObject):
                 target_languages=filtered_target_languages,
                 dnt_terms=dnt_tuple,
                 termbase=termbase_proxy,
-                model_name="gpt-4o-mini",
-                aggressiveness=0.75,
+                model_name=model_name,
+                aggressiveness=aggressiveness,
                 log_mode="Standard",
                 api_key=self.api_key,
                 mode="GUI",
