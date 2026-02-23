@@ -28,7 +28,7 @@ from srt_translator.prompts.config import (
 
 # Batch-level AI config constants
 _CHARS_PER_TOKEN = 4  # rough heuristic: ~4 chars per token
-_TOKEN_CAP = 12_500
+_TOKEN_CAP = 100_000
 _CHAR_CAP = _TOKEN_CAP * _CHARS_PER_TOKEN  # ~50k chars
 
 
@@ -51,7 +51,7 @@ class AIConfigGenerator:
         self.logger = logging.getLogger("srt_translator.gui.ai_config")
         # GUI-only model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
-        self.DEFAULT_MODEL = "gpt-4o-mini"
+        self.DEFAULT_MODEL = "gpt-5-mini"
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
         self.CHARS_PER_TOKEN = 4
@@ -143,8 +143,8 @@ class AIConfigGenerator:
             response = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                temperature=0.3,
+                max_tokens=5000,
+                temperature=0.0,
             )
 
             result_text = response.choices[0].message.content
@@ -342,7 +342,7 @@ class AIConfigGenerator:
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=5000,
-                temperature=0.2,
+                temperature=0.0,
                 response_format={"type": "json_object"},
             )
             raw = (response.choices[0].message.content or "").strip()
@@ -798,8 +798,8 @@ class AIConfigGenerator:
             response = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=3000,
-                temperature=0.1,
+                max_tokens=5000,
+                temperature=0.0,
                 response_format={"type": "json_object"},
             )
 
@@ -1054,8 +1054,8 @@ class AIConfigGenerator:
             resp = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1400,
+                temperature=0.0,
+                max_tokens=5000,
                 response_format={"type": "json_object"},
             )
             raw = (resp.choices[0].message.content or "").strip()
