@@ -338,12 +338,12 @@ class SRTTranslator:
         src_tok = sum(estimate_tokens(s or "") for s in src_items)
         cap = int(math.ceil(2.4 * max(1, src_tok)))
         floor = 120  # <-- token floor: prevents cut-off JSON on very short cues
-        max_tokens = min(900, max(floor, cap))
+        max_completion_tokens = min(900, max(floor, cap))
         return {
             "temperature": 0,
             "frequency_penalty": 0.6,  # discourage loops like "ek ek ek…"
             "presence_penalty": 0.0,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_completion_tokens,
             # Optional: stop right after JSON; remove if provider doesn't support 'stop'
             "stop": ["]}"],
         }
@@ -860,7 +860,7 @@ class SRTTranslator:
         kwargs = (
             self._strict_retry_kwargs(src_items)
             if strict
-            else {"temperature": 0.1, "response_format": {"type": "json_object"}}
+            else {"temperature": 1, "response_format": {"type": "json_object"}}
         )
         resp = self.client.chat.completions.create(
             model=self.model_name,
@@ -925,8 +925,8 @@ class SRTTranslator:
                                 {"role": "user", "content": question},
                             ],
                         ),
-                        temperature=0,
-                        max_tokens=160,
+                        temperature=self.temperature,
+                        max_completion_tokens=160,
                     )
                     diag_text = (diag_resp.choices[0].message.content or "").strip()
                     self.logger.debug(
@@ -1083,8 +1083,8 @@ class SRTTranslator:
                     {"role": "user", "content": usr},
                 ],
             ),
-            temperature=0.0,
-            max_tokens=256,
+            temperature=self.temperature,
+            max_completion_tokens=256,
         )
         out = (resp.choices[0].message.content or "").strip()
         # Be defensive about accidental quoting
@@ -1119,7 +1119,7 @@ class SRTTranslator:
         resp = self.client.chat.completions.create(
             model=self.model_name,
             messages=cast(Sequence[ChatMsg], messages_payload),
-            temperature=0.0,
+            temperature=self.temperature,
             response_format={"type": "json_object"},
         )
         content = (resp.choices[0].message.content or "").strip()
@@ -1319,7 +1319,7 @@ class SRTTranslator:
                 )
                 raise RuntimeError(
                     f"Invalid model '{self.model_name}'. Check the model name in your settings. "
-                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini"
+                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini,gpt-5-mini"
                 ) from ex
 
             except Exception as ex:

@@ -18,8 +18,15 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QSlider,
     QTabWidget,
-    QVBoxLayout,
+    QVBoxLayout, QMessageBox,
 )
+
+SUPPORTED_MODELS = {
+    "gpt-4o-mini": True,
+    "gpt-4o": True,
+    "gpt-4.1-mini": True,
+    "gpt-5-mini": False,  # Does not support custom temperature
+}
 
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
@@ -206,21 +213,27 @@ class AIConfigSection(QGroupBox):
         self.model_name_edit = QLineEdit()
         self.model_name_edit.setPlaceholderText("gpt-4o-mini")
         self.model_name_edit.setToolTip(
-            "OpenAI model used for translation. Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini"
+            "OpenAI model used for translation.\n"
+            "Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini\n\n"
+            "Note: gpt-5-mini does not support custom temperature —\n"
+            "the Fix Aggressiveness option will be hidden for that model."
         )
+        self.model_name_edit.textChanged.connect(self._on_model_changed)
         model_row.addWidget(model_label)
         model_row.addWidget(self.model_name_edit)
         adv_layout.addLayout(model_row)
 
         # Aggressiveness row
-        agg_row = QHBoxLayout()
+        self.agg_row_frame = QFrame()
+        agg_row = QHBoxLayout(self.agg_row_frame)
+        agg_row.setContentsMargins(0, 0, 0, 0)
         agg_label = QLabel("Fix Aggressiveness:")
         agg_label.setStyleSheet("font-weight: 500; color: #374151;")
         self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
         self.aggressiveness_slider.setRange(0, 100)
         self.aggressiveness_slider.setValue(75)
         self.aggressiveness_slider.setToolTip(
-            "How aggressively the system fixes placeholder issues. "
+            "How aggressively the system fixes placeholder issues.\n"
             "0.0 = lenient, 1.0 = strict. Recommended: 0.75"
         )
         self.aggressiveness_value_label = QLabel("0.75")
@@ -229,7 +242,7 @@ class AIConfigSection(QGroupBox):
         agg_row.addWidget(agg_label)
         agg_row.addWidget(self.aggressiveness_slider)
         agg_row.addWidget(self.aggressiveness_value_label)
-        adv_layout.addLayout(agg_row)
+        adv_layout.addWidget(self.agg_row_frame)
 
         # Reset to Defaults button
         self.reset_advanced_btn = QPushButton("Reset to Defaults")
@@ -265,15 +278,7 @@ class AIConfigSection(QGroupBox):
         """Toggle the Translation Settings section expansion"""
         self.is_expanded = not self.is_expanded
         self.content.setVisible(self.is_expanded)
-
-        if self.is_expanded:
-            # Expand to show full content
-            self.content.setMaximumHeight(16777215)  # Qt's default maximum
-        else:
-            # Collapse to 0 height
-            self.content.setMaximumHeight(0)
-
-        # Animate the toggle button
+        self.content.setMaximumHeight(16777215 if self.is_expanded else 0)
         self.toggle_btn.set_expanded_state(self.is_expanded)
 
     def set_generate_button_enabled(self, enabled: bool):
@@ -314,6 +319,44 @@ class AIConfigSection(QGroupBox):
             self.generate_btn.setVisible(True)
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
+
+
+    def _on_model_changed(self, model_name: str) -> None:
+        """
+        Show or hide the Fix Aggressiveness row based on the model name.
+
+        GPT-5 models manage temperature automatically and the API rejects
+        any custom temperature value. We hide the entire aggressiveness row
+        so users are not confused by a setting that has no effect.
+
+        For all other models the row is shown as normal.
+        Triggered automatically via the textChanged signal on model_name_edit,
+        so set_model_name().
+        """
+        is_gpt5 = (model_name or "").strip().startswith("gpt-5")
+        self.agg_row_frame.setVisible(not is_gpt5)
+
+    def validate_advanced_settings(self) -> bool:
+        """
+        Validate advanced settings before generation or translation starts.
+        """
+        model = self.get_model_name()
+
+        if model not in SUPPORTED_MODELS:
+            QMessageBox.warning(
+                self,
+                "Invalid Model",
+                f"The model '{model}' is not supported.\n\n"
+                "Supported models:\n"
+                "  • gpt-4o-mini\n"
+                "  • gpt-4o\n"
+                "  • gpt-4.1-mini\n"
+                "  • gpt-5-mini"
+            )
+            return False
+
+        return True
+
 
     def get_tone(self) -> str:
         """Get the currently selected tone"""

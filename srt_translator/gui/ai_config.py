@@ -42,7 +42,7 @@ class BatchAIConfig:
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
-    def __init__(self, api_key: str, language_config: LanguageConfig | None = None):
+    def __init__(self, api_key: str, language_config: LanguageConfig ,model_name: str | None = None,temperature: float | None = None):
         """Initialize the AI config generator with OpenAI API key and language configuration"""
         if language_config is None:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
@@ -52,6 +52,13 @@ class AIConfigGenerator:
         # GUI-only model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
         self.DEFAULT_MODEL = "gpt-5-mini"
+        self.DEFAULT_TEMPERATURE = 1
+        self.model_name = (
+            model_name if model_name is not None else self.DEFAULT_MODEL
+        )
+        self.temperature = (
+            temperature if temperature is not None else self.DEFAULT_TEMPERATURE
+        )
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
         self.CHARS_PER_TOKEN = 4
@@ -140,11 +147,16 @@ class AIConfigGenerator:
         try:
             prompt = build_dnt_extraction_prompt(content)
 
+            model_used = self.DEFAULT_MODEL
+            temp_used = self.temperature
+
+            self.logger.info("Model: %s", model_used)
+            self.logger.info("Temperature: %s", temp_used)
             response = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=5000,
-                temperature=0.0,
+                max_completion_tokens=5000,
+                temperature=self.temperature
             )
 
             result_text = response.choices[0].message.content
@@ -341,8 +353,8 @@ class AIConfigGenerator:
             response = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=5000,
-                temperature=0.0,
+                max_completion_tokens=5000,
+                temperature=self.temperature,
                 response_format={"type": "json_object"},
             )
             raw = (response.choices[0].message.content or "").strip()
@@ -798,8 +810,8 @@ class AIConfigGenerator:
             response = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=5000,
-                temperature=0.0,
+                max_completion_tokens=5000,
+                temperature=self.temperature,
                 response_format={"type": "json_object"},
             )
 
@@ -856,7 +868,7 @@ class AIConfigGenerator:
             self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=5,
+                max_completion_tokens=5,
             )
             return True
         except Exception as e:
@@ -1054,8 +1066,8 @@ class AIConfigGenerator:
             resp = self.client.chat.completions.create(
                 model=self.DEFAULT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-                max_tokens=5000,
+                temperature=self.temperature,
+                max_completion_tokens=5000,
                 response_format={"type": "json_object"},
             )
             raw = (resp.choices[0].message.content or "").strip()

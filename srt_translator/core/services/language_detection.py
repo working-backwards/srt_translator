@@ -38,8 +38,8 @@ def detect_source_language(
         resp = chat.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=120,
+            temperature=1,
+            max_completion_tokens=120,
             response_format={"type": "json_object"},
         )
         import json

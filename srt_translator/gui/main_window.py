@@ -444,6 +444,9 @@ class SRTTranslatorMainWindow(QMainWindow):
     def generate_translation_settings(self):
         """Generate Translation Settings for the selected files"""
         # Get selected files and target languages from UI
+        if not self.ai_config_section.validate_advanced_settings():
+            return
+
         selected_files = self.file_section.get_selected_files()
         target_codes = self._get_target_codes_from_ui()
         api_key = self.settings_manager.load_api_key()
@@ -487,8 +490,29 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
 
         # Initialize AI config generator if not already done
-        if not self.ai_config_generator:
-            self.ai_config_generator = AIConfigGenerator(api_key, self.language_config)
+        model_name = self.settings_manager.load_model_name()
+
+        if model_name.lower().startswith("gpt-5-mini"):
+            temperature = None
+        else:
+            temperature = self.settings_manager.load_aggressiveness()
+
+
+        self.ai_config_generator = AIConfigGenerator(
+            api_key=api_key,
+            language_config=self.language_config,
+            model_name=model_name,
+            temperature=temperature,
+        )
+
+        self.ai_config_generator.DEFAULT_MODEL = model_name
+        self.ai_config_generator.temperature = temperature
+
+        self.logger.debug(
+            "DEBUG: Generator using model=%s temperature=%s",
+            self.ai_config_generator.model_name,
+            self.ai_config_generator.temperature,
+        )
 
         # Show progress and disable button
         self.ai_config_section.show_progress(True)
@@ -883,6 +907,10 @@ class SRTTranslatorMainWindow(QMainWindow):
     # Translation Section Handlers
     def start_translation(self):
         """Start the translation process"""
+
+        if not self.ai_config_section.validate_advanced_settings():
+            return
+
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
             self.mem_timer.start(300000)
