@@ -52,12 +52,11 @@ class AIConfigGenerator:
         # GUI-only model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
         self.DEFAULT_MODEL = "gpt-5-mini"
-        self.DEFAULT_TEMPERATURE = 1
         self.model_name = (
             model_name if model_name is not None else self.DEFAULT_MODEL
         )
         self.temperature = (
-            temperature if temperature is not None else self.DEFAULT_TEMPERATURE
+            temperature if temperature is not None else 0.75
         )
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
@@ -147,17 +146,21 @@ class AIConfigGenerator:
         try:
             prompt = build_dnt_extraction_prompt(content)
 
-            model_used = self.DEFAULT_MODEL
+            model_used = self.model_name
             temp_used = self.temperature
 
             self.logger.info("Model: %s", model_used)
             self.logger.info("Temperature: %s", temp_used)
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=5000,
-                temperature=self.temperature
-            )
+            params = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": 5000,
+            }
+
+            if not self.model_name.startswith("gpt-5"):
+                params["temperature"] = self.temperature
+
+            response = self.client.chat.completions.create(**params)
 
             result_text = response.choices[0].message.content
             if result_text is None:
@@ -350,13 +353,18 @@ class AIConfigGenerator:
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=5000,
-                temperature=self.temperature,
-                response_format={"type": "json_object"},
-            )
+            params = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": 16000,
+                "response_format": {"type": "json_object"},
+            }
+
+            # GPT-5 models don't support temperature
+            if not self.model_name.startswith("gpt-5"):
+                params["temperature"] = self.temperature
+
+            response = self.client.chat.completions.create(**params)
             raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             exhausted = bool(data.get("exhausted") or False)
@@ -807,14 +815,18 @@ class AIConfigGenerator:
 
             prompt = build_single_language_termbase_prompt(lang_name, term_list)
 
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=5000,
-                temperature=self.temperature,
-                response_format={"type": "json_object"},
-            )
+            params = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": 5000,
+                "response_format": {"type": "json_object"},
+            }
 
+            # GPT-5 models don't support temperature
+            if not self.model_name.startswith("gpt-5"):
+                params["temperature"] = self.temperature
+
+            response = self.client.chat.completions.create(**params)
             result_text = response.choices[0].message.content.strip()
             if not result_text:
                 raise ValueError("Empty response from AI")
@@ -865,11 +877,17 @@ class AIConfigGenerator:
         """Validate that the API key is working"""
         try:
             # Make a simple test call
-            self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": "Hello"}],
-                max_completion_tokens=5,
-            )
+            params = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_completion_tokens": 5000,
+            }
+
+            # GPT-5 models don't support temperature
+            if not self.model_name.startswith("gpt-5"):
+                params["temperature"] = self.temperature
+
+            response = self.client.chat.completions.create(**params)
             return True
         except Exception as e:
             error_msg = str(e).lower()
@@ -1000,7 +1018,8 @@ class AIConfigGenerator:
         source_lang = detect_source_language(
             transcript_sample,
             chat=self.client,
-            model=self.DEFAULT_MODEL,
+            model=self.model_name,
+            temperature=self.temperature,
             language_config=self._lang_cfg,
         )
         self.logger.info(
@@ -1063,14 +1082,19 @@ class AIConfigGenerator:
             dnt_terms=dnt_terms,
         )
         try:
-            resp = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-                max_completion_tokens=5000,
-                response_format={"type": "json_object"},
-            )
-            raw = (resp.choices[0].message.content or "").strip()
+            params = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": 5000,
+                "response_format": {"type": "json_object"},
+            }
+
+            # GPT-5 models don't support temperature
+            if not self.model_name.startswith("gpt-5"):
+                params["temperature"] = self.temperature
+
+            response = self.client.chat.completions.create(**params)
+            raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             out = []
             for it in data.get("pass1_terms") or []:

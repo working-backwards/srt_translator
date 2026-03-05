@@ -275,6 +275,7 @@ class SRTTranslator:
         model_name: str,
         batch_size: int,
         error_policy: str = "STRICT",
+        temperature: float | None = None,          # ← ADD THIS BACK
         language_config: LanguageConfig,
         tone: str = "neutral",
     ) -> None:
@@ -288,6 +289,7 @@ class SRTTranslator:
         self.batch_size = max(1, int(batch_size))
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
+        self.temperature = temperature if temperature is not None else 0.75
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -339,14 +341,16 @@ class SRTTranslator:
         cap = int(math.ceil(2.4 * max(1, src_tok)))
         floor = 120  # <-- token floor: prevents cut-off JSON on very short cues
         max_completion_tokens = min(900, max(floor, cap))
-        return {
-            "temperature": 0,
-            "frequency_penalty": 0.6,  # discourage loops like "ek ek ek…"
+        base = {
+            "frequency_penalty": 0.6, # discourage loops like "ek ek ek…"
             "presence_penalty": 0.0,
             "max_completion_tokens": max_completion_tokens,
             # Optional: stop right after JSON; remove if provider doesn't support 'stop'
             "stop": ["]}"],
         }
+        if not self.model_name.startswith("gpt-5"):
+            base["temperature"] = self.temperature
+        return base
 
     def _setup_file_logging(
         self: SRTTranslator, input_filepath: str, target_lang: str
@@ -857,11 +861,12 @@ class SRTTranslator:
         messages_typed = cast(Sequence[ChatMsg], messages_payload)
 
         # Use JSON mode if available; otherwise rely on instruction.
-        kwargs = (
-            self._strict_retry_kwargs(src_items)
-            if strict
-            else {"temperature": 1, "response_format": {"type": "json_object"}}
-        )
+        if strict:
+            kwargs = self._strict_retry_kwargs(src_items)
+        else:
+            kwargs = {"response_format": {"type": "json_object"}}
+            if not self.model_name.startswith("gpt-5"):
+                kwargs["temperature"] = self.temperature
         resp = self.client.chat.completions.create(
             model=self.model_name,
             messages=messages_typed,
@@ -913,9 +918,9 @@ class SRTTranslator:
                         target_lang,
                         batch_ids,
                     )
-                    diag_resp = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=cast(
+                    diag_params = {
+                        "model": self.model_name,
+                        "messages": cast(
                             Sequence[ChatMsg],
                             [
                                 {
@@ -925,10 +930,13 @@ class SRTTranslator:
                                 {"role": "user", "content": question},
                             ],
                         ),
-                        temperature=self.temperature,
-                        max_completion_tokens=160,
-                    )
-                    diag_text = (diag_resp.choices[0].message.content or "").strip()
+                        "max_completion_tokens": 160,
+                    }
+                    if not self.model_name.startswith("gpt-5"):
+                        diag_params["temperature"] = self.temperature
+
+                    response = self.client.chat.completions.create(**diag_params)
+                    diag_text = (response.choices[0].message.content or "").strip()
                     self.logger.debug(
                         "AI diagnostic explanation (lang=%s, ids=%s): %s",
                         target_lang,
@@ -1074,18 +1082,21 @@ class SRTTranslator:
         Returns ONLY a translated string; caller will wrap into JSON.
         """
         sys, usr = build_single_string_fallback_prompt(target_lang, _src_text)
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=cast(
+        params = {
+            "model": self.model_name,
+            "messages": cast(
                 Sequence[ChatMsg],
                 [
                     {"role": "system", "content": sys},
                     {"role": "user", "content": usr},
                 ],
             ),
-            temperature=self.temperature,
-            max_completion_tokens=256,
-        )
+            "max_completion_tokens": 256,
+        }
+        if not self.model_name.startswith("gpt-5"):
+            params["temperature"] = self.temperature
+
+        resp = self.client.chat.completions.create(**params)
         out = (resp.choices[0].message.content or "").strip()
         # Be defensive about accidental quoting
         if (out.startswith('"') and out.endswith('"')) or (out.startswith("'") and out.endswith("'")):
@@ -1116,12 +1127,15 @@ class SRTTranslator:
             {"role": "user", "content": prompt},
         ]
 
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=cast(Sequence[ChatMsg], messages_payload),
-            temperature=self.temperature,
-            response_format={"type": "json_object"},
-        )
+        params = {
+            "model": self.model_name,
+            "messages": cast(Sequence[ChatMsg], messages_payload),
+            "response_format": {"type": "json_object"},
+        }
+        if not self.model_name.startswith("gpt-5"):
+            params["temperature"] = self.temperature
+
+        resp = self.client.chat.completions.create(**params)
         content = (resp.choices[0].message.content or "").strip()
         try:
             data = json.loads(content)

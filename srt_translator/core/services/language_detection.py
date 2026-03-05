@@ -8,6 +8,7 @@ def detect_source_language(
     *,
     chat,  # object exposing .chat.completions.create(...)
     model: str,
+    temperature: float,
     language_config: object | None = None,
     sample_chars: int = 2000,
 ) -> dict[str, object]:
@@ -35,16 +36,20 @@ def detect_source_language(
     prompt = build_language_detection_prompt(text)
 
     try:
-        resp = chat.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=1,
-            max_completion_tokens=120,
-            response_format={"type": "json_object"},
-        )
-        import json
+        params = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_completion_tokens": 120,
+            "response_format": {"type": "json_object"},
+        }
 
-        data = json.loads((resp.choices[0].message.content or "").strip() or "{}")
+        # GPT-5 models don't support temperature
+        if not model.startswith("gpt-5"):
+            params["temperature"] = temperature
+
+        import json
+        response = chat.chat.completions.create(**params)
+        data = json.loads((response.choices[0].message.content or "").strip() or "{}")
         detected = (data.get("detected_code") or "").strip()
         confidence = float(data.get("confidence") or 0.0)
         mixed = bool(data.get("mixed") or False)

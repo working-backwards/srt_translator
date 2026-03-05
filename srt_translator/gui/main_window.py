@@ -492,7 +492,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Initialize AI config generator if not already done
         model_name = self.settings_manager.load_model_name()
 
-        if model_name.lower().startswith("gpt-5-mini"):
+        if model_name.lower().startswith("gpt-5"):
             temperature = None
         else:
             temperature = self.settings_manager.load_aggressiveness()
