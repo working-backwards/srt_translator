@@ -1030,7 +1030,7 @@ class AIConfigGenerator:
             transcript_sample,
             chat=self.client,
             generation_model_name=self.generation_model_name,
-            temperture=self.temperature,
+            temperature=self.temperature,
             language_config=self._lang_cfg,
         )
         self.logger.info(
