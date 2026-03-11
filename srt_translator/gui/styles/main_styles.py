@@ -368,4 +368,31 @@ MAIN_STYLESHEET = """
         width: 14px;
         height: 14px;
     }
+    
+    
+    /* Model Dropdown */
+    QComboBox {
+        color: #374151;
+        background-color: #FFFFFF;
+        border: 1px solid #000000;    /* changed to black */
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 13px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        min-width: 160px;
+    }
+
+    QComboBox::drop-down {
+        border: none;
+        width: 20px;
+    }
+
+    QComboBox QAbstractItemView {
+        color: #374151;
+        background-color: #FFFFFF;
+        border: 1px solid #D1D5DB;
+        selection-background-color: #DBEAFE;
+        selection-color: #1E293B;
+        font-size: 13px;
+    }
 """

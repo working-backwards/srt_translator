@@ -134,7 +134,7 @@ def translate_srt_files(
                 termbase=config.termbase.get(lang_code, {}),
                 api_key=config.api_key,
                 allow_global_termbase_fallback=config.mode == "CLI",  # GUI: no fallback; CLI: allow
-                model_name=config.model_name,
+                translation_model_name=config.translation_model_name,
                 batch_size=batch_size_for_lang,
                 logger=logger,
                 error_policy=config.error_policy,  # Pass error policy
@@ -200,8 +200,9 @@ def translate_srt_files(
             "dnt_terms": list(config.dnt_terms),
             "termbase": {lang: dict(entries) for lang, entries in config.termbase.items()},
             "language_batch_sizes": language_batch_sizes,
-            "aggressiveness": config.aggressiveness,
+            "temperature": config.temperature,
             "tone": config.tone,
+            "translation_model_name": config.translation_model_name,
         }
 
         # Write ai_config.json directly to artifacts directory

@@ -1,13 +1,14 @@
 # srt_translator/core/services/language_detection.py
-
+from srt_translator.core.constants import MAX_COMPLETION_TOKENS, MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION
 from srt_translator.prompts.detection import build_language_detection_prompt
+from srt_translator.config.model_config_loader import get_model_config
 
 
 def detect_source_language(
     text: str,
     *,
     chat,  # object exposing .chat.completions.create(...)
-    model: str,
+    generation_model_name: str,
     temperature: float,
     language_config: object | None = None,
     sample_chars: int = 2000,
@@ -37,14 +38,16 @@ def detect_source_language(
 
     try:
         params = {
-            "model": model,
+            "model": generation_model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "max_completion_tokens": 120,
+            "max_completion_tokens": MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION,
             "response_format": {"type": "json_object"},
         }
 
+        model_config = get_model_config(generation_model_name)
+
         # GPT-5 models don't support temperature
-        if not model.startswith("gpt-5"):
+        if model_config.get("supports_temperature", True):
             params["temperature"] = temperature
 
         import json

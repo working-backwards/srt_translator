@@ -10,6 +10,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal, TypedDict
 
+from srt_translator.core.constants import (
+    DEFAULT_TONE,
+    DEFAULT_TRANSLATION_MODEL,
+    DEFAULT_ERROR_POLICY, DEFAULT_TEMPERATURE
+)
+
+
 
 class LogMode(StrEnum):
     """Logging mode for the translation system."""
@@ -50,8 +57,8 @@ class TranslationConfig:
     mode: Literal["CLI", "GUI"]
 
     # Optional fields with defaults - must come after required fields
-    model_name: str = "gpt-4o-mini"
-    aggressiveness: float = 0.75  # Aggressiveness of automatic placeholder fixes
+    translation_model_name: str = DEFAULT_TRANSLATION_MODEL
+    temperature: float = DEFAULT_TEMPERATURE   # Aggressiveness of automatic placeholder fixes
     # Immutable sequence of DNT (Do Not Translate) terms.
     # Empty tuple if none provided - never None to avoid Optional handling in core.
     dnt_terms: tuple[str, ...] = ()
@@ -60,7 +67,7 @@ class TranslationConfig:
     # Empty MappingProxy if none provided - never None to avoid Optional handling in core.
     termbase: Mapping[str, Mapping[str, str]] = field(default_factory=lambda: MappingProxyType({}))
 
-    error_policy: Literal["STRICT", "BOUNDED", "DEV"] = "BOUNDED"
+    error_policy: Literal["STRICT", "BOUNDED", "DEV"] = DEFAULT_ERROR_POLICY
 
     # File handling
     files: Iterable[Path] | None = None
@@ -72,7 +79,7 @@ class TranslationConfig:
     language_policies: dict[str, dict[str, Any]] | None = None
 
     # Translation tone/register: casual, neutral, or formal
-    tone: str = "neutral"
+    tone: str = DEFAULT_TONE
 
     def run(self) -> SummaryDict:
         """Run the translation with this configuration and return summary."""
@@ -127,18 +134,18 @@ class TranslationConfig:
             api_key = ""
 
         # Validate model name (handle both openai_model and model_name)
-        model_name = raw.get("openai_model") or raw.get("model_name") or "gpt-4o-mini"
+        translation_model_name = raw.get("translation_model_name") or raw.get("openai_model") or raw.get("model_name") or DEFAULT_TRANSLATION_MODEL
 
         # Validate aggressiveness
-        raw_agg = raw.get("aggressiveness")
+        raw_agg = raw.get("Temperature")
         try:
-            aggressiveness = float(raw_agg) if raw_agg is not None else 0.75
-            if not 0.0 <= aggressiveness <= 1.0:
-                errors.append("aggressiveness must be between 0.0 and 1.0")
-                aggressiveness = 0.75
+            temperature = float(raw_agg) if raw_agg is not None else DEFAULT_TEMPERATURE
+            if not 0.0 <= temperature <= 1.0:
+                errors.append("temperature must be between 0.0 and 1.0")
+                temperature =DEFAULT_TEMPERATURE
         except (ValueError, TypeError):
-            errors.append("aggressiveness must be a float")
-            aggressiveness = 0.75
+            errors.append("temperature must be a float")
+            temperature = DEFAULT_TEMPERATURE
 
         # Validate log mode
         try:
@@ -151,12 +158,12 @@ class TranslationConfig:
         error_policy = raw.get("error_policy", "BOUNDED")
         if error_policy not in ("STRICT", "BOUNDED", "DEV"):
             errors.append(f"Invalid error_policy: {error_policy}")
-            error_policy = "BOUNDED"
+            error_policy = DEFAULT_ERROR_POLICY
 
         # Validate tone (case-insensitive, normalize to lowercase)
         tone_raw = raw.get("tone", "neutral")
         if tone_raw is None:
-            tone = "neutral"
+            tone =DEFAULT_TONE
         else:
             tone = str(tone_raw).lower().strip()
             if tone not in ("casual", "neutral", "formal"):
@@ -193,8 +200,8 @@ class TranslationConfig:
             termbase=termbase_proxy,
             output_directory=output_dir,
             api_key=api_key,
-            model_name=model_name,
-            aggressiveness=aggressiveness,
+            translation_model_name=translation_model_name,
+            temperature=temperature,
             log_mode=log_mode,
             mode=mode,
             error_policy=error_policy,

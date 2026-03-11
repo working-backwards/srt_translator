@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QSlider,
     QTabWidget,
-    QVBoxLayout, QMessageBox,
+    QVBoxLayout, QMessageBox, QComboBox,
 )
+
+from srt_translator.core.constants import DEFAULT_GENERATION_MODEL, DEFAULT_TEMPERATURE
 
 SUPPORTED_MODELS = {
     "gpt-4o-mini": True,
@@ -210,17 +212,18 @@ class AIConfigSection(QGroupBox):
         model_row = QHBoxLayout()
         model_label = QLabel("Model:")
         model_label.setStyleSheet("font-weight: 500; color: #374151;")
-        self.model_name_edit = QLineEdit()
-        self.model_name_edit.setPlaceholderText("gpt-4o-mini")
-        self.model_name_edit.setToolTip(
+        self.model_dropdown = QComboBox()
+        self.model_dropdown.addItems(list(SUPPORTED_MODELS))
+        self.model_dropdown.currentTextChanged.connect(self._on_model_changed)
+
+        self.model_dropdown.setToolTip(
             "OpenAI model used for translation.\n"
             "Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini\n\n"
             "Note: gpt-5-mini does not support custom temperature —\n"
             "the Fix Aggressiveness option will be hidden for that model."
         )
-        self.model_name_edit.textChanged.connect(self._on_model_changed)
         model_row.addWidget(model_label)
-        model_row.addWidget(self.model_name_edit)
+        model_row.addWidget(self.model_dropdown)
         adv_layout.addLayout(model_row)
 
         # Aggressiveness row
@@ -231,12 +234,12 @@ class AIConfigSection(QGroupBox):
         agg_label.setStyleSheet("font-weight: 500; color: #374151;")
         self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
         self.aggressiveness_slider.setRange(0, 100)
-        self.aggressiveness_slider.setValue(75)
+        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
         self.aggressiveness_slider.setToolTip(
             "How aggressively the system fixes placeholder issues.\n"
             "0.0 = lenient, 1.0 = strict. Recommended: 0.75"
         )
-        self.aggressiveness_value_label = QLabel("0.75")
+        self.aggressiveness_value_label = QLabel(str(DEFAULT_TEMPERATURE))
         self.aggressiveness_value_label.setFixedWidth(35)
         self.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
         agg_row.addWidget(agg_label)
@@ -254,6 +257,8 @@ class AIConfigSection(QGroupBox):
 
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
+
+        self._on_model_changed(self.model_dropdown.currentText())
 
     def connect_signals(
         self,
@@ -325,8 +330,8 @@ class AIConfigSection(QGroupBox):
         """
         Show or hide the Fix Aggressiveness row based on the model name.
 
-        GPT-5 models manage temperature automatically and the API rejects
-        any custom temperature value. We hide the entire aggressiveness row
+        GPT-5 models manage aggressive automatically and the API rejects
+        any custom aggressive value. We hide the entire aggressiveness row
         so users are not confused by a setting that has no effect.
 
         For all other models the row is shown as normal.
@@ -389,11 +394,11 @@ class AIConfigSection(QGroupBox):
 
     def get_model_name(self) -> str:
         """Get the current model name from the text field."""
-        return self.model_name_edit.text().strip() or "gpt-4o-mini"
+        return self.model_dropdown.currentText()
 
     def set_model_name(self, name: str) -> None:
         """Set the model name in the text field."""
-        self.model_name_edit.setText(name)
+        self.model_dropdown.setCurrentText(name)
 
     def get_aggressiveness(self) -> float:
         """Get the current aggressiveness value (0.0-1.0)."""
@@ -411,9 +416,9 @@ class AIConfigSection(QGroupBox):
 
     def _on_reset_advanced_defaults(self) -> None:
         """Reset both advanced fields to defaults."""
-        self.model_name_edit.setText("gpt-4o-mini")
-        self.aggressiveness_slider.setValue(75)
-        self.aggressiveness_value_label.setText("0.75")
+        self.model_dropdown.setCurrentText(DEFAULT_GENERATION_MODEL)
+        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
+        self.aggressiveness_value_label.setText(str(DEFAULT_TEMPERATURE))
 
 
 class EditConfigurationDialog(QDialog):

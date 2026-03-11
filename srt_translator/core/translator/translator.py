@@ -30,6 +30,27 @@ from openai.types.chat import (
 )
 
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.config.model_config_loader import get_model_config
+from srt_translator.core.constants import (
+    MAX_COMPLETION_TOKENS_DIAGNOSTIC,
+    MAX_COMPLETION_TOKENS_FALLBACK,
+    MAX_BATCH_SIZE,
+    MAX_SPLIT_DEPTH,
+    MICRO_BACKOFF_BASE,
+    MAX_JSON_RETRIES_PER_SEGMENT,
+    MAX_CONSECUTIVE_DECODE_FAILURES,
+    STRICT_RETRY_TOKEN_CAP,
+    STRICT_RETRY_TOKEN_FLOOR,
+    STRICT_RETRY_TOKEN_MULTIPLIER,
+    STRICT_RETRY_FREQUENCY_PENALTY,
+    OVERSIZE_RESPONSE_MULTIPLIER,
+    MIN_TRANSLATION_TOKEN_RATIO,
+    MAX_TRANSLATION_TOKEN_RATIO,
+    DIAG_RESPONSE_PREVIEW_CHARS,
+    DIAG_MAX_PROBE_BATCH_IDS,
+    DIAG_MAX_SOURCE_ITEMS,
+    MICRO_BACKOFF_CAP, DEFAULT_TEMPERATURE,
+)
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
     build_oversize_probe_question,
@@ -256,13 +277,13 @@ class SRTTranslator:
     term_handler: TermHandler
 
     # Expert configuration - modify these values as needed
-    MAX_BATCH_SIZE = 8  # Maximum subtitles per batch (safety cap)
+    MAX_BATCH_SIZE = MAX_BATCH_SIZE  # Maximum subtitles per batch (safety cap)
     # Internal bounded shape-lock caps (not user-configurable)
-    _MAX_SPLIT_DEPTH = 3
-    _MAX_JSON_RETRIES_PER_SEGMENT = 2
-    _MAX_CONSECUTIVE_DECODE_FAILURES = 8
-    _MICRO_BACKOFF_BASE_S = 0.25
-    _MICRO_BACKOFF_CAP_S = 1.0
+    _MAX_SPLIT_DEPTH = MAX_SPLIT_DEPTH
+    _MAX_JSON_RETRIES_PER_SEGMENT = MAX_JSON_RETRIES_PER_SEGMENT
+    _MAX_CONSECUTIVE_DECODE_FAILURES = MAX_CONSECUTIVE_DECODE_FAILURES
+    _MICRO_BACKOFF_BASE_S = MICRO_BACKOFF_BASE
+    _MICRO_BACKOFF_CAP_S = MICRO_BACKOFF_CAP
 
     def __init__(
         self,
@@ -272,10 +293,10 @@ class SRTTranslator:
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
-        model_name: str,
+        translation_model_name: str,
         batch_size: int,
         error_policy: str = "STRICT",
-        temperature: float | None = None,          # ← ADD THIS BACK
+        temperature: float | None = None,
         language_config: LanguageConfig,
         tone: str = "neutral",
     ) -> None:
@@ -285,11 +306,12 @@ class SRTTranslator:
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
-        self.model_name = model_name
+        self.translation_model_name = translation_model_name
         self.batch_size = max(1, int(batch_size))
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
-        self.temperature = temperature if temperature is not None else 0.75
+        self.temperature = temperature if temperature is not None else DEFAULT_TEMPERATURE
+        self.model_config = get_model_config(self.translation_model_name)
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -338,17 +360,17 @@ class SRTTranslator:
         but guarantees enough budget to close the JSON wrapper even for tiny inputs.
         """
         src_tok = sum(estimate_tokens(s or "") for s in src_items)
-        cap = int(math.ceil(2.4 * max(1, src_tok)))
-        floor = 120  # <-- token floor: prevents cut-off JSON on very short cues
-        max_completion_tokens = min(900, max(floor, cap))
+        cap = int(math.ceil(STRICT_RETRY_TOKEN_MULTIPLIER * max(1, src_tok)))
+        floor = STRICT_RETRY_TOKEN_FLOOR  # <-- token floor: prevents cut-off JSON on very short cues
+        max_completion_tokens = min(STRICT_RETRY_TOKEN_CAP, max(floor, cap))
         base = {
-            "frequency_penalty": 0.6, # discourage loops like "ek ek ek…"
+            "frequency_penalty": STRICT_RETRY_FREQUENCY_PENALTY, # discourage loops like "ek ek ek…"
             "presence_penalty": 0.0,
             "max_completion_tokens": max_completion_tokens,
             # Optional: stop right after JSON; remove if provider doesn't support 'stop'
             "stop": ["]}"],
         }
-        if not self.model_name.startswith("gpt-5"):
+        if self.model_config.get("supports_temperature", True):
             base["temperature"] = self.temperature
         return base
 
@@ -865,10 +887,10 @@ class SRTTranslator:
             kwargs = self._strict_retry_kwargs(src_items)
         else:
             kwargs = {"response_format": {"type": "json_object"}}
-            if not self.model_name.startswith("gpt-5"):
+            if self.model_config.get("supports_temperature", True):
                 kwargs["temperature"] = self.temperature
         resp = self.client.chat.completions.create(
-            model=self.model_name,
+            model=self.translation_model_name,
             messages=messages_typed,
             **kwargs,
         )
@@ -881,7 +903,7 @@ class SRTTranslator:
         repetitive_loop = looks_like_repetitive_loop(content or "")
 
         # Heuristic: response wildly larger than prompt (>= 4x), or loop detected
-        oversize = response_token_est >= 4 * prompt_token_est
+        oversize = response_token_est >= OVERSIZE_RESPONSE_MULTIPLIER * prompt_token_est
         if oversize or repetitive_loop:
             self.logger.debug(
                 "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
@@ -898,10 +920,10 @@ class SRTTranslator:
                 try:
                     # Build a concise source excerpt and response preview for the question
                     # Limit source items to the same number we asked the model to translate.
-                    src_excerpt: Sequence[str] = tuple(src_items[: min(len(src_items), 8)])
+                    src_excerpt: Sequence[str] = tuple(src_items[: min(len(src_items), DIAG_MAX_SOURCE_ITEMS)])
                     response_preview = content or ""
-                    if len(response_preview) > 500:
-                        response_preview = response_preview[:500] + "…"
+                    if len(response_preview) > DIAG_RESPONSE_PREVIEW_CHARS:
+                        response_preview = response_preview[:DIAG_RESPONSE_PREVIEW_CHARS] + "…"
 
                     question = build_oversize_probe_question(
                         lang_code=target_lang,
@@ -919,7 +941,7 @@ class SRTTranslator:
                         batch_ids,
                     )
                     diag_params = {
-                        "model": self.model_name,
+                        "model": self.translation_model_name,
                         "messages": cast(
                             Sequence[ChatMsg],
                             [
@@ -930,9 +952,9 @@ class SRTTranslator:
                                 {"role": "user", "content": question},
                             ],
                         ),
-                        "max_completion_tokens": 160,
+                        "max_completion_tokens": MAX_COMPLETION_TOKENS_DIAGNOSTIC,
                     }
-                    if not self.model_name.startswith("gpt-5"):
+                    if self.model_config.get("supports_temperature", True):
                         diag_params["temperature"] = self.temperature
 
                     response = self.client.chat.completions.create(**diag_params)
@@ -993,11 +1015,11 @@ class SRTTranslator:
                     bad.append((i, "repetitive_loop"))
                     continue
 
-                if estimate_tokens(tgt) < 0.3 * max(1, estimate_tokens(src or "")):
+                if estimate_tokens(tgt) < MIN_TRANSLATION_TOKEN_RATIO * max(1, estimate_tokens(src or "")):
                     bad.append((i, "under_ratio"))
 
                 # 2.8× is conservative; adjust later per language if needed
-                if estimate_tokens(tgt) >= 2.8 * max(1, estimate_tokens(src or "")):
+                if estimate_tokens(tgt) >= MAX_TRANSLATION_TOKEN_RATIO * max(1, estimate_tokens(src or "")):
                     bad.append((i, "oversize_ratio"))
             if bad:
                 self.logger.debug(
@@ -1045,8 +1067,8 @@ class SRTTranslator:
                     budget=self._probe_budget,
                     file_base=file_base,
                     lang=target_lang,
-                    batch_ids=batch_ids[:8],
-                    raw_excerpt=(content or "")[:500],
+                    batch_ids=batch_ids[:DIAG_MAX_PROBE_BATCH_IDS],
+                    raw_excerpt=(content or "")[:DIAG_RESPONSE_PREVIEW_CHARS],
                     hint_class=hint_class,
                     source_text=source_text,
                 )
@@ -1083,7 +1105,7 @@ class SRTTranslator:
         """
         sys, usr = build_single_string_fallback_prompt(target_lang, _src_text)
         params = {
-            "model": self.model_name,
+            "model": self.translation_model_name,
             "messages": cast(
                 Sequence[ChatMsg],
                 [
@@ -1091,9 +1113,9 @@ class SRTTranslator:
                     {"role": "user", "content": usr},
                 ],
             ),
-            "max_completion_tokens": 256,
+            "max_completion_tokens": MAX_COMPLETION_TOKENS_FALLBACK,
         }
-        if not self.model_name.startswith("gpt-5"):
+        if self.model_config.get("supports_temperature", True):
             params["temperature"] = self.temperature
 
         resp = self.client.chat.completions.create(**params)
@@ -1128,11 +1150,11 @@ class SRTTranslator:
         ]
 
         params = {
-            "model": self.model_name,
+            "model": self.translation_model_name,
             "messages": cast(Sequence[ChatMsg], messages_payload),
             "response_format": {"type": "json_object"},
         }
-        if not self.model_name.startswith("gpt-5"):
+        if self.model_config.get("supports_temperature", True):
             params["temperature"] = self.temperature
 
         resp = self.client.chat.completions.create(**params)
@@ -1328,11 +1350,11 @@ class SRTTranslator:
                 self._model_invalid = True
                 logger.error(
                     "Invalid model '%s': %s. Check the model name in your settings.",
-                    self.model_name,
+                    self.translation_model_name,
                     ex,
                 )
                 raise RuntimeError(
-                    f"Invalid model '{self.model_name}'. Check the model name in your settings. "
+                    f"Invalid model '{self.translation_model_name}'. Check the model name in your settings. "
                     f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini,gpt-5-mini"
                 ) from ex
 

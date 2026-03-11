@@ -25,6 +25,13 @@ from PySide6.QtWidgets import (
 )
 
 from srt_translator.core.config.utils import normalize_target_languages
+from srt_translator.core.constants import (
+    DEFAULT_GENERATION_MODEL,
+    BYTES_TO_TOKENS_RATIO,
+    TRANSLATION_OVERHEAD_FACTOR,
+    PRICE_PER_1K_TOKENS,
+    AI_CONFIG_BASE_COST, DEFAULT_TEMPERATURE
+)
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
@@ -34,6 +41,7 @@ from srt_translator.gui.ui.api_section import APISection
 from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.translation_section import TranslationSection
+from srt_translator.config.model_config_loader import get_model_config
 from srt_translator.gui.utils.termbase_merger import (
     load_dnt_terms_from_file,
     load_termbase_from_file,
@@ -213,7 +221,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.adv_toggle_btn.clicked.connect(
             self.ai_config_section.toggle_advanced_expansion
         )
-        self.ai_config_section.model_name_edit.editingFinished.connect(self._on_model_name_changed)
+        self.ai_config_section.model_dropdown.currentTextChanged.connect(self._on_model_name_changed)
         self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
         self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
 
@@ -317,8 +325,8 @@ class SRTTranslatorMainWindow(QMainWindow):
     def _on_reset_advanced_defaults(self) -> None:
         """Reset advanced settings to defaults and persist."""
         self.ai_config_section._on_reset_advanced_defaults()
-        self.settings_manager.save_model_name("gpt-4o-mini")
-        self.settings_manager.save_aggressiveness(0.75)
+        self.settings_manager.save_model_name(DEFAULT_GENERATION_MODEL)
+        self.settings_manager.save_aggressiveness(DEFAULT_TEMPERATURE)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""
@@ -444,8 +452,6 @@ class SRTTranslatorMainWindow(QMainWindow):
     def generate_translation_settings(self):
         """Generate Translation Settings for the selected files"""
         # Get selected files and target languages from UI
-        if not self.ai_config_section.validate_advanced_settings():
-            return
 
         selected_files = self.file_section.get_selected_files()
         target_codes = self._get_target_codes_from_ui()
@@ -490,27 +496,28 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
 
         # Initialize AI config generator if not already done
-        model_name = self.settings_manager.load_model_name()
+        generation_model_name = self.settings_manager.load_model_name()
 
-        if model_name.lower().startswith("gpt-5"):
-            temperature = None
-        else:
+        model_config = get_model_config(generation_model_name)
+
+        if model_config.get("supports_temperature", True):
             temperature = self.settings_manager.load_aggressiveness()
+        else:
+            temperature = None
 
+        if not self.ai_config_section.validate_advanced_settings():
+            return
 
         self.ai_config_generator = AIConfigGenerator(
             api_key=api_key,
             language_config=self.language_config,
-            model_name=model_name,
+            generation_model_name=generation_model_name,
             temperature=temperature,
         )
 
-        self.ai_config_generator.DEFAULT_MODEL = model_name
-        self.ai_config_generator.temperature = temperature
-
         self.logger.debug(
             "DEBUG: Generator using model=%s temperature=%s",
-            self.ai_config_generator.model_name,
+            self.ai_config_generator.generation_model_name,
             self.ai_config_generator.temperature,
         )
 
@@ -885,21 +892,21 @@ class SRTTranslatorMainWindow(QMainWindow):
             except OSError:
                 continue
 
-        estimated_tokens = total_bytes * 0.25
+        estimated_tokens = total_bytes * BYTES_TO_TOKENS_RATIO
 
         total_languages = len(target_languages)
         estimated_tokens *= total_languages
 
-        OVERHEAD_FACTOR = 2.3
+        OVERHEAD_FACTOR = TRANSLATION_OVERHEAD_FACTOR
         estimated_tokens *= OVERHEAD_FACTOR
 
-        PRICE_PER_1K = 0.00015
+        PRICE_PER_1K = PRICE_PER_1K_TOKENS
         estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K
 
         # Add AI configuration cost if not already generated
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if not dnt_terms and not termbase:
-            estimated_cost += 0.10  # AI configuration cost
+            estimated_cost += AI_CONFIG_BASE_COST   # AI configuration cost
 
         cost_text = f"${estimated_cost:.3f}"
         self.translation_section.update_cost_estimate(cost_text)
@@ -908,8 +915,6 @@ class SRTTranslatorMainWindow(QMainWindow):
     def start_translation(self):
         """Start the translation process"""
 
-        if not self.ai_config_section.validate_advanced_settings():
-            return
 
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
@@ -934,6 +939,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         is_valid, error_message = validate_translation_inputs(api_key, selected_files, target_codes)
         if not is_valid:
             show_validation_error(self, "Validation Error", error_message)
+            return
+
+        if not self.ai_config_section.validate_advanced_settings():
             return
 
         # Start translation

@@ -17,6 +17,10 @@ from PySide6.QtCore import Signal as pyqtSignal
 
 from srt_translator.config import load_language_catalog
 from srt_translator.core.config.models import TranslationConfig
+from srt_translator.core.constants import (
+    DEFAULT_TONE,
+    DEFAULT_TEMPERATURE,
+)
 
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
@@ -245,18 +249,12 @@ class TranslationWorker(QObject):
             termbase_proxy = MappingProxyType(safe_tb_outer)
 
             # Load tone from settings (default to "neutral" if not set)
-            tone = "neutral"
-            model_name = "gpt-4o-mini"
-            aggressiveness = 0.75
+            tone = DEFAULT_TONE
+            temperature = DEFAULT_TEMPERATURE
             if self.settings_manager:
                 tone = self.settings_manager.load_tone()
-                model_name = self.settings_manager.load_model_name()
-                aggressiveness = self.settings_manager.load_aggressiveness()
+                temperature = self.settings_manager.load_aggressiveness()
                 self.logger.debug("Loaded tone from settings: '%s'", tone)
-                self.logger.debug("Loaded model_name from settings: '%s'", model_name)
-                self.logger.debug("Loaded aggressiveness from settings: %s", aggressiveness)
-            else:
-                self.logger.debug("No settings manager, using defaults: tone='%s', model='%s'", tone, model_name)
 
             # Construct the immutable, complete TranslationConfig
             api_cfg = TranslationConfig(
@@ -265,8 +263,7 @@ class TranslationWorker(QObject):
                 target_languages=filtered_target_languages,
                 dnt_terms=dnt_tuple,
                 termbase=termbase_proxy,
-                model_name=model_name,
-                aggressiveness=aggressiveness,
+                temperature=temperature,
                 log_mode="Standard",
                 api_key=self.api_key,
                 mode="GUI",
@@ -274,6 +271,8 @@ class TranslationWorker(QObject):
                 source_language=source_language,
                 tone=tone,
             )
+
+            self.logger.info("Translation model used: %s", api_cfg.translation_model_name)
 
             self.logger.info(
                 "Using configuration from settings manager: %s languages",
@@ -293,6 +292,7 @@ class TranslationWorker(QObject):
 
                 try:
                     results = _GuiTranslator(api_cfg).run()
+                    print("TRANSLATION MODEL:", api_cfg.translation_model_name)
                 except Exception as e:
                     self.logger.error("Translation session failed: %s", e)
                     raise e
