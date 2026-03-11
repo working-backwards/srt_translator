@@ -1,0 +1,18 @@
+{
+  "gpt-4o-mini": {
+    "supports_temperature": true,
+    "model_context_length": 128000
+  },
+  "gpt-4o": {
+    "supports_temperature": true,
+    "model_context_length": 128000
+  },
+  "gpt-4.1-mini": {
+    "supports_temperature": true,
+    "model_context_length": 1047576
+  },
+  "gpt-5-mini": {
+    "supports_temperature": false,
+    "model_context_length": 400000
+  }
+}
