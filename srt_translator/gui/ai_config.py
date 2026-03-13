@@ -977,7 +977,7 @@ class AIConfigGenerator:
 
         CHAR_CAP = TOKEN_CAP * _CHARS_PER_TOKEN
 
-        self.logger.info("Model selected: %s", generation_model_name)
+        self.logger.info("Model selected of generation_model_name: %s", generation_model_name)
         self.logger.info("Model context length (tokens): %s", TOKEN_CAP)
         self.logger.info("Calculated character cap: %s", CHAR_CAP)
 

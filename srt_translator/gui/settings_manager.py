@@ -14,6 +14,7 @@ from typing import Any
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.constants import DEFAULT_GENERATION_MODEL
 from srt_translator.gui.utils.termbase_merger import normalize_termbase_keys
 
 
@@ -349,12 +350,12 @@ class SettingsManager:
 
     def save_model_name(self, model_name: str) -> None:
         """Save the OpenAI model name."""
-        self.settings.setValue("model_name", model_name.strip() or "gpt-4o-mini")
+        self.settings.setValue("model_name", model_name.strip() or DEFAULT_GENERATION_MODEL)
 
     def load_model_name(self) -> str:
-        """Load the OpenAI model name (defaults to 'gpt-4o-mini')."""
-        value = self.settings.value("model_name", "gpt-4o-mini")
-        return str(value).strip() if value else "gpt-4o-mini"
+        """Load the OpenAI model name (defaults to 'gpt-5-mini')."""
+        value = self.settings.value("model_name", DEFAULT_GENERATION_MODEL)
+        return str(value).strip() if value else DEFAULT_GENERATION_MODEL
 
     def save_aggressiveness(self, value: float) -> None:
         """Save the fix aggressiveness setting (clamped 0.0-1.0)."""

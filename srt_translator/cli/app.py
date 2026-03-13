@@ -110,6 +110,11 @@ Examples:
             logger.info("Overriding translation model from ENV: %s", env_translation_model)
             raw_config["translation_model_name"] = env_translation_model
 
+        env_generation_model = os.getenv("GENERATION_MODEL_NAME")
+        if env_generation_model:
+            logger.info("Overriding generation model from ENV: %s", env_generation_model)
+            raw_config["generation_model_name"] = env_generation_model
+
         # Override tone from CLI argument if provided (takes precedence over env)
         if args.tone:
             raw_config["tone"] = args.tone

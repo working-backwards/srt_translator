@@ -1,7 +1,7 @@
 # srt_translator/core/constants.py
 MAX_COMPLETION_TOKENS = 120
 
-DEFAULT_GENERATION_MODEL = "gpt-4o-mini"         # model used for DNT / termbase generation
+DEFAULT_GENERATION_MODEL = "gpt-5-mini"         # model used for DNT / termbase generation
 MAX_COMPLETION_TOKENS_DNT = 5000                 # token budget for DNT extraction calls
 MAX_COMPLETION_TOKENS_TERMBASE = 5000            # token budget for termbase generation calls
 MAX_COMPLETION_TOKENS_DIAGNOSTIC = 160           # token budget for oversize / malformed-JSON probes
@@ -108,7 +108,7 @@ SOFT_BAND_HARD_CAP = 40
 JITTER_SLEEP_LOW = 0.4
 JITTER_SLEEP_HIGH = 1.1
 
-DEFAULT_TRANSLATION_MODEL = "gpt-5-mini"  # default model used for subtitle translation
+DEFAULT_TRANSLATION_MODEL = "gpt-4o-mini"  # default model used for subtitle translation
 DEFAULT_TONE = "neutral"                  # translation tone/register: "casual" | "neutral" | "formal"
 DEFAULT_ERROR_POLICY = "BOUNDED"          # placeholder error policy: "STRICT" | "BOUNDED" | "DEV"
 
