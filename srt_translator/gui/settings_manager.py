@@ -14,7 +14,12 @@ from typing import Any
 from PySide6.QtCore import QSettings
 
 from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.core.constants import DEFAULT_GENERATION_MODEL
+from srt_translator.core.constants import (
+    AI_CONFIG_MAX_AGE_DAYS,
+    DEFAULT_GENERATION_MODEL,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_TONE,
+)
 from srt_translator.gui.utils.termbase_merger import normalize_termbase_keys
 
 
@@ -100,7 +105,7 @@ class SettingsManager:
 
         return dnt_terms, termbase, source_language
 
-    def has_recent_ai_config(self, max_age_days: int = 30) -> bool:
+    def has_recent_ai_config(self, max_age_days: int = AI_CONFIG_MAX_AGE_DAYS) -> bool:
         """Check if AI configuration is recent"""
         timestamp_str = self.settings.value("ai_config_timestamp", "")
         if not timestamp_str:
@@ -334,26 +339,30 @@ class SettingsManager:
     def save_tone(self, tone: str) -> None:
         """Save translation tone setting (casual, neutral, or formal)"""
         # Normalize to lowercase and validate
-        tone_lower = (tone or "neutral").lower().strip()
+        tone_lower = (tone or DEFAULT_TONE).lower().strip()
         if tone_lower not in ("casual", "neutral", "formal"):
-            tone_lower = "neutral"
+            tone_lower = DEFAULT_TONE
         self.settings.setValue("tone", tone_lower)
 
     def load_tone(self) -> str:
         """Load translation tone setting (defaults to 'neutral')"""
-        value = self.settings.value("tone", "neutral")
-        tone = str(value).lower().strip() if value else "neutral"
+        value = self.settings.value("tone", DEFAULT_TONE)
+        tone = str(value).lower().strip() if value else DEFAULT_TONE
         # Validate and return
         if tone in ("casual", "neutral", "formal"):
             return tone
-        return "neutral"
+        return DEFAULT_TONE
 
     def save_model_name(self, model_name: str) -> None:
         """Save the OpenAI model name."""
         self.settings.setValue("model_name", model_name.strip() or DEFAULT_GENERATION_MODEL)
 
     def load_model_name(self) -> str:
+<<<<<<< HEAD
         """Load the OpenAI model name (defaults to 'gpt-5-mini')."""
+=======
+        """Load the OpenAI model name (defaults to 'gpt-4o-mini')."""
+>>>>>>> d2c8b53 (feat(config): model config architecture, token-cap fix, CLI env, docs and tests)
         value = self.settings.value("model_name", DEFAULT_GENERATION_MODEL)
         return str(value).strip() if value else DEFAULT_GENERATION_MODEL
 
@@ -364,9 +373,9 @@ class SettingsManager:
 
     def load_aggressiveness(self) -> float:
         """Load the fix aggressiveness setting (defaults to 0.75)."""
-        raw = self.settings.value("aggressiveness", 0.75)
+        raw = self.settings.value("aggressiveness", DEFAULT_TEMPERATURE)
         try:
             val = float(raw)
             return max(0.0, min(1.0, val))
         except (ValueError, TypeError):
-            return 0.75
+            return DEFAULT_TEMPERATURE

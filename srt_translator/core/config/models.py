@@ -11,11 +11,11 @@ from types import MappingProxyType
 from typing import Any, Literal, TypedDict
 
 from srt_translator.core.constants import (
+    DEFAULT_ERROR_POLICY,
+    DEFAULT_TEMPERATURE,
     DEFAULT_TONE,
     DEFAULT_TRANSLATION_MODEL,
-    DEFAULT_ERROR_POLICY, DEFAULT_TEMPERATURE
 )
-
 
 
 class LogMode(StrEnum):
@@ -58,7 +58,7 @@ class TranslationConfig:
 
     # Optional fields with defaults - must come after required fields
     translation_model_name: str = DEFAULT_TRANSLATION_MODEL
-    temperature: float = DEFAULT_TEMPERATURE   # Aggressiveness of automatic placeholder fixes
+    temperature: float = DEFAULT_TEMPERATURE  # Aggressiveness of automatic placeholder fixes
     # Immutable sequence of DNT (Do Not Translate) terms.
     # Empty tuple if none provided - never None to avoid Optional handling in core.
     dnt_terms: tuple[str, ...] = ()
@@ -133,8 +133,8 @@ class TranslationConfig:
             errors.append("api_key is required")
             api_key = ""
 
-        # Validate model name (handle both openai_model and model_name)
-        translation_model_name = raw.get("translation_model_name") or raw.get("openai_model") or raw.get("model_name") or DEFAULT_TRANSLATION_MODEL
+        # Validate model name: prefer explicit translation_model_name/model_name, then default
+        translation_model_name = raw.get("translation_model_name") or raw.get("model_name") or DEFAULT_TRANSLATION_MODEL
 
         # Validate aggressiveness
         raw_agg = raw.get("Temperature")
@@ -142,7 +142,7 @@ class TranslationConfig:
             temperature = float(raw_agg) if raw_agg is not None else DEFAULT_TEMPERATURE
             if not 0.0 <= temperature <= 1.0:
                 errors.append("temperature must be between 0.0 and 1.0")
-                temperature =DEFAULT_TEMPERATURE
+                temperature = DEFAULT_TEMPERATURE
         except (ValueError, TypeError):
             errors.append("temperature must be a float")
             temperature = DEFAULT_TEMPERATURE
@@ -163,7 +163,7 @@ class TranslationConfig:
         # Validate tone (case-insensitive, normalize to lowercase)
         tone_raw = raw.get("tone", "neutral")
         if tone_raw is None:
-            tone =DEFAULT_TONE
+            tone = DEFAULT_TONE
         else:
             tone = str(tone_raw).lower().strip()
             if tone not in ("casual", "neutral", "formal"):

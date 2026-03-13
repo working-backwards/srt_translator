@@ -111,7 +111,7 @@ def probe_malformed_json_with_translator(
         try:
             translator.logger.info("Making AI probe call via translator's OpenAI client")
             diag_resp = translator.client.chat.completions.create(
-                model=translator.model_name,
+                model=translator.translation_model_name,
                 messages=[
                     {
                         "role": "system",

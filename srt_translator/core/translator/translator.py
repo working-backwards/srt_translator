@@ -29,27 +29,29 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
+from srt_translator.config.model_config_loader import build_call_params, get_model_config
 from srt_translator.core.config.language_config import LanguageConfig
-from srt_translator.config.model_config_loader import get_model_config
 from srt_translator.core.constants import (
+    DEFAULT_TEMPERATURE,
+    DIAG_MAX_PROBE_BATCH_IDS,
+    DIAG_MAX_SOURCE_ITEMS,
+    DIAG_RESPONSE_PREVIEW_CHARS,
+    MAX_BATCH_SIZE,
     MAX_COMPLETION_TOKENS_DIAGNOSTIC,
     MAX_COMPLETION_TOKENS_FALLBACK,
-    MAX_BATCH_SIZE,
-    MAX_SPLIT_DEPTH,
-    MICRO_BACKOFF_BASE,
-    MAX_JSON_RETRIES_PER_SEGMENT,
+    MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
     MAX_CONSECUTIVE_DECODE_FAILURES,
+    MAX_JSON_RETRIES_PER_SEGMENT,
+    MAX_SPLIT_DEPTH,
+    MAX_TRANSLATION_TOKEN_RATIO,
+    MICRO_BACKOFF_BASE,
+    MICRO_BACKOFF_CAP,
+    MIN_TRANSLATION_TOKEN_RATIO,
+    OVERSIZE_RESPONSE_MULTIPLIER,
+    STRICT_RETRY_FREQUENCY_PENALTY,
     STRICT_RETRY_TOKEN_CAP,
     STRICT_RETRY_TOKEN_FLOOR,
     STRICT_RETRY_TOKEN_MULTIPLIER,
-    STRICT_RETRY_FREQUENCY_PENALTY,
-    OVERSIZE_RESPONSE_MULTIPLIER,
-    MIN_TRANSLATION_TOKEN_RATIO,
-    MAX_TRANSLATION_TOKEN_RATIO,
-    DIAG_RESPONSE_PREVIEW_CHARS,
-    DIAG_MAX_PROBE_BATCH_IDS,
-    DIAG_MAX_SOURCE_ITEMS,
-    MICRO_BACKOFF_CAP, DEFAULT_TEMPERATURE,
 )
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
@@ -68,6 +70,11 @@ from srt_translator.prompts.translation import (
     build_single_string_fallback_prompt,
     build_translation_prompt,
 )
+
+# Token caps: use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH (4096) for any call that returns
+# JSON with multiple subtitles (main batch, placeholder-fixer). Using a small cap (e.g. 120)
+# truncates the response and produces empty subtitles. Use the smaller constants
+# (DIAGNOSTIC, FALLBACK) or strict-retry computed cap only for single-answer or retry paths.
 
 # ---------------------------
 # Data models
@@ -358,20 +365,22 @@ class SRTTranslator:
         """
         Strict decoding for retries: cools repetition and caps length conservatively,
         but guarantees enough budget to close the JSON wrapper even for tiny inputs.
+        Uses a computed cap (STRICT_RETRY_*), not the generic 120-token constant, so
+        retries get enough tokens for valid JSON without allowing runaway length.
         """
         src_tok = sum(estimate_tokens(s or "") for s in src_items)
         cap = int(math.ceil(STRICT_RETRY_TOKEN_MULTIPLIER * max(1, src_tok)))
         floor = STRICT_RETRY_TOKEN_FLOOR  # <-- token floor: prevents cut-off JSON on very short cues
         max_completion_tokens = min(STRICT_RETRY_TOKEN_CAP, max(floor, cap))
-        base = {
-            "frequency_penalty": STRICT_RETRY_FREQUENCY_PENALTY, # discourage loops like "ek ek ek…"
-            "presence_penalty": 0.0,
-            "max_completion_tokens": max_completion_tokens,
-            # Optional: stop right after JSON; remove if provider doesn't support 'stop'
-            "stop": ["]}"],
-        }
-        if self.model_config.get("supports_temperature", True):
-            base["temperature"] = self.temperature
+        base = build_call_params(
+            self.translation_model_name,
+            max_completion_tokens=max_completion_tokens,
+            temperature=self.temperature,
+            frequency_penalty=STRICT_RETRY_FREQUENCY_PENALTY,
+            presence_penalty=0.0,
+        )
+        # Optional: stop right after JSON; remove if provider doesn't support 'stop'
+        base["stop"] = ["]}"]
         return base
 
     def _setup_file_logging(
@@ -886,9 +895,17 @@ class SRTTranslator:
         if strict:
             kwargs = self._strict_retry_kwargs(src_items)
         else:
-            kwargs = {"response_format": {"type": "json_object"}}
-            if self.model_config.get("supports_temperature", True):
-                kwargs["temperature"] = self.temperature
+            # Main batch path: response is JSON for up to MAX_BATCH_SIZE subtitles. A small
+            # token cap (e.g. 120) truncates the JSON and yields empty subtitles; use
+            # MAX_COMPLETION_TOKENS_TRANSLATION_BATCH.
+            kwargs = {
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.translation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
+                    temperature=self.temperature,
+                ),
+            }
         resp = self.client.chat.completions.create(
             model=self.translation_model_name,
             messages=messages_typed,
@@ -952,10 +969,14 @@ class SRTTranslator:
                                 {"role": "user", "content": question},
                             ],
                         ),
-                        "max_completion_tokens": MAX_COMPLETION_TOKENS_DIAGNOSTIC,
+                        # Diagnostic probe: we only need a short explanation of oversize
+                        # behaviour; small cap is sufficient.
+                        **build_call_params(
+                            self.translation_model_name,
+                            max_completion_tokens=MAX_COMPLETION_TOKENS_DIAGNOSTIC,
+                            temperature=self.temperature,
+                        ),
                     }
-                    if self.model_config.get("supports_temperature", True):
-                        diag_params["temperature"] = self.temperature
 
                     response = self.client.chat.completions.create(**diag_params)
                     diag_text = (response.choices[0].message.content or "").strip()
@@ -1113,10 +1134,13 @@ class SRTTranslator:
                     {"role": "user", "content": usr},
                 ],
             ),
-            "max_completion_tokens": MAX_COMPLETION_TOKENS_FALLBACK,
+            # Fallback returns a single translated string only; small cap is enough.
+            **build_call_params(
+                self.translation_model_name,
+                max_completion_tokens=MAX_COMPLETION_TOKENS_FALLBACK,
+                temperature=self.temperature,
+            ),
         }
-        if self.model_config.get("supports_temperature", True):
-            params["temperature"] = self.temperature
 
         resp = self.client.chat.completions.create(**params)
         out = (resp.choices[0].message.content or "").strip()
@@ -1149,13 +1173,18 @@ class SRTTranslator:
             {"role": "user", "content": prompt},
         ]
 
+        # Placeholder-fixer returns JSON for multiple items (same shape as main batch);
+        # use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH so the response is not truncated.
         params = {
             "model": self.translation_model_name,
             "messages": cast(Sequence[ChatMsg], messages_payload),
             "response_format": {"type": "json_object"},
+            **build_call_params(
+                self.translation_model_name,
+                max_completion_tokens=MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
+                temperature=self.temperature,
+            ),
         }
-        if self.model_config.get("supports_temperature", True):
-            params["temperature"] = self.temperature
 
         resp = self.client.chat.completions.create(**params)
         content = (resp.choices[0].message.content or "").strip()

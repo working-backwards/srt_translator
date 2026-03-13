@@ -15,37 +15,41 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
+from srt_translator.config.model_config_loader import (
+    build_call_params,
+    get_max_inline_tokens,
+    get_model_config,
+)
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.constants import (
-    DEFAULT_GENERATION_MODEL,
-    CHARS_PER_TOKEN,
-    MAX_INLINE_TOKENS,
-    MAX_COMPLETION_TOKENS_DNT,
-    MAX_COMPLETION_TOKENS_TERMBASE,
-    MIN_TERMBASE_SIZE,
-    MIN_ANCHOR_TERM_COUNT,
-    MIN_ANCHOR_COVERAGE,
-    TOPUP_OVERSAMPLE_DIVISOR,
-    MAX_GENERIC_SINGLETONS,
-    MIN_GENERIC_SINGLETON_LINE_FREQ,
-    TERMBASE_FILL_CHUNK_SIZE,
-    SOFT_BAND_FLOOR_SHORT,
-    SOFT_BAND_FLOOR_MEDIUM,
-    SOFT_BAND_FLOOR_LONG,
-    SOFT_BAND_SHORT,
-    SOFT_BAND_MEDIUM,
-    SOFT_BAND_LONG,
     ANCHOR_TOLERANCE_FRACTION,
     ANCHOR_TOLERANCE_MIN,
-    SOFT_BAND_HARD_CAP,
-    JITTER_SLEEP_LOW,
+    CHARS_PER_TOKEN,
+    DEFAULT_GENERATION_MODEL,
+    DEFAULT_TEMPERATURE,
     JITTER_SLEEP_HIGH,
-    MAX_COMPLETION_TOKENS_VALIDATE, DEFAULT_TEMPERATURE,
+    JITTER_SLEEP_LOW,
+    MAX_COMPLETION_TOKENS_DNT,
+    MAX_COMPLETION_TOKENS_TERMBASE,
+    MAX_COMPLETION_TOKENS_VALIDATE,
+    MAX_GENERIC_SINGLETONS,
+    MIN_ANCHOR_COVERAGE,
+    MIN_ANCHOR_TERM_COUNT,
+    MIN_GENERIC_SINGLETON_LINE_FREQ,
+    MIN_TERMBASE_SIZE,
+    SOFT_BAND_FLOOR_LONG,
+    SOFT_BAND_FLOOR_MEDIUM,
+    SOFT_BAND_FLOOR_SHORT,
+    SOFT_BAND_HARD_CAP,
+    SOFT_BAND_LONG,
+    SOFT_BAND_MEDIUM,
+    SOFT_BAND_SHORT,
+    TERMBASE_FILL_CHUNK_SIZE,
+    TOPUP_OVERSAMPLE_DIVISOR,
 )
 from srt_translator.core.services.language_detection import detect_source_language
 from srt_translator.core.terminology_utils import is_hard_preserve, is_numeric_like
 from srt_translator.core.translator.srt_parser import SRTParser
-from srt_translator.config.model_config_loader import get_model_config
 from srt_translator.prompts.config import (
     build_dnt_extraction_prompt,
     build_single_language_termbase_prompt,
@@ -67,7 +71,13 @@ class BatchAIConfig:
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
-    def __init__(self, api_key: str, language_config: LanguageConfig ,generation_model_name: str | None = None,temperature: float | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        language_config: LanguageConfig,
+        generation_model_name: str | None = None,
+        temperature: float | None = None,
+    ):
         """Initialize the AI config generator with OpenAI API key and language configuration"""
         if language_config is None:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
@@ -79,7 +89,6 @@ class AIConfigGenerator:
         self.DEFAULT_MODEL = DEFAULT_GENERATION_MODEL
         self.temperature = DEFAULT_TEMPERATURE
         self.generation_model_name = generation_model_name or self.DEFAULT_MODEL
-        self.model_config = get_model_config(self.generation_model_name)
         self.temperature = temperature or self.temperature
 
         # GUI-local approximation for characters per token to guide truncation.
@@ -90,7 +99,7 @@ class AIConfigGenerator:
         self._lang_cfg = language_config
 
         # Configuration constants
-        self.MAX_INLINE_TOKENS = MAX_INLINE_TOKENS  # Precise token limit for inline content
+        self.MAX_INLINE_TOKENS = get_max_inline_tokens(self.generation_model_name)
         self.MAX_CONTENT_TOKENS = 100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
         self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
 
@@ -170,18 +179,16 @@ class AIConfigGenerator:
         try:
             prompt = build_dnt_extraction_prompt(content)
 
-            if self.model_config.get("supports_temperature", True):
-                self.logger.info("Temperature: %s", self.temperature)
-            else:
-                self.logger.info("Temperature not supported for model %s", self.generation_model_name)
+            self.logger.info("Temperature: %s", self.temperature)
             params = {
                 "model": self.generation_model_name,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_completion_tokens": MAX_COMPLETION_TOKENS_DNT,
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_DNT,
+                    temperature=self.temperature,
+                ),
             }
-
-            if self.model_config.get("supports_temperature", True):
-                params["temperature"] = self.temperature
 
             response = self.client.chat.completions.create(**params)
 
@@ -379,13 +386,13 @@ class AIConfigGenerator:
             params = {
                 "model": self.generation_model_name,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_completion_tokens": MAX_COMPLETION_TOKENS_VALIDATE,
                 "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_VALIDATE,
+                    temperature=self.temperature,
+                ),
             }
-
-            # GPT-5 models don't support temperature
-            if self.model_config.get("supports_temperature", True):
-                params["temperature"] = self.temperature
 
             response = self.client.chat.completions.create(**params)
             raw = (response.choices[0].message.content or "").strip()
@@ -509,7 +516,9 @@ class AIConfigGenerator:
 
             def do_top_up(needed: int) -> int:
                 # oversample to survive DNT/dedupe; clip later
-                ask_low = needed + max(ANCHOR_TOLERANCE_MIN, needed // TOPUP_OVERSAMPLE_DIVISOR)  # e.g., need 3 -> ask 4 or 5
+                ask_low = needed + max(
+                    ANCHOR_TOLERANCE_MIN, needed // TOPUP_OVERSAMPLE_DIVISOR
+                )  # e.g., need 3 -> ask 4 or 5
                 ask_high = ask_low + 2
                 addl = self._top_up_extracted_terms(
                     content=content,
@@ -840,13 +849,13 @@ class AIConfigGenerator:
             params = {
                 "model": self.generation_model_name,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_completion_tokens": MAX_COMPLETION_TOKENS_TERMBASE,
                 "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TERMBASE,
+                    temperature=self.temperature,
+                ),
             }
-
-            # GPT-5 models don't support temperature
-            if self.model_config.get("supports_temperature", True):
-                params["temperature"] = self.temperature
 
             response = self.client.chat.completions.create(**params)
             result_text = response.choices[0].message.content.strip()
@@ -894,7 +903,6 @@ class AIConfigGenerator:
         except Exception as e:
             self.logger.error("Error generating termbase for %s: %s", lang_code, e)
             raise
-
 
     def get_error_details(self, error: Exception) -> dict:
         """Get detailed error information for GUI display"""
@@ -1096,13 +1104,13 @@ class AIConfigGenerator:
             params = {
                 "model": self.generation_model_name,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_completion_tokens": MAX_COMPLETION_TOKENS_TERMBASE,
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TERMBASE,
+                    temperature=self.temperature,
+                ),
             }
-
-            # GPT-5 models don't support temperature
-            if self.model_config.get("supports_temperature", True):
-                params["temperature"] = self.temperature
 
             response = self.client.chat.completions.create(**params)
             raw = (response.choices[0].message.content or "").strip()

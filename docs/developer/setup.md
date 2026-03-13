@@ -146,6 +146,28 @@ srt_translator/
 └── config/         # Configuration files
 ```
 
+## CLI Model Configuration
+
+For CLI runs (`srtx-cli`):
+
+- **API key** comes from `OPENAI_API_KEY` (OS environment wins over `.env`).
+- **Translation model** is controlled by the `.env` key:
+
+  ```bash
+  OPENAI_TRANSLATION_MODEL=gpt-4o-mini
+  ```
+
+  If unset, the CLI uses `DEFAULT_TRANSLATION_MODEL` from `srt_translator/core/constants.py`.
+
+- The **generation/configuration model** (used for DNT + termbase generation) is a
+  code-level choice driven by:
+
+  - `DEFAULT_GENERATION_MODEL` in `srt_translator/core/constants.py`
+  - Per-model capabilities in `srt_translator/config/model_config.json`
+
+  CLI code does not override or reference a separate configuration model; that remains
+  the responsibility of the AI-config pipeline (currently GUI-only).
+
 ## Troubleshooting
 
 **"Module not found" errors**

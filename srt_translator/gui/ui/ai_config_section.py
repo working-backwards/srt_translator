@@ -6,30 +6,24 @@ AI Configuration Section for the SRT Translator GUI.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QSlider,
     QTabWidget,
-    QVBoxLayout, QMessageBox, QComboBox,
+    QVBoxLayout,
 )
 
+from srt_translator.config.model_config_loader import MODEL_CONFIG, get_model_config
 from srt_translator.core.constants import DEFAULT_GENERATION_MODEL, DEFAULT_TEMPERATURE
-
-SUPPORTED_MODELS = {
-    "gpt-4o-mini": True,
-    "gpt-4o": True,
-    "gpt-4.1-mini": True,
-    "gpt-5-mini": False,  # Does not support custom temperature
-}
-
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor
@@ -213,7 +207,7 @@ class AIConfigSection(QGroupBox):
         model_label = QLabel("Model:")
         model_label.setStyleSheet("font-weight: 500; color: #374151;")
         self.model_dropdown = QComboBox()
-        self.model_dropdown.addItems(list(SUPPORTED_MODELS))
+        self.model_dropdown.addItems(list(MODEL_CONFIG.keys()))
         self.model_dropdown.currentTextChanged.connect(self._on_model_changed)
 
         self.model_dropdown.setToolTip(
@@ -236,8 +230,7 @@ class AIConfigSection(QGroupBox):
         self.aggressiveness_slider.setRange(0, 100)
         self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
         self.aggressiveness_slider.setToolTip(
-            "How aggressively the system fixes placeholder issues.\n"
-            "0.0 = lenient, 1.0 = strict. Recommended: 0.75"
+            "How aggressively the system fixes placeholder issues.\n0.0 = lenient, 1.0 = strict. Recommended: 0.75"
         )
         self.aggressiveness_value_label = QLabel(str(DEFAULT_TEMPERATURE))
         self.aggressiveness_value_label.setFixedWidth(35)
@@ -325,21 +318,12 @@ class AIConfigSection(QGroupBox):
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
 
-
     def _on_model_changed(self, model_name: str) -> None:
         """
-        Show or hide the Fix Aggressiveness row based on the model name.
-
-        GPT-5 models manage aggressive automatically and the API rejects
-        any custom aggressive value. We hide the entire aggressiveness row
-        so users are not confused by a setting that has no effect.
-
-        For all other models the row is shown as normal.
-        Triggered automatically via the textChanged signal on model_name_edit,
-        so set_model_name().
+        Show or hide the Fix Aggressiveness row based on the model configuration.
         """
-        is_gpt5 = (model_name or "").strip().startswith("gpt-5")
-        self.agg_row_frame.setVisible(not is_gpt5)
+        cfg = get_model_config(model_name or "")
+        self.agg_row_frame.setVisible(cfg.get("supports_temperature", True))
 
     def validate_advanced_settings(self) -> bool:
         """
@@ -347,21 +331,16 @@ class AIConfigSection(QGroupBox):
         """
         model = self.get_model_name()
 
-        if model not in SUPPORTED_MODELS:
+        if model not in MODEL_CONFIG:
             QMessageBox.warning(
                 self,
                 "Invalid Model",
                 f"The model '{model}' is not supported.\n\n"
-                "Supported models:\n"
-                "  • gpt-4o-mini\n"
-                "  • gpt-4o\n"
-                "  • gpt-4.1-mini\n"
-                "  • gpt-5-mini"
+                "Supported models:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
             )
             return False
 
         return True
-
 
     def get_tone(self) -> str:
         """Get the currently selected tone"""
