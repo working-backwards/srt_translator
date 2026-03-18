@@ -19,7 +19,7 @@ def detect_source_language(
         "detected_code": str|None,     # raw BCP-47 guess (e.g., "en", "es", "zh-Hans", "pt-BR")
         "normalized_code": str|None,   # mapped to app-supported code if language_config provided
         "normalized_name": str|None,   # human-readable name (via language_config)
-        "confidence": float,           # 0..1 (model self-report)
+        "confidence": float,           # 0..1 (generation_model self-report)
         "mixed": bool                  # true if multiple sources detected
       }
     Never raises; returns a safe empty structure on failure.

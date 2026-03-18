@@ -64,7 +64,6 @@ class TranslationWorker(QObject):
     progress_updated = pyqtSignal(str)
     translation_completed = pyqtSignal(dict)
     translation_error = pyqtSignal(str)
-    log_message = pyqtSignal(str)
     eval_report_ready = pyqtSignal(dict)  # All report paths
 
     def __init__(
@@ -81,7 +80,6 @@ class TranslationWorker(QObject):
         self.target_languages = target_languages
         self.settings_manager = settings_manager
         self.output_directory = output_directory
-        self.translation_successful = False
         self.log_file = None
         self.batch_dir = None
         self.translation_results = None
@@ -426,27 +424,3 @@ class TranslationWorker(QObject):
         finally:
             self._stop_logging_bridge()
 
-    def setup_ai_configuration(self):
-        """Log AI configuration snapshot from settings (if available)."""
-        if not self.settings_manager:
-            self.logger.warning("No settings manager available for AI configuration")
-            return
-
-        try:
-            dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-            self.logger.info("AI configuration (snapshot) loaded from settings")
-            self.logger.info("DNT terms count: %s", len(dnt_terms))
-            if termbase:
-                self.logger.info("Termbase languages: %s", list(termbase.keys()))
-            if source_language:
-                code = source_language.get("code")
-                name = source_language.get("name")
-                self.logger.info("Source language: %s (%s)", name, code)
-
-            # Note: The translation run receives the config directly; this is logging only.
-
-        except Exception as e:
-            self.logger.error("Error setting up AI configuration: %s", e)
-            # Don't raise - this is not critical for translation
-
-    # (no fixer here; core owns fixes)

@@ -33,7 +33,6 @@ from srt_translator.core.constants import (
     AI_CONFIG_BASE_COST, DEFAULT_TEMPERATURE
 )
 from srt_translator.gui.ai_config import AIConfigGenerator
-from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.styles.main_styles import MAIN_STYLESHEET
 from srt_translator.gui.ui.ai_config_section import AIConfigSection
@@ -41,7 +40,6 @@ from srt_translator.gui.ui.api_section import APISection
 from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.translation_section import TranslationSection
-from srt_translator.config.model_config_loader import get_model_config
 from srt_translator.gui.utils.termbase_merger import (
     load_dnt_terms_from_file,
     load_termbase_from_file,
@@ -65,7 +63,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Set up logging for the GUI application (only once in worker;
         # avoid duplicate files)
-        self.log_file = None
         self.logger = logging.getLogger(__name__)
         self.logger.info("SRT Translator GUI started")
 
@@ -91,7 +88,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)
-        self.config_manager = GUIConfigManager(self.settings_manager, self.language_config)
 
         self.ai_config_generator = None
         self.ai_config_thread = None
@@ -103,7 +99,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         self._proc = psutil.Process(os.getpid())
         self._rss0 = self._proc.memory_info().rss
         self._memory_warning_shown = False
-        self._mem_sample_count = 0
 
         # Initialize HTML report tracking
         self._last_eval_json: Path | None = None
@@ -221,7 +216,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.adv_toggle_btn.clicked.connect(
             self.ai_config_section.toggle_advanced_expansion
         )
-        self.ai_config_section.model_dropdown.currentTextChanged.connect(self._on_model_name_changed)
+        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_name_changed) # todo
         self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
         self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
 
@@ -306,17 +301,17 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.set_tone(saved_tone)
         self.ai_config_section.connect_tone_changed(self.on_tone_changed)
 
-        # Load advanced settings (model name & aggressiveness)
-        self.ai_config_section.set_model_name(self.settings_manager.load_model_name())
+        # Load advanced settings (generation model name & aggressiveness)
+        self.ai_config_section.set_generation_model_name(self.settings_manager.load_generation_model_name())
         self.ai_config_section.set_aggressiveness(self.settings_manager.load_aggressiveness())
 
     def on_tone_changed(self, tone: str) -> None:
         """Handle tone selection change"""
         self.settings_manager.save_tone(tone)
 
-    def _on_model_name_changed(self) -> None:
-        """Persist model name when editing finishes."""
-        self.settings_manager.save_model_name(self.ai_config_section.get_model_name())
+    def _on_generation_model_name_changed(self) -> None:
+        """Persist generation model name when editing finishes."""
+        self.settings_manager.save_generation_model_name(self.ai_config_section.get_generation_model_name())
 
     def _on_aggressiveness_changed(self) -> None:
         """Persist aggressiveness when slider value changes."""
@@ -325,7 +320,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def _on_reset_advanced_defaults(self) -> None:
         """Reset advanced settings to defaults and persist."""
         self.ai_config_section._on_reset_advanced_defaults()
-        self.settings_manager.save_model_name(DEFAULT_GENERATION_MODEL)
+        self.settings_manager.save_generation_model_name(DEFAULT_GENERATION_MODEL)
         self.settings_manager.save_aggressiveness(DEFAULT_TEMPERATURE)
 
     def apply_styles(self):
@@ -496,14 +491,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
 
         # Initialize AI config generator if not already done
-        generation_model_name = self.settings_manager.load_model_name()
-
-        model_config = get_model_config(generation_model_name)
-
-        if model_config.get("supports_temperature", True):
-            temperature = self.settings_manager.load_aggressiveness()
-        else:
-            temperature = None
+        generation_model_name = self.settings_manager.load_generation_model_name()
 
         if not self.ai_config_section.validate_advanced_settings():
             return
@@ -512,7 +500,7 @@ class SRTTranslatorMainWindow(QMainWindow):
             api_key=api_key,
             language_config=self.language_config,
             generation_model_name=generation_model_name,
-            temperature=temperature,
+            temperature=self.settings_manager.load_aggressiveness(),
         )
 
         self.logger.debug(
@@ -897,11 +885,8 @@ class SRTTranslatorMainWindow(QMainWindow):
         total_languages = len(target_languages)
         estimated_tokens *= total_languages
 
-        OVERHEAD_FACTOR = TRANSLATION_OVERHEAD_FACTOR
-        estimated_tokens *= OVERHEAD_FACTOR
-
-        PRICE_PER_1K = PRICE_PER_1K_TOKENS
-        estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K
+        estimated_tokens *= TRANSLATION_OVERHEAD_FACTOR
+        estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K_TOKENS
 
         # Add AI configuration cost if not already generated
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()

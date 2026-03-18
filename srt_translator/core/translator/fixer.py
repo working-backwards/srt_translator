@@ -4,7 +4,6 @@ from pathlib import Path
 
 import srt
 
-from srt_translator.core.translator.srt_parser import SRTParser
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -14,7 +13,6 @@ class SRTFixer:
     def __init__(self, log_file: str, translations_dir: str):
         self.log_file = log_file
         self.translations_dir = translations_dir
-        self.parser = SRTParser()
 
     def scan_and_fix_placeholders(self, *, batch_dir: Path, dnt_terms: list[str], dry_run: bool = False) -> dict:
         """
@@ -247,20 +245,3 @@ class SRTFixer:
 
         if dry_run and (tokens_replaced > 0 or tokens_removed > 0):
             logger.info("Dry-run: changes were NOT written")
-
-    # Legacy methods for backward compatibility (deprecated)
-    def parse_log_file(self):
-        """Deprecated: Log parsing is no longer used."""
-        logger.warning("parse_log_file() is deprecated - using SRT-first approach")
-
-    def fix_srt_files(self, _aggressiveness: float = 0.75):
-        """Deprecated: Use scan_and_fix_placeholders() instead."""
-        logger.warning("fix_srt_files() is deprecated - use scan_and_fix_placeholders()")
-
-    def fix_specific_srt_files(self, _file_paths: list[str], _aggressiveness: float = 0.75):
-        """Deprecated: Use scan_and_fix_placeholders() instead."""
-        logger.warning("fix_specific_srt_files() is deprecated - use scan_and_fix_placeholders()")
-
-    def report_status(self):
-        """Deprecated: Status is now reported by scan_and_fix_placeholders()."""
-        logger.warning("report_status() is deprecated - status reported by scan_and_fix_placeholders()")

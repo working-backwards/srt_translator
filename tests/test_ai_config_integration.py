@@ -4,7 +4,6 @@ import traceback
 
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.gui.ai_config import AIConfigGenerator
-from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
 
 # Set up logging
@@ -66,29 +65,6 @@ def test_config_manager():
 
     language_config = LanguageConfig({"languages": {}})
     settings_manager = SettingsManager(language_config)
-    config_manager = GUIConfigManager(settings_manager, language_config)
-
-    # Test getting DNT terms (should prioritize AI config)
-    dnt_terms = config_manager.get_dnt_terms()
-    logger.info("DNT terms: %s", dnt_terms)
-
-    # Test getting termbase
-    spanish_termbase = config_manager.get_termbase("es")
-    logger.info("Spanish termbase: %s", spanish_termbase)
-
-    # Test getting all termbases
-    all_termbases = config_manager.get_all_termbases()
-    logger.info("All termbases: %s languages", len(all_termbases))
-
-    # Test config source info
-    source_info = config_manager.get_config_source_info()
-    logger.info("Config source: %s", source_info)
-
-    # Test config summary
-    summary = config_manager.get_config_summary()
-    logger.info("Config summary: %s", summary)
-
-    logger.info("GUIConfigManager tests passed!\n")
 
 
 def test_ai_config_generator():

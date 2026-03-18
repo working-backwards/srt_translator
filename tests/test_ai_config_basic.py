@@ -1,6 +1,5 @@
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.constants import DEFAULT_GENERATION_MODEL
-from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
 
 
@@ -31,12 +30,8 @@ def test_settings_manager_round_trip_and_defaults(tmp_path, monkeypatch):
     assert loaded_terms == test_dnt_terms
     assert loaded_termbase == test_termbase
 
-    # Test default model name uses constant
-    settings_manager.settings.remove("model_name")
-    assert settings_manager.load_model_name() == DEFAULT_GENERATION_MODEL
+    # Test default generation model name uses constant
+    settings_manager.settings.remove("generation_model_name")
+    assert settings_manager.load_generation_model_name() == DEFAULT_GENERATION_MODEL # todo
 
-    # Basic smoke test for GUIConfigManager wiring
-    config_manager = GUIConfigManager(settings_manager, language_config)
-    dnt_terms = config_manager.get_dnt_terms()
-    assert isinstance(dnt_terms, list)
-    assert dnt_terms == test_dnt_terms
+

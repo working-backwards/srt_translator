@@ -353,17 +353,13 @@ class SettingsManager:
             return tone
         return DEFAULT_TONE
 
-    def save_model_name(self, model_name: str) -> None:
-        """Save the OpenAI model name."""
-        self.settings.setValue("model_name", model_name.strip() or DEFAULT_GENERATION_MODEL)
+    def save_generation_model_name(self, generation_model_name: str) -> None:
+        """Save the OpenAI generation model name."""
+        self.settings.setValue("generation_model_name", generation_model_name.strip() or DEFAULT_GENERATION_MODEL)
 
-    def load_model_name(self) -> str:
-<<<<<<< HEAD
-        """Load the OpenAI model name (defaults to 'gpt-5-mini')."""
-=======
-        """Load the OpenAI model name (defaults to 'gpt-4o-mini')."""
->>>>>>> d2c8b53 (feat(config): model config architecture, token-cap fix, CLI env, docs and tests)
-        value = self.settings.value("model_name", DEFAULT_GENERATION_MODEL)
+    def load_generation_model_name(self) -> str:
+        """Load the OpenAI generation model name (defaults to 'gpt-5-mini')."""
+        value = self.settings.value("generation_model_name", DEFAULT_GENERATION_MODEL)
         return str(value).strip() if value else DEFAULT_GENERATION_MODEL
 
     def save_aggressiveness(self, value: float) -> None:

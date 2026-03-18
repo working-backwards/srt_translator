@@ -370,7 +370,7 @@ MAIN_STYLESHEET = """
     }
     
     
-    /* Model Dropdown */
+    /* Generation Model Dropdown */
     QComboBox {
         color: #374151;
         background-color: #FFFFFF;

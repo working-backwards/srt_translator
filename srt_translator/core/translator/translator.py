@@ -29,7 +29,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
-from srt_translator.config.model_config_loader import build_call_params, get_model_config
+from srt_translator.config.model_config_loader import build_call_params
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.constants import (
     DEFAULT_TEMPERATURE,
@@ -318,7 +318,7 @@ class SRTTranslator:
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
         self.temperature = temperature if temperature is not None else DEFAULT_TEMPERATURE
-        self.model_config = get_model_config(self.translation_model_name)
+        self.language_config = language_config
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -1378,13 +1378,13 @@ class SRTTranslator:
             except OpenAINotFoundError as ex:
                 self._model_invalid = True
                 logger.error(
-                    "Invalid model '%s': %s. Check the model name in your settings.",
+                    "Invalid model '%s': %s. Check the translator model name in your settings.",
                     self.translation_model_name,
                     ex,
                 )
                 raise RuntimeError(
-                    f"Invalid model '{self.translation_model_name}'. Check the model name in your settings. "
-                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini,gpt-5-mini"
+                    f"Invalid model '{self.translation_model_name}'. Check the translator model name in your settings. "
+                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
                 ) from ex
 
             except Exception as ex:

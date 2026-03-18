@@ -272,7 +272,6 @@ def main() -> None:
 
     ensure_gui_built()
 
-    created: list[Path] = []
     if system == "Windows":
         created = package_windows(version, zip_win=args.zip_win)
     elif system == "Darwin":

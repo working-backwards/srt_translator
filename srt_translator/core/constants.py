@@ -1,5 +1,5 @@
 # srt_translator/core/constants.py
-MAX_COMPLETION_TOKENS = 120
+MAX_INLINE_TOKENS = 12500
 
 # Token budget for main translation batch JSON (up to MAX_BATCH_SIZE subtitles).
 # Must be large enough that the API does not truncate the response.

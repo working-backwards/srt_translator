@@ -202,23 +202,23 @@ class AIConfigSection(QGroupBox):
         adv_layout = QVBoxLayout(self.adv_content)
         adv_layout.setSpacing(8)
 
-        # Model row
-        model_row = QHBoxLayout()
-        model_label = QLabel("Model:")
-        model_label.setStyleSheet("font-weight: 500; color: #374151;")
-        self.model_dropdown = QComboBox()
-        self.model_dropdown.addItems(list(MODEL_CONFIG.keys()))
-        self.model_dropdown.currentTextChanged.connect(self._on_model_changed)
+        # Generation Model row
+        generation_model_row = QHBoxLayout()
+        generation_model_label = QLabel("Model:")
+        generation_model_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.generation_model_dropdown = QComboBox()
+        self.generation_model_dropdown.addItems(list(MODEL_CONFIG.keys()))
+        self.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_changed)
 
-        self.model_dropdown.setToolTip(
-            "OpenAI model used for translation.\n"
+        self.generation_model_dropdown.setToolTip(
+            "OpenAI model used for generation.\n"
             "Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini\n\n"
             "Note: gpt-5-mini does not support custom temperature —\n"
-            "the Fix Aggressiveness option will be hidden for that model."
+            "the Fix Aggressiveness option will be hidden for that generation model."
         )
-        model_row.addWidget(model_label)
-        model_row.addWidget(self.model_dropdown)
-        adv_layout.addLayout(model_row)
+        generation_model_row.addWidget(generation_model_label)
+        generation_model_row.addWidget(self.generation_model_dropdown)
+        adv_layout.addLayout(generation_model_row)
 
         # Aggressiveness row
         self.agg_row_frame = QFrame()
@@ -243,7 +243,7 @@ class AIConfigSection(QGroupBox):
         # Reset to Defaults button
         self.reset_advanced_btn = QPushButton("Reset to Defaults")
         self.reset_advanced_btn.setObjectName("secondaryButton")
-        self.reset_advanced_btn.setToolTip("Reset model and aggressiveness to default values")
+        self.reset_advanced_btn.setToolTip("Reset generation model to default")
         adv_layout.addWidget(self.reset_advanced_btn)
 
         content_layout.addWidget(self.adv_content)
@@ -251,7 +251,7 @@ class AIConfigSection(QGroupBox):
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
 
-        self._on_model_changed(self.model_dropdown.currentText())
+        self._on_generation_model_changed(self.generation_model_dropdown.currentText())
 
     def connect_signals(
         self,
@@ -318,25 +318,25 @@ class AIConfigSection(QGroupBox):
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
 
-    def _on_model_changed(self, model_name: str) -> None:
+    def _on_generation_model_changed(self, generation_model_name: str) -> None:
         """
         Show or hide the Fix Aggressiveness row based on the model configuration.
         """
-        cfg = get_model_config(model_name or "")
+        cfg = get_model_config(generation_model_name or "")
         self.agg_row_frame.setVisible(cfg.get("supports_temperature", True))
 
     def validate_advanced_settings(self) -> bool:
         """
         Validate advanced settings before generation or translation starts.
         """
-        model = self.get_model_name()
+        generation_model = self.get_generation_model_name()
 
-        if model not in MODEL_CONFIG:
+        if generation_model not in MODEL_CONFIG:
             QMessageBox.warning(
                 self,
-                "Invalid Model",
-                f"The model '{model}' is not supported.\n\n"
-                "Supported models:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
+                "Invalid generation Model",
+                f"The generation model '{generation_model}' is not supported.\n\n"
+                "Supported generation models are:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
             )
             return False
 
@@ -371,13 +371,13 @@ class AIConfigSection(QGroupBox):
         self.adv_content.setVisible(visible)
         self.adv_toggle_btn.set_expanded_state(visible)
 
-    def get_model_name(self) -> str:
+    def get_generation_model_name(self) -> str:
         """Get the current model name from the text field."""
-        return self.model_dropdown.currentText()
+        return self.generation_model_dropdown.currentText()
 
-    def set_model_name(self, name: str) -> None:
+    def set_generation_model_name(self, name: str) -> None:
         """Set the model name in the text field."""
-        self.model_dropdown.setCurrentText(name)
+        self.generation_model_dropdown.setCurrentText(name)
 
     def get_aggressiveness(self) -> float:
         """Get the current aggressiveness value (0.0-1.0)."""
@@ -395,7 +395,7 @@ class AIConfigSection(QGroupBox):
 
     def _on_reset_advanced_defaults(self) -> None:
         """Reset both advanced fields to defaults."""
-        self.model_dropdown.setCurrentText(DEFAULT_GENERATION_MODEL)
+        self.generation_model_dropdown.setCurrentText(DEFAULT_GENERATION_MODEL)
         self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
         self.aggressiveness_value_label.setText(str(DEFAULT_TEMPERATURE))
 

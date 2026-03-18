@@ -133,8 +133,8 @@ class TranslationConfig:
             errors.append("api_key is required")
             api_key = ""
 
-        # Validate model name: prefer explicit translation_model_name/model_name, then default
-        translation_model_name = raw.get("translation_model_name") or raw.get("model_name") or DEFAULT_TRANSLATION_MODEL
+        # Validate translation_model_name: prefer explicit translation_model_name, then default
+        translation_model_name = raw.get("translation_model_name") or DEFAULT_TRANSLATION_MODEL
 
         # Validate aggressiveness
         raw_agg = raw.get("Temperature")

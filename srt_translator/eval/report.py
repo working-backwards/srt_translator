@@ -13,18 +13,6 @@ from typing import Any
 EMPTY_CUE_PLACEHOLDER = ""
 
 
-def _render_context_pairs(pairs: list[tuple[int, str]]) -> str:
-    """
-    Given [(index, text), ...] pairs from the evaluator, build a fenced code block.
-    """
-    if not pairs:
-        return "```\n(context unavailable)\n```"
-    lines = []
-    for idx, txt in pairs:
-        lines.append(f"{idx}: {txt or EMPTY_CUE_PLACEHOLDER}")
-    return "```\n" + "\n".join(lines) + "\n```"
-
-
 # This function is no longer needed since we use eval_parse_srt directly
 
 

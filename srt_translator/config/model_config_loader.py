@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from srt_translator.core.constants import MAX_INLINE_TOKENS
+
 CONFIG_FILE = Path(__file__).parent / "model_config.json"
 
 with open(CONFIG_FILE, encoding="utf-8") as f:
@@ -9,17 +11,13 @@ with open(CONFIG_FILE, encoding="utf-8") as f:
 
 
 def get_model_config(model_name: str) -> dict[str, Any]:
+    """model_name: could be generator model or translator model"""
     return MODEL_CONFIG.get(model_name, {})
 
 
-def get_max_inline_tokens(model_name: str) -> int:
+def get_max_inline_tokens(generation_model_name: str) -> int:
     """Max transcript tokens to send inline; falls back to the old constant value."""
-    return int(get_model_config(model_name).get("max_inline_tokens", 12500))
-
-
-def get_max_output_tokens(model_name: str) -> int:
-    """API ceiling for completion tokens for the given model."""
-    return int(get_model_config(model_name).get("max_output_tokens", 16384))
+    return int(get_model_config(generation_model_name).get("max_inline_tokens", MAX_INLINE_TOKENS))
 
 
 def build_call_params(

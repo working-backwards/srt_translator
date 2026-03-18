@@ -52,7 +52,7 @@ class TermHandler:
         self.lang_code = (lang_code or "").lower()
         self.termbase = termbase or {}
         self.term_map: dict[str, str] = {}
-        self.patterns: list[tuple[re.Pattern, str]] = []
+        self.termbase_patterns: list[tuple[re.Pattern, str]] = []
         self.termbase_target_map: dict[str, dict[str, str]] = {}
 
         for lang, entries in self.termbase.items():
@@ -73,7 +73,7 @@ class TermHandler:
 
         for term, replacement in sorted(self.term_map.items(), key=lambda x: len(x[0]), reverse=True):
             pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
-            self.patterns.append((pat, replacement))
+            self.termbase_patterns.append((pat, replacement))
 
         # Build stable placeholder map once per file/language
 
@@ -82,16 +82,12 @@ class TermHandler:
         self.dnt_terms = self._ordered_terms
         self.placeholder_map: dict[str, str] = {term: f"__DNT_TERM_{i}__" for i, term in enumerate(self._ordered_terms)}
         # Precompile exact patterns for speed and correctness
-        self._patterns: list[tuple[re.Pattern, str, str]] = []
+        self.dnt_patterns: list[tuple[re.Pattern, str, str]] = []
         # Sort longest-first to avoid partial/overlapping replacement issues.
         for term in sorted(self._ordered_terms, key=len, reverse=True):
             pat = _compile_word_safe_pattern(term)
             ph = self.placeholder_map[term]
-            self._patterns.append((pat, term, ph))
-
-        for term in sorted(self.term_map.keys(), key=len, reverse=True):
-            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
-            self.patterns.append((pat, self.term_map[term]))
+            self.dnt_patterns.append((pat, term, ph))
 
         self.logger.debug(
             "TermHandler initialized (lang=%s): %d DNT terms, %d TB entries",
@@ -120,25 +116,20 @@ class TermHandler:
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 
-    def load_dnt_terms(self, file_path: str, lang_code: str) -> list[str]:
-        with open(file_path, encoding="utf-8") as f:
-            all_terms = json.load(f)
-        return all_terms.get(lang_code, [])
-
     def apply_dnt_placeholders(self, text: str) -> str:
         """
         Replace DNT terms in `text` with placeholders.
         Longest-first; token-safe; preserves punctuation/spacing.
         """
 
-        if not text or not self._patterns:
+        if not text or not self.dnt_patterns:
             return text
 
         def _sub_once(s: str, pat: re.Pattern, ph: str) -> str:
             return pat.sub(ph, s)
 
         out = text
-        for pat, term, ph in self._patterns:
+        for pat, term, ph in self.dnt_patterns:
             # Only apply placeholder if the term is in text
             if term in out:
                 new_out = _sub_once(out, pat, ph)
@@ -179,7 +170,7 @@ class TermHandler:
             return text
 
         out = text
-        for pat, replacement in self.patterns:
+        for pat, replacement in self.termbase_patterns:
             out = pat.sub(replacement, out)
         return out
 

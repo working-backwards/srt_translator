@@ -366,17 +366,6 @@ class TermbaseEditor(QWidget):
         self.update_count_label()
         self.termbase_changed.emit(self.termbase)
 
-    def _update_term_translations(self, source_term: str, translations: dict):
-        """Update translations for an existing term."""
-        for language, translation in translations.items():
-            if language not in self.termbase:
-                self.termbase[language] = {}
-
-            if translation.strip():
-                self.termbase[language][source_term] = translation.strip()
-            elif source_term in self.termbase[language]:
-                del self.termbase[language][source_term]
-
     def export_termbase(self):
         """Export termbase to a JSON file."""
         if not self.termbase:

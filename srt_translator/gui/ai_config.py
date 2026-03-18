@@ -26,7 +26,6 @@ from srt_translator.core.constants import (
     ANCHOR_TOLERANCE_MIN,
     CHARS_PER_TOKEN,
     DEFAULT_GENERATION_MODEL,
-    DEFAULT_TEMPERATURE,
     JITTER_SLEEP_HIGH,
     JITTER_SLEEP_LOW,
     MAX_COMPLETION_TOKENS_DNT,
@@ -84,12 +83,10 @@ class AIConfigGenerator:
         self.api_key = api_key
         self.client = OpenAI(api_key=api_key)
         self.logger = logging.getLogger("srt_translator.gui.ai_config")
-        # GUI-only model selection for AI config generation is intentionally
+        # GUI-only generation model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
-        self.DEFAULT_MODEL = DEFAULT_GENERATION_MODEL
-        self.temperature = DEFAULT_TEMPERATURE
-        self.generation_model_name = generation_model_name or self.DEFAULT_MODEL
-        self.temperature = temperature or self.temperature
+        self.temperature = temperature
+        self.generation_model_name = generation_model_name or DEFAULT_GENERATION_MODEL
 
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
@@ -100,8 +97,6 @@ class AIConfigGenerator:
 
         # Configuration constants
         self.MAX_INLINE_TOKENS = get_max_inline_tokens(self.generation_model_name)
-        self.MAX_CONTENT_TOKENS = 100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
-        self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
 
     def get_supported_languages(self) -> list[str]:
         """Get all supported languages from unified configuration"""
@@ -917,7 +912,7 @@ class AIConfigGenerator:
             return {
                 "type": "context_length_exceeded",
                 "title": "Content Too Large for Analysis",
-                "message": "The selected files contain too much text for the AI model to process at once",
+                "message": "The selected files contain too much text for the AI generation model to process at once",
                 "suggestion": "Try selecting fewer files or use the content truncation feature",
             }
         elif "invalid" in error_msg and "authentication" in error_msg:
@@ -976,12 +971,12 @@ class AIConfigGenerator:
 
         generation_model_name = self.generation_model_name
 
-        model_config = get_model_config(generation_model_name)
+        generation_model_config = get_model_config(generation_model_name)
 
-        if not model_config:
+        if not generation_model_config:
             raise ValueError(f"Model config not found for {generation_model_name}")
 
-        TOKEN_CAP = model_config["model_context_length"]
+        TOKEN_CAP = generation_model_config["model_context_length"]
 
         CHAR_CAP = TOKEN_CAP * _CHARS_PER_TOKEN
 
