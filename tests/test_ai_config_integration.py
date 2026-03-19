@@ -58,14 +58,6 @@ def test_settings_manager():
     logger.info("SettingsManager tests passed!\n")
 
 
-def test_config_manager():
-    """Test the GUIConfigManager priority system."""
-    logger = logging.getLogger(__name__)
-    logger.info("Testing GUIConfigManager priority system...")
-
-    language_config = LanguageConfig({"languages": {}})
-    settings_manager = SettingsManager(language_config)
-
 
 def test_ai_config_generator():
     """Test the AIConfigGenerator basic functionality."""
@@ -96,7 +88,6 @@ def main():
 
     try:
         test_settings_manager()
-        test_config_manager()
         test_ai_config_generator()
 
         logger.info("=" * 50)

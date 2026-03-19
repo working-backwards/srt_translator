@@ -318,7 +318,6 @@ class SRTTranslator:
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
         self.temperature = temperature if temperature is not None else DEFAULT_TEMPERATURE
-        self.language_config = language_config
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -1116,8 +1115,8 @@ class SRTTranslator:
                     self.logger.debug("Plain-string fallback failed: %s", _fallback_ex)
 
             # Otherwise, let shape-lock handle it as before.
-            self.logger.error("Model did not return JSON; cannot recover without shape lock.")
-            raise RuntimeError("Translation failed: model did not return valid JSON format") from None
+            self.logger.error("Translation model did not return JSON; cannot recover without shape lock.")
+            raise RuntimeError("Translation failed: translation model did not return valid JSON format") from None
 
     def _translate_single_string_fallback(self, *, _src_text: str, target_lang: str) -> str:
         """
@@ -1378,12 +1377,12 @@ class SRTTranslator:
             except OpenAINotFoundError as ex:
                 self._model_invalid = True
                 logger.error(
-                    "Invalid model '%s': %s. Check the translator model name in your settings.",
+                    "Invalid translation model '%s': %s. Check the translator model name in your settings.",
                     self.translation_model_name,
                     ex,
                 )
                 raise RuntimeError(
-                    f"Invalid model '{self.translation_model_name}'. Check the translator model name in your settings. "
+                    f"Invalid translation model '{self.translation_model_name}'. Check the translator model name in your settings. "
                     f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
                 ) from ex
 

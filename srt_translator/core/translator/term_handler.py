@@ -110,9 +110,9 @@ class TermHandler:
             return self.placeholder_map
         self._ordered_terms = _dedup_preserve_order(new_terms)
         self.placeholder_map = {t: f"__DNT_TERM_{i}__" for i, t in enumerate(self._ordered_terms)}
-        self._patterns.clear()
+        self.dnt_patterns.clear()
         for term in sorted(self._ordered_terms, key=len, reverse=True):
-            self._patterns.append((_compile_word_safe_pattern(term), term, self.placeholder_map[term]))
+            self.dnt_patterns.append((_compile_word_safe_pattern(term), term, self.placeholder_map[term]))
         self.logger.debug("Rebuilt DNT placeholder map: %d terms", len(self._ordered_terms))
         return self.placeholder_map
 

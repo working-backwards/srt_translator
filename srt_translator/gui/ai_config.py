@@ -974,14 +974,14 @@ class AIConfigGenerator:
         generation_model_config = get_model_config(generation_model_name)
 
         if not generation_model_config:
-            raise ValueError(f"Model config not found for {generation_model_name}")
+            raise ValueError(f"Generation model config not found for {generation_model_name}")
 
         TOKEN_CAP = generation_model_config["model_context_length"]
 
         CHAR_CAP = TOKEN_CAP * _CHARS_PER_TOKEN
 
-        self.logger.info("Model selected of generation_model_name: %s", generation_model_name)
-        self.logger.info("Model context length (tokens): %s", TOKEN_CAP)
+        self.logger.info("Generation model selected: %s", generation_model_name)
+        self.logger.info("Generation model context length (tokens): %s", TOKEN_CAP)
         self.logger.info("Calculated character cap: %s", CHAR_CAP)
 
         if not source_file_paths:

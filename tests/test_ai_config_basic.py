@@ -32,6 +32,6 @@ def test_settings_manager_round_trip_and_defaults(tmp_path, monkeypatch):
 
     # Test default generation model name uses constant
     settings_manager.settings.remove("generation_model_name")
-    assert settings_manager.load_generation_model_name() == DEFAULT_GENERATION_MODEL # todo
+    assert settings_manager.load_generation_model_name() == DEFAULT_GENERATION_MODEL
 
 

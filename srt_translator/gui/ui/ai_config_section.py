@@ -204,7 +204,7 @@ class AIConfigSection(QGroupBox):
 
         # Generation Model row
         generation_model_row = QHBoxLayout()
-        generation_model_label = QLabel("Model:")
+        generation_model_label = QLabel("Generation Model:")
         generation_model_label.setStyleSheet("font-weight: 500; color: #374151;")
         self.generation_model_dropdown = QComboBox()
         self.generation_model_dropdown.addItems(list(MODEL_CONFIG.keys()))
@@ -334,7 +334,7 @@ class AIConfigSection(QGroupBox):
         if generation_model not in MODEL_CONFIG:
             QMessageBox.warning(
                 self,
-                "Invalid generation Model",
+                "Invalid generation model",
                 f"The generation model '{generation_model}' is not supported.\n\n"
                 "Supported generation models are:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
             )

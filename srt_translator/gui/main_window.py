@@ -216,7 +216,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.adv_toggle_btn.clicked.connect(
             self.ai_config_section.toggle_advanced_expansion
         )
-        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_name_changed) # todo
+        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_name_changed)
         self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
         self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
 
@@ -504,7 +504,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         self.logger.debug(
-            "DEBUG: Generator using model=%s temperature=%s",
+            "DEBUG: Generator using generation model=%s temperature=%s",
             self.ai_config_generator.generation_model_name,
             self.ai_config_generator.temperature,
         )
