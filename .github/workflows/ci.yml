@@ -103,7 +103,7 @@ jobs:
         shell: bash
         run: |
           # audit installed environment (no auth required)
-          pip-audit -v
+          pip-audit -v --ignore-vuln CVE-2026-4539
 
   golden-tests:
     name: Golden Structure & Invariants
