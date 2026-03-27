@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 
 import psutil
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -21,8 +23,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.core.constants import (
