@@ -81,7 +81,7 @@ class AIConfigGenerator:
         if language_config is None:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
         self.api_key = api_key
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
         self.logger = logging.getLogger("srt_translator.gui.ai_config")
         # GUI-only generation model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
@@ -300,9 +300,6 @@ class AIConfigGenerator:
 
                     # small jitter AFTER anchor to reduce order effects
                     if anchor_count is not None:
-                        import random
-                        import time
-
                         time.sleep(random.uniform(JITTER_SLEEP_LOW, JITTER_SLEEP_HIGH))  # nosec B311
 
                     tb_dict, extracted_terms = self.generate_language_termbase_two_pass(
@@ -853,7 +850,7 @@ class AIConfigGenerator:
             }
 
             response = self.client.chat.completions.create(**params)
-            result_text = response.choices[0].message.content.strip()
+            result_text = (response.choices[0].message.content or "").strip()
             if not result_text:
                 raise ValueError("Empty response from AI")
 
@@ -1000,7 +997,7 @@ class AIConfigGenerator:
                 subs = parser.parse_file(path)
             except Exception:
                 # Fallback: read raw text if parsing fails
-                with open(path, encoding="utf-8", errors="ignore") as f:
+                with open(path, encoding="utf-8", errors="replace") as f:
                     raw = f.read()
                 text_only = self._strip_srt_markup(raw)
                 if total < char_budget:

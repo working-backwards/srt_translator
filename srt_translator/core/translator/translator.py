@@ -19,8 +19,11 @@ from typing import (
 )
 
 # OpenAI client
+from openai import AuthenticationError as OpenAIAuthenticationError
 from openai import NotFoundError as OpenAINotFoundError
 from openai import OpenAI
+from openai import PermissionDeniedError as OpenAIPermissionDeniedError
+from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionDeveloperMessageParam,
@@ -204,7 +207,7 @@ def validate_placeholders_pair(
     ph_regex: Pattern[str],
 ) -> dict[int, dict[str, set[str]]]:
     issues: dict[int, dict[str, set[str]]] = {}
-    for i, (src, tgt) in enumerate(zip(src_items, tgt_items, strict=False)):
+    for i, (src, tgt) in enumerate(zip(src_items, tgt_items, strict=True)):
         src_ids = _extract_ph_ids(src, ph_regex)
         tgt_ids = _extract_ph_ids(tgt, ph_regex)
         invented = tgt_ids - src_ids
@@ -243,8 +246,21 @@ def _is_invalid_translation(text: str) -> bool:
 
 def _load_and_parse_file(input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
-    with open(input_filepath, encoding="utf-8") as f:
-        src_text = f.read()
+    for encoding in ("utf-8", "utf-16", "iso-8859-1"):
+        try:
+            with open(input_filepath, encoding=encoding) as f:
+                src_text = f.read()
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    else:
+        raise UnicodeDecodeError(
+            "multi",
+            b"",
+            0,
+            1,
+            f"Failed to decode {input_filepath} with utf-8, utf-16, or iso-8859-1",
+        )
     src_subs = parse_srt(src_text)
     if not src_subs:
         raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
@@ -259,7 +275,7 @@ def _format_and_append_subtitles(
 ) -> list[Subtitle]:
     """Format subtitles with CPS and append to global list."""
     formatted_subs = []
-    for s, tgt in zip(batch, tgt_texts, strict=False):
+    for s, tgt in zip(batch, tgt_texts, strict=True):
         start_s = _parse_time_to_seconds(s.start)
         end_s = _parse_time_to_seconds(s.end)
         formatted = format_subtitle_text(
@@ -314,10 +330,10 @@ class SRTTranslator:
         self.termbase = termbase or {}
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
         self.translation_model_name = translation_model_name
-        self.batch_size = max(1, int(batch_size))
+        self.batch_size = min(MAX_BATCH_SIZE, max(1, int(batch_size)))
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
-        self.temperature = temperature if temperature is not None else DEFAULT_TEMPERATURE
+        self.temperature = max(0.0, min(2.0, temperature if temperature is not None else DEFAULT_TEMPERATURE))
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -350,7 +366,7 @@ class SRTTranslator:
         if OpenAI is None:
             raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
 
         # One-shot advisory probe budget per (file, lang)
         self._probe_budget = MalformedProbeBudget()
@@ -394,7 +410,7 @@ class SRTTranslator:
             base_logger = cast(logging.Logger, self.logger)
 
         extra: Mapping[str, object] = {
-            "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
+            "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
             "file": os.path.basename(input_filepath),
             "lang": target_lang,
         }
@@ -412,7 +428,7 @@ class SRTTranslator:
     ) -> list[str]:
         """Validate and repair placeholder integrity."""
         # Log input/output for troubleshooting placeholder issues
-        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
+        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=True)):
             # Use the regex pattern directly to avoid logging violations
             src_placeholders = PH_RE.findall(src)
             tgt_placeholders = PH_RE.findall(tgt)
@@ -431,14 +447,14 @@ class SRTTranslator:
                 )
 
         # Policy-aware placeholder validation for apostrophes after placeholders
-        target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
+        target_lang = getattr(batch_logger, "extra", {}).get("lang", "unknown")
         if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
             # Normalize for detection only: treat "__...__'..." as "__...__"
             norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
             ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
             # Once-per-batch debug (observational only)
             seen = False
-            for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+            for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=True)):
                 if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                     batch_logger.debug(
                         "Apostrophe after placeholder observed (allowed for %s, item=%d).",
@@ -452,7 +468,7 @@ class SRTTranslator:
             # Stage 1: language-agnostic detector (observational logging only, once per batch)
             seen = False
 
-            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=True)):
                 if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                     batch_logger.debug(
                         "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
@@ -628,7 +644,7 @@ class SRTTranslator:
         batch_logger: LoggerLike,
     ) -> list[str]:
         """Handle mid-batch empty translation retries."""
-        for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=False)):
+        for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=True)):
             if tgt_raw.strip():
                 continue
             sid = batch[i].idx
@@ -1027,7 +1043,7 @@ class SRTTranslator:
 
             # Lightweight degeneracy check per item (advisory; retry paths already exist)
             bad = []
-            for i, (src, out) in enumerate(zip(src_items, norm, strict=False)):
+            for i, (src, out) in enumerate(zip(src_items, norm, strict=True)):
                 tgt = (out or {}).get("tgt", "")
                 if not tgt:
                     continue
@@ -1213,7 +1229,7 @@ class SRTTranslator:
     @staticmethod
     def _render_items_for_prompt(ids: list[int], texts: list[str]) -> str:
         rows = []
-        for i, t in zip(ids, texts, strict=False):
+        for i, t in zip(ids, texts, strict=True):
             clean = (t or "").replace("\n", " ").replace("{", "{{").replace("}", "}}").strip()
             rows.append(f"{i}) {clean}")
         return "\n".join(rows)
@@ -1385,6 +1401,18 @@ class SRTTranslator:
                     f"Invalid translation model '{self.translation_model_name}'. Check the translator model name in your settings. "
                     f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
                 ) from ex
+
+            except (OpenAIAuthenticationError, OpenAIPermissionDeniedError) as ex:
+                logger.error("Auth/permission error (non-retriable): %s", ex)
+                raise
+
+            except OpenAIRateLimitError as ex:
+                self._consecutive_decode_failures += 1
+                wait = min(self._MICRO_BACKOFF_CAP_S, self._MICRO_BACKOFF_BASE_S * (2**retries))
+                logger.warning("Rate-limited; backing off %.1fs: %s", wait, ex)
+                time.sleep(wait)
+                work_q.appendleft((start, end, depth, retries + 1))
+                continue
 
             except Exception as ex:
                 self._consecutive_decode_failures += 1
