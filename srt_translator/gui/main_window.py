@@ -25,8 +25,15 @@ from PySide6.QtWidgets import (
 )
 
 from srt_translator.core.config.utils import normalize_target_languages
+from srt_translator.core.constants import (
+    AI_CONFIG_BASE_COST,
+    BYTES_TO_TOKENS_RATIO,
+    DEFAULT_GENERATION_MODEL,
+    DEFAULT_TEMPERATURE,
+    PRICE_PER_1K_TOKENS,
+    TRANSLATION_OVERHEAD_FACTOR,
+)
 from srt_translator.gui.ai_config import AIConfigGenerator
-from srt_translator.gui.config_manager import GUIConfigManager
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.styles.main_styles import MAIN_STYLESHEET
 from srt_translator.gui.ui.ai_config_section import AIConfigSection
@@ -57,7 +64,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Set up logging for the GUI application (only once in worker;
         # avoid duplicate files)
-        self.log_file = None
         self.logger = logging.getLogger(__name__)
         self.logger.info("SRT Translator GUI started")
 
@@ -83,7 +89,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)
-        self.config_manager = GUIConfigManager(self.settings_manager, self.language_config)
 
         self.ai_config_generator = None
         self.ai_config_thread = None
@@ -95,7 +100,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         self._proc = psutil.Process(os.getpid())
         self._rss0 = self._proc.memory_info().rss
         self._memory_warning_shown = False
-        self._mem_sample_count = 0
 
         # Initialize HTML report tracking
         self._last_eval_json: Path | None = None
@@ -209,6 +213,14 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.import_dnt_file,
         )
 
+        # Advanced Settings signals
+        self.ai_config_section.adv_toggle_btn.clicked.connect(
+            self.ai_config_section.toggle_advanced_expansion
+        )
+        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_name_changed)
+        self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
+        self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
+
         # Translation Section signals
         self.translation_section.connect_signals(self.start_translation, self._open_html_report)
 
@@ -290,9 +302,27 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_section.set_tone(saved_tone)
         self.ai_config_section.connect_tone_changed(self.on_tone_changed)
 
+        # Load advanced settings (generation model name & aggressiveness)
+        self.ai_config_section.set_generation_model_name(self.settings_manager.load_generation_model_name())
+        self.ai_config_section.set_aggressiveness(self.settings_manager.load_aggressiveness())
+
     def on_tone_changed(self, tone: str) -> None:
         """Handle tone selection change"""
         self.settings_manager.save_tone(tone)
+
+    def _on_generation_model_name_changed(self) -> None:
+        """Persist generation model name when editing finishes."""
+        self.settings_manager.save_generation_model_name(self.ai_config_section.get_generation_model_name())
+
+    def _on_aggressiveness_changed(self) -> None:
+        """Persist aggressiveness when slider value changes."""
+        self.settings_manager.save_aggressiveness(self.ai_config_section.get_aggressiveness())
+
+    def _on_reset_advanced_defaults(self) -> None:
+        """Reset advanced settings to defaults and persist."""
+        self.ai_config_section._on_reset_advanced_defaults()
+        self.settings_manager.save_generation_model_name(DEFAULT_GENERATION_MODEL)
+        self.settings_manager.save_aggressiveness(DEFAULT_TEMPERATURE)
 
     def apply_styles(self):
         """Apply the complete style guide to the application"""
@@ -418,6 +448,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def generate_translation_settings(self):
         """Generate Translation Settings for the selected files"""
         # Get selected files and target languages from UI
+
         selected_files = self.file_section.get_selected_files()
         target_codes = self._get_target_codes_from_ui()
         api_key = self.settings_manager.load_api_key()
@@ -461,8 +492,23 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.logger.info("User-provided DNT terms will be merged: %s terms", len(user_dnt_terms))
 
         # Initialize AI config generator if not already done
-        if not self.ai_config_generator:
-            self.ai_config_generator = AIConfigGenerator(api_key, self.language_config)
+        generation_model_name = self.settings_manager.load_generation_model_name()
+
+        if not self.ai_config_section.validate_advanced_settings():
+            return
+
+        self.ai_config_generator = AIConfigGenerator(
+            api_key=api_key,
+            language_config=self.language_config,
+            generation_model_name=generation_model_name,
+            temperature=self.settings_manager.load_aggressiveness(),
+        )
+
+        self.logger.debug(
+            "DEBUG: Generator using generation model=%s temperature=%s",
+            self.ai_config_generator.generation_model_name,
+            self.ai_config_generator.temperature,
+        )
 
         # Show progress and disable button
         self.ai_config_section.show_progress(True)
@@ -835,21 +881,18 @@ class SRTTranslatorMainWindow(QMainWindow):
             except OSError:
                 continue
 
-        estimated_tokens = total_bytes * 0.25
+        estimated_tokens = total_bytes * BYTES_TO_TOKENS_RATIO
 
         total_languages = len(target_languages)
         estimated_tokens *= total_languages
 
-        OVERHEAD_FACTOR = 2.3
-        estimated_tokens *= OVERHEAD_FACTOR
-
-        PRICE_PER_1K = 0.00015
-        estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K
+        estimated_tokens *= TRANSLATION_OVERHEAD_FACTOR
+        estimated_cost = (estimated_tokens / 1000) * PRICE_PER_1K_TOKENS
 
         # Add AI configuration cost if not already generated
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if not dnt_terms and not termbase:
-            estimated_cost += 0.10  # AI configuration cost
+            estimated_cost += AI_CONFIG_BASE_COST   # AI configuration cost
 
         cost_text = f"${estimated_cost:.3f}"
         self.translation_section.update_cost_estimate(cost_text)
@@ -857,6 +900,8 @@ class SRTTranslatorMainWindow(QMainWindow):
     # Translation Section Handlers
     def start_translation(self):
         """Start the translation process"""
+
+
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():
             self.mem_timer.start(300000)
@@ -880,6 +925,9 @@ class SRTTranslatorMainWindow(QMainWindow):
         is_valid, error_message = validate_translation_inputs(api_key, selected_files, target_codes)
         if not is_valid:
             show_validation_error(self, "Validation Error", error_message)
+            return
+
+        if not self.ai_config_section.validate_advanced_settings():
             return
 
         # Start translation

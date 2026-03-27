@@ -15,7 +15,37 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
+from srt_translator.config.model_config_loader import (
+    build_call_params,
+    get_max_inline_tokens,
+    get_model_config,
+)
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.constants import (
+    ANCHOR_TOLERANCE_FRACTION,
+    ANCHOR_TOLERANCE_MIN,
+    CHARS_PER_TOKEN,
+    DEFAULT_GENERATION_MODEL,
+    JITTER_SLEEP_HIGH,
+    JITTER_SLEEP_LOW,
+    MAX_COMPLETION_TOKENS_DNT,
+    MAX_COMPLETION_TOKENS_TERMBASE,
+    MAX_COMPLETION_TOKENS_VALIDATE,
+    MAX_GENERIC_SINGLETONS,
+    MIN_ANCHOR_COVERAGE,
+    MIN_ANCHOR_TERM_COUNT,
+    MIN_GENERIC_SINGLETON_LINE_FREQ,
+    MIN_TERMBASE_SIZE,
+    SOFT_BAND_FLOOR_LONG,
+    SOFT_BAND_FLOOR_MEDIUM,
+    SOFT_BAND_FLOOR_SHORT,
+    SOFT_BAND_HARD_CAP,
+    SOFT_BAND_LONG,
+    SOFT_BAND_MEDIUM,
+    SOFT_BAND_SHORT,
+    TERMBASE_FILL_CHUNK_SIZE,
+    TOPUP_OVERSAMPLE_DIVISOR,
+)
 from srt_translator.core.services.language_detection import detect_source_language
 from srt_translator.core.terminology_utils import is_hard_preserve, is_numeric_like
 from srt_translator.core.translator.srt_parser import SRTParser
@@ -27,9 +57,7 @@ from srt_translator.prompts.config import (
 )
 
 # Batch-level AI config constants
-_CHARS_PER_TOKEN = 4  # rough heuristic: ~4 chars per token
-_TOKEN_CAP = 12_500
-_CHAR_CAP = _TOKEN_CAP * _CHARS_PER_TOKEN  # ~50k chars
+_CHARS_PER_TOKEN = CHARS_PER_TOKEN  # rough heuristic: ~4 chars per token
 
 
 @dataclass
@@ -42,27 +70,33 @@ class BatchAIConfig:
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
-    def __init__(self, api_key: str, language_config: LanguageConfig | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        language_config: LanguageConfig,
+        generation_model_name: str | None = None,
+        temperature: float | None = None,
+    ):
         """Initialize the AI config generator with OpenAI API key and language configuration"""
         if language_config is None:
             raise ValueError("LanguageConfig is required for AIConfigGenerator")
         self.api_key = api_key
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
         self.logger = logging.getLogger("srt_translator.gui.ai_config")
-        # GUI-only model selection for AI config generation is intentionally
+        # GUI-only generation model selection for AI config generation is intentionally
         # isolated from CLI/env to avoid cross-mode confusion
-        self.DEFAULT_MODEL = "gpt-4o-mini"
+        self.temperature = temperature
+        self.generation_model_name = generation_model_name or DEFAULT_GENERATION_MODEL
+
         # GUI-local approximation for characters per token to guide truncation.
         # Keep GUI/CLI separation: do not read from env.
-        self.CHARS_PER_TOKEN = 4
+        self.CHARS_PER_TOKEN = CHARS_PER_TOKEN
 
         # Language configuration for script validation
         self._lang_cfg = language_config
 
         # Configuration constants
-        self.MAX_INLINE_TOKENS = 12500  # Precise token limit for inline content
-        self.MAX_CONTENT_TOKENS = 100000  # Token limit for AI analysis (well within OpenAI's 128K limit)
-        self.MAX_CONTENT_LENGTH = 400000  # Character limit as fallback (roughly 100K tokens)
+        self.MAX_INLINE_TOKENS = get_max_inline_tokens(self.generation_model_name)
 
     def get_supported_languages(self) -> list[str]:
         """Get all supported languages from unified configuration"""
@@ -140,12 +174,18 @@ class AIConfigGenerator:
         try:
             prompt = build_dnt_extraction_prompt(content)
 
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                temperature=0.3,
-            )
+            self.logger.info("Temperature: %s", self.temperature)
+            params = {
+                "model": self.generation_model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_DNT,
+                    temperature=self.temperature,
+                ),
+            }
+
+            response = self.client.chat.completions.create(**params)
 
             result_text = response.choices[0].message.content
             if result_text is None:
@@ -210,21 +250,21 @@ class AIConfigGenerator:
             # derive a simple size floor from transcript size (tokens ≈ chars/4)
             approx_tokens = max(1, len(content) // self.CHARS_PER_TOKEN)
             if approx_tokens <= 400:
-                size_floor = 6
+                size_floor = SOFT_BAND_FLOOR_SHORT
             elif approx_tokens <= 2000:
-                size_floor = 10
+                size_floor = SOFT_BAND_FLOOR_MEDIUM
             else:
-                size_floor = 14
+                size_floor = SOFT_BAND_FLOOR_LONG
 
             # default soft band BEFORE we have an anchor (content-scaled)
             # this helps the first few languages aim for a healthy size
             def _default_soft_band(tokens: int) -> tuple[int, int]:
                 if tokens <= 600:
-                    return (8, 12)
+                    return SOFT_BAND_SHORT
                 if tokens <= 2000:
-                    return (16, 24)
+                    return SOFT_BAND_MEDIUM
                 # long content
-                return (20, 30)
+                return SOFT_BAND_LONG
 
             default_lo, default_hi = _default_soft_band(approx_tokens)
 
@@ -237,9 +277,9 @@ class AIConfigGenerator:
                 try:
                     # compute soft band (clamped to defaults)
                     if anchor_count:
-                        tol = max(2, round(anchor_count * 0.15))
-                        soft_lo = max(default_lo, min(default_hi, max(8, anchor_count - tol)))
-                        soft_hi = max(soft_lo, min(default_hi, min(40, anchor_count + tol)))
+                        tol = max(ANCHOR_TOLERANCE_MIN, round(anchor_count * ANCHOR_TOLERANCE_FRACTION))
+                        soft_lo = max(default_lo, min(default_hi, max(MIN_ANCHOR_TERM_COUNT, anchor_count - tol)))
+                        soft_hi = max(soft_lo, min(default_hi, min(SOFT_BAND_HARD_CAP, anchor_count + tol)))
                     else:
                         soft_lo, soft_hi = default_lo, default_hi
                     if anchor_count is None:
@@ -260,10 +300,7 @@ class AIConfigGenerator:
 
                     # small jitter AFTER anchor to reduce order effects
                     if anchor_count is not None:
-                        import random
-                        import time
-
-                        time.sleep(random.uniform(0.4, 1.1))  # nosec B311
+                        time.sleep(random.uniform(JITTER_SLEEP_LOW, JITTER_SLEEP_HIGH))  # nosec B311
 
                     tb_dict, extracted_terms = self.generate_language_termbase_two_pass(
                         content=content,
@@ -287,7 +324,7 @@ class AIConfigGenerator:
                         # anchor may rise later, but never drop below default_soft_lo
                         extracted_n = max(1, len(extracted_terms))
                         coverage = size / extracted_n
-                        if size >= max(size_floor, 8) and coverage >= 0.6:
+                        if size >= max(size_floor, MIN_ANCHOR_TERM_COUNT) and coverage >= MIN_ANCHOR_COVERAGE:
                             candidate = max(size, default_lo)
                             if anchor_count is None:
                                 anchor_count = candidate
@@ -338,13 +375,18 @@ class AIConfigGenerator:
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=5000,
-                temperature=0.2,
-                response_format={"type": "json_object"},
-            )
+            params = {
+                "model": self.generation_model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_VALIDATE,
+                    temperature=self.temperature,
+                ),
+            }
+
+            response = self.client.chat.completions.create(**params)
             raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             exhausted = bool(data.get("exhausted") or False)
@@ -400,8 +442,8 @@ class AIConfigGenerator:
                         singles.append(t)
                     else:
                         others.append(t)
-                singles_keep = [t for t in singles if count_distinct_lines(t, lines) >= 3]
-                singles_budget = max(0, 2 - len(singles_keep))
+                singles_keep = [t for t in singles if count_distinct_lines(t, lines) >= MIN_GENERIC_SINGLETON_LINE_FREQ]
+                singles_budget = max(0, MAX_GENERIC_SINGLETONS - len(singles_keep))
                 singles_fill = [t for t in singles if t not in singles_keep][:singles_budget]
                 return others + singles_keep + singles_fill
 
@@ -466,7 +508,9 @@ class AIConfigGenerator:
 
             def do_top_up(needed: int) -> int:
                 # oversample to survive DNT/dedupe; clip later
-                ask_low = needed + max(2, needed // 2)  # e.g., need 3 -> ask 4 or 5
+                ask_low = needed + max(
+                    ANCHOR_TOLERANCE_MIN, needed // TOPUP_OVERSAMPLE_DIVISOR
+                )  # e.g., need 3 -> ask 4 or 5
                 ask_high = ask_low + 2
                 addl = self._top_up_extracted_terms(
                     content=content,
@@ -539,9 +583,8 @@ class AIConfigGenerator:
             missing_src = [s for s in src_terms if not tb_dict.get(s)]
             if missing_src:
                 merged = {}
-                CHUNK = 25
-                for i in range(0, len(missing_src), CHUNK):
-                    chunk = missing_src[i : i + CHUNK]
+                for i in range(0, len(missing_src), TERMBASE_FILL_CHUNK_SIZE):
+                    chunk = missing_src[i : i + TERMBASE_FILL_CHUNK_SIZE]
                     fill_map = (
                         self.generate_single_language_termbase(
                             terms=[{"term": s, "reason": ""} for s in chunk],
@@ -592,7 +635,7 @@ class AIConfigGenerator:
                 )
 
             # Add size validation
-            if len(cleaned_terms) < 5:  # Minimum reasonable size
+            if len(cleaned_terms) < MIN_TERMBASE_SIZE:  # Minimum reasonable size
                 self.logger.warning("Very small termbase for %s: %s terms", lang_code, len(cleaned_terms))
 
             return tb_dict, cleaned_terms
@@ -795,15 +838,19 @@ class AIConfigGenerator:
 
             prompt = build_single_language_termbase_prompt(lang_name, term_list)
 
-            response = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=3000,
-                temperature=0.1,
-                response_format={"type": "json_object"},
-            )
+            params = {
+                "model": self.generation_model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TERMBASE,
+                    temperature=self.temperature,
+                ),
+            }
 
-            result_text = response.choices[0].message.content.strip()
+            response = self.client.chat.completions.create(**params)
+            result_text = (response.choices[0].message.content or "").strip()
             if not result_text:
                 raise ValueError("Empty response from AI")
 
@@ -849,30 +896,6 @@ class AIConfigGenerator:
             self.logger.error("Error generating termbase for %s: %s", lang_code, e)
             raise
 
-    def validate_api_key(self) -> bool:
-        """Validate that the API key is working"""
-        try:
-            # Make a simple test call
-            self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=5,
-            )
-            return True
-        except Exception as e:
-            error_msg = str(e).lower()
-            if "invalid" in error_msg or "authentication" in error_msg:
-                self.logger.error("Invalid API key - please check your key at platform.openai.com")
-            elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
-                self.logger.error("Insufficient API credits - please add credits to your OpenAI account")
-            elif "rate" in error_msg:
-                self.logger.error("Rate limit exceeded - please wait a moment and try again")
-            elif "network" in error_msg or "connection" in error_msg:
-                self.logger.error("Network connection issue - please check your internet connection")
-            else:
-                self.logger.error("API key validation failed: %s", e)
-            return False
-
     def get_error_details(self, error: Exception) -> dict:
         """Get detailed error information for GUI display"""
         error_msg = str(error).lower()
@@ -886,7 +909,7 @@ class AIConfigGenerator:
             return {
                 "type": "context_length_exceeded",
                 "title": "Content Too Large for Analysis",
-                "message": "The selected files contain too much text for the AI model to process at once",
+                "message": "The selected files contain too much text for the AI generation model to process at once",
                 "suggestion": "Try selecting fewer files or use the content truncation feature",
             }
         elif "invalid" in error_msg and "authentication" in error_msg:
@@ -936,16 +959,34 @@ class AIConfigGenerator:
         self,
         source_file_paths: list[str],
         target_lang_codes: list[str],
-        token_cap: int = _TOKEN_CAP,
+        token_cap: int | None = None,
     ) -> BatchAIConfig:
         """
         Build ONE batch-level DNT list and ONE termbase (per target language)
         by sampling up to ~12,500 tokens (~50k chars) from the selected source SRTs.
         """
+
+        generation_model_name = self.generation_model_name
+
+        generation_model_config = get_model_config(generation_model_name)
+
+        if not generation_model_config:
+            raise ValueError(f"Generation model config not found for {generation_model_name}")
+
+        TOKEN_CAP = generation_model_config["model_context_length"]
+
+        CHAR_CAP = TOKEN_CAP * _CHARS_PER_TOKEN
+
+        self.logger.info("Generation model selected: %s", generation_model_name)
+        self.logger.info("Generation model context length (tokens): %s", TOKEN_CAP)
+        self.logger.info("Calculated character cap: %s", CHAR_CAP)
+
         if not source_file_paths:
             raise ValueError("No source files provided for AI config generation.")
 
         # 1) Read & parse SRTs, concatenate subtitle text up to char budget
+        if token_cap is None:
+            token_cap = TOKEN_CAP
         char_budget = token_cap * _CHARS_PER_TOKEN
         sampler = []
         total = 0
@@ -956,7 +997,7 @@ class AIConfigGenerator:
                 subs = parser.parse_file(path)
             except Exception:
                 # Fallback: read raw text if parsing fails
-                with open(path, encoding="utf-8", errors="ignore") as f:
+                with open(path, encoding="utf-8", errors="replace") as f:
                     raw = f.read()
                 text_only = self._strip_srt_markup(raw)
                 if total < char_budget:
@@ -988,7 +1029,8 @@ class AIConfigGenerator:
         source_lang = detect_source_language(
             transcript_sample,
             chat=self.client,
-            model=self.DEFAULT_MODEL,
+            generation_model_name=self.generation_model_name,
+            temperature=self.temperature,
             language_config=self._lang_cfg,
         )
         self.logger.info(
@@ -1051,14 +1093,19 @@ class AIConfigGenerator:
             dnt_terms=dnt_terms,
         )
         try:
-            resp = self.client.chat.completions.create(
-                model=self.DEFAULT_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1400,
-                response_format={"type": "json_object"},
-            )
-            raw = (resp.choices[0].message.content or "").strip()
+            params = {
+                "model": self.generation_model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.generation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TERMBASE,
+                    temperature=self.temperature,
+                ),
+            }
+
+            response = self.client.chat.completions.create(**params)
+            raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             out = []
             for it in data.get("pass1_terms") or []:

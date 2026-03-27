@@ -139,6 +139,7 @@ Examples:
         api_cfg = TranslationConfig.from_raw(normalized_raw, mode="CLI")
 
         logger.info("Configuration loaded successfully")
+        logger.info("Translation model selected (CLI): %s", api_cfg.translation_model_name)
         logger.debug("API key source: %s", raw_config.get("api_key_source", "unknown"))
 
         # Debug logging for termbase and DNT terms

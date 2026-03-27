@@ -3,21 +3,27 @@
 AI Configuration Section for the SRT Translator GUI.
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QSlider,
     QTabWidget,
     QVBoxLayout,
 )
 
+from srt_translator.config.model_config_loader import MODEL_CONFIG, get_model_config
+from srt_translator.core.constants import DEFAULT_GENERATION_MODEL, DEFAULT_TEMPERATURE
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor
@@ -176,8 +182,76 @@ class AIConfigSection(QGroupBox):
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
 
+        # --- Advanced Settings (collapsible) ---
+        adv_separator = QFrame()
+        adv_separator.setFrameShape(QFrame.Shape.HLine)
+        adv_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        content_layout.addWidget(adv_separator)
+
+        adv_header = QHBoxLayout()
+        adv_label = QLabel("Advanced Settings")
+        adv_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.adv_toggle_btn = AnimatedToggleButton()
+        adv_header.addWidget(adv_label)
+        adv_header.addStretch()
+        adv_header.addWidget(self.adv_toggle_btn)
+        content_layout.addLayout(adv_header)
+
+        self.adv_content = QFrame()
+        self.adv_content.setVisible(False)
+        adv_layout = QVBoxLayout(self.adv_content)
+        adv_layout.setSpacing(8)
+
+        # Generation Model row
+        generation_model_row = QHBoxLayout()
+        generation_model_label = QLabel("Generation Model:")
+        generation_model_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.generation_model_dropdown = QComboBox()
+        self.generation_model_dropdown.addItems(list(MODEL_CONFIG.keys()))
+        self.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_changed)
+
+        self.generation_model_dropdown.setToolTip(
+            "OpenAI model used for generation.\n"
+            "Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini\n\n"
+            "Note: gpt-5-mini does not support custom temperature —\n"
+            "the Fix Aggressiveness option will be hidden for that generation model."
+        )
+        generation_model_row.addWidget(generation_model_label)
+        generation_model_row.addWidget(self.generation_model_dropdown)
+        adv_layout.addLayout(generation_model_row)
+
+        # Aggressiveness row
+        self.agg_row_frame = QFrame()
+        agg_row = QHBoxLayout(self.agg_row_frame)
+        agg_row.setContentsMargins(0, 0, 0, 0)
+        agg_label = QLabel("Fix Aggressiveness:")
+        agg_label.setStyleSheet("font-weight: 500; color: #374151;")
+        self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
+        self.aggressiveness_slider.setRange(0, 100)
+        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
+        self.aggressiveness_slider.setToolTip(
+            "How aggressively the system fixes placeholder issues.\n0.0 = lenient, 1.0 = strict. Recommended: 0.75"
+        )
+        self.aggressiveness_value_label = QLabel(str(DEFAULT_TEMPERATURE))
+        self.aggressiveness_value_label.setFixedWidth(35)
+        self.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
+        agg_row.addWidget(agg_label)
+        agg_row.addWidget(self.aggressiveness_slider)
+        agg_row.addWidget(self.aggressiveness_value_label)
+        adv_layout.addWidget(self.agg_row_frame)
+
+        # Reset to Defaults button
+        self.reset_advanced_btn = QPushButton("Reset to Defaults")
+        self.reset_advanced_btn.setObjectName("secondaryButton")
+        self.reset_advanced_btn.setToolTip("Reset generation model to default")
+        adv_layout.addWidget(self.reset_advanced_btn)
+
+        content_layout.addWidget(self.adv_content)
+
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
+
+        self._on_generation_model_changed(self.generation_model_dropdown.currentText())
 
     def connect_signals(
         self,
@@ -202,15 +276,7 @@ class AIConfigSection(QGroupBox):
         """Toggle the Translation Settings section expansion"""
         self.is_expanded = not self.is_expanded
         self.content.setVisible(self.is_expanded)
-
-        if self.is_expanded:
-            # Expand to show full content
-            self.content.setMaximumHeight(16777215)  # Qt's default maximum
-        else:
-            # Collapse to 0 height
-            self.content.setMaximumHeight(0)
-
-        # Animate the toggle button
+        self.content.setMaximumHeight(16777215 if self.is_expanded else 0)
         self.toggle_btn.set_expanded_state(self.is_expanded)
 
     def set_generate_button_enabled(self, enabled: bool):
@@ -252,6 +318,30 @@ class AIConfigSection(QGroupBox):
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
 
+    def _on_generation_model_changed(self, generation_model_name: str) -> None:
+        """
+        Show or hide the Fix Aggressiveness row based on the model configuration.
+        """
+        cfg = get_model_config(generation_model_name or "")
+        self.agg_row_frame.setVisible(cfg.get("supports_temperature", True))
+
+    def validate_advanced_settings(self) -> bool:
+        """
+        Validate advanced settings before generation or translation starts.
+        """
+        generation_model = self.get_generation_model_name()
+
+        if generation_model not in MODEL_CONFIG:
+            QMessageBox.warning(
+                self,
+                "Invalid generation model",
+                f"The generation model '{generation_model}' is not supported.\n\n"
+                "Supported generation models are:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
+            )
+            return False
+
+        return True
+
     def get_tone(self) -> str:
         """Get the currently selected tone"""
         if self.tone_casual.isChecked():
@@ -274,6 +364,40 @@ class AIConfigSection(QGroupBox):
     def connect_tone_changed(self, callback) -> None:
         """Connect a callback to be called when tone selection changes"""
         self.tone_button_group.buttonClicked.connect(lambda: callback(self.get_tone()))
+
+    def toggle_advanced_expansion(self) -> None:
+        """Toggle the Advanced Settings subsection visibility."""
+        visible = not self.adv_content.isVisible()
+        self.adv_content.setVisible(visible)
+        self.adv_toggle_btn.set_expanded_state(visible)
+
+    def get_generation_model_name(self) -> str:
+        """Get the current model name from the text field."""
+        return self.generation_model_dropdown.currentText()
+
+    def set_generation_model_name(self, name: str) -> None:
+        """Set the model name in the text field."""
+        self.generation_model_dropdown.setCurrentText(name)
+
+    def get_aggressiveness(self) -> float:
+        """Get the current aggressiveness value (0.0-1.0)."""
+        return self.aggressiveness_slider.value() / 100.0
+
+    def set_aggressiveness(self, value: float) -> None:
+        """Set the aggressiveness slider value (0.0-1.0)."""
+        int_val = max(0, min(100, int(round(value * 100))))
+        self.aggressiveness_slider.setValue(int_val)
+        self.aggressiveness_value_label.setText(f"{value:.2f}")
+
+    def _on_aggressiveness_changed(self, value: int) -> None:
+        """Update the value display label when slider moves."""
+        self.aggressiveness_value_label.setText(f"{value / 100.0:.2f}")
+
+    def _on_reset_advanced_defaults(self) -> None:
+        """Reset both advanced fields to defaults."""
+        self.generation_model_dropdown.setCurrentText(DEFAULT_GENERATION_MODEL)
+        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
+        self.aggressiveness_value_label.setText(str(DEFAULT_TEMPERATURE))
 
 
 class EditConfigurationDialog(QDialog):

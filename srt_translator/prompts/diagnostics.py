@@ -61,7 +61,7 @@ def build_oversize_probe_question(
         f"- Response: ~{response_token_estimate} tokens\n"
         f"- Repetitive loop detected: {loop_note}\n"
         "\n"
-        "QUESTION: What likely caused the model to output an oversized/malformed translation "
+        "QUESTION: What likely caused the translation model to output an oversized/malformed translation "
         "response here (e.g., confusion about task, prompt/formatting, context length, or "
         "other failure mode)? Keep it concise."
     )

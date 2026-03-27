@@ -19,7 +19,11 @@ from typing import (
 )
 
 # OpenAI client
+from openai import AuthenticationError as OpenAIAuthenticationError
+from openai import NotFoundError as OpenAINotFoundError
 from openai import OpenAI
+from openai import PermissionDeniedError as OpenAIPermissionDeniedError
+from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionDeveloperMessageParam,
@@ -28,7 +32,30 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
+from srt_translator.config.model_config_loader import build_call_params
 from srt_translator.core.config.language_config import LanguageConfig
+from srt_translator.core.constants import (
+    DEFAULT_TEMPERATURE,
+    DIAG_MAX_PROBE_BATCH_IDS,
+    DIAG_MAX_SOURCE_ITEMS,
+    DIAG_RESPONSE_PREVIEW_CHARS,
+    MAX_BATCH_SIZE,
+    MAX_COMPLETION_TOKENS_DIAGNOSTIC,
+    MAX_COMPLETION_TOKENS_FALLBACK,
+    MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
+    MAX_CONSECUTIVE_DECODE_FAILURES,
+    MAX_JSON_RETRIES_PER_SEGMENT,
+    MAX_SPLIT_DEPTH,
+    MAX_TRANSLATION_TOKEN_RATIO,
+    MICRO_BACKOFF_BASE,
+    MICRO_BACKOFF_CAP,
+    MIN_TRANSLATION_TOKEN_RATIO,
+    OVERSIZE_RESPONSE_MULTIPLIER,
+    STRICT_RETRY_FREQUENCY_PENALTY,
+    STRICT_RETRY_TOKEN_CAP,
+    STRICT_RETRY_TOKEN_FLOOR,
+    STRICT_RETRY_TOKEN_MULTIPLIER,
+)
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
     build_oversize_probe_question,
@@ -46,6 +73,11 @@ from srt_translator.prompts.translation import (
     build_single_string_fallback_prompt,
     build_translation_prompt,
 )
+
+# Token caps: use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH (4096) for any call that returns
+# JSON with multiple subtitles (main batch, placeholder-fixer). Using a small cap (e.g. 120)
+# truncates the response and produces empty subtitles. Use the smaller constants
+# (DIAGNOSTIC, FALLBACK) or strict-retry computed cap only for single-answer or retry paths.
 
 # ---------------------------
 # Data models
@@ -175,7 +207,7 @@ def validate_placeholders_pair(
     ph_regex: Pattern[str],
 ) -> dict[int, dict[str, set[str]]]:
     issues: dict[int, dict[str, set[str]]] = {}
-    for i, (src, tgt) in enumerate(zip(src_items, tgt_items, strict=False)):
+    for i, (src, tgt) in enumerate(zip(src_items, tgt_items, strict=True)):
         src_ids = _extract_ph_ids(src, ph_regex)
         tgt_ids = _extract_ph_ids(tgt, ph_regex)
         invented = tgt_ids - src_ids
@@ -214,8 +246,21 @@ def _is_invalid_translation(text: str) -> bool:
 
 def _load_and_parse_file(input_filepath: str) -> list[Subtitle]:
     """Load and parse SRT file into subtitle objects."""
-    with open(input_filepath, encoding="utf-8") as f:
-        src_text = f.read()
+    for encoding in ("utf-8", "utf-16", "iso-8859-1"):
+        try:
+            with open(input_filepath, encoding=encoding) as f:
+                src_text = f.read()
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    else:
+        raise UnicodeDecodeError(
+            "multi",
+            b"",
+            0,
+            1,
+            f"Failed to decode {input_filepath} with utf-8, utf-16, or iso-8859-1",
+        )
     src_subs = parse_srt(src_text)
     if not src_subs:
         raise ValueError("Empty or invalid SRT: no subtitle blocks found.")
@@ -230,7 +275,7 @@ def _format_and_append_subtitles(
 ) -> list[Subtitle]:
     """Format subtitles with CPS and append to global list."""
     formatted_subs = []
-    for s, tgt in zip(batch, tgt_texts, strict=False):
+    for s, tgt in zip(batch, tgt_texts, strict=True):
         start_s = _parse_time_to_seconds(s.start)
         end_s = _parse_time_to_seconds(s.end)
         formatted = format_subtitle_text(
@@ -255,13 +300,13 @@ class SRTTranslator:
     term_handler: TermHandler
 
     # Expert configuration - modify these values as needed
-    MAX_BATCH_SIZE = 8  # Maximum subtitles per batch (safety cap)
+    MAX_BATCH_SIZE = MAX_BATCH_SIZE  # Maximum subtitles per batch (safety cap)
     # Internal bounded shape-lock caps (not user-configurable)
-    _MAX_SPLIT_DEPTH = 3
-    _MAX_JSON_RETRIES_PER_SEGMENT = 2
-    _MAX_CONSECUTIVE_DECODE_FAILURES = 8
-    _MICRO_BACKOFF_BASE_S = 0.25
-    _MICRO_BACKOFF_CAP_S = 1.0
+    _MAX_SPLIT_DEPTH = MAX_SPLIT_DEPTH
+    _MAX_JSON_RETRIES_PER_SEGMENT = MAX_JSON_RETRIES_PER_SEGMENT
+    _MAX_CONSECUTIVE_DECODE_FAILURES = MAX_CONSECUTIVE_DECODE_FAILURES
+    _MICRO_BACKOFF_BASE_S = MICRO_BACKOFF_BASE
+    _MICRO_BACKOFF_CAP_S = MICRO_BACKOFF_CAP
 
     def __init__(
         self,
@@ -271,9 +316,10 @@ class SRTTranslator:
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
         allow_global_termbase_fallback: bool = False,
-        model_name: str = "gpt-4o-mini",
+        translation_model_name: str,
         batch_size: int,
         error_policy: str = "STRICT",
+        temperature: float | None = None,
         language_config: LanguageConfig,
         tone: str = "neutral",
     ) -> None:
@@ -283,10 +329,11 @@ class SRTTranslator:
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
         self.allow_global_termbase_fallback = allow_global_termbase_fallback
-        self.model_name = model_name
-        self.batch_size = max(1, int(batch_size))
+        self.translation_model_name = translation_model_name
+        self.batch_size = min(MAX_BATCH_SIZE, max(1, int(batch_size)))
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
+        self.temperature = max(0.0, min(2.0, temperature if temperature is not None else DEFAULT_TEMPERATURE))
 
         # Log the tone setting for debugging
         if isinstance(logger, logging.LoggerAdapter):
@@ -319,7 +366,7 @@ class SRTTranslator:
         if OpenAI is None:
             raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
 
         # One-shot advisory probe budget per (file, lang)
         self._probe_budget = MalformedProbeBudget()
@@ -327,24 +374,29 @@ class SRTTranslator:
         self._probe_budget_langs: set[str] = set()
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
+        self._model_invalid = False
 
     def _strict_retry_kwargs(self, src_items: list[str]) -> dict[str, Any]:
         """
         Strict decoding for retries: cools repetition and caps length conservatively,
         but guarantees enough budget to close the JSON wrapper even for tiny inputs.
+        Uses a computed cap (STRICT_RETRY_*), not the generic 120-token constant, so
+        retries get enough tokens for valid JSON without allowing runaway length.
         """
         src_tok = sum(estimate_tokens(s or "") for s in src_items)
-        cap = int(math.ceil(2.4 * max(1, src_tok)))
-        floor = 120  # <-- token floor: prevents cut-off JSON on very short cues
-        max_tokens = min(900, max(floor, cap))
-        return {
-            "temperature": 0,
-            "frequency_penalty": 0.6,  # discourage loops like "ek ek ek…"
-            "presence_penalty": 0.0,
-            "max_tokens": max_tokens,
-            # Optional: stop right after JSON; remove if provider doesn't support 'stop'
-            "stop": ["]}"],
-        }
+        cap = int(math.ceil(STRICT_RETRY_TOKEN_MULTIPLIER * max(1, src_tok)))
+        floor = STRICT_RETRY_TOKEN_FLOOR  # <-- token floor: prevents cut-off JSON on very short cues
+        max_completion_tokens = min(STRICT_RETRY_TOKEN_CAP, max(floor, cap))
+        base = build_call_params(
+            self.translation_model_name,
+            max_completion_tokens=max_completion_tokens,
+            temperature=self.temperature,
+            frequency_penalty=STRICT_RETRY_FREQUENCY_PENALTY,
+            presence_penalty=0.0,
+        )
+        # Optional: stop right after JSON; remove if provider doesn't support 'stop'
+        base["stop"] = ["]}"]
+        return base
 
     def _setup_file_logging(
         self: SRTTranslator, input_filepath: str, target_lang: str
@@ -358,7 +410,7 @@ class SRTTranslator:
             base_logger = cast(logging.Logger, self.logger)
 
         extra: Mapping[str, object] = {
-            "run_id": getattr(getattr(self.logger, "extra", {}), "get", lambda *_: "n/a")("run_id", "n/a"),
+            "run_id": getattr(self.logger, "extra", {}).get("run_id", "n/a"),
             "file": os.path.basename(input_filepath),
             "lang": target_lang,
         }
@@ -376,7 +428,7 @@ class SRTTranslator:
     ) -> list[str]:
         """Validate and repair placeholder integrity."""
         # Log input/output for troubleshooting placeholder issues
-        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=False)):
+        for i, (src, tgt) in enumerate(zip(src_items, tgt_texts, strict=True)):
             # Use the regex pattern directly to avoid logging violations
             src_placeholders = PH_RE.findall(src)
             tgt_placeholders = PH_RE.findall(tgt)
@@ -395,14 +447,14 @@ class SRTTranslator:
                 )
 
         # Policy-aware placeholder validation for apostrophes after placeholders
-        target_lang = getattr(getattr(batch_logger, "extra", {}), "get", lambda *_: "unknown")("lang", "unknown")
+        target_lang = getattr(batch_logger, "extra", {}).get("lang", "unknown")
         if self.language_config.allows_placeholder_apostrophe(target_lang.lower()):
             # Normalize for detection only: treat "__...__'..." as "__...__"
             norm_tgts = [TR_PLACEHOLDER_APOS_RE.sub(lambda m: m.group(0)[:-1], t) for t in tgt_texts]
             ph_issues = validate_placeholders_pair(src_items, norm_tgts, self.term_handler.placeholder_regex)
             # Once-per-batch debug (observational only)
             seen = False
-            for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+            for i, (_s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=True)):
                 if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                     batch_logger.debug(
                         "Apostrophe after placeholder observed (allowed for %s, item=%d).",
@@ -416,7 +468,7 @@ class SRTTranslator:
             # Stage 1: language-agnostic detector (observational logging only, once per batch)
             seen = False
 
-            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=False)):
+            for i, (s_i, t_i) in enumerate(zip(src_items, tgt_texts, strict=True)):
                 if TR_PLACEHOLDER_APOS_RE.search(t_i) and not seen:
                     batch_logger.debug(
                         "Observed apostrophe immediately after placeholder (item=%d, lang=%s). Source≈%s | Target≈%s",
@@ -469,10 +521,8 @@ class SRTTranslator:
                             self.term_handler.placeholder_regex,
                         )
 
-        # Restore DNT placeholders to originals
-        tgt_texts = [self.term_handler.restore_dnt_placeholders(t) for t in tgt_texts]
-
-        tgt_texts = [self.term_handler.restore_termbase(t, target_lang) for t in tgt_texts]
+        # Restore DNT placeholders and termbase substitutions
+        tgt_texts = [self.term_handler.restore_all(t, target_lang) for t in tgt_texts]
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
@@ -594,7 +644,7 @@ class SRTTranslator:
         batch_logger: LoggerLike,
     ) -> list[str]:
         """Handle mid-batch empty translation retries."""
-        for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=False)):
+        for i, (_src_raw, tgt_raw) in enumerate(zip([s.text for s in batch], tgt_texts, strict=True)):
             if tgt_raw.strip():
                 continue
             sid = batch[i].idx
@@ -606,12 +656,8 @@ class SRTTranslator:
                         sid,
                     )
                     pair_src = [
-                        self.term_handler.apply_dnt_placeholders(
-                            self.term_handler.apply_termbase(batch[i].text)
-                        ),
-                        self.term_handler.apply_dnt_placeholders(
-                            self.term_handler.apply_termbase(batch[i + 1].text)
-                        ),
+                        self.term_handler.apply_all(batch[i].text),
+                        self.term_handler.apply_all(batch[i + 1].text),
                     ]
 
                     pair_ids = [batch[i].idx, batch[i + 1].idx]
@@ -625,8 +671,7 @@ class SRTTranslator:
                     if isinstance(pair_items, list) and len(pair_items) >= 1:
                         candidate = pair_items[0].get("tgt", "")
                         if candidate and candidate.strip():
-                            tgt_texts[i] = self.term_handler.restore_dnt_placeholders(candidate)
-                            tgt_texts[i] = self.term_handler.restore_termbase(tgt_texts[i], target_lang)
+                            tgt_texts[i] = self.term_handler.restore_all(candidate, target_lang)
                             batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                             filled = True
                 except Exception as ex:
@@ -698,7 +743,7 @@ class SRTTranslator:
                     head = batch[0]
                     pair_src = [
                         deferred_tail_retry["source_text_with_placeholders"],
-                        self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(head.text)),
+                        self.term_handler.apply_all(head.text),
                     ]
                     pair_ids = [deferred_tail_retry["cue_index"], head.idx]
                     batch_logger.debug(
@@ -716,10 +761,7 @@ class SRTTranslator:
                         )
                         fixed = pair_tgts[0].get("text", "") if pair_tgts else ""
                         if fixed:
-                            # Restore DNT placeholders first
-                            fixed = self.term_handler.restore_dnt_placeholders(fixed)
-                            # Then restore termbase for the target language
-                            fixed = self.term_handler.restore_termbase(fixed, target_lang)
+                            fixed = self.term_handler.restore_all(fixed, target_lang)
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
                             batch_logger.debug(
@@ -760,10 +802,8 @@ class SRTTranslator:
                 [s.idx for s in batch],
             )
 
-            # Preprocess: apply DNT placeholders on a per-subtitle basis
-            src_items = [
-                self.term_handler.apply_dnt_placeholders(self.term_handler.apply_termbase(s.text)) for s in batch
-            ]
+            # Preprocess: apply termbase + DNT placeholders on a per-subtitle basis
+            src_items = [self.term_handler.apply_all(s.text) for s in batch]
 
             # Log source items being sent to AI for troubleshooting
             file_logger.debug(
@@ -867,13 +907,22 @@ class SRTTranslator:
         messages_typed = cast(Sequence[ChatMsg], messages_payload)
 
         # Use JSON mode if available; otherwise rely on instruction.
-        kwargs = (
-            self._strict_retry_kwargs(src_items)
-            if strict
-            else {"temperature": 0.1, "response_format": {"type": "json_object"}}
-        )
+        if strict:
+            kwargs = self._strict_retry_kwargs(src_items)
+        else:
+            # Main batch path: response is JSON for up to MAX_BATCH_SIZE subtitles. A small
+            # token cap (e.g. 120) truncates the JSON and yields empty subtitles; use
+            # MAX_COMPLETION_TOKENS_TRANSLATION_BATCH.
+            kwargs = {
+                "response_format": {"type": "json_object"},
+                **build_call_params(
+                    self.translation_model_name,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
+                    temperature=self.temperature,
+                ),
+            }
         resp = self.client.chat.completions.create(
-            model=self.model_name,
+            model=self.translation_model_name,
             messages=messages_typed,
             **kwargs,
         )
@@ -886,7 +935,7 @@ class SRTTranslator:
         repetitive_loop = looks_like_repetitive_loop(content or "")
 
         # Heuristic: response wildly larger than prompt (>= 4x), or loop detected
-        oversize = response_token_est >= 4 * prompt_token_est
+        oversize = response_token_est >= OVERSIZE_RESPONSE_MULTIPLIER * prompt_token_est
         if oversize or repetitive_loop:
             self.logger.debug(
                 "Diag: token_est prompt=%d, response=%d, total≈%d (chars: prompt=%d, response=%d)",
@@ -903,10 +952,10 @@ class SRTTranslator:
                 try:
                     # Build a concise source excerpt and response preview for the question
                     # Limit source items to the same number we asked the model to translate.
-                    src_excerpt: Sequence[str] = tuple(src_items[: min(len(src_items), 8)])
+                    src_excerpt: Sequence[str] = tuple(src_items[: min(len(src_items), DIAG_MAX_SOURCE_ITEMS)])
                     response_preview = content or ""
-                    if len(response_preview) > 500:
-                        response_preview = response_preview[:500] + "…"
+                    if len(response_preview) > DIAG_RESPONSE_PREVIEW_CHARS:
+                        response_preview = response_preview[:DIAG_RESPONSE_PREVIEW_CHARS] + "…"
 
                     question = build_oversize_probe_question(
                         lang_code=target_lang,
@@ -923,9 +972,9 @@ class SRTTranslator:
                         target_lang,
                         batch_ids,
                     )
-                    diag_resp = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=cast(
+                    diag_params = {
+                        "model": self.translation_model_name,
+                        "messages": cast(
                             Sequence[ChatMsg],
                             [
                                 {
@@ -935,10 +984,17 @@ class SRTTranslator:
                                 {"role": "user", "content": question},
                             ],
                         ),
-                        temperature=0,
-                        max_tokens=160,
-                    )
-                    diag_text = (diag_resp.choices[0].message.content or "").strip()
+                        # Diagnostic probe: we only need a short explanation of oversize
+                        # behaviour; small cap is sufficient.
+                        **build_call_params(
+                            self.translation_model_name,
+                            max_completion_tokens=MAX_COMPLETION_TOKENS_DIAGNOSTIC,
+                            temperature=self.temperature,
+                        ),
+                    }
+
+                    response = self.client.chat.completions.create(**diag_params)
+                    diag_text = (response.choices[0].message.content or "").strip()
                     self.logger.debug(
                         "AI diagnostic explanation (lang=%s, ids=%s): %s",
                         target_lang,
@@ -987,7 +1043,7 @@ class SRTTranslator:
 
             # Lightweight degeneracy check per item (advisory; retry paths already exist)
             bad = []
-            for i, (src, out) in enumerate(zip(src_items, norm, strict=False)):
+            for i, (src, out) in enumerate(zip(src_items, norm, strict=True)):
                 tgt = (out or {}).get("tgt", "")
                 if not tgt:
                     continue
@@ -995,11 +1051,11 @@ class SRTTranslator:
                     bad.append((i, "repetitive_loop"))
                     continue
 
-                if estimate_tokens(tgt) < 0.3 * max(1, estimate_tokens(src or "")):
+                if estimate_tokens(tgt) < MIN_TRANSLATION_TOKEN_RATIO * max(1, estimate_tokens(src or "")):
                     bad.append((i, "under_ratio"))
 
                 # 2.8× is conservative; adjust later per language if needed
-                if estimate_tokens(tgt) >= 2.8 * max(1, estimate_tokens(src or "")):
+                if estimate_tokens(tgt) >= MAX_TRANSLATION_TOKEN_RATIO * max(1, estimate_tokens(src or "")):
                     bad.append((i, "oversize_ratio"))
             if bad:
                 self.logger.debug(
@@ -1047,8 +1103,8 @@ class SRTTranslator:
                     budget=self._probe_budget,
                     file_base=file_base,
                     lang=target_lang,
-                    batch_ids=batch_ids[:8],
-                    raw_excerpt=(content or "")[:500],
+                    batch_ids=batch_ids[:DIAG_MAX_PROBE_BATCH_IDS],
+                    raw_excerpt=(content or "")[:DIAG_RESPONSE_PREVIEW_CHARS],
                     hint_class=hint_class,
                     source_text=source_text,
                 )
@@ -1075,8 +1131,8 @@ class SRTTranslator:
                     self.logger.debug("Plain-string fallback failed: %s", _fallback_ex)
 
             # Otherwise, let shape-lock handle it as before.
-            self.logger.error("Model did not return JSON; cannot recover without shape lock.")
-            raise RuntimeError("Translation failed: model did not return valid JSON format") from None
+            self.logger.error("Translation model did not return JSON; cannot recover without shape lock.")
+            raise RuntimeError("Translation failed: translation model did not return valid JSON format") from None
 
     def _translate_single_string_fallback(self, *, _src_text: str, target_lang: str) -> str:
         """
@@ -1084,18 +1140,24 @@ class SRTTranslator:
         Returns ONLY a translated string; caller will wrap into JSON.
         """
         sys, usr = build_single_string_fallback_prompt(target_lang, _src_text)
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=cast(
+        params = {
+            "model": self.translation_model_name,
+            "messages": cast(
                 Sequence[ChatMsg],
                 [
                     {"role": "system", "content": sys},
                     {"role": "user", "content": usr},
                 ],
             ),
-            temperature=0.0,
-            max_tokens=256,
-        )
+            # Fallback returns a single translated string only; small cap is enough.
+            **build_call_params(
+                self.translation_model_name,
+                max_completion_tokens=MAX_COMPLETION_TOKENS_FALLBACK,
+                temperature=self.temperature,
+            ),
+        }
+
+        resp = self.client.chat.completions.create(**params)
         out = (resp.choices[0].message.content or "").strip()
         # Be defensive about accidental quoting
         if (out.startswith('"') and out.endswith('"')) or (out.startswith("'") and out.endswith("'")):
@@ -1126,12 +1188,20 @@ class SRTTranslator:
             {"role": "user", "content": prompt},
         ]
 
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=cast(Sequence[ChatMsg], messages_payload),
-            temperature=0.0,
-            response_format={"type": "json_object"},
-        )
+        # Placeholder-fixer returns JSON for multiple items (same shape as main batch);
+        # use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH so the response is not truncated.
+        params = {
+            "model": self.translation_model_name,
+            "messages": cast(Sequence[ChatMsg], messages_payload),
+            "response_format": {"type": "json_object"},
+            **build_call_params(
+                self.translation_model_name,
+                max_completion_tokens=MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
+                temperature=self.temperature,
+            ),
+        }
+
+        resp = self.client.chat.completions.create(**params)
         content = (resp.choices[0].message.content or "").strip()
         try:
             data = json.loads(content)
@@ -1159,7 +1229,7 @@ class SRTTranslator:
     @staticmethod
     def _render_items_for_prompt(ids: list[int], texts: list[str]) -> str:
         rows = []
-        for i, t in zip(ids, texts, strict=False):
+        for i, t in zip(ids, texts, strict=True):
             clean = (t or "").replace("\n", " ").replace("{", "{{").replace("}", "}}").strip()
             rows.append(f"{i}) {clean}")
         return "\n".join(rows)
@@ -1284,6 +1354,14 @@ class SRTTranslator:
                         results[i] = {"id": cue_id, "tgt": ""}
                 break
 
+            # Fast-exit: if model was already flagged invalid, emit empties for all remaining work
+            if self._model_invalid:
+                while work_q:
+                    s, e, _, _ = work_q.popleft()
+                    for i, cue_id in enumerate(batch_ids[s:e], start=s):
+                        results[i] = {"id": cue_id, "tgt": ""}
+                break
+
             start, end, depth, retries = work_q.popleft()
             seg_src = src_items[start:end]
             seg_ids = batch_ids[start:end]
@@ -1310,6 +1388,30 @@ class SRTTranslator:
                         "tgt": obj.get("tgt", ""),
                     }
                 self._consecutive_decode_failures = 0  # reset breaker on success
+                continue
+
+            except OpenAINotFoundError as ex:
+                self._model_invalid = True
+                logger.error(
+                    "Invalid translation model '%s': %s. Check the translator model name in your settings.",
+                    self.translation_model_name,
+                    ex,
+                )
+                raise RuntimeError(
+                    f"Invalid translation model '{self.translation_model_name}'. Check the translator model name in your settings. "
+                    f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
+                ) from ex
+
+            except (OpenAIAuthenticationError, OpenAIPermissionDeniedError) as ex:
+                logger.error("Auth/permission error (non-retriable): %s", ex)
+                raise
+
+            except OpenAIRateLimitError as ex:
+                self._consecutive_decode_failures += 1
+                wait = min(self._MICRO_BACKOFF_CAP_S, self._MICRO_BACKOFF_BASE_S * (2**retries))
+                logger.warning("Rate-limited; backing off %.1fs: %s", wait, ex)
+                time.sleep(wait)
+                work_q.appendleft((start, end, depth, retries + 1))
                 continue
 
             except Exception as ex:

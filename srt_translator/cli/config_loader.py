@@ -130,11 +130,13 @@ def collect_cli_raw() -> dict[str, Any]:
         print(f"Warning: Failed to load language policies, using defaults: {e}")
         # Continue with empty policies - will use defaults
 
+    translation_model = env_file.get("OPENAI_TRANSLATION_MODEL")
+
     return {
         "api_key": api_key,
-        "openai_model": env_file.get("OPENAI_MODEL", "gpt-4o-mini"),
+        "translation_model_name": translation_model,
         # batch size now set per language during orchestration
-        "aggressiveness": env_file.get("AGGRESSIVENESS", "0.75"),
+        "aggressiveness": env_file.get("AGGRESSIVENESS"),
         "log_mode": env_file.get("LOG_MODE", "Standard"),
         "output_directory": env_file.get("OUTPUT_DIRECTORY", "translated_srt_files"),
         "input_directory": env_file.get("INPUT_DIRECTORY", "original_captions"),

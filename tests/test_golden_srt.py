@@ -122,6 +122,7 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
             dnt_terms=overrides.get("dnt_terms", []),
             termbase=termbase,
             api_key="sk-test",
+            translation_model_name="gpt-4o-mini",
             logger=logging.getLogger(f"test.golden.{filename}.{target_lang}"),
             batch_size=overrides.get("batch_size", 8),
             error_policy=overrides.get("error_policy", "STRICT"),

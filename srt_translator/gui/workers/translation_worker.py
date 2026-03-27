@@ -17,6 +17,10 @@ from PySide6.QtCore import Signal as pyqtSignal
 
 from srt_translator.config import load_language_catalog
 from srt_translator.core.config.models import TranslationConfig
+from srt_translator.core.constants import (
+    DEFAULT_TEMPERATURE,
+    DEFAULT_TONE,
+)
 
 # Evaluation imports (config-gated)
 from srt_translator.eval.runner import run_batch_evaluation
@@ -60,7 +64,6 @@ class TranslationWorker(QObject):
     progress_updated = pyqtSignal(str)
     translation_completed = pyqtSignal(dict)
     translation_error = pyqtSignal(str)
-    log_message = pyqtSignal(str)
     eval_report_ready = pyqtSignal(dict)  # All report paths
 
     def __init__(
@@ -77,7 +80,6 @@ class TranslationWorker(QObject):
         self.target_languages = target_languages
         self.settings_manager = settings_manager
         self.output_directory = output_directory
-        self.translation_successful = False
         self.log_file = None
         self.batch_dir = None
         self.translation_results = None
@@ -245,12 +247,12 @@ class TranslationWorker(QObject):
             termbase_proxy = MappingProxyType(safe_tb_outer)
 
             # Load tone from settings (default to "neutral" if not set)
-            tone = "neutral"
+            tone = DEFAULT_TONE
+            temperature = DEFAULT_TEMPERATURE
             if self.settings_manager:
                 tone = self.settings_manager.load_tone()
+                temperature = self.settings_manager.load_aggressiveness()
                 self.logger.debug("Loaded tone from settings: '%s'", tone)
-            else:
-                self.logger.debug("No settings manager, using default tone: '%s'", tone)
 
             # Construct the immutable, complete TranslationConfig
             api_cfg = TranslationConfig(
@@ -259,8 +261,7 @@ class TranslationWorker(QObject):
                 target_languages=filtered_target_languages,
                 dnt_terms=dnt_tuple,
                 termbase=termbase_proxy,
-                model_name="gpt-4o-mini",
-                aggressiveness=0.75,
+                temperature=temperature,
                 log_mode="Standard",
                 api_key=self.api_key,
                 mode="GUI",
@@ -268,6 +269,8 @@ class TranslationWorker(QObject):
                 source_language=source_language,
                 tone=tone,
             )
+
+            self.logger.info("Translation model used: %s", api_cfg.translation_model_name)
 
             self.logger.info(
                 "Using configuration from settings manager: %s languages",
@@ -287,6 +290,7 @@ class TranslationWorker(QObject):
 
                 try:
                     results = _GuiTranslator(api_cfg).run()
+                    print("TRANSLATION MODEL:", api_cfg.translation_model_name)
                 except Exception as e:
                     self.logger.error("Translation session failed: %s", e)
                     raise e
@@ -420,27 +424,3 @@ class TranslationWorker(QObject):
         finally:
             self._stop_logging_bridge()
 
-    def setup_ai_configuration(self):
-        """Log AI configuration snapshot from settings (if available)."""
-        if not self.settings_manager:
-            self.logger.warning("No settings manager available for AI configuration")
-            return
-
-        try:
-            dnt_terms, termbase, source_language = self.settings_manager.load_ai_config()
-            self.logger.info("AI configuration (snapshot) loaded from settings")
-            self.logger.info("DNT terms count: %s", len(dnt_terms))
-            if termbase:
-                self.logger.info("Termbase languages: %s", list(termbase.keys()))
-            if source_language:
-                code = source_language.get("code")
-                name = source_language.get("name")
-                self.logger.info("Source language: %s (%s)", name, code)
-
-            # Note: The translation run receives the config directly; this is logging only.
-
-        except Exception as e:
-            self.logger.error("Error setting up AI configuration: %s", e)
-            # Don't raise - this is not critical for translation
-
-    # (no fixer here; core owns fixes)

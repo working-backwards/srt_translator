@@ -1,5 +1,6 @@
 # srt_translator/core/services/language_detection.py
-
+from srt_translator.config.model_config_loader import build_call_params
+from srt_translator.core.constants import MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION
 from srt_translator.prompts.detection import build_language_detection_prompt
 
 
@@ -7,7 +8,8 @@ def detect_source_language(
     text: str,
     *,
     chat,  # object exposing .chat.completions.create(...)
-    model: str,
+    generation_model_name: str,
+    temperature: float,
     language_config: object | None = None,
     sample_chars: int = 2000,
 ) -> dict[str, object]:
@@ -17,7 +19,7 @@ def detect_source_language(
         "detected_code": str|None,     # raw BCP-47 guess (e.g., "en", "es", "zh-Hans", "pt-BR")
         "normalized_code": str|None,   # mapped to app-supported code if language_config provided
         "normalized_name": str|None,   # human-readable name (via language_config)
-        "confidence": float,           # 0..1 (model self-report)
+        "confidence": float,           # 0..1 (generation_model self-report)
         "mixed": bool                  # true if multiple sources detected
       }
     Never raises; returns a safe empty structure on failure.
@@ -35,16 +37,21 @@ def detect_source_language(
     prompt = build_language_detection_prompt(text)
 
     try:
-        resp = chat.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=120,
-            response_format={"type": "json_object"},
-        )
+        params = {
+            "model": generation_model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            **build_call_params(
+                generation_model_name,
+                max_completion_tokens=MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION,
+                temperature=temperature,
+            ),
+        }
+
         import json
 
-        data = json.loads((resp.choices[0].message.content or "").strip() or "{}")
+        response = chat.chat.completions.create(**params)
+        data = json.loads((response.choices[0].message.content or "").strip() or "{}")
         detected = (data.get("detected_code") or "").strip()
         confidence = float(data.get("confidence") or 0.0)
         mixed = bool(data.get("mixed") or False)

@@ -7,16 +7,6 @@ from pathlib import Path
 from typing import Any
 
 
-def _format_number(value: int | float) -> str:
-    """Format numeric values consistently, avoiding locale dependence."""
-    if isinstance(value, float):
-        # Format floating point numbers to 1 decimal place
-        return f"{value:.1f}"
-    else:
-        # Format integers as-is
-        return str(value)
-
-
 def _load_eval_css() -> str:
     """Load CSS from package data; fail soft so HTML still renders if missing."""
     try:

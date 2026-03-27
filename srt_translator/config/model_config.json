@@ -1,0 +1,31 @@
+{
+  "gpt-4o-mini": {
+    "supports_temperature": true,
+    "supports_sampling_penalties": true,
+    "model_context_length": 128000,
+    "max_output_tokens": 16384,
+    "max_inline_tokens": 80000
+  },
+  "gpt-4o": {
+    "supports_temperature": true,
+    "supports_sampling_penalties": true,
+    "model_context_length": 128000,
+    "max_output_tokens": 16384,
+    "max_inline_tokens": 80000
+  },
+  "gpt-4.1-mini": {
+    "supports_temperature": true,
+    "supports_sampling_penalties": true,
+    "model_context_length": 1047576,
+    "max_output_tokens": 32768,
+    "max_inline_tokens": 500000
+  },
+  "gpt-5-mini": {
+    "supports_temperature": false,
+    "supports_sampling_penalties": false,
+    "reasoning_effort": "medium",
+    "model_context_length": 400000,
+    "max_output_tokens": 128000,
+    "max_inline_tokens": 250000
+  }
+}
