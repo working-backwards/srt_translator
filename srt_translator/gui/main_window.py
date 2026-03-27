@@ -9,8 +9,6 @@ import time
 from pathlib import Path
 
 import psutil
-from openai import OpenAI
-from openai._exceptions import AuthenticationError
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -23,14 +21,17 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from openai import OpenAI
+from openai._exceptions import AuthenticationError
 
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.core.constants import (
-    DEFAULT_GENERATION_MODEL,
+    AI_CONFIG_BASE_COST,
     BYTES_TO_TOKENS_RATIO,
-    TRANSLATION_OVERHEAD_FACTOR,
+    DEFAULT_GENERATION_MODEL,
+    DEFAULT_TEMPERATURE,
     PRICE_PER_1K_TOKENS,
-    AI_CONFIG_BASE_COST, DEFAULT_TEMPERATURE
+    TRANSLATION_OVERHEAD_FACTOR,
 )
 from srt_translator.gui.ai_config import AIConfigGenerator
 from srt_translator.gui.settings_manager import SettingsManager

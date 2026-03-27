@@ -4,7 +4,6 @@ from pathlib import Path
 
 import srt
 
-
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
