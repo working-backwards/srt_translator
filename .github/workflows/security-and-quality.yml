@@ -84,8 +84,7 @@ jobs:
       shell: bash
       run: |
         # audit installed environment (no auth required)
-        pip-audit -v \ 
-        --ignore-vuln CVE-2026-4539
+        pip-audit -v --ignore-vuln CVE-2026-4539
 
   dependency-update-check:
     name: Dependency Update Check
