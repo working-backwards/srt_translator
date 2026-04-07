@@ -27,31 +27,45 @@ MAIN_STYLESHEET = """
     /* Main Content Container */
     #contentContainer {
         background-color: #FFFFFF;
-        border-radius: 8px;
+        border-radius: 12px;
         border: 1px solid #E5E7EB;
         margin: 10px;
+        padding: 10px;
     }
 
     /* Section Headers */
     QGroupBox {
+        background-color: #FFFFFF;
         font-size: 16px;
         font-weight: 600;
         color: #1E293B;
         border: 1px solid #E5E7EB;
-        border-radius: 6px;
-        margin-top: 10px;
-        padding-top: 10px;
+        border-bottom: 2px solid #E5E7EB;
+        border-radius: 12px;
+        margin-top: 16px;
+        padding-top: 16px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
             sans-serif;
+    }
+    QCheckBox {
+        background-color: #F3F4F6;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    QCheckBox:hover {
+        background-color: #E5E7EB;
     }
 
     QGroupBox::title {
         subcontrol-origin: margin;
-        left: 10px;
-        padding: 0 5px 0 5px;
-        color: #1E293B;
+        left: 12px;
+        padding: 0 6px;
+        color: #111827;
         font-size: 16px;
         font-weight: 600;
+        background-color: #FFFFFF;
     }
 
     /* Sub-headers */
@@ -109,8 +123,10 @@ MAIN_STYLESHEET = """
     }
 
     #mainActionButton {
-        height: 50px;
-        font-size: 14px;
+        background-color: #2563EB;
+        border-radius: 10px;
+        height: 48px;
+        font-size: 15px;
         font-weight: 600;
     }
 
@@ -121,13 +137,17 @@ MAIN_STYLESHEET = """
     #primaryButton:pressed, #mainActionButton:pressed {
         background-color: #1E40AF;
     }
+    
+    #mainActionButton {
+      background-color: #2563EB;
+}
 
     /* Secondary Buttons */
     #secondaryButton {
-        background-color: #F3F4F6;
-        color: #374151;
-        border: 1px solid #D1D5DB;
-        border-radius: 6px;
+        background-color: #FFFFFF;
+        color: #2563EB;
+        border: 1px solid #2563EB;
+        border-radius: 8px;
         padding: 8px 16px;
         font-size: 13px;
         font-weight: 500;
@@ -137,7 +157,7 @@ MAIN_STYLESHEET = """
     }
 
     #secondaryButton:hover {
-        background-color: #E5E7EB;
+        background-color: #F9FAFB;
     }
 
     #secondaryButton:pressed {
@@ -202,6 +222,11 @@ MAIN_STYLESHEET = """
         min-height: 100px;
         max-height: 120px;
     }
+
+    #fileList:hover {
+        border: 2px dashed #2563EB;
+        background-color: #F0F7FF;
+    }  
 
     #fileList::item, #languageList::item {
         padding: 8px;
@@ -394,5 +419,48 @@ MAIN_STYLESHEET = """
         selection-background-color: #DBEAFE;
         selection-color: #1E293B;
         font-size: 13px;
+    }
+    
+    #translationSection {
+        background-color: #FFFFFF;
+        border-radius: 14px;
+        padding: 20px;
+        border: 1px solid #E5E7EB;
+   }
+   
+   
+   #languageCheckbox {
+        background-color: #F3F4F6;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    
+    #languageCheckbox:hover {
+        background-color: #E5E7EB;
+    }
+    
+    #languageCheckbox:checked {
+        background-color: #DBEAFE;
+        border: 1px solid #2563EB;
+    }
+    
+    #secondaryButton {
+        background-color: #FFFFFF;
+        color: #2563EB;
+        border: 1px solid #2563EB;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    
+    #secondaryButton:hover {
+        background-color: #EFF6FF;
+    }
+    
+    #header {
+        background-color: #2563EB;
+        padding: 18px;
+        font-size: 20px;
+        font-weight: 700;
+        color: white;
     }
 """

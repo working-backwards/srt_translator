@@ -290,7 +290,6 @@ class TranslationWorker(QObject):
 
                 try:
                     results = _GuiTranslator(api_cfg).run()
-                    print("TRANSLATION MODEL:", api_cfg.translation_model_name)
                 except Exception as e:
                     self.logger.error("Translation session failed: %s", e)
                     raise e

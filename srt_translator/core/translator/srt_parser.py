@@ -90,3 +90,4 @@ class SRTParser:
                 file.write(srt_content)
         except Exception as e:
             logger.error("Error writing %s: %s", filepath, e)
+            raise RuntimeError(f"Write failed: {filepath}")

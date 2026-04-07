@@ -4,6 +4,8 @@ from pathlib import Path
 
 import srt
 
+from srt_translator.core.constants import FIXER_SKIP_DIRS
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
@@ -69,12 +71,15 @@ class SRTFixer:
 
         # Look for language subdirectories
         for lang_dir in batch_dir.iterdir():
-            if lang_dir.is_dir() and not lang_dir.name.startswith("."):
-                # Find .srt files in each language directory
-                for srt_file in lang_dir.glob("*.srt"):
-                    if srt_file.is_file():
-                        srt_files.append(srt_file)
+            if not lang_dir.is_dir():
+                continue
+            # Find .srt files in each language directory
+            if lang_dir.name.startswith(".") or lang_dir.name in FIXER_SKIP_DIRS:
+                continue
 
+            for srt_file in lang_dir.glob("*.srt"):
+                if srt_file.is_file():
+                    srt_files.append(srt_file)
         return srt_files
 
     def _process_single_file(self, file_path: Path, dnt_terms: list[str], dry_run: bool) -> dict:

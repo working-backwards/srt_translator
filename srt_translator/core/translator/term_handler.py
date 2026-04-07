@@ -191,11 +191,13 @@ class TermHandler:
 
     def apply_all(self, text: str) -> str:
         """Apply termbase substitutions then DNT placeholders (correct order)."""
-        return self.apply_dnt_placeholders(self.apply_termbase(text))
+        termbase_substituted = self.apply_termbase(text)
+        return self.apply_dnt_placeholders(termbase_substituted)
 
     def restore_all(self, text: str, lang_code: str) -> str:
         """Restore DNT placeholders then termbase substitutions (correct order)."""
-        return self.restore_termbase(self.restore_dnt_placeholders(text), lang_code)
+        dnt_terms_restored = self.restore_dnt_placeholders(text)
+        return self.restore_termbase(dnt_terms_restored, lang_code)
 
     # Optional artifacts/metrics helpers
     def placeholder_count(self) -> int:
@@ -206,11 +208,6 @@ class TermHandler:
         Returns list of (idx, term, placeholder) for logging/artifacts.
         """
         return [(i, term, self.placeholder_map[term]) for i, term in enumerate(self._ordered_terms)]
-
-    def get_filtered_termbase(self) -> dict[str, str]:
-        """Get termbase with DNT precedence enforced (collisions removed)"""
-        # For now, return empty dict - this can be enhanced later if needed
-        return {}
 
     def get_effective_dnt(self) -> list[str]:
         """Get the effective DNT terms (after precedence rules applied)"""

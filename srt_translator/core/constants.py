@@ -118,3 +118,5 @@ PRICE_PER_1K_TOKENS = 0.00015  # estimated cost in USD per 1 000 tokens
 AI_CONFIG_BASE_COST = 0.10  # flat estimated cost in USD for one AI config generation run
 
 AI_CONFIG_MAX_AGE_DAYS = 30
+
+FIXER_SKIP_DIRS = {"artifacts", "originals"}
