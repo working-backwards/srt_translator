@@ -190,7 +190,6 @@ class AIConfigSection(QGroupBox):
 
         adv_header = QHBoxLayout()
         adv_label = QLabel("Advanced Settings")
-        adv_label.setStyleSheet("font-weight: 500; color: #374151;")
         self.adv_toggle_btn = AnimatedToggleButton()
         adv_header.addWidget(adv_label)
         adv_header.addStretch()
