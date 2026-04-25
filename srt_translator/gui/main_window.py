@@ -214,10 +214,10 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         # Advanced Settings signals
-        self.ai_config_section.adv_toggle_btn.clicked.connect(
-            self.ai_config_section.toggle_advanced_expansion
+        self.ai_config_section.adv_toggle_btn.clicked.connect(self.ai_config_section.toggle_advanced_expansion)
+        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(
+            self._on_generation_model_name_changed
         )
-        self.ai_config_section.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_name_changed)
         self.ai_config_section.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
         self.ai_config_section.reset_advanced_btn.clicked.connect(self._on_reset_advanced_defaults)
 
@@ -552,11 +552,18 @@ class SRTTranslatorMainWindow(QMainWindow):
                         user_provided=self.user_termbase,
                     )
 
+                    requested_lang_count = len(self.languages)
+                    succeeded_lang_count = len(batch_config.termbase)
                     progress_msg = (
                         f"AI Config Worker: Generated {len(batch_config.dnt_terms)} AI DNT terms "
-                        f"(merged to {len(merged_dnt)} total) and termbase for {len(batch_config.termbase)} languages "
+                        f"(merged to {len(merged_dnt)} total) and termbase for "
+                        f"{succeeded_lang_count} of {requested_lang_count} requested languages "
                         f"(merged to {len(merged_termbase)} languages)"
                     )
+                    if batch_config.failed_languages:
+                        progress_msg += (
+                            f"; AI generation failed for: {', '.join(sorted(batch_config.failed_languages))}"
+                        )
                     self.progress.emit(progress_msg)
                     self.logger.info(progress_msg)
 
@@ -565,6 +572,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                             merged_dnt,
                             merged_termbase,
                             batch_config.source_language,
+                            list(batch_config.failed_languages),
                         )
                     )
 
@@ -637,13 +645,21 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def ai_config_generation_finished(self, result):
         """Handle AI configuration generation completion"""
-        dnt_terms, termbase, source_language = result
+        # Tuple is (merged_dnt, merged_termbase, source_language, failed_languages).
+        # failed_languages may be an empty list on a clean run.
+        dnt_terms, termbase, source_language, failed_languages = result
 
         self.logger.info(
             "AI configuration generation completed: %s DNT terms, %s languages in termbase",
             len(dnt_terms),
             len(termbase),
         )
+        if failed_languages:
+            self.logger.warning(
+                "AI generation failed for %d languages (no termbase entries produced): %s",
+                len(failed_languages),
+                ", ".join(sorted(failed_languages)),
+            )
 
         # Hide progress
         self.ai_config_section.show_progress(False)
@@ -892,7 +908,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         # Add AI configuration cost if not already generated
         dnt_terms, termbase, _ = self.settings_manager.load_ai_config()
         if not dnt_terms and not termbase:
-            estimated_cost += AI_CONFIG_BASE_COST   # AI configuration cost
+            estimated_cost += AI_CONFIG_BASE_COST  # AI configuration cost
 
         cost_text = f"${estimated_cost:.3f}"
         self.translation_section.update_cost_estimate(cost_text)
@@ -900,7 +916,6 @@ class SRTTranslatorMainWindow(QMainWindow):
     # Translation Section Handlers
     def start_translation(self):
         """Start the translation process"""
-
 
         # Start memory sampling for this run
         if self.mem_timer and not self.mem_timer.isActive():

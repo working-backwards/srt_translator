@@ -11,7 +11,7 @@ import random
 import re
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
@@ -68,6 +68,10 @@ class BatchAIConfig:
     dnt_terms: list[str]
     termbase: dict[str, dict[str, str]]  # lang -> {source_term: mapped_translation}
     source_language: dict[str, object] | None = None
+    # Language codes the AI generation pipeline could not produce a termbase
+    # for (after retries). Empty in the happy path. Surfaced to the GUI so
+    # creators see partial failures instead of just the success count.
+    failed_languages: list[str] = field(default_factory=list)
 
 
 _RETRYABLE_OPENAI_ERRORS: tuple[type[Exception], ...] = (
@@ -343,7 +347,7 @@ class AIConfigGenerator:
         target_languages: list[str],
         dnt_terms: list[str] | None = None,
         source_language: dict[str, object] | None = None,
-    ) -> dict[str, dict[str, str]]:
+    ) -> tuple[dict[str, dict[str, str]], list[str]]:
         """
         Generate a termbase per target language using a per‑language TWO‑PASS approach:
           Pass 1: ~20 topic‑critical & likely‑risky source‑language terms
@@ -351,7 +355,13 @@ class AIConfigGenerator:
         Then translate those to the target language. DNT takes precedence; any term
         present in DNT is excluded from selection and filtered out if it slips through.
 
-        If a language's TB fails, it is skipped. TB is optional by design.
+        Returns:
+          (termbase, failed_languages) — termbase maps lang_code -> {source: target},
+          failed_languages lists the codes that did not produce a termbase (after
+          retries). A language can fail because its API call kept timing out, the
+          model returned an empty result, or any other exception bubbled up from
+          generate_language_termbase_two_pass. Surfacing this list lets the GUI
+          show partial-failure summaries rather than silently dropping languages.
         """
         try:
             supported_languages = self.get_supported_languages()
@@ -363,10 +373,11 @@ class AIConfigGenerator:
                 self.logger.warning("No valid target languages provided")
                 self.logger.warning("Input languages: %s", target_languages)
                 self.logger.warning("Supported languages sample: %s", supported_languages[:10])
-                return {}
+                return {}, []
 
             dnt_set = {term.lower().strip() for term in (dnt_terms or [])}
             termbase: dict[str, dict[str, str]] = {}
+            failed_languages: list[str] = []
 
             # --- soft alignment anchor (first successful TB) ---
             anchor_count: int | None = None
@@ -396,6 +407,7 @@ class AIConfigGenerator:
                 lang_name = self._lang_cfg.get_language_name(lang_code)
                 if not lang_name:
                     self.logger.warning("Could not get language name for %s, skipping", lang_code)
+                    failed_languages.append(lang_code)
                     continue
                 try:
                     # compute soft band (clamped to defaults)
@@ -436,6 +448,7 @@ class AIConfigGenerator:
                     )
                     if not tb_dict:
                         self.logger.warning("Empty termbase for %s; skipping", lang_code)
+                        failed_languages.append(lang_code)
                         continue
                     # DNT wins: aggressively drop any collisions that slipped in.
                     cleaned = self._drop_dnt_from_termbase(tb_dict, dnt_set)
@@ -461,10 +474,18 @@ class AIConfigGenerator:
                             )
                 except Exception as e:
                     self.logger.error("Failed to generate termbase for %s: %s", lang_code, e)
+                    failed_languages.append(lang_code)
                     continue
 
             self.logger.info("Generated termbase for %s languages (per‑language two‑pass)", len(termbase))
-            return termbase
+            if failed_languages:
+                self.logger.warning(
+                    "AI termbase generation failed for %d of %d languages: %s",
+                    len(failed_languages),
+                    len(valid_languages),
+                    ", ".join(sorted(failed_languages)),
+                )
+            return termbase, failed_languages
         except Exception as e:
             self.logger.error("Error generating termbase: %s", e)
             raise
@@ -1172,7 +1193,7 @@ class AIConfigGenerator:
         self.logger.info("Generated %s DNT terms (batch-level)", len(dnt_terms))
 
         # 4) Generate termbase using the new two-stage pipeline
-        termbase_by_lang = self.generate_termbase(
+        termbase_by_lang, failed_languages = self.generate_termbase(
             transcript_sample,
             target_lang_codes,
             dnt_terms=dnt_terms,
@@ -1180,7 +1201,12 @@ class AIConfigGenerator:
         )
         self.logger.info("Generated termbase for %s languages (batch-level)", len(termbase_by_lang))
 
-        return BatchAIConfig(dnt_terms=dnt_terms, termbase=termbase_by_lang, source_language=source_lang)
+        return BatchAIConfig(
+            dnt_terms=dnt_terms,
+            termbase=termbase_by_lang,
+            source_language=source_lang,
+            failed_languages=failed_languages,
+        )
 
     @staticmethod
     def _strip_srt_markup(raw: str) -> str:
