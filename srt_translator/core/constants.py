@@ -5,12 +5,44 @@ MAX_INLINE_TOKENS = 12500
 # Must be large enough that the API does not truncate the response.
 MAX_COMPLETION_TOKENS_TRANSLATION_BATCH = 4096
 
-DEFAULT_GENERATION_MODEL = "gpt-5-mini"  # model used for DNT / termbase generation
+# --- Default models per AI task ---------------------------------------------
+# The app makes three kinds of OpenAI calls, each with different needs:
+#
+#   GENERATION  — DNT + termbase extraction, called once per course. Benefits
+#                 from a large-context model that can ingest the full transcript.
+#   TRANSLATION — subtitle translation, called once per 5-8 cues, many times
+#                 per course. Cost / latency dominate; quality on tiny prompts
+#                 is the same across modern small models.
+#   DETECTION   — language detection of the source transcript, one short
+#                 classification call per course. Fast and deterministic;
+#                 reasoning effort is wasted compute and risks empty output
+#                 when the token budget is small (see notes below).
+#
+# When changing any of these defaults:
+#   1. Confirm the new model is registered in srt_translator/config/model_config.json
+#      with correct supports_temperature / supports_sampling_penalties /
+#      max_output_tokens / max_inline_tokens / reasoning_effort fields.
+#   2. Reasoning models (those with reasoning_effort set) consume the same
+#      max_completion_tokens budget for both internal reasoning AND visible
+#      output. Make sure every call site that targets the model uses a
+#      completion-token budget >= REASONING_MODEL_COMPLETION_TOKEN_FLOOR
+#      (build_call_params() enforces this automatically).
+# ----------------------------------------------------------------------------
+
+DEFAULT_GENERATION_MODEL = "gpt-5-mini"  # DNT / termbase extraction (large input, deep reasoning)
+DEFAULT_DETECTION_MODEL = "gpt-4o-mini"  # language detection (tiny classification; non-reasoning by design)
 MAX_COMPLETION_TOKENS_DNT = 32000  # token budget for DNT extraction calls
 MAX_COMPLETION_TOKENS_TERMBASE = 48000  # token budget for termbase generation calls
 MAX_COMPLETION_TOKENS_DIAGNOSTIC = 160  # token budget for oversize / malformed-JSON probes
 MAX_COMPLETION_TOKENS_FALLBACK = 256  # token budget for single-string plain-text fallback
 MAX_COMPLETION_TOKENS_VALIDATE = 16000
+
+# Floor for max_completion_tokens when calling a reasoning model. Reasoning
+# tokens (chain-of-thought) and visible output share this budget; if the
+# caller-supplied value is below this floor, build_call_params() raises it
+# (clamped to the model's max_output_tokens). 4096 leaves room for ~3-4k
+# reasoning tokens at "medium" effort plus a small JSON response.
+REASONING_MODEL_COMPLETION_TOKEN_FLOOR = 4096
 
 # Default sampling temperature for generation calls
 DEFAULT_TEMPERATURE = 0.75
@@ -95,7 +127,11 @@ SOFT_BAND_SHORT = (8, 12)  # ≤ 600 tokens
 SOFT_BAND_MEDIUM = (16, 24)  # ≤ 2 000 tokens
 SOFT_BAND_LONG = (20, 30)  # > 2 000 tokens
 
-MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION = 120  # token budget for the language-detection call
+# Token budget for the language-detection call. Visible output is ~50 tokens
+# (a small JSON object), so 256 is generous headroom for non-reasoning models.
+# If DEFAULT_DETECTION_MODEL is ever changed to a reasoning model,
+# build_call_params() will lift this to REASONING_MODEL_COMPLETION_TOKEN_FLOOR.
+MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION = 256
 
 # Anchor tolerance: ± fraction of anchor_count used to compute soft_lo / soft_hi
 ANCHOR_TOLERANCE_FRACTION = 0.15

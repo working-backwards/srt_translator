@@ -1025,12 +1025,11 @@ class AIConfigGenerator:
             len(transcript_sample),
         )
 
-        # 2) Detect source language
+        # 2) Detect source language. Detection uses DEFAULT_DETECTION_MODEL
+        # (not the user's generation model) — see language_detection.py.
         source_lang = detect_source_language(
             transcript_sample,
             chat=self.client,
-            generation_model_name=self.generation_model_name,
-            temperature=self.temperature,
             language_config=self._lang_cfg,
         )
         self.logger.info(
