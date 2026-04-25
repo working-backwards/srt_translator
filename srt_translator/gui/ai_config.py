@@ -13,7 +13,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
 from srt_translator.config.model_config_loader import (
     build_call_params,
@@ -36,6 +36,9 @@ from srt_translator.core.constants import (
     MIN_ANCHOR_TERM_COUNT,
     MIN_GENERIC_SINGLETON_LINE_FREQ,
     MIN_TERMBASE_SIZE,
+    PER_LANGUAGE_RETRY_ATTEMPTS,
+    PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
+    PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
     SOFT_BAND_FLOOR_LONG,
     SOFT_BAND_FLOOR_MEDIUM,
     SOFT_BAND_FLOOR_SHORT,
@@ -65,6 +68,62 @@ class BatchAIConfig:
     dnt_terms: list[str]
     termbase: dict[str, dict[str, str]]  # lang -> {source_term: mapped_translation}
     source_language: dict[str, object] | None = None
+
+
+_RETRYABLE_OPENAI_ERRORS: tuple[type[Exception], ...] = (
+    APITimeoutError,
+    APIConnectionError,
+    RateLimitError,
+)
+
+
+def _call_with_retry(
+    create_fn,
+    *,
+    context: str,
+    logger: logging.Logger,
+    attempts: int = PER_LANGUAGE_RETRY_ATTEMPTS,
+    base_backoff_s: float = PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
+    cap_backoff_s: float = PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
+    sleep_fn=time.sleep,
+):
+    """Call create_fn() with exponential backoff on transient OpenAI errors.
+
+    Retries on APITimeoutError, APIConnectionError, RateLimitError up to
+    `attempts` times. Other exceptions propagate immediately. After the
+    final attempt, the last retryable exception is re-raised.
+
+    Args:
+        create_fn: Zero-arg callable that performs the API call.
+        context: Human-readable identifier (e.g. language code) used in
+            log messages so creators can see which call retried.
+        logger: Logger to write WARNING-level retry notices to.
+        attempts: Number of retries after the initial attempt.
+        base_backoff_s: Backoff for retry 1; subsequent retries double up
+            to `cap_backoff_s`.
+        cap_backoff_s: Maximum backoff between retries.
+        sleep_fn: Injected for tests so they don't actually sleep.
+
+    Returns:
+        Whatever create_fn returns on success.
+    """
+    for attempt in range(attempts + 1):
+        try:
+            return create_fn()
+        except _RETRYABLE_OPENAI_ERRORS as ex:
+            if attempt == attempts:
+                raise
+            backoff = min(cap_backoff_s, base_backoff_s * (2**attempt))
+            logger.warning(
+                "[%s] %s on attempt %d/%d; retrying in %.1fs: %s",
+                context,
+                type(ex).__name__,
+                attempt + 1,
+                attempts + 1,
+                backoff,
+                ex,
+            )
+            sleep_fn(backoff)
 
 
 def _filter_termbase_response(
@@ -450,7 +509,11 @@ class AIConfigGenerator:
                 ),
             }
 
-            response = self.client.chat.completions.create(**params)
+            response = _call_with_retry(
+                lambda: self.client.chat.completions.create(**params),
+                context=lang_code,
+                logger=self.logger,
+            )
             raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             exhausted = bool(data.get("exhausted") or False)

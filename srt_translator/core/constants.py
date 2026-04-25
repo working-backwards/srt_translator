@@ -144,6 +144,15 @@ SOFT_BAND_HARD_CAP = 40
 JITTER_SLEEP_LOW = 0.4
 JITTER_SLEEP_HIGH = 1.1
 
+# Retry policy for the per-language termbase API call. These calls are
+# long single-shot requests (often 1-6 minutes) and can fail with
+# APITimeoutError, APIConnectionError, or RateLimitError under transient
+# load. Backoff is exponential with a cap; values are tuned for one-shot
+# calls, not tight rate-limit loops (which use MICRO_BACKOFF_* above).
+PER_LANGUAGE_RETRY_ATTEMPTS = 2  # retries after the initial attempt (so up to 3 total tries)
+PER_LANGUAGE_RETRY_BACKOFF_BASE_S = 5.0
+PER_LANGUAGE_RETRY_BACKOFF_CAP_S = 30.0
+
 DEFAULT_TRANSLATION_MODEL = "gpt-4o-mini"  # default model used for subtitle translation
 DEFAULT_TONE = "neutral"  # translation tone/register: "casual" | "neutral" | "formal"
 DEFAULT_ERROR_POLICY = "BOUNDED"  # placeholder error policy: "STRICT" | "BOUNDED" | "DEV"
