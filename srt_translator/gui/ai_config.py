@@ -67,6 +67,70 @@ class BatchAIConfig:
     source_language: dict[str, object] | None = None
 
 
+def _filter_termbase_response(
+    tb: object,
+    extracted: list[dict],
+    dnt_set: set[str],
+) -> tuple[dict[str, str], dict[str, int]]:
+    """Filter the raw termbase dict from a model response.
+
+    Drops entries that are:
+      - empty (no key or value)
+      - DNT collisions (key matches a do-not-translate term)
+      - self-references (source key equal to target value, case-insensitive)
+      - unknown keys (key not present in pass1_terms + pass2_terms)
+
+    The self-reference and unknown-key filters defend against malformed model
+    output where the source key is in the target language (e.g. Japanese
+    `2ピザチーム` → `2ピザチーム` for a Japanese-target call). Such entries
+    are dead weight: they never match English source text.
+
+    Args:
+        tb: The raw termbase value from the model response. Expected to be a
+            dict, but typed as object so callers can pass through whatever
+            json.loads returned.
+        extracted: List of {"term": str, ...} dicts from pass1_terms +
+            pass2_terms (the model's own source-term list). If empty, the
+            unknown-key filter is skipped — there is no reference to compare
+            against.
+        dnt_set: Set of lowercased DNT terms.
+
+    Returns:
+        (filtered_dict, drop_counts) where drop_counts has integer keys
+        "dnt_collision", "self_reference", "unknown_key".
+    """
+    filtered: dict[str, str] = {}
+    drops = {"dnt_collision": 0, "self_reference": 0, "unknown_key": 0}
+
+    if not isinstance(tb, dict):
+        return filtered, drops
+
+    valid_source_terms = {
+        str(t.get("term", "")).strip().lower() for t in extracted if isinstance(t, dict) and t.get("term")
+    }
+
+    for k, v in tb.items():
+        if not k or not v:
+            continue
+        k_clean = str(k).strip()
+        v_clean = str(v).strip()
+        if not k_clean or not v_clean:
+            continue
+        k_lower = k_clean.lower()
+        if k_lower in dnt_set:
+            drops["dnt_collision"] += 1
+            continue
+        if k_lower == v_clean.lower():
+            drops["self_reference"] += 1
+            continue
+        if valid_source_terms and k_lower not in valid_source_terms:
+            drops["unknown_key"] += 1
+            continue
+        filtered[k_clean] = v_clean
+
+    return filtered, drops
+
+
 class AIConfigGenerator:
     """Generates AI-powered translation configurations from SRT content"""
 
@@ -568,15 +632,18 @@ class AIConfigGenerator:
             # Update cleaned_terms with filtered results
             cleaned_terms = filtered_cleaned_terms
 
-            # Filter DNT collisions from TB keys
-            tb_dict = {}
-            if isinstance(tb, dict):
-                for k, v in tb.items():
-                    if not k or not v:
-                        continue
-                    if k.strip().lower() in dnt_set:
-                        continue
-                    tb_dict[k.strip()] = str(v).strip()
+            # Filter the raw termbase response: drops empty/DNT/self-ref/unknown-key entries.
+            tb_dict, _tb_drops = _filter_termbase_response(tb, extracted, dnt_set)
+            if any(_tb_drops.values()):
+                self.logger.warning(
+                    "[%s] Dropped %d malformed termbase entries from model response: "
+                    "%d DNT collisions, %d self-references, %d unknown keys (not in pass terms)",
+                    lang_code,
+                    sum(_tb_drops.values()),
+                    _tb_drops["dnt_collision"],
+                    _tb_drops["self_reference"],
+                    _tb_drops["unknown_key"],
+                )
 
             # --- ensure translations exist for ALL cleaned terms ---
             src_terms = [t["term"] for t in cleaned_terms]
