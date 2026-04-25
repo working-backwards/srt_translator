@@ -22,6 +22,44 @@ class LanguageConfig:
         "Return language codes available in the injected policy."
         return list(self._langs.keys())
 
+    def closest_supported_code(self, code: str) -> str | None:
+        """Return the catalog code that best matches `code`, or None.
+
+        Used by language detection to map an LLM's BCP-47 guess (e.g. "en",
+        "EN", "zh-CN") to whatever code the loaded catalog actually uses.
+        Resolution order:
+          1. Exact case-sensitive match against the catalog.
+          2. Case-insensitive match (returning the catalog's canonical casing).
+          3. Class-level alias normalization (e.g. "zh" -> "zh-Hans"), then
+             retry exact + case-insensitive against the catalog.
+          4. Base-language fallback for region-tagged codes (e.g. "en-GB"
+             matches catalog "en" if no region-specific entry exists).
+        Returns None if no resolution path lands on a supported code.
+        """
+        if not code:
+            return None
+
+        supported = self.codes()
+        if code in supported:
+            return code
+
+        lowered = {c.lower(): c for c in supported}
+        if code.lower() in lowered:
+            return lowered[code.lower()]
+
+        normalized = self.normalize_language_code(code)
+        if normalized != code:
+            if normalized in supported:
+                return normalized
+            if normalized.lower() in lowered:
+                return lowered[normalized.lower()]
+
+        base = code.split("-")[0].lower()
+        if base != code.lower() and base in lowered:
+            return lowered[base]
+
+        return None
+
     def get_all_languages(self) -> dict[str, Any]:
         """Get all available languages"""
         return self._langs
