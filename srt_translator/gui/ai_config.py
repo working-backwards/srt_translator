@@ -130,6 +130,37 @@ def _call_with_retry(
             sleep_fn(backoff)
 
 
+def _build_pass_assignment(
+    response_pass1: list,
+    response_pass2: list,
+) -> dict[str, str]:
+    """Build a term-lower -> 'pass1' | 'pass2' lookup from the model's response.
+
+    Used so the local term-validation loop can preserve the model's own
+    pass categorization instead of re-deriving it from the `reason` text.
+    Re-derivation by English-keyword matching (the previous approach) silently
+    failed when the model wrote reasons in the target language — for example
+    a zh-Hans run came back with reasons in Chinese, so no English keyword
+    matched and every term collapsed into Pass 1 in the diagnostic logs.
+
+    On duplicate terms (same surface form in both arrays), Pass 2 wins —
+    "confusable" is the more specific category, so if the model thought a
+    term was confusable it should be reported as such.
+    """
+    assignment: dict[str, str] = {}
+    for it in response_pass1 or []:
+        if isinstance(it, dict):
+            term = (it.get("term") or "").strip().lower()
+            if term:
+                assignment[term] = "pass1"
+    for it in response_pass2 or []:
+        if isinstance(it, dict):
+            term = (it.get("term") or "").strip().lower()
+            if term:
+                assignment[term] = "pass2"
+    return assignment
+
+
 def _filter_termbase_response(
     tb: object,
     extracted: list[dict],
@@ -539,10 +570,16 @@ class AIConfigGenerator:
             data = json.loads(raw)
             exhausted = bool(data.get("exhausted") or False)
             exhaustion_reason = data.get("exhaustion_reason")
-            pass1_terms = data.get("pass1_terms", []) or []
-            pass2_terms = data.get("pass2_terms", []) or []
-            extracted = pass1_terms + pass2_terms
+            response_pass1 = data.get("pass1_terms", []) or []
+            response_pass2 = data.get("pass2_terms", []) or []
+            extracted = response_pass1 + response_pass2
             tb = data.get("termbase", {}) or {}
+            # Capture the model's own pass assignment now, before the local
+            # `pass1_terms` / `pass2_terms` accumulators below shadow these
+            # names. Used in place of English-keyword matching on the reason
+            # text, which silently miscategorizes when the model writes
+            # reasons in the target language.
+            _response_pass_assignment = _build_pass_assignment(response_pass1, response_pass2)
 
             # Domain-agnostic post-filtering constants and functions
             GENERIC_SINGLETONS = {
@@ -621,29 +658,15 @@ class AIConfigGenerator:
                     continue
                 seen_terms.add(kl)
 
-                # Categorize by pass based on reason content
-                reason_lower = reason.lower()
                 # Debug: log a few reasons to see what the AI is actually writing
                 if len(cleaned_terms) < 3:
                     self.logger.debug("Sample reason for '%s': '%s'", term, reason)
 
-                if any(
-                    keyword in reason_lower
-                    for keyword in [
-                        "confusable",
-                        "near-homophone",
-                        "orthography",
-                        "mistranslate",
-                        "over-literal",
-                        "confused",
-                        "similar",
-                        "hard to translate",
-                        "difficult",
-                        "ambiguous",
-                        "literal",
-                        "misunderstood",
-                    ]
-                ):
+                # Categorize using the model's own pass assignment from the
+                # response. Default to pass1 if the term isn't in either
+                # response array (e.g. terms added later by the top-up path,
+                # which doesn't carry pass info).
+                if _response_pass_assignment.get(term.lower()) == "pass2":
                     pass2_terms.append({"term": term, "reason": reason})
                 else:
                     pass1_terms.append({"term": term, "reason": reason})
