@@ -523,7 +523,7 @@ class SRTTranslator:
 
         # Restore DNT placeholders and termbase substitutions
         tgt_texts = [self.term_handler.restore_all(t, target_lang) for t in tgt_texts]
-        self.logger.info("FINAL OUTPUT: %s", tgt_texts)
+        self.logger.debug("FINAL OUTPUT: %s", tgt_texts)
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
@@ -805,7 +805,6 @@ class SRTTranslator:
 
             # Preprocess: apply termbase + DNT placeholders on a per-subtitle basis
             src_items = [self.term_handler.apply_all(s.text) for s in batch]
-            self.logger.info("INPUT: %s", src_items)
 
             # Log source items being sent to AI for troubleshooting
             file_logger.debug(
