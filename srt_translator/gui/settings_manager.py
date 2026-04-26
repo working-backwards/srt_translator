@@ -27,12 +27,58 @@ class SettingsManager:
     """Manages persistent settings for the SRT Translator GUI (AI Config is SSOT)"""
 
     def __init__(self, language_config: LanguageConfig):
-        self.settings = QSettings("SRTTranslator", "SRTTranslator")
+        # IniFormat (not the platform default NativeFormat) is mandatory:
+        # NativeFormat means registry on Windows / plist on macOS, neither of
+        # which can be redirected via QSettings.setPath(). Tests rely on
+        # setPath(IniFormat, UserScope, tmp_path) for isolation — switching
+        # the production format here is what makes that redirect actually
+        # take effect. See migrate_from_native_if_needed() for the one-shot
+        # migration of pre-existing user data from the old NativeFormat.
+        self.settings = QSettings(
+            QSettings.IniFormat,
+            QSettings.UserScope,
+            "SRTTranslator",
+            "SRTTranslator",
+        )
         self.logger = logging.getLogger(__name__)
         self.language_config = language_config
 
     # NOTE: All former 'current_state' APIs have been removed.
     # AI Config stored in QSettings is the single source of truth.
+
+    def migrate_from_native_if_needed(self) -> None:
+        """Copy settings from the legacy NativeFormat backend (registry on
+        Windows / plist on macOS) into the current IniFormat backend, once.
+
+        Pre-2026-04-26 builds stored everything in NativeFormat. That backend
+        cannot be redirected by QSettings.setPath(), so the test isolation
+        fixture was a silent no-op on Windows and macOS — tests clobbered
+        real user data.
+
+        Callers (the GUI app and admin scripts) should invoke this once
+        right after constructing a SettingsManager. It is intentionally NOT
+        called from __init__: tests construct SettingsManager too, and we do
+        not want them reading the user's real registry/plist even read-only.
+        """
+        if self.settings.allKeys():
+            return  # already migrated, or fresh install with no native data
+        legacy = QSettings(
+            QSettings.NativeFormat,
+            QSettings.UserScope,
+            "SRTTranslator",
+            "SRTTranslator",
+        )
+        legacy_keys = legacy.allKeys()
+        if not legacy_keys:
+            return
+        for key in legacy_keys:
+            self.settings.setValue(key, legacy.value(key))
+        self.settings.sync()
+        self.logger.info(
+            "Migrated %d settings from NativeFormat to IniFormat at %s",
+            len(legacy_keys),
+            self.settings.fileName(),
+        )
 
     def _save_json(self, key: str, value) -> None:
         """Serialize complex types as JSON strings to avoid QSettings/Registry corruption."""

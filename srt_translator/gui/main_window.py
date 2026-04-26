@@ -89,6 +89,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Initialize components
         self.settings_manager = SettingsManager(self.language_config)
+        self.settings_manager.migrate_from_native_if_needed()
 
         self.ai_config_generator = None
         self.ai_config_thread = None

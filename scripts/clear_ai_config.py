@@ -9,9 +9,7 @@ import os
 import sys
 
 # Set up logging - ALWAYS include this
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -28,6 +26,7 @@ def main():
         logger.info("Clearing AI-generated configuration...")
         language_config = LanguageConfig({"languages": {}})
         settings_manager = SettingsManager(language_config)
+        settings_manager.migrate_from_native_if_needed()
 
         # Check what's currently stored
         dnt_terms, termbase, _ = settings_manager.load_ai_config()
