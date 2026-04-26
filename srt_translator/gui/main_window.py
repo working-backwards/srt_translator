@@ -258,6 +258,11 @@ class SRTTranslatorMainWindow(QMainWindow):
             merged = merge_dnt_terms(ai_generated=ai_dnt, user_provided=dnt_terms)
             self.settings_manager.save_ai_config(merged, ai_tb, source_lang)
 
+            # Persisted state is now configured — flip the UI to match without
+            # waiting for the next app launch.
+            self.ai_config_section.set_action_buttons_enabled(True)
+            self.ai_config_section.set_configured_status(True)
+
             QMessageBox.information(
                 self,
                 "DNT Terms Imported",
@@ -788,6 +793,11 @@ class SRTTranslatorMainWindow(QMainWindow):
                     ai_dnt, ai_tb, source_lang = self.settings_manager.load_ai_config()
                     merged = merge_termbase(ai_generated=ai_tb, user_provided=termbase)
                     self.settings_manager.save_ai_config(ai_dnt, merged, source_lang)
+
+                    # Persisted state is now configured — flip the UI to match
+                    # without waiting for the next app launch.
+                    self.ai_config_section.set_action_buttons_enabled(True)
+                    self.ai_config_section.set_configured_status(True)
 
                     QMessageBox.information(
                         self,
