@@ -103,7 +103,13 @@ jobs:
         shell: bash
         run: |
           # audit installed environment (no auth required)
-          pip-audit -v --ignore-vuln CVE-2026-4539
+          # Ignored CVEs:
+          #   CVE-2026-4539: pre-existing exception (review when fix lands).
+          #   CVE-2026-3219: pip polyglot tar+ZIP archive confusion (CVSS 4.6,
+          #     requires user-supplied malicious archive). CI installs only
+          #     from PyPI with pinned deps — no exposure. No upstream fix yet
+          #     (pip PR #13870). Remove once a fixed pip is released.
+          pip-audit -v --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219
 
   golden-tests:
     name: Golden Structure & Invariants
