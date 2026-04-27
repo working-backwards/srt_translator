@@ -228,13 +228,20 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
     return ph_regex.sub(_sub, text or "")
 
 
-def _is_invalid_translation(text: str) -> bool:
+def _is_invalid_translation(text: str, src: str | None = None) -> bool:
     if not text:
         return True
     t = text.strip()
     if not t:
         return True
     if re.fullmatch(r"[\W\d_]+", t):
+        # Punctuation/digit-only output is usually a model failure (collapsed
+        # placeholder, dropped content). Exception: when the source itself is
+        # punctuation/digit-only (isolated year, dollar amount, ellipsis,
+        # chapter marker), returning it unchanged IS the correct translation.
+        # Strict identity match — partial matches still count as failures.
+        if src is not None and t == src.strip():
+            return False
         return True
     return False
 
@@ -1382,7 +1389,7 @@ class SRTTranslator:
                 for offset, obj in enumerate(items):
                     tgt = (obj.get("tgt") or "").strip()
 
-                    if _is_invalid_translation(tgt):
+                    if _is_invalid_translation(tgt, src=seg_src[offset]):
                         raise RuntimeError(f"Invalid translation at cue id={seg_ids[offset]}: {tgt!r}")
                     results[start + offset] = {
                         "id": obj.get("id"),
