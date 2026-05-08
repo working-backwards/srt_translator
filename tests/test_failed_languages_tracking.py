@@ -36,7 +36,11 @@ def _make_generator():
             }
         }
     )
-    return AIConfigGenerator(api_key="test-key", language_config=lang_cfg)
+    return AIConfigGenerator(
+        api_key="test-key",
+        language_config=lang_cfg,
+        generation_model_name="gpt-4o-mini",
+    )
 
 
 def test_batch_ai_config_has_failed_languages_field():

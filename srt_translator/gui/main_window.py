@@ -1023,7 +1023,6 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         if self._last_eval_html and self._last_eval_html.exists():
             self.translation_section.open_html_btn.setEnabled(True)
-            self.translation_section.open_html_btn.clicked.connect(lambda: self._open_html_report())
 
     def _open_html_report(self):
         if self._last_eval_html and self._last_eval_html.exists():
