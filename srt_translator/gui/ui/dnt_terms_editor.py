@@ -69,7 +69,7 @@ class DNTTermsEditor(QWidget):
 
         # Terms count label
         self.count_label = QLabel("0 terms")
-        self.count_label.setStyleSheet("color: #666; font-size: 9pt;")
+        self.count_label.setObjectName("secondaryText")
         header_layout.addWidget(self.count_label)
 
         layout.addLayout(header_layout)
@@ -91,139 +91,38 @@ class DNTTermsEditor(QWidget):
 
         # Add button
         self.add_button = QPushButton("Add Term")
+        self.add_button.setObjectName("primaryButton")
         self.add_button.setMinimumWidth(80)
-        self.add_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;
-            }
-        """
-        )
         buttons_layout.addWidget(self.add_button)
 
         # Edit button
         self.edit_button = QPushButton("Edit Selected")
+        self.edit_button.setObjectName("secondaryButton")
         self.edit_button.setMinimumWidth(100)
         self.edit_button.setEnabled(False)
-        self.edit_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-                color: #757575;
-            }
-        """
-        )
         buttons_layout.addWidget(self.edit_button)
 
         # Remove button
         self.remove_button = QPushButton("Remove Selected")
+        self.remove_button.setObjectName("dangerButton")
         self.remove_button.setMinimumWidth(120)
         self.remove_button.setEnabled(False)
-        self.remove_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #f44336;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #d32f2f;
-            }
-            QPushButton:pressed {
-                background-color: #c62828;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-                color: #757575;
-            }
-        """
-        )
         buttons_layout.addWidget(self.remove_button)
 
         buttons_layout.addStretch()
 
         # Clear all button
         self.clear_button = QPushButton("Clear All")
+        self.clear_button.setObjectName("dangerButton")
         self.clear_button.setMinimumWidth(80)
         self.clear_button.setEnabled(False)
-        self.clear_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;
-            }
-            QPushButton:pressed {
-                background-color: #EF6C00;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-                color: #757575;
-            }
-        """
-        )
         buttons_layout.addWidget(self.clear_button)
 
         # Export button
         self.export_button = QPushButton("Export")
+        self.export_button.setObjectName("secondaryButton")
         self.export_button.setMinimumWidth(80)
         self.export_button.setEnabled(False)
-        self.export_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #9C27B0;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #7B1FA2;
-            }
-            QPushButton:pressed {
-                background-color: #6A1B9A;
-            }
-            QPushButton:disabled {
-                background-color: #BDBDBD;
-                color: #757575;
-            }
-        """
-        )
         buttons_layout.addWidget(self.export_button)
 
         layout.addWidget(buttons_frame)

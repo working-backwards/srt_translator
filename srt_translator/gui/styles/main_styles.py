@@ -96,6 +96,11 @@ MAIN_STYLESHEET = """
         selection-background-color: #2563EB;
     }
 
+    #searchInput {
+        height: 26px;
+        padding: 4px 10px;
+    }
+
     #apiKeyInput:focus,
     #searchInput:focus {
         border-color: #2563EB;
@@ -287,7 +292,6 @@ MAIN_STYLESHEET = """
     }
 
     #fileList:hover {
-        border: 2px dashed #2563EB;
         background-color: #1E2A3A;
     }
 
@@ -314,8 +318,8 @@ MAIN_STYLESHEET = """
     #languageCheckbox {
         background-color: #252830;
         border: 1px solid #2A2D38;
-        border-radius: 10px;
-        padding: 10px 14px;
+        border-radius: 8px;
+        padding: 2px 10px;
         font-size: 13px;
         color: #D1D5DB;
         spacing: 8px;
@@ -555,6 +559,71 @@ MAIN_STYLESHEET = """
         padding: 4px;
     }
 
+    /* Settings Button (gear icon in title bar) */
+    #settingsButton {
+        background-color: transparent;
+        color: #9CA3AF;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 18px;
+        height: 34px;
+        width: 34px;
+    }
+
+    #settingsButton:hover {
+        background-color: #252830;
+        border-color: #3B3F52;
+        color: #E5E7EB;
+    }
+
+    #settingsButton:pressed {
+        background-color: #1E2028;
+    }
+
+    /* Next / Back navigation buttons */
+    #nextButton {
+        background-color: #2563EB;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        height: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #nextButton:hover {
+        background-color: #1D4ED8;
+    }
+
+    #nextButton:pressed {
+        background-color: #1E40AF;
+    }
+
+    #backButton {
+        background-color: #252830;
+        color: #D1D5DB;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        padding: 6px 20px;
+        font-size: 13px;
+        font-weight: 500;
+        height: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #backButton:hover {
+        background-color: #2E3140;
+        border-color: #4B5068;
+        color: #FFFFFF;
+    }
+
+    #backButton:pressed {
+        background-color: #1E2028;
+    }
+
     /* ── Scroll Bars */
     QScrollArea {
         border: none;
@@ -638,6 +707,19 @@ MAIN_STYLESHEET = """
     QTabBar::tab:hover:!selected {
         background-color: #2E3140;
         color: #D1D5DB;
+    }
+
+    QTabBar::tab:disabled {
+        color: #3B3F52;
+        background-color: #1A1D26;
+    }
+
+    QTabBar::tab:first {
+        border-top-left-radius: 6px;
+    }
+
+    QTabBar::tab:last {
+        border-top-right-radius: 6px;
     }
 
     /* ── Dialog / Message Box*/

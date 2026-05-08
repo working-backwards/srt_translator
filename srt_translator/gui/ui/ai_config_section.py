@@ -3,27 +3,21 @@
 AI Configuration Section for the SRT Translator GUI.
 """
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
-    QSlider,
     QTabWidget,
     QVBoxLayout,
 )
 
-from srt_translator.config.model_config_loader import MODEL_CONFIG, get_model_config
-from srt_translator.core.constants import DEFAULT_GENERATION_MODEL, DEFAULT_TEMPERATURE
 from srt_translator.gui.settings_manager import SettingsManager
 from srt_translator.gui.ui.dnt_terms_editor import DNTTermsEditor
 from srt_translator.gui.ui.termbase_editor import TermbaseEditor
@@ -182,75 +176,8 @@ class AIConfigSection(QGroupBox):
         content_layout.addWidget(self.progress_bar)
         content_layout.addWidget(self.progress_label)
 
-        # --- Advanced Settings (collapsible) ---
-        adv_separator = QFrame()
-        adv_separator.setFrameShape(QFrame.Shape.HLine)
-        adv_separator.setFrameShadow(QFrame.Shadow.Sunken)
-        content_layout.addWidget(adv_separator)
-
-        adv_header = QHBoxLayout()
-        adv_label = QLabel("Advanced Settings")
-        self.adv_toggle_btn = AnimatedToggleButton()
-        adv_header.addWidget(adv_label)
-        adv_header.addStretch()
-        adv_header.addWidget(self.adv_toggle_btn)
-        content_layout.addLayout(adv_header)
-
-        self.adv_content = QFrame()
-        self.adv_content.setVisible(False)
-        adv_layout = QVBoxLayout(self.adv_content)
-        adv_layout.setSpacing(8)
-
-        # Generation Model row
-        generation_model_row = QHBoxLayout()
-        generation_model_label = QLabel("Generation Model:")
-        generation_model_label.setStyleSheet("font-weight: 500; color: #374151;")
-        self.generation_model_dropdown = QComboBox()
-        self.generation_model_dropdown.addItems(list(MODEL_CONFIG.keys()))
-        self.generation_model_dropdown.currentTextChanged.connect(self._on_generation_model_changed)
-
-        self.generation_model_dropdown.setToolTip(
-            "OpenAI model used for generation.\n"
-            "Examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini\n\n"
-            "Note: gpt-5-mini does not support custom temperature —\n"
-            "the Fix Aggressiveness option will be hidden for that generation model."
-        )
-        generation_model_row.addWidget(generation_model_label)
-        generation_model_row.addWidget(self.generation_model_dropdown)
-        adv_layout.addLayout(generation_model_row)
-
-        # Aggressiveness row
-        self.agg_row_frame = QFrame()
-        agg_row = QHBoxLayout(self.agg_row_frame)
-        agg_row.setContentsMargins(0, 0, 0, 0)
-        agg_label = QLabel("Fix Aggressiveness:")
-        agg_label.setStyleSheet("font-weight: 500; color: #374151;")
-        self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
-        self.aggressiveness_slider.setRange(0, 100)
-        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
-        self.aggressiveness_slider.setToolTip(
-            "How aggressively the system fixes placeholder issues.\n0.0 = lenient, 1.0 = strict. Recommended: 0.75"
-        )
-        self.aggressiveness_value_label = QLabel(str(DEFAULT_TEMPERATURE))
-        self.aggressiveness_value_label.setFixedWidth(35)
-        self.aggressiveness_slider.valueChanged.connect(self._on_aggressiveness_changed)
-        agg_row.addWidget(agg_label)
-        agg_row.addWidget(self.aggressiveness_slider)
-        agg_row.addWidget(self.aggressiveness_value_label)
-        adv_layout.addWidget(self.agg_row_frame)
-
-        # Reset to Defaults button
-        self.reset_advanced_btn = QPushButton("Reset to Defaults")
-        self.reset_advanced_btn.setObjectName("secondaryButton")
-        self.reset_advanced_btn.setToolTip("Reset generation model to default")
-        adv_layout.addWidget(self.reset_advanced_btn)
-
-        content_layout.addWidget(self.adv_content)
-
         layout.addLayout(header_layout)
         layout.addWidget(self.content)
-
-        self._on_generation_model_changed(self.generation_model_dropdown.currentText())
 
     def connect_signals(
         self,
@@ -317,30 +244,6 @@ class AIConfigSection(QGroupBox):
             self.edit_btn.setVisible(False)
             self.regenerate_btn.setVisible(False)
 
-    def _on_generation_model_changed(self, generation_model_name: str) -> None:
-        """
-        Show or hide the Fix Aggressiveness row based on the model configuration.
-        """
-        cfg = get_model_config(generation_model_name or "")
-        self.agg_row_frame.setVisible(cfg.get("supports_temperature", True))
-
-    def validate_advanced_settings(self) -> bool:
-        """
-        Validate advanced settings before generation or translation starts.
-        """
-        generation_model = self.get_generation_model_name()
-
-        if generation_model not in MODEL_CONFIG:
-            QMessageBox.warning(
-                self,
-                "Invalid generation model",
-                f"The generation model '{generation_model}' is not supported.\n\n"
-                "Supported generation models are:\n" + "\n".join(f"  • {name}" for name in MODEL_CONFIG.keys()),
-            )
-            return False
-
-        return True
-
     def get_tone(self) -> str:
         """Get the currently selected tone"""
         if self.tone_casual.isChecked():
@@ -363,41 +266,6 @@ class AIConfigSection(QGroupBox):
     def connect_tone_changed(self, callback) -> None:
         """Connect a callback to be called when tone selection changes"""
         self.tone_button_group.buttonClicked.connect(lambda: callback(self.get_tone()))
-
-    def toggle_advanced_expansion(self) -> None:
-        """Toggle the Advanced Settings subsection visibility."""
-        visible = not self.adv_content.isVisible()
-        self.adv_content.setVisible(visible)
-        self.adv_toggle_btn.set_expanded_state(visible)
-
-    def get_generation_model_name(self) -> str:
-        """Get the current model name from the text field."""
-        return self.generation_model_dropdown.currentText()
-
-    def set_generation_model_name(self, name: str) -> None:
-        """Set the model name in the text field."""
-        self.generation_model_dropdown.setCurrentText(name)
-
-    def get_aggressiveness(self) -> float:
-        """Get the current aggressiveness value (0.0-1.0)."""
-        return self.aggressiveness_slider.value() / 100.0
-
-    def set_aggressiveness(self, value: float) -> None:
-        """Set the aggressiveness slider value (0.0-1.0)."""
-        int_val = max(0, min(100, int(round(value * 100))))
-        self.aggressiveness_slider.setValue(int_val)
-        self.aggressiveness_value_label.setText(f"{value:.2f}")
-
-    def _on_aggressiveness_changed(self, value: int) -> None:
-        """Update the value display label when slider moves."""
-        self.aggressiveness_value_label.setText(f"{value / 100.0:.2f}")
-
-    def _on_reset_advanced_defaults(self) -> None:
-        """Reset both advanced fields to defaults."""
-        self.generation_model_dropdown.setCurrentText(DEFAULT_GENERATION_MODEL)
-        self.aggressiveness_slider.setValue(int(DEFAULT_TEMPERATURE * 100))
-        self.aggressiveness_value_label.setText(str(DEFAULT_TEMPERATURE))
-
 
 class EditConfigurationDialog(QDialog):
     """Dialog for editing AI-generated configuration."""
@@ -424,6 +292,8 @@ class EditConfigurationDialog(QDialog):
         self.setWindowTitle("Translation Settings")
         self.setModal(True)
         self.resize(800, 600)
+
+        self.setStyleSheet(EDIT_DIALOG_STYLESHEET)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -470,3 +340,245 @@ class EditConfigurationDialog(QDialog):
     def has_changes(self) -> bool:
         """Check if any changes were made."""
         return self.terms_editor.is_modified(self.dnt_terms) or self.termbase_editor.is_modified(self.termbase)
+
+
+EDIT_DIALOG_STYLESHEET = """
+    /* Dialog background */
+    QDialog {
+        background-color: #1E2028;
+        color: #E5E7EB;
+    }
+
+    /* Labels */
+    QLabel {
+        color: #D1D5DB;
+        font-size: 13px;
+        background-color: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Tab widget */
+    QTabWidget::pane {
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        background-color: #1E2028;
+    }
+
+    QTabBar::tab {
+        background-color: #252830;
+        color: #9CA3AF;
+        border: 1px solid #2A2D38;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    QTabBar::tab:selected {
+        background-color: #1E2028;
+        color: #E5E7EB;
+        border-color: #2A2D38;
+    }
+
+    QTabBar::tab:hover:!selected {
+        background-color: #2E3140;
+        color: #D1D5DB;
+    }
+
+    /* List widgets (DNT terms list) */
+    QListWidget {
+        background-color: #252830;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        color: #D1D5DB;
+        font-size: 13px;
+        alternate-background-color: #2A2D38;
+    }
+
+    QListWidget::item {
+        padding: 6px 8px;
+        border-radius: 3px;
+    }
+
+    QListWidget::item:selected {
+        background-color: #1E3A5F;
+        color: #BFDBFE;
+    }
+
+    QListWidget::item:hover {
+        background-color: #2E3140;
+    }
+
+    /* Table widgets (Termbase table) */
+    QTableWidget {
+        background-color: #252830;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        color: #D1D5DB;
+        gridline-color: #2A2D38;
+        font-size: 13px;
+        alternate-background-color: #2A2D38;
+    }
+
+    QTableWidget::item {
+        padding: 4px 8px;
+    }
+
+    QTableWidget::item:selected {
+        background-color: #1E3A5F;
+        color: #BFDBFE;
+    }
+
+    QHeaderView::section {
+        background-color: #1A1D26;
+        color: #9CA3AF;
+        border: 1px solid #2A2D38;
+        padding: 6px 8px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    /* Input fields */
+    QLineEdit {
+        background-color: #252830;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: #E5E7EB;
+        font-size: 13px;
+    }
+
+    QLineEdit:focus {
+        border-color: #2563EB;
+    }
+
+    QLineEdit::placeholder {
+        color: #4B5068;
+    }
+
+    /* Frames */
+    QFrame {
+        background-color: transparent;
+    }
+
+    /* Primary buttons (Add Term) */
+    #primaryButton {
+        background-color: #2563EB;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    #primaryButton:hover {
+        background-color: #1D4ED8;
+    }
+
+    #primaryButton:pressed {
+        background-color: #1E40AF;
+    }
+
+    /* Secondary buttons (Edit, Export) */
+    #secondaryButton {
+        background-color: #252830;
+        color: #93C5FD;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    #secondaryButton:hover {
+        background-color: #2E3140;
+        border-color: #4B5068;
+        color: #BFDBFE;
+    }
+
+    #secondaryButton:disabled {
+        color: #3B3F52;
+        border-color: #252830;
+    }
+
+    /* Danger buttons (Remove, Clear) */
+    #dangerButton {
+        background-color: #252830;
+        color: #FCA5A5;
+        border: 1px solid #7F1D1D;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    #dangerButton:hover {
+        background-color: #3B1111;
+        border-color: #B91C1C;
+        color: #FEE2E2;
+    }
+
+    #dangerButton:disabled {
+        color: #3B3F52;
+        border-color: #252830;
+    }
+
+    /* Dialog button box (OK / Cancel) */
+    QDialogButtonBox QPushButton {
+        background-color: #252830;
+        color: #D1D5DB;
+        border: 1px solid #2A2D38;
+        border-radius: 6px;
+        padding: 6px 18px;
+        font-size: 13px;
+        min-width: 80px;
+    }
+
+    QDialogButtonBox QPushButton:hover {
+        background-color: #2E3140;
+        border-color: #4B5068;
+        color: #FFFFFF;
+    }
+
+    /* Scroll bars */
+    QScrollBar:vertical {
+        background-color: #1E2028;
+        width: 10px;
+        border-radius: 5px;
+    }
+
+    QScrollBar::handle:vertical {
+        background-color: #2A2D38;
+        border-radius: 5px;
+        min-height: 24px;
+    }
+
+    QScrollBar::handle:vertical:hover {
+        background-color: #3B3F52;
+    }
+
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+
+    /* Scroll areas */
+    QScrollArea {
+        border: none;
+        background-color: transparent;
+    }
+
+    /* Message boxes spawned from this dialog */
+    QMessageBox {
+        background-color: #1E2028;
+        color: #E5E7EB;
+    }
+
+    /* Input dialogs spawned from this dialog */
+    QInputDialog {
+        background-color: #1E2028;
+        color: #E5E7EB;
+    }
+"""

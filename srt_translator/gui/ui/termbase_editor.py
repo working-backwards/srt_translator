@@ -175,7 +175,7 @@ class TermbaseEditor(QWidget):
             # Source term (read-only) in column 0
             source_item = QTableWidgetItem(source_term)
             source_item.setFlags(source_item.flags() & ~Qt.ItemIsEditable)  # type: ignore[attr-defined]
-            source_item.setBackground(QColor(240, 240, 240))
+            source_item.setBackground(QColor(26, 29, 38))  # #1A1D26 — dark read-only bg
             self.table.setItem(row, 0, source_item)
 
             # Translations for each language in columns 1-N

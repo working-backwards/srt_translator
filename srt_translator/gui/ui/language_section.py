@@ -43,7 +43,8 @@ class LanguageSection(QGroupBox):
         layout.addWidget(popular_label)
 
         popular_grid = QGridLayout()
-        popular_grid.setVerticalSpacing(25)  # 25px between checkbox rows as per style guide
+        popular_grid.setVerticalSpacing(12)
+        popular_grid.setHorizontalSpacing(12)
 
         # Get adaptive popular languages from settings manager
         popular_language_codes = self.settings_manager.get_adaptive_popular_languages()
@@ -54,6 +55,7 @@ class LanguageSection(QGroupBox):
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
             checkbox.setProperty("language_code", code)  # Store language code for tracking
+            checkbox.setFixedHeight(26)
             self.language_checkboxes[code] = checkbox
             popular_grid.addWidget(checkbox, i // 3, i % 3)
 
@@ -279,6 +281,7 @@ class LanguageSection(QGroupBox):
             checkbox = QCheckBox(name)
             checkbox.setObjectName("languageCheckbox")
             checkbox.setProperty("language_code", code)
+            checkbox.setFixedHeight(26)
 
             # Restore previous selection if this language was selected
             if code in current_selections:
