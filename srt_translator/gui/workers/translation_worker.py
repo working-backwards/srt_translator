@@ -29,6 +29,7 @@ from srt_translator.eval.runner import run_batch_evaluation
 # Stream core logs into the GUI box safely
 from srt_translator.gui.logging_bridge import make_gui_logging_pipeline
 from srt_translator.gui.settings_manager import SettingsManager
+from srt_translator.gui.utils.error_classifier import get_error_details
 
 
 def _load_language_policies(selected_codes: list[str]) -> dict:
@@ -63,7 +64,8 @@ class TranslationWorker(QObject):
 
     progress_updated = pyqtSignal(str)
     translation_completed = pyqtSignal(dict)
-    translation_error = pyqtSignal(str)
+    translation_error = pyqtSignal(dict)
+    retry_status = pyqtSignal(str)
     eval_report_ready = pyqtSignal(dict)  # All report paths
 
     def __init__(
@@ -91,6 +93,8 @@ class TranslationWorker(QObject):
         self._emit_buf: deque[str] = deque(maxlen=500)  # Bound the buffer
         self._last_emit = 0.0
         self._stop = threading.Event()  # Cooperative stop flag
+        self._total_languages = len(target_languages or {})
+        self._completed_languages = 0
         # Logging bridge state
 
     def request_stop(self):
@@ -100,6 +104,20 @@ class TranslationWorker(QObject):
     def is_stopped(self):
         """Check if stop has been requested"""
         return self._stop.is_set()
+
+    def _on_language_done(self):
+        """Bump the completed-language counter so  messages stay accurate."""
+        self._completed_languages += 1
+
+    def emit_retry_status(self, message: str):
+        """Emit retry status updates to GUI."""
+        if message and "Connection interrupted" in message and self._total_languages:
+            message = (
+                f"{message}\n"
+                f"{self._completed_languages} of {self._total_languages} "
+                f"languages translated so far."
+            )
+        self.retry_status.emit(message)
 
     # === Logging bridge ===
     def _append_log_to_ui(self, text: str, _levelno: int, _extra: dict) -> None:
@@ -228,6 +246,7 @@ class TranslationWorker(QObject):
                                 len(self.target_languages) - len(keep),
                             )
                         filtered_target_languages = keep
+                        self._total_languages = len(filtered_target_languages)
             except Exception:
                 # Be defensive: if filtering fails, fall back to original target set
                 self.logger.exception("Failed to filter same-language targets - proceeding without filtering")
@@ -268,6 +287,9 @@ class TranslationWorker(QObject):
                 language_policies=lang_policies,
                 source_language=source_language,
                 tone=tone,
+                retry_status_callback=self.emit_retry_status,
+                stop_check=self.is_stopped,
+                on_language_done=self._on_language_done,
             )
 
             self.logger.info("Translation model used: %s", api_cfg.translation_model_name)
@@ -291,8 +313,10 @@ class TranslationWorker(QObject):
                 try:
                     results = _GuiTranslator(api_cfg).run()
                 except Exception as e:
-                    self.logger.error("Translation session failed: %s", e)
-                    raise e
+                    details = get_error_details(e)
+                    self.logger.error("Translation failed: %s", details["message"])
+                    self.translation_error.emit(get_error_details(e))
+                    return
 
             # Remember returned paths for fixer and UI
             self.log_file = results.get("log_file") if results else None
@@ -301,6 +325,13 @@ class TranslationWorker(QObject):
             # Check again after translation
             if self.is_stopped():
                 self.logger.info("Translation stopped by user request before completion")
+
+                self.translation_completed.emit({
+                    "cancelled": True,
+                    "completed": 0,
+                    "failed": 0,
+                    "failed_languages": [],
+                })
                 return
 
             # Capture stdout output and chunk if large
@@ -416,10 +447,15 @@ class TranslationWorker(QObject):
             self.translation_completed.emit(results)
 
         except Exception as e:
-            error_msg = f"Translation failed: {str(e)}"
-            self.logger.exception(error_msg)
+            details = get_error_details(e)
+            # Expected operational/runtime errors:
+            # show concise GUI-safe logs without traceback noise
+            if details["title"] != "Translation failed":
+                self.logger.error("Translation failed: %s",details["title"],)
+            else:
+                self.logger.exception( "Unexpected internal translation failure")
             # Emit error via signal (thread-safe)
-            self.translation_error.emit(error_msg)
+            self.translation_error.emit(details)
         finally:
             self._stop_logging_bridge()
 

@@ -15,7 +15,8 @@ import time
 from pathlib import Path
 
 import psutil
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -70,6 +71,10 @@ class SRTTranslatorMainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self._last_failed_languages = []
+        self.is_translating = False
+        self.is_cancelling = False
+        self.translation_worker = None
 
         self.logger = logging.getLogger(__name__)
         self.logger.info("SRT Translator GUI started")
@@ -101,7 +106,6 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.ai_config_generator = None
         self.ai_config_thread = None
         self.ai_config_worker = None
-        self.translation_worker = None
         self.translation_thread = None
 
         # Track the highest tab the user has successfully validated to
@@ -343,10 +347,29 @@ class SRTTranslatorMainWindow(QMainWindow):
         )
 
         # Translation Section signals
-        self.translation_section.connect_signals(self.start_translation, self._open_html_report)
+        self.translation_section.connect_signals(
+            self.start_translation,
+            self.retry_failed_languages,
+            self._open_html_report,
+            self.cancel_translation,
+        )
 
         # Tab change — update cost when arriving at Translate tab
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
+
+    def cancel_translation(self):
+        """Cancel active translation."""
+        if not self.translation_worker:
+            return
+        if self.is_cancelling:
+            return
+
+        self.is_cancelling = True
+        self.logger.info("Translation cancellation requested")
+        self.translation_worker.request_stop()
+        self.translation_section.show_retry_status("Cancelling translation...")
+
+        self.translation_section.hide_cancel_button()
 
     def _on_tab_changed(self, index: int):
         """Handle tab change events."""
@@ -700,16 +723,17 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.logger.error("AI configuration generation failed: %s", error_message)
         self.ai_config_section.show_progress(False)
 
-        if self.ai_config_generator is not None:
-            try:
-                error_details = self.ai_config_generator.get_error_details(Exception(error_message))
-                title = error_details.get("title", "AI Configuration Failed")
-                message = error_details.get("message", error_message)
-                suggestion = error_details.get("suggestion", "")
-                QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
-                return
-            except Exception as e:
-                print(f"Warning: Failed to show detailed error message: {e}")  # noqa: T201
+        try:
+            from srt_translator.gui.utils.error_classifier import get_error_details
+
+            error_details = get_error_details(Exception(error_message))
+            title = error_details.get("title", "AI Configuration Failed")
+            message = error_details.get("message", error_message)
+            suggestion = error_details.get("suggestion", "")
+            QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
+            return
+        except Exception as e:
+            self.logger.warning("Failed to show detailed error message: %s", e)
 
         QMessageBox.warning(
             self,
@@ -934,14 +958,23 @@ class SRTTranslatorMainWindow(QMainWindow):
     #  Translation
     # ------------------------------------------------------------------ #
 
-    def start_translation(self):
+    def start_translation(self, override_target_languages: dict[str, str] | None = None):
+        if self.is_translating:
+            self.logger.info("start_translation ignored: a run is already in progress")
+            return
+
         if self.mem_timer and not self.mem_timer.isActive():
             self.mem_timer.start(300000)
 
         self.translation_section.open_html_btn.setEnabled(False)
+        self.translation_section.hide_retry_failed_button()
+        self.translation_section.show_cancel_button()
+
+        self._last_eval_json = None
+        self._last_eval_html = None
 
         selected_files = self.file_section.get_selected_files()
-        target_languages = self._target_langs_from_ui()
+        target_languages = override_target_languages or self._target_langs_from_ui()
         target_codes = list(target_languages.values())
         self.logger.info("Translation requested with %s languages: %s", len(target_codes), target_codes)
 
@@ -954,6 +987,8 @@ class SRTTranslatorMainWindow(QMainWindow):
 
         # Lock tabs 1-3 during translation
         self._set_tabs_locked(True)
+        self.is_translating = True
+        self.is_cancelling = False
 
         self.translation_section.start_translation()
 
@@ -971,6 +1006,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.translation_worker.moveToThread(self.translation_thread)
 
         self.translation_worker.progress_updated.connect(self.translation_section.update_log_output)
+        self.translation_worker.retry_status.connect(self.translation_section.show_retry_status)
         self.translation_worker.translation_completed.connect(self.translation_finished)
         self.translation_worker.translation_error.connect(self.translation_error)
         self.translation_worker.eval_report_ready.connect(self._after_eval_finished)
@@ -989,11 +1025,40 @@ class SRTTranslatorMainWindow(QMainWindow):
             self.tab_widget.setTabEnabled(i, not locked)
 
     def translation_finished(self, results: dict):
-        self.translation_section.finish_translation()
+        failed_languages = results.get("failed_languages", [])
+        cancelled = results.get("cancelled", False)
+
+        # Reset run state up-front so the Retry-Failed-Languages callback
+        # fired from inside the results dialog can start a new run cleanly.
+        self._last_failed_languages = failed_languages
+        self.is_translating = False
+        self.is_cancelling = False
+        self.translation_worker = None
+
+        self.translation_section.clear_retry_status()
+        self.translation_section.hide_cancel_button()
         self._set_tabs_locked(False)
 
         if self.mem_timer and self.mem_timer.isActive():
             self.mem_timer.stop()
+
+        if cancelled:
+            self.translation_section.reset_progress_bar()
+            self.translation_section.show_translate_button()
+            self.translation_section.hide_retry_failed_button()
+            return
+
+        if failed_languages:
+            self.translation_section.show_retry_failed_button()
+        else:
+            self.translation_section.hide_retry_failed_button()
+
+        # Open-HTML button is only useful when the eval pipeline actually
+        # produced a report; `_after_eval_finished` populates `_last_eval_html`
+        # before this slot runs (eval_report_ready is emitted before
+        # translation_completed in the worker).
+        has_report = self._last_eval_html is not None
+        self.translation_section.finish_translation(has_report=has_report)
 
         target_languages = self._target_langs_from_ui()
         self.settings_manager.save_target_languages(target_languages)
@@ -1001,17 +1066,82 @@ class SRTTranslatorMainWindow(QMainWindow):
         logging.info("Processing translation results: %s", results)
         self.translation_section.update_log_output(f"Processing translation results: {results}")
 
-        show_translation_results(self, results)
+        show_translation_results(
+            self,
+            results,
+            on_open_folder=self._open_output_folder,
+            on_retry_failed=self.retry_failed_languages,
+        )
 
-    def translation_error(self, error_message: str):
-        self.translation_section.finish_translation()
+    def _open_output_folder(self, output_directory: str):
+        """Reveal the output directory in the user's file manager."""
+        path = Path(output_directory).resolve()
+        if not path.exists():
+            QMessageBox.warning(
+                self,
+                "Folder Not Found",
+                f"Output folder does not exist: {path}",
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def retry_failed_languages(self):
+        """Retry only languages that failed with transient errors"""
+        if not self._last_failed_languages:
+            QMessageBox.information(
+                self,
+                "No Failed Languages",
+                "There are no retryable failed languages.",
+            )
+            return
+
+        retryable_errors = {
+            "APIConnectionError",
+            "APITimeoutError",
+            "RateLimitError",
+            "InternalServerError",
+            "RuntimeError",
+        }
+        current_targets = self.language_section.get_target_languages()
+        retry_targets = {
+            item["language"]: current_targets[item["language"]]
+            for item in self._last_failed_languages
+            if item.get("error_type") in retryable_errors
+            and item.get("language") in current_targets
+        }
+
+        if not retry_targets:
+            QMessageBox.information(
+                self,
+                "No Retryable Languages",
+                "No failed languages can be retried.",
+            )
+            return
+
+        self.logger.info("Retrying failed languages: %s", list(retry_targets.keys()))
+        self.start_translation(override_target_languages=retry_targets)
+
+    def translation_error(self, details: dict):
+        # `details` is the classifier dict; a hard error means no HTML report.
+        self.is_translating = False
+        self.is_cancelling = False
+        self.translation_worker = None
+
+        self.translation_section.clear_retry_status()
+        self.translation_section.hide_cancel_button()
+        self.translation_section.finish_translation(has_report=False)
         self._set_tabs_locked(False)
 
         if self.mem_timer and self.mem_timer.isActive():
             self.mem_timer.stop()
 
         self.translation_section.open_html_btn.setEnabled(False)
-        show_translation_error(self, error_message)
+        show_translation_error(
+            self,
+            details,
+            on_open_settings=self._open_settings_dialog,
+            on_retry=self.start_translation,
+        )
 
     def _after_eval_finished(self, report_paths: dict):
         self.logger.info("Evaluation completed - reports available:")

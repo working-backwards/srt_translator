@@ -49,6 +49,7 @@ from srt_translator.core.constants import (
     TERMBASE_FILL_CHUNK_SIZE,
     TOPUP_OVERSAMPLE_DIVISOR,
 )
+from srt_translator.core.retry import compute_retry_delay, parse_retry_after
 from srt_translator.core.services.language_detection import detect_source_language
 from srt_translator.core.terminology_utils import is_hard_preserve, is_numeric_like
 from srt_translator.core.translator.srt_parser import SRTParser
@@ -115,9 +116,21 @@ def _call_with_retry(
         try:
             return create_fn()
         except _RETRYABLE_OPENAI_ERRORS as ex:
+            if isinstance(ex, RateLimitError):
+                detail = str(ex).lower()
+                if (
+                        "insufficient_quota" in detail
+                        or "current quota" in detail
+                ):
+                    raise
             if attempt == attempts:
                 raise
-            backoff = min(cap_backoff_s, base_backoff_s * (2**attempt))
+            backoff = compute_retry_delay(
+                attempt + 1,
+                base=base_backoff_s,
+                cap=cap_backoff_s,
+                retry_after=parse_retry_after(ex),
+            )
             logger.warning(
                 "[%s] %s on attempt %d/%d; retrying in %.1fs: %s",
                 context,
@@ -1069,65 +1082,6 @@ class AIConfigGenerator:
         except Exception as e:
             self.logger.error("Error generating termbase for %s: %s", lang_code, e)
             raise
-
-    def get_error_details(self, error: Exception) -> dict:
-        """Get detailed error information for GUI display"""
-        error_msg = str(error).lower()
-
-        # Check for context length exceeded first (before "invalid" check)
-        if (
-            "context length" in error_msg
-            or "maximum context length" in error_msg
-            or "context_length_exceeded" in error_msg
-        ):
-            return {
-                "type": "context_length_exceeded",
-                "title": "Content Too Large for Analysis",
-                "message": "The selected files contain too much text for the AI generation model to process at once",
-                "suggestion": "Try selecting fewer files or use the content truncation feature",
-            }
-        elif "invalid" in error_msg and "authentication" in error_msg:
-            return {
-                "type": "invalid_api_key",
-                "title": "Invalid API Key",
-                "message": "Please check your API key at platform.openai.com",
-                "suggestion": "Get your key at: platform.openai.com",
-            }
-        elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
-            return {
-                "type": "insufficient_credits",
-                "title": "Insufficient API Credits",
-                "message": "Please add credits to your OpenAI account",
-                "suggestion": "Add credits at: platform.openai.com",
-            }
-        elif "rate" in error_msg:
-            return {
-                "type": "rate_limit",
-                "title": "Rate Limit Exceeded",
-                "message": "Please wait a moment and try again",
-                "suggestion": "Wait 1-2 minutes before retrying",
-            }
-        elif "network" in error_msg or "connection" in error_msg:
-            return {
-                "type": "network_error",
-                "title": "Network Connection Issue",
-                "message": "Please check your internet connection",
-                "suggestion": "Check your internet connection and try again",
-            }
-        elif "content" in error_msg and ("too small" in error_msg or "insufficient" in error_msg):
-            return {
-                "type": "insufficient_content",
-                "title": "Insufficient Content for Analysis",
-                "message": "Selected files contain very little text for analysis",
-                "suggestion": "Try selecting larger files or more files from your course",
-            }
-        else:
-            return {
-                "type": "unknown_error",
-                "title": "AI Configuration Failed",
-                "message": f"An error occurred: {str(error)}",
-                "suggestion": "Please check your settings and try again",
-            }
 
     def generate_batch_ai_config(
         self,

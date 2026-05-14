@@ -10,6 +10,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from openai import APIConnectionError, AuthenticationError, PermissionDeniedError, RateLimitError
+
 from srt_translator import __version__
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.config.models import SummaryDict, TranslationConfig
@@ -23,6 +25,9 @@ from srt_translator.core.translator.translator import SRTTranslator
 def translate_srt_files(
     file_paths: list[str],
     config: TranslationConfig,
+    retry_status_callback=None,
+    stop_check=None,
+    on_language_done=None,
     *,
     logger: logging.Logger | None = None,
 ) -> SummaryDict:
@@ -113,7 +118,16 @@ def translate_srt_files(
         successful_translations = 0
         total_operations = 0
 
+        successful_languages = []
+        failed_languages = []
+        cancelled = False
+
         for lang_name, lang_code in active_target_languages.items():
+            if stop_check is not None and stop_check():
+                logger.info("Translation cancelled by user before language: %s", lang_name)
+                cancelled = True
+                break
+
             if not lang_code:
                 logger.warning("Skipping language '%s' with empty code", lang_name)
                 continue
@@ -141,6 +155,8 @@ def translate_srt_files(
                     error_policy=config.error_policy,  # Pass error policy
                     language_config=language_config,  # Pass language configuration
                     tone=config.tone,  # Pass tone setting
+                    retry_status_callback=retry_status_callback,
+                    stop_check=stop_check,
                 )
                 logger.info(
                     "Language run: %s (%s) batch_size=%d cps_cap=%s apostrophe_allowed=%s tone=%s",
@@ -171,10 +187,90 @@ def translate_srt_files(
                     )
 
                 successful_translations += 1
+                successful_languages.append(
+                    {"language": lang_name, "code": lang_code, "status": "success"}
+                )
                 logger.info("Successfully translated to %s", lang_name)
+                if on_language_done is not None:
+                    try:
+                        on_language_done()
+                    except Exception:
+                        logger.exception("on_language_done callback raised; ignoring")
+
+            except (AuthenticationError, PermissionDeniedError):
+                logger.error(
+                    "Authentication failed for %s.",
+                    lang_name,
+                )
+                raise
+
+            except RuntimeError as e:
+                if "Invalid translation model" in str(e):
+                    logger.error("Fatal model configuration error for %s: %s", lang_name, e)
+                    raise
+                logger.error(
+                    "Translation failed for %s: %s",
+                    lang_name,
+                    e,
+                )
+                failed_languages.append(
+                    {
+                        "language": lang_name,
+                        "code": lang_code,
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                        "retryable": True,
+                    }
+                )
+                continue
+
+            except RateLimitError as e:
+                detail = str(e).lower()
+                if ("insufficient_quota" in detail
+                        or "quota" in detail
+                        or "billing" in detail
+                ):
+                    logger.error("OpenAI quota exhausted for %s: %s",
+                        lang_name,
+                        e,
+                    )
+                    raise
+
+                # Soft/transient throttling → track per-language failure
+                logger.error(
+                    "Rate limit while translating to %s: %s",
+                    lang_name,
+                    e,
+                )
+
+                failed_languages.append(
+                    {
+                        "language": lang_name,
+                        "code": lang_code,
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                    }
+                )
+                continue
+
+            except APIConnectionError as e:
+                logger.error(
+                    "Internet connection lost for %s: %s",
+                    lang_name,
+                    e,
+                )
+                raise
 
             except Exception as e:
                 logger.error("Failed to translate to %s: %s", lang_name, e)
+                failed_languages.append(
+                    {
+                        "language": lang_name,
+                        "code": lang_code,
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                    }
+                )
                 continue
 
         # Write AI config manifest
@@ -289,5 +385,8 @@ def translate_srt_files(
         "skipped": 0,
         "errors": total_operations - successful_translations,
         "error_details": [],
+        "successful_languages": successful_languages,
+        "failed_languages": failed_languages,
         "batch_directory": batch_dir,  # Include batch directory for evaluation
+        "cancelled": cancelled,
     }
