@@ -154,12 +154,8 @@ def show_translation_error(parent, details: dict, *, on_open_settings=None, on_r
     # decision explicit; otherwise OK is fine because there's nothing to cancel.
     if action_kind == "cancel_retry":
         secondary = box.addButton("Cancel", QMessageBox.RejectRole)
-
-    elif primary is None:
-        secondary = box.addButton(QMessageBox.Ok)
-
     else:
-        secondary = None
+        secondary = box.addButton(QMessageBox.Ok)
 
     default_button = primary or secondary
 

@@ -18,6 +18,15 @@ from typing import (
     cast,
 )
 
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    NotFoundError,
+    OpenAI,
+    PermissionDeniedError,
+    RateLimitError,
+)
 # OpenAI client
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -25,16 +34,6 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionToolMessageParam,
     ChatCompletionUserMessageParam,
-)
-
-from openai import (
-    OpenAI as open_ai,
-    APIConnectionError as open_aiapi_connection_error,
-    APITimeoutError as open_aiapi_timeout_error,
-    AuthenticationError as open_ai_authentication_error,
-    NotFoundError as open_ai_not_found_error,
-    PermissionDeniedError as open_ai_permission_denied_error,
-    RateLimitError as open_ai_rate_limit_error,
 )
 
 from srt_translator.config.model_config_loader import build_call_params
@@ -82,6 +81,7 @@ from srt_translator.prompts.translation import (
     build_single_string_fallback_prompt,
     build_translation_prompt,
 )
+
 
 # Token caps: use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH (4096) for any call that returns
 # JSON with multiple subtitles (main batch, placeholder-fixer). Using a small cap (e.g. 120)
@@ -383,10 +383,10 @@ class SRTTranslator:
             logger=self.logger,
         )
 
-        if open_ai is None:
+        if OpenAI is None:
             raise RuntimeError("OpenAI client not available; install/openai and configure API key.")
 
-        self.client = open_ai(api_key=api_key, timeout=120.0)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
 
         # One-shot advisory probe budget per (file, lang)
         self._probe_budget = MalformedProbeBudget()
@@ -1434,7 +1434,7 @@ class SRTTranslator:
                 self._emit_retry_status("")
                 continue
 
-            except open_ai_not_found_error as ex:
+            except NotFoundError as ex:
                 self._model_invalid = True
                 logger.error(
                     "Invalid translation model '%s': %s. Check the translator model name in your settings.",
@@ -1446,14 +1446,14 @@ class SRTTranslator:
                     f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
                 ) from ex
 
-            except (open_ai_authentication_error, open_ai_permission_denied_error):
+            except (AuthenticationError, PermissionDeniedError):
                 logger.error("Authentication failed: API key or permissions invalid.")
                 raise
 
             except (
-                    open_aiapi_connection_error,
-                    open_aiapi_timeout_error,
-                    open_ai_rate_limit_error,
+                    APIConnectionError,
+                    APITimeoutError,
+                    RateLimitError,
             ) as ex:
                 detail = str(ex).lower()
 
@@ -1478,7 +1478,7 @@ class SRTTranslator:
                     base=TRANSLATION_CONNECTION_RETRY_BASE_S,
                     cap=TRANSLATION_CONNECTION_RETRY_CAP_S,
                     retry_after=parse_retry_after(ex),
-                    max_total=TRANSLATION_CONNECTION_RETRY_BASE_S * 2,
+                    max_total=TRANSLATION_CONNECTION_RETRY_CAP_S * 2,
                 )
                 logger.warning(
                     "Transient API error. Retrying in %.1fs (attempt %s/%s): %s",
