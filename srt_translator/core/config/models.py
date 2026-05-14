@@ -147,7 +147,7 @@ class TranslationConfig:
         translation_model_name = raw.get("translation_model_name") or DEFAULT_TRANSLATION_MODEL
 
         # Validate aggressiveness
-        raw_agg = raw.get("Temperature")
+        raw_agg = raw.get("aggressiveness")
         try:
             temperature = float(raw_agg) if raw_agg is not None else DEFAULT_TEMPERATURE
             if not 0.0 <= temperature <= 1.0:
