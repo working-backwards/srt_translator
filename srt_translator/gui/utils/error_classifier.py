@@ -133,6 +133,25 @@ def get_error_details(error: Exception) -> dict:
             "action_kind": "open_settings",
         }
 
+    if "insufficient_quota" in raw:
+        return {
+            "title": "Quota Exceeded",
+            "message": "Your OpenAI API quota has been exhausted.",
+            "suggestion": "Add billing credits on platform.openai.com.",
+            "recoverable": False,
+            "action_kind": "open_url",
+            "action_url": _BILLING_URL,
+        }
+
+    if "invalid_api_key" in raw or "incorrect api key" in raw:
+        return {
+            "title": "Invalid API Key",
+            "message": "The OpenAI API key is invalid.",
+            "suggestion": "Check the API key in Settings.",
+            "recoverable": False,
+            "action_kind": "open_settings",
+        }
+
     # ---------------- Fallback ----------------------------------
     return {
         "title": "Translation failed",

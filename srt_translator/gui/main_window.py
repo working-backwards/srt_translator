@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
+from srt_translator.gui.utils.error_classifier import get_error_details
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.core.constants import (
     AI_CONFIG_BASE_COST,
@@ -723,14 +723,14 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.logger.error("AI configuration generation failed: %s", error_message)
         self.ai_config_section.show_progress(False)
 
+        # Get detailed error information
         try:
-            from srt_translator.gui.utils.error_classifier import get_error_details
-
             error_details = get_error_details(Exception(error_message))
-            title = error_details.get("title", "AI Configuration Failed")
-            message = error_details.get("message", error_message)
-            suggestion = error_details.get("suggestion", "")
-            QMessageBox.warning(self, title, f"{message}\n\n{suggestion}" if suggestion else message)
+            show_translation_error(
+                self,
+                error_details,
+                on_open_settings=self._open_settings_dialog,
+            )
             return
         except Exception as e:
             self.logger.warning("Failed to show detailed error message: %s", e)
