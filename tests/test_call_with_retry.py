@@ -14,8 +14,8 @@ from openai import APIConnectionError, APITimeoutError, RateLimitError
 
 from srt_translator.core.constants import (
     GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS,
-    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
     GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
+    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
 )
 from srt_translator.gui.ai_config import _call_with_retry
 

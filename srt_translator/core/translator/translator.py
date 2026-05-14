@@ -27,6 +27,7 @@ from openai import (
     PermissionDeniedError,
     RateLimitError,
 )
+
 # OpenAI client
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -39,8 +40,6 @@ from openai.types.chat import (
 from srt_translator.config.model_config_loader import build_call_params
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.constants import (
-    TRANSLATION_CONNECTION_RETRY_BASE_S,
-    TRANSLATION_CONNECTION_RETRY_CAP_S,
     DEFAULT_TEMPERATURE,
     DIAG_MAX_PROBE_BATCH_IDS,
     DIAG_MAX_SOURCE_ITEMS,
@@ -49,7 +48,6 @@ from srt_translator.core.constants import (
     MAX_COMPLETION_TOKENS_DIAGNOSTIC,
     MAX_COMPLETION_TOKENS_FALLBACK,
     MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
-    TRANSLATION_MAX_CONNECTION_RETRIES,
     MAX_CONSECUTIVE_DECODE_FAILURES,
     MAX_JSON_RETRIES_PER_SEGMENT,
     MAX_SPLIT_DEPTH,
@@ -62,6 +60,9 @@ from srt_translator.core.constants import (
     STRICT_RETRY_TOKEN_CAP,
     STRICT_RETRY_TOKEN_FLOOR,
     STRICT_RETRY_TOKEN_MULTIPLIER,
+    TRANSLATION_CONNECTION_RETRY_BASE_S,
+    TRANSLATION_CONNECTION_RETRY_CAP_S,
+    TRANSLATION_MAX_CONNECTION_RETRIES,
 )
 from srt_translator.core.retry import compute_retry_delay, parse_retry_after
 from srt_translator.core.translator.diagnostics import (
@@ -81,7 +82,6 @@ from srt_translator.prompts.translation import (
     build_single_string_fallback_prompt,
     build_translation_prompt,
 )
-
 
 # Token caps: use MAX_COMPLETION_TOKENS_TRANSLATION_BATCH (4096) for any call that returns
 # JSON with multiple subtitles (main batch, placeholder-fixer). Using a small cap (e.g. 120)

@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from srt_translator.gui.utils.error_classifier import get_error_details
+
 from srt_translator.core.config.utils import normalize_target_languages
 from srt_translator.core.constants import (
     AI_CONFIG_BASE_COST,
@@ -45,6 +45,7 @@ from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.settings_dialog import SettingsDialog
 from srt_translator.gui.ui.translation_section import TranslationSection
+from srt_translator.gui.utils.error_classifier import get_error_details
 from srt_translator.gui.utils.termbase_merger import (
     load_dnt_terms_from_file,
     load_termbase_from_file,
