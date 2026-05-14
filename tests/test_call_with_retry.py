@@ -13,9 +13,9 @@ import pytest
 from openai import APIConnectionError, APITimeoutError, RateLimitError
 
 from srt_translator.core.constants import (
-    PER_LANGUAGE_RETRY_ATTEMPTS,
-    PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
-    PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
+    GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS,
+    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
+    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
 )
 from srt_translator.gui.ai_config import _call_with_retry
 
@@ -79,7 +79,7 @@ def test_retries_on_timeout_then_succeeds():
 
     assert result == "ok"
     assert create_fn.call_count == 2
-    assert durations == [PER_LANGUAGE_RETRY_BACKOFF_BASE_S]
+    assert durations == [GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S]
 
 
 def test_retries_use_exponential_backoff():
@@ -192,18 +192,18 @@ def test_logs_retry_with_context():
 def test_default_attempts_match_constant():
     """Sanity check that the default attempts matches the configured
     constant, so changing the constant changes runtime behavior."""
-    create_fn = MagicMock(side_effect=[_timeout()] * (PER_LANGUAGE_RETRY_ATTEMPTS + 1))
+    create_fn = MagicMock(side_effect=[_timeout()] * (GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS + 1))
     sleep_fn, _ = _make_sleep()
 
     with pytest.raises(APITimeoutError):
         _call_with_retry(create_fn, context="tr", logger=_make_logger(), sleep_fn=sleep_fn)
 
-    # PER_LANGUAGE_RETRY_ATTEMPTS=2 means we call 3 times total (initial + 2 retries)
-    assert create_fn.call_count == PER_LANGUAGE_RETRY_ATTEMPTS + 1
+    # GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS=2 means we call 3 times total (initial + 2 retries)
+    assert create_fn.call_count == GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS + 1
 
 
 def test_constants_are_sane():
     """Sanity bounds to catch accidental regressions in the policy values."""
-    assert PER_LANGUAGE_RETRY_ATTEMPTS >= 1
-    assert PER_LANGUAGE_RETRY_BACKOFF_BASE_S > 0
-    assert PER_LANGUAGE_RETRY_BACKOFF_CAP_S >= PER_LANGUAGE_RETRY_BACKOFF_BASE_S
+    assert GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS >= 1
+    assert GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S > 0
+    assert GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S >= GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S

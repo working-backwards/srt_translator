@@ -149,14 +149,14 @@ JITTER_SLEEP_HIGH = 1.1
 # APITimeoutError, APIConnectionError, or RateLimitError under transient
 # load. Backoff is exponential with a cap; values are tuned for one-shot
 # calls, not tight rate-limit loops (which use MICRO_BACKOFF_* above).
-PER_LANGUAGE_RETRY_ATTEMPTS = 2  # retries after the initial attempt (so up to 3 total tries)
-PER_LANGUAGE_RETRY_BACKOFF_BASE_S = 5.0
-PER_LANGUAGE_RETRY_BACKOFF_CAP_S = 30.0
+GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS = 2  # retries after the initial attempt (so up to 3 total tries)
+GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S = 5.0
+GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S = 30.0
 
 # GUI translation retry policy for transient API failures
-CONNECTION_RETRY_BASE_S = 5.0
-CONNECTION_RETRY_CAP_S = 30.0
-MAX_CONNECTION_RETRIES = 5
+TRANSLATION_CONNECTION_RETRY_BASE_S = 5.0
+TRANSLATION_CONNECTION_RETRY_CAP_S = 30.0
+TRANSLATION_MAX_CONNECTION_RETRIES = 5
 
 DEFAULT_TRANSLATION_MODEL = "gpt-4o-mini"  # default model used for subtitle translation
 DEFAULT_TONE = "neutral"  # translation tone/register: "casual" | "neutral" | "formal"

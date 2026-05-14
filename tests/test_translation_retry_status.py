@@ -10,9 +10,9 @@ from srt_translator.api import Translator
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.config.models import LogMode, TranslationConfig
 from srt_translator.core.constants import (
-    CONNECTION_RETRY_BASE_S,
-    CONNECTION_RETRY_CAP_S,
-    MAX_CONNECTION_RETRIES,
+    TRANSLATION_CONNECTION_RETRY_BASE_S,
+    TRANSLATION_CONNECTION_RETRY_CAP_S,
+    TRANSLATION_MAX_CONNECTION_RETRIES,
 )
 from srt_translator.core.translator.translator import SRTTranslator
 
@@ -154,10 +154,10 @@ def test_retry_uses_new_constants_not_micro_backoff(no_sleep, monkeypatch):
 
     _run_shape_lock_with_failures(t, [_connection_error(), _connection_error(), _connection_error()])
 
-    # Exponential backoff anchored at CONNECTION_RETRY_BASE_S, capped at _CAP_S
-    assert durations[0] == CONNECTION_RETRY_BASE_S
-    assert durations[1] == min(CONNECTION_RETRY_BASE_S * 2, CONNECTION_RETRY_CAP_S)
-    assert durations[2] == min(CONNECTION_RETRY_BASE_S * 4, CONNECTION_RETRY_CAP_S)
+    # Exponential backoff anchored at TRANSLATION_CONNECTION_RETRY_BASE_S, capped at _CAP_S
+    assert durations[0] == TRANSLATION_CONNECTION_RETRY_BASE_S
+    assert durations[1] == min(TRANSLATION_CONNECTION_RETRY_BASE_S * 2, TRANSLATION_CONNECTION_RETRY_CAP_S)
+    assert durations[2] == min(TRANSLATION_CONNECTION_RETRY_BASE_S * 4, TRANSLATION_CONNECTION_RETRY_CAP_S)
     # And the first delay must not be the 1s MICRO_BACKOFF_CAP from the old code
     assert durations[0] > 1.0
 
@@ -182,7 +182,7 @@ def test_retry_exhaustion_raises_after_max_attempts(no_sleep):
     received: list[str] = []
     t = _make_translator(callback=received.append)
 
-    too_many = [_connection_error()] * (MAX_CONNECTION_RETRIES + 1)
+    too_many = [_connection_error()] * (TRANSLATION_MAX_CONNECTION_RETRIES + 1)
     t._translate_batch_json = MagicMock(side_effect=too_many)
 
     with pytest.raises(APIConnectionError):

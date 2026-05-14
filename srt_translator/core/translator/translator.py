@@ -40,8 +40,8 @@ from openai import (
 from srt_translator.config.model_config_loader import build_call_params
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.constants import (
-    CONNECTION_RETRY_BASE_S,
-    CONNECTION_RETRY_CAP_S,
+    TRANSLATION_CONNECTION_RETRY_BASE_S,
+    TRANSLATION_CONNECTION_RETRY_CAP_S,
     DEFAULT_TEMPERATURE,
     DIAG_MAX_PROBE_BATCH_IDS,
     DIAG_MAX_SOURCE_ITEMS,
@@ -50,7 +50,7 @@ from srt_translator.core.constants import (
     MAX_COMPLETION_TOKENS_DIAGNOSTIC,
     MAX_COMPLETION_TOKENS_FALLBACK,
     MAX_COMPLETION_TOKENS_TRANSLATION_BATCH,
-    MAX_CONNECTION_RETRIES,
+    TRANSLATION_MAX_CONNECTION_RETRIES,
     MAX_CONSECUTIVE_DECODE_FAILURES,
     MAX_JSON_RETRIES_PER_SEGMENT,
     MAX_SPLIT_DEPTH,
@@ -1464,10 +1464,10 @@ class SRTTranslator:
                 ):
                     raise
                 transient_retry += 1
-                if transient_retry > MAX_CONNECTION_RETRIES:
+                if transient_retry > TRANSLATION_MAX_CONNECTION_RETRIES:
                     logger.error(
                         "Transient API retries exhausted after %s attempts: %s",
-                        MAX_CONNECTION_RETRIES,
+                        TRANSLATION_MAX_CONNECTION_RETRIES,
                         ex,
                     )
                     self._emit_retry_status("")
@@ -1475,27 +1475,27 @@ class SRTTranslator:
 
                 delay = compute_retry_delay(
                     transient_retry,
-                    base=CONNECTION_RETRY_BASE_S,
-                    cap=CONNECTION_RETRY_CAP_S,
+                    base=TRANSLATION_CONNECTION_RETRY_BASE_S,
+                    cap=TRANSLATION_CONNECTION_RETRY_CAP_S,
                     retry_after=parse_retry_after(ex),
-                    max_total=CONNECTION_RETRY_CAP_S * 2,
+                    max_total=TRANSLATION_CONNECTION_RETRY_BASE_S * 2,
                 )
                 logger.warning(
                     "Transient API error. Retrying in %.1fs (attempt %s/%s): %s",
                     delay,
                     transient_retry,
-                    MAX_CONNECTION_RETRIES,
+                    TRANSLATION_MAX_CONNECTION_RETRIES,
                     ex,
                 )
                 if transient_retry >= 3:
                     status_msg = (
                         f"Connection interrupted — retrying every {int(delay)}s "
-                        f"(attempt {transient_retry}/{MAX_CONNECTION_RETRIES})..."
+                        f"(attempt {transient_retry}/{TRANSLATION_MAX_CONNECTION_RETRIES})..."
                     )
                 else:
                     status_msg = (
                         f"Connection issue, retrying in {int(delay)}s "
-                        f"(attempt {transient_retry}/{MAX_CONNECTION_RETRIES})..."
+                        f"(attempt {transient_retry}/{TRANSLATION_MAX_CONNECTION_RETRIES})..."
                     )
                 self._emit_retry_status(status_msg)
                 time.sleep(delay)
