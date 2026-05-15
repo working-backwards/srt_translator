@@ -135,7 +135,7 @@ def get_error_details(error: Exception) -> dict:
 
     if "insufficient_quota" in raw:
         return {
-            "title": "Quota Exceeded",
+            "title": "Your OpenAI account is out of credits",
             "message": "Your OpenAI API quota has been exhausted.",
             "suggestion": "Add billing credits on platform.openai.com.",
             "recoverable": False,
@@ -145,11 +145,25 @@ def get_error_details(error: Exception) -> dict:
 
     if "invalid_api_key" in raw or "incorrect api key" in raw:
         return {
-            "title": "Invalid API Key",
+            "title": "Your API key was rejected",
             "message": "The OpenAI API key is invalid.",
             "suggestion": "Check the API key in Settings.",
             "recoverable": False,
             "action_kind": "open_settings",
+        }
+
+    # Handles wrapped/stringified APIConnectionError (the typed branch at the top
+    # of this function covers the un-wrapped case). Narrowed to OpenAI's canonical
+    # "Connection error." prefix and the class name so unrelated "connection error"
+    # mentions (DB pool, SSL, etc.) don't get classified as internet loss.
+    raw_lower = raw.lower()
+    if raw_lower.startswith("connection error") or "apiconnectionerror" in raw_lower:
+        return {
+            "title": "Internet connection lost",
+            "message": "The app could not reach OpenAI.",
+            "suggestion": "Reconnect to the internet and retry.",
+            "recoverable": True,
+            "action_kind": "cancel_retry",
         }
 
     # ---------------- Fallback ----------------------------------

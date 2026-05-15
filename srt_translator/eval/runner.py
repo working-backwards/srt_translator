@@ -309,7 +309,7 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
         logger.error("No target languages specified in ai_config.json")
         return False
 
-    # Check that target language directories exist and contain SRT files
+    available_langs = []
     missing_langs = []
     for lang in target_langs:
         lang_dir = batch_root / lang
@@ -321,12 +321,23 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
         srt_files = list(lang_dir.glob("*.srt"))
         if not srt_files:
             missing_langs.append(f"{lang} (no SRT files)")
+            continue
+        available_langs.append(lang)
 
     if missing_langs:
-        logger.error("Missing or empty target language directories: %s", missing_langs)
+        logger.warning(
+            "Missing or empty target language directories: %s",
+            missing_langs,
+        )
+
+    if not available_langs:
+        logger.error("No valid language directories found")
         return False
 
-    logger.info("Batch structure validation passed")
+    logger.info("Batch structure validation passed with %d/%d languages",
+        len(available_langs),
+        len(target_langs),
+    )
     return True
 
 
@@ -789,6 +800,17 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
             "cps_hard": cps_hard_cap,
             "files": per_files,
         }
+
+    # Coverage: which requested languages actually produced an evaluation.
+    # Consumed by the GUI worker to distinguish "fully successful" from
+    # "evaluation ran but some languages were missing".
+    requested_langs = batch_config.get("target_languages", []) or []
+    evaluated_langs = list(rollup["languages"].keys())
+    rollup["coverage"] = {
+        "requested": requested_langs,
+        "evaluated": evaluated_langs,
+        "missing": [lang for lang in requested_langs if lang not in evaluated_langs],
+    }
 
     # Note: eval_report.json is now written by the report module with strict EvalReportV1 format
 

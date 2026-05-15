@@ -140,9 +140,9 @@ def show_translation_error(parent, details: dict, *, on_open_settings=None, on_r
     action_kind = details.get("action_kind", "ok")
     primary = None
     if action_kind == "open_settings" and on_open_settings is not None:
-        primary = box.addButton("Open Settings", QMessageBox.ActionRole)
+        primary = box.addButton("Settings", QMessageBox.ActionRole)
     elif action_kind == "open_url":
-        primary = box.addButton("Open platform.openai.com", QMessageBox.ActionRole)
+        primary = box.addButton("Open Billing Page", QMessageBox.ActionRole)
     elif action_kind == "wait_retry" and on_retry is not None:
         primary = box.addButton("Wait and Retry", QMessageBox.ActionRole)
     elif action_kind == "cancel_retry" and on_retry is not None:

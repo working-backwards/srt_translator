@@ -417,12 +417,29 @@ class TranslationWorker(QObject):
                             self.logger.error("Failed to generate reports: %s", e)
                             raise
 
-                        self.logger.info("Evaluation completed successfully")
-                        # Update progress for GUI
-                        self._throttled_emit(
-                            self.progress_updated,
-                            f"Evaluation completed successfully for batch: {latest_batch.name}",
-                        )
+                        coverage = rollup.get("coverage") or {}
+                        missing = coverage.get("missing") or []
+                        if missing:
+                            evaluated_count = len(coverage.get("evaluated") or [])
+                            requested_count = len(coverage.get("requested") or []) or evaluated_count
+                            self.logger.warning(
+                                "Evaluation completed with partial coverage: %d/%d languages "
+                                "(missing: %s)",
+                                evaluated_count,
+                                requested_count,
+                                ", ".join(missing),
+                            )
+                            progress_msg = (
+                                f"Evaluation completed for batch: {latest_batch.name} "
+                                f"({evaluated_count}/{requested_count} languages — "
+                                f"missing: {', '.join(missing)})"
+                            )
+                        else:
+                            self.logger.info("Evaluation completed successfully")
+                            progress_msg = (
+                                f"Evaluation completed successfully for batch: {latest_batch.name}"
+                            )
+                        self._throttled_emit(self.progress_updated, progress_msg)
 
                         # Emit signal with all report paths
                         self.eval_report_ready.emit({k: str(v) for k, v in paths.items()})

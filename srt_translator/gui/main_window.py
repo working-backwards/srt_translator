@@ -140,8 +140,8 @@ class SRTTranslatorMainWindow(QMainWindow):
     def setup_window(self):
         """Set up window properties."""
         self.setWindowTitle("SRT Translator")
-        self.resize(820, 680)
-        self.setMinimumSize(800, 650)
+        self.resize(820, 760)
+        self.setMinimumSize(800, 720)
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
 
     # ------------------------------------------------------------------ #
@@ -720,6 +720,9 @@ class SRTTranslatorMainWindow(QMainWindow):
             f"You can now click 'Edit Settings' to review and modify the results.",
         )
 
+    def retry_ai_generation(self):
+        self.generate_translation_settings()
+
     def ai_config_generation_error(self, error_message: str):
         self.logger.error("AI configuration generation failed: %s", error_message)
         self.ai_config_section.show_progress(False)
@@ -731,6 +734,7 @@ class SRTTranslatorMainWindow(QMainWindow):
                 self,
                 error_details,
                 on_open_settings=self._open_settings_dialog,
+                on_retry=self.retry_ai_generation,
             )
             return
         except Exception as e:

@@ -67,7 +67,6 @@ from srt_translator.core.constants import (
 from srt_translator.core.retry import compute_retry_delay, parse_retry_after
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
-    build_oversize_probe_question,
     estimate_tokens,
     looks_like_repetitive_loop,
     probe_malformed_json_with_translator,
@@ -76,7 +75,7 @@ from srt_translator.core.translator.diagnostics import (
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.log_types import LoggerLike
-from srt_translator.prompts.diagnostics import build_oversize_diagnostic_system_prompt
+from srt_translator.prompts.diagnostics import build_oversize_diagnostic_system_prompt, build_oversize_probe_question
 from srt_translator.prompts.translation import (
     build_placeholder_fixer_prompt,
     build_single_string_fallback_prompt,
