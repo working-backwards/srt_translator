@@ -16,8 +16,9 @@ if not ENTRY.exists():
     raise FileNotFoundError(f"Entry script not found: {ENTRY}")
 
 # Config files
-LANG_FILE = ROOT / "srt_translator" / "config" / "languages.json"
-RUBRIC_FILE = ROOT / "srt_translator" / "config" / "translation_rubric.yaml"
+CONFIG_DIR = ROOT / "srt_translator" / "config"
+LANG_FILE = CONFIG_DIR / "languages.json"
+RUBRIC_FILE = CONFIG_DIR / "translation_rubric.yaml"
 
 # Set environment variables
 os.environ["LANGUAGE_CONFIG"] = str(LANG_FILE)
@@ -32,8 +33,16 @@ print(f"TRANSLATION_RUBRIC={os.environ['TRANSLATION_RUBRIC']}")
 OS_NAME = platform.system()
 SEP = ";" if OS_NAME == "Windows" else ":"
 
-ADD_DATA_1 = f"{LANG_FILE}{SEP}srt_translator/config"
-ADD_DATA_2 = f"{RUBRIC_FILE}{SEP}srt_translator/config"
+# Bundle every JSON/YAML in srt_translator/config/ so new resource files
+# (added by future commits) get packaged automatically. The original
+# explicit list missed model_config.json when it was added in 2026-03 and
+# silently shipped a broken settings dialog in built wheels.
+CONFIG_RESOURCES = sorted(CONFIG_DIR.glob("*.json")) + sorted(CONFIG_DIR.glob("*.yaml"))
+ADD_DATA_ARGS = [f"--add-data={f}{SEP}srt_translator/config" for f in CONFIG_RESOURCES]
+
+print("Bundling config resources:")
+for f in CONFIG_RESOURCES:
+    print(f"  {f.name}")
 
 # ------------------------------
 # Build arguments
@@ -41,14 +50,13 @@ ADD_DATA_2 = f"{RUBRIC_FILE}{SEP}srt_translator/config"
 args = [
     "--clean",
     "--name=SRT-Translator",
-    f"--add-data={ADD_DATA_1}",
-    f"--add-data={ADD_DATA_2}",
+    *ADD_DATA_ARGS,
 ]
 
 if OS_NAME == "Darwin":
     # macOS → produce .app bundle
     args += [
-        "--windowed",          # REQUIRED for .app bundle
+        "--windowed",  # REQUIRED for .app bundle
         "--noconfirm",
     ]
 else:

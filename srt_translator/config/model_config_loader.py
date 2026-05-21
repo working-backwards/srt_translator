@@ -1,13 +1,14 @@
 import json
-from pathlib import Path
+from importlib.resources import as_file, files
 from typing import Any
 
 from srt_translator.core.constants import MAX_INLINE_TOKENS, REASONING_MODEL_COMPLETION_TOKEN_FLOOR
 
-CONFIG_FILE = Path(__file__).parent / "model_config.json"
-
-with open(CONFIG_FILE, encoding="utf-8") as f:
-    MODEL_CONFIG: dict[str, dict[str, Any]] = json.load(f)
+# Resource-based load (not Path(__file__)) so this works identically in
+# editable installs, built wheels, Windows onefile EXE, and macOS .app.
+# See srt_translator/config/resources.py for the same pattern.
+with as_file(files("srt_translator.config") / "model_config.json") as _p:
+    MODEL_CONFIG: dict[str, dict[str, Any]] = json.loads(_p.read_text(encoding="utf-8"))
 
 
 def get_model_config(model_name: str) -> dict[str, Any]:
