@@ -118,10 +118,7 @@ def _call_with_retry(
         except _RETRYABLE_OPENAI_ERRORS as ex:
             if isinstance(ex, RateLimitError):
                 detail = str(ex).lower()
-                if (
-                        "insufficient_quota" in detail
-                        or "current quota" in detail
-                ):
+                if "insufficient_quota" in detail or "current quota" in detail:
                     raise
             if attempt == attempts:
                 raise
@@ -176,7 +173,7 @@ def _build_pass_assignment(
 
 def _filter_termbase_response(
     tb: object,
-    extracted: list[dict],
+    allowed_terms: list[dict],
     dnt_set: set[str],
 ) -> tuple[dict[str, str], dict[str, int]]:
     """Filter the raw termbase dict from a model response.
@@ -185,37 +182,63 @@ def _filter_termbase_response(
       - empty (no key or value)
       - DNT collisions (key matches a do-not-translate term)
       - self-references (source key equal to target value, case-insensitive)
-      - unknown keys (key not present in pass1_terms + pass2_terms)
+      - unknown keys (key not present in allowed_terms)
+      - case-only duplicates of an already-kept key
+
+    Surviving keys are normalized to the canonical surface form from
+    allowed_terms (the first-encountered casing in cleaned_terms). This
+    matters because the downstream post-fill step does a case-sensitive
+    `tb_dict.get(src_term)` against cleaned_terms — without normalization,
+    `cleaned_terms=["fulfillment center"]` plus model-returned
+    `tb={"Fulfillment center": ...}` would miss the lookup, post-fill would
+    generate a fresh translation for "fulfillment center", and the saved
+    JSON would end up with both case variants pointing at the same concept.
 
     The self-reference and unknown-key filters defend against malformed model
     output where the source key is in the target language (e.g. Japanese
     `2ピザチーム` → `2ピザチーム` for a Japanese-target call). Such entries
     are dead weight: they never match English source text.
 
+    The case-duplicate filter defends against the model emitting the same
+    surface form in multiple casings within its own tb response. Termbase
+    lookup at translation time uses `re.IGNORECASE`, so case variants are
+    functionally one entry — only the first-iterated regex pattern matches;
+    the rest are dead. Worse, when the model emits conflicting translations
+    across the case variants, all but one are silently orphaned.
+
     Args:
         tb: The raw termbase value from the model response. Expected to be a
             dict, but typed as object so callers can pass through whatever
             json.loads returned.
-        extracted: List of {"term": str, ...} dicts from pass1_terms +
-            pass2_terms (the model's own source-term list). If empty, the
-            unknown-key filter is skipped — there is no reference to compare
-            against.
+        allowed_terms: List of {"term": str, ...} dicts representing the
+            canonical kept set of source terms. The caller should pass the
+            post-cap, post-prune `cleaned_terms` list — passing the full
+            uncapped pass1+pass2 response bypasses the size band the
+            anchor mechanism is enforcing. If empty, the unknown-key filter
+            is skipped and key normalization is also skipped (no canonical
+            reference to normalize toward).
         dnt_set: Set of lowercased DNT terms.
 
     Returns:
         (filtered_dict, drop_counts) where drop_counts has integer keys
-        "dnt_collision", "self_reference", "unknown_key".
+        "dnt_collision", "self_reference", "unknown_key", "case_duplicate".
     """
     filtered: dict[str, str] = {}
-    drops = {"dnt_collision": 0, "self_reference": 0, "unknown_key": 0}
+    drops = {"dnt_collision": 0, "self_reference": 0, "unknown_key": 0, "case_duplicate": 0}
 
     if not isinstance(tb, dict):
         return filtered, drops
 
-    valid_source_terms = {
-        str(t.get("term", "")).strip().lower() for t in extracted if isinstance(t, dict) and t.get("term")
-    }
+    # Build lower -> canonical surface form from allowed_terms (first wins,
+    # matching cleaned_terms's own first-seen-wins dedup).
+    lower_to_surface: dict[str, str] = {}
+    for t in allowed_terms:
+        if isinstance(t, dict):
+            term = str(t.get("term", "")).strip()
+            if term:
+                lower_to_surface.setdefault(term.lower(), term)
 
+    seen_lower: set[str] = set()
     for k, v in tb.items():
         if not k or not v:
             continue
@@ -230,10 +253,18 @@ def _filter_termbase_response(
         if k_lower == v_clean.lower():
             drops["self_reference"] += 1
             continue
-        if valid_source_terms and k_lower not in valid_source_terms:
+        if lower_to_surface and k_lower not in lower_to_surface:
             drops["unknown_key"] += 1
             continue
-        filtered[k_clean] = v_clean
+        if k_lower in seen_lower:
+            drops["case_duplicate"] += 1
+            continue
+        seen_lower.add(k_lower)
+        # Normalize to canonical surface form so post-fill's case-sensitive
+        # lookup against cleaned_terms succeeds. Falls back to the model's
+        # casing when allowed_terms is empty (no canonical reference).
+        surface = lower_to_surface.get(k_lower, k_clean)
+        filtered[surface] = v_clean
 
     return filtered, drops
 
@@ -752,17 +783,24 @@ class AIConfigGenerator:
             # Update cleaned_terms with filtered results
             cleaned_terms = filtered_cleaned_terms
 
-            # Filter the raw termbase response: drops empty/DNT/self-ref/unknown-key entries.
-            tb_dict, _tb_drops = _filter_termbase_response(tb, extracted, dnt_set)
+            # Filter the raw termbase response. Validate against cleaned_terms,
+            # not the model's full pass1+pass2 response — otherwise terms the
+            # cap dropped or prune_generics removed would still leak into the
+            # saved tb_dict. (Observed leak: zh-Hans returning ~49 entries
+            # under a soft_hi of ~30 because the model over-generated and the
+            # filter validated against the uncapped extracted list.)
+            tb_dict, _tb_drops = _filter_termbase_response(tb, cleaned_terms, dnt_set)
             if any(_tb_drops.values()):
                 self.logger.warning(
                     "[%s] Dropped %d malformed termbase entries from model response: "
-                    "%d DNT collisions, %d self-references, %d unknown keys (not in pass terms)",
+                    "%d DNT collisions, %d self-references, %d unknown keys (not in cleaned terms), "
+                    "%d case-only duplicates",
                     lang_code,
                     sum(_tb_drops.values()),
                     _tb_drops["dnt_collision"],
                     _tb_drops["self_reference"],
                     _tb_drops["unknown_key"],
+                    _tb_drops["case_duplicate"],
                 )
 
             # --- ensure translations exist for ALL cleaned terms ---
