@@ -36,7 +36,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 - **Dependabot**: Automatic dependency vulnerability monitoring
 - **Security Headers**: Protection against common web vulnerabilities
 - **Input Validation**: Comprehensive input sanitization
-- **API Key Protection**: Secure handling of sensitive credentials
+- **API Key Handling**: OpenAI API keys are stored locally in app settings (plaintext, not encrypted), never written to logs or batch artifacts, and never transmitted anywhere except to OpenAI's API over HTTPS. See the GUI manual's "API Key Storage" section for the full data-handling description.
 
 ### 📋 **Security Checklist for Contributors:**
 

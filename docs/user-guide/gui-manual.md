@@ -235,17 +235,21 @@ Features include:
 - Copy your key and paste it into the app.
 - You can test your key and update it at any time.
 
-### API Key Security
+### API Key Storage
 
-The SRT Translator takes your API key security seriously:
+Your API key is stored locally on your computer in the app's settings file. **It is not encrypted.** Local app settings are protected by your operating system account; treat the key the same way you'd treat any other credential saved in plaintext config (e.g., a `.env` file or an IDE's saved credentials).
 
-- **Secure Storage**: Your API key is stored securely in your system's registry (Windows) or preferences (macOS/Linux) using Qt's built-in [settings system]( https://doc.qt.io/qt-6/qsettings.html)
-- **Masked Input**: The key is hidden with dots as you type it
-- **No Logging**: Your API key is never written to log files or reports
-- **HTTPS Only**: The key is only transmitted over secure HTTPS connections to OpenAI
-- **Easy Management**: You can update or clear your API key at any time through the app settings
+What the app does with your key:
 
-Your API key stays on your computer and is only used to communicate with OpenAI's translation services.
+- **Sent only to OpenAI**: The key is used solely to authenticate translation and termbase requests to OpenAI's API over HTTPS. It is never sent anywhere else.
+- **Never logged**: The key is never written to log files, error messages, or terminal output.
+- **Never in outputs**: The key is never written to translated SRT files, evaluation reports, batch artifacts (`ai_config.json`, `manifest.json`, etc.), or any other file the app produces.
+- **Never shared between machines**: It stays in your local app settings unless you explicitly copy them.
+- **Masked input**: The input field hides the key with dots as you type it.
+
+If you suspect your key has been exposed, rotate it at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) — OpenAI keys are revocable, and rotation is the recommended recovery action.
+
+You can update or clear the key at any time from the app's settings dialog.
 
 The **Test Connection** button verifies:
 - Your API key is valid
