@@ -292,6 +292,12 @@ def translate_srt_files(
                 # - termbase: MappingProxyType (nested) -> dict of dicts
                 "dnt_terms": list(config.dnt_terms),
                 "termbase": {lang: dict(entries) for lang, entries in config.termbase.items()},
+                # Persist source language so evaluation is reproducible from
+                # artifacts alone. Shape matches what TranslationConfig holds
+                # (detected_code/normalized_code/normalized_name keys); the
+                # eval reader at runner.py:_extract_source_language unpacks
+                # those keys back into {code, name}.
+                "source_language": dict(config.source_language) if config.source_language else {},
                 "language_batch_sizes": language_batch_sizes,
                 "temperature": config.temperature,
                 "tone": config.tone,

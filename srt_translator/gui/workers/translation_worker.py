@@ -391,7 +391,6 @@ class TranslationWorker(QObject):
                     rollup = run_batch_evaluation(
                         batch_root=latest_batch,
                         logger=eval_logger,
-                        language_config=api_cfg,
                     )
 
                     if rollup:
