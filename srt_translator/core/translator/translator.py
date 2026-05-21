@@ -9,7 +9,7 @@ import random
 import re
 import time
 from collections import deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from re import Match, Pattern
 from typing import (
@@ -308,8 +308,10 @@ def _format_and_append_subtitles(
 # SRTTranslator
 # ---------------------------
 
+
 class TranslationCancelledError(Exception):
     """Raised when translation is cancelled by user."""
+
 
 class SRTTranslator:
     # Explicit attribute types to avoid "Cannot determine type of X"
@@ -339,8 +341,8 @@ class SRTTranslator:
         temperature: float | None = None,
         language_config: LanguageConfig,
         tone: str = "neutral",
-        retry_status_callback=None,
-        stop_check=None,
+        retry_status_callback: Callable[[str], None] | None = None,
+        stop_check: Callable[[], bool] | None = None,
     ) -> None:
         if logger is None:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
@@ -424,8 +426,8 @@ class SRTTranslator:
         try:
             if self.retry_status_callback:
                 self.retry_status_callback(message)
-        except Exception:
-            pass
+        except Exception as exc:
+            self.logger.debug("retry_status_callback raised: %s", exc)
 
     def _setup_file_logging(
         self: SRTTranslator, input_filepath: str, target_lang: str
@@ -766,8 +768,7 @@ class SRTTranslator:
         for bi, batch in enumerate(batches, start=1):
             if self.stop_check is not None and self.stop_check():
                 file_logger.info(
-                    "Translation cancelled during batch processing "
-                    "(file=%s lang=%s batch=%s/%s)",
+                    "Translation cancelled during batch processing (file=%s lang=%s batch=%s/%s)",
                     os.path.basename(input_filepath),
                     target_lang,
                     bi,
@@ -1450,17 +1451,13 @@ class SRTTranslator:
                 raise
 
             except (
-                    APIConnectionError,
-                    APITimeoutError,
-                    RateLimitError,
+                APIConnectionError,
+                APITimeoutError,
+                RateLimitError,
             ) as ex:
                 detail = str(ex).lower()
 
-                if (
-                        "insufficient_quota" in detail
-                        or "quota" in detail
-                        or "billing" in detail
-                ):
+                if "insufficient_quota" in detail or "quota" in detail or "billing" in detail:
                     raise
                 transient_retry += 1
                 if transient_retry > TRANSLATION_MAX_CONNECTION_RETRIES:

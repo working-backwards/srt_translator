@@ -41,10 +41,9 @@ def compute_retry_delay(
     a long-running batch for minutes.
     """
     backoff = min(cap, base * (2 ** (attempt - 1)))
+    delay: float = backoff
     if retry_after is not None:
         delay = max(backoff, retry_after)
         if max_total is not None:
             delay = min(delay, max_total)
-    else:
-        delay = backoff
     return delay
