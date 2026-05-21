@@ -267,6 +267,7 @@ class AIConfigSection(QGroupBox):
         """Connect a callback to be called when tone selection changes"""
         self.tone_button_group.buttonClicked.connect(lambda: callback(self.get_tone()))
 
+
 class EditConfigurationDialog(QDialog):
     """Dialog for editing AI-generated configuration."""
 

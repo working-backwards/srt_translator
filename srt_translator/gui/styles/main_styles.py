@@ -197,7 +197,7 @@ MAIN_STYLESHEET = """
         color: #3B3F52;
         border-color: #252830;
     }
-    
+
     /* Advanced Settings title match */
     QLabel {
         font-size: 14px;

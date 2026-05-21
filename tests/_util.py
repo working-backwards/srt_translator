@@ -14,15 +14,11 @@ def read_json_utf8(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def grep_dir(
-    root: Path, pattern: str, exts: tuple[str, ...] = (".srt",)
-) -> list[tuple[Path, int, str]]:
+def grep_dir(root: Path, pattern: str, exts: tuple[str, ...] = (".srt",)) -> list[tuple[Path, int, str]]:
     out: list[tuple[Path, int, str]] = []
     for ext in exts:
         for p in root.rglob(f"*{ext}"):
-            for i, line in enumerate(
-                p.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
-            ):
+            for i, line in enumerate(p.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
                 if pattern in line:
                     out.append((p, i, line))
     return out

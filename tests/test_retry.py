@@ -1,6 +1,5 @@
 """Unit tests for srt_translator.core.retry"""
 
-
 import httpx
 import pytest
 from openai import APIConnectionError, APITimeoutError, RateLimitError
@@ -48,9 +47,7 @@ def test_compute_retry_delay_ignores_retry_after_when_shorter():
 
 def test_compute_retry_delay_max_total_clamps_a_misbehaving_server():
     """A server that returns Retry-After: 9999 must not park us for hours."""
-    delay = compute_retry_delay(
-        1, base=5, cap=30, retry_after=9999.0, max_total=60.0
-    )
+    delay = compute_retry_delay(1, base=5, cap=30, retry_after=9999.0, max_total=60.0)
     assert delay == 60.0
 
 
@@ -89,9 +86,7 @@ def test_parse_retry_after_returns_none_when_header_missing():
 def test_parse_retry_after_returns_none_when_header_unparseable():
     """HTTP-date format is allowed by the spec but OpenAI doesn't send it; we
     treat any non-numeric value as 'no hint' rather than crash."""
-    response = httpx.Response(
-        429, headers={"retry-after": "Mon, 12 May 2026 12:00:00 GMT"}, request=_REQ
-    )
+    response = httpx.Response(429, headers={"retry-after": "Mon, 12 May 2026 12:00:00 GMT"}, request=_REQ)
     err = RateLimitError("throttled", response=response, body=None)
 
     assert parse_retry_after(err) is None
@@ -147,13 +142,9 @@ def test_compute_retry_delay_with_parse_retry_after_round_trip():
     err = RateLimitError("throttled", response=response, body=None)
 
     # attempt 1 backoff = 5; server says 15 → 15 wins
-    delay = compute_retry_delay(
-        1, base=5, cap=30, retry_after=parse_retry_after(err)
-    )
+    delay = compute_retry_delay(1, base=5, cap=30, retry_after=parse_retry_after(err))
     assert delay == 15
 
     # attempt 3 backoff = 20; server says 15 → backoff wins
-    delay = compute_retry_delay(
-        3, base=5, cap=30, retry_after=parse_retry_after(err)
-    )
+    delay = compute_retry_delay(3, base=5, cap=30, retry_after=parse_retry_after(err))
     assert delay == 20

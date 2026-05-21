@@ -637,6 +637,7 @@ class SRTTranslatorMainWindow(QMainWindow):
 
             def _setup_logging_bridge(self):
                 try:
+
                     class ProgressLogHandler(logging.Handler):
                         def __init__(self, worker):
                             super().__init__()
@@ -1111,8 +1112,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         retry_targets = {
             item["language"]: current_targets[item["language"]]
             for item in self._last_failed_languages
-            if item.get("error_type") in retryable_errors
-            and item.get("language") in current_targets
+            if item.get("error_type") in retryable_errors and item.get("language") in current_targets
         }
 
         if not retry_targets:
@@ -1162,6 +1162,7 @@ class SRTTranslatorMainWindow(QMainWindow):
     def _open_html_report(self):
         if self._last_eval_html and self._last_eval_html.exists():
             import webbrowser
+
             webbrowser.open(f"file://{self._last_eval_html.absolute()}")
         else:
             QMessageBox.warning(self, "Report Not Available", "HTML report not found.")

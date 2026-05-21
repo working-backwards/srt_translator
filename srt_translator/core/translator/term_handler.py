@@ -23,6 +23,7 @@ def _dedup_preserve_order(items: list[str]) -> list[str]:
             out.append(x)
     return out
 
+
 def _compile_word_safe_pattern(term: str) -> re.Pattern:
     """
     Compile a regex that matches `term` as a token without
@@ -41,11 +42,11 @@ class TermHandler:
     """
 
     def __init__(
-            self,
-            dnt_terms: list[str] | None = None,
-            termbase: dict[str, dict[str, str]] | None = None,
-            lang_code: str | None = None,
-            logger: logging.Logger | None = None,
+        self,
+        dnt_terms: list[str] | None = None,
+        termbase: dict[str, dict[str, str]] | None = None,
+        lang_code: str | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
@@ -61,7 +62,6 @@ class TermHandler:
                 # wrap single string entry into a dict with itself as key/value
                 self.termbase_target_map[lang] = {entries: entries}
 
-
         # Flatten the termbase into term_map for easy lookup
         for key, value in self.termbase.items():
             if isinstance(value, dict):
@@ -71,7 +71,7 @@ class TermHandler:
                 self.term_map[key] = value
 
         for term, replacement in sorted(self.term_map.items(), key=lambda x: len(x[0]), reverse=True):
-            pat = re.compile(rf'\b{re.escape(term)}\b', re.IGNORECASE)
+            pat = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
             self.termbase_patterns.append((pat, replacement))
 
         # Build stable placeholder map once per file/language
@@ -185,7 +185,7 @@ class TermHandler:
         out = text
         for src_term, tgt_term in tb_map.items():
             # Only replace full word matches
-            pat = re.compile(rf'\b{re.escape(src_term)}\b', re.IGNORECASE)
+            pat = re.compile(rf"\b{re.escape(src_term)}\b", re.IGNORECASE)
             out = pat.sub(tgt_term, out)
         return out
 

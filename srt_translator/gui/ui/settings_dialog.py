@@ -117,8 +117,7 @@ class SettingsDialog(QDialog):
         self.aggressiveness_slider = QSlider(Qt.Orientation.Horizontal)
         self.aggressiveness_slider.setRange(0, 100)
         self.aggressiveness_slider.setToolTip(
-            "How aggressively the system fixes placeholder issues.\n"
-            "0.0 = lenient, 1.0 = strict. Recommended: 0.75"
+            "How aggressively the system fixes placeholder issues.\n0.0 = lenient, 1.0 = strict. Recommended: 0.75"
         )
         self.aggressiveness_value_label = QLabel("")
         self.aggressiveness_value_label.setFixedWidth(35)
@@ -195,6 +194,7 @@ class SettingsDialog(QDialog):
         self.api_status_label.setStyleSheet("color: #6B7280;")
         # Force UI update
         from PySide6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
         try:

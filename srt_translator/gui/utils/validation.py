@@ -62,8 +62,7 @@ def show_translation_results(parent, results: dict, *, on_open_folder=None, on_r
 
     success_codes = [item.get("code", "?") for item in successful_languages]
     success_line = (
-        f"Successfully translated {len(success_codes)} languages: "
-        f"{', '.join(success_codes)}"
+        f"Successfully translated {len(success_codes)} languages: {', '.join(success_codes)}"
         if success_codes
         else "Successfully translated 0 languages"
     )
@@ -74,9 +73,7 @@ def show_translation_results(parent, results: dict, *, on_open_folder=None, on_r
             code = item.get("code", "?")
             err = item.get("error_type", "error")
             failed_groups.setdefault(err, []).append(code)
-        failed_lines = [
-            f"  - {', '.join(codes)} ({err})" for err, codes in failed_groups.items()
-        ]
+        failed_lines = [f"  - {', '.join(codes)} ({err})" for err, codes in failed_groups.items()]
         body = (
             f"Translation complete with errors.\n\n"
             f"{success_line}\n\n"
@@ -87,11 +84,7 @@ def show_translation_results(parent, results: dict, *, on_open_folder=None, on_r
         title = "Translation Complete with Errors"
         icon = QMessageBox.Warning
     else:
-        body = (
-            f"Translation complete.\n\n"
-            f"{success_line}\n\n"
-            f"Output files are available in '{output_directory}'."
-        )
+        body = f"Translation complete.\n\n{success_line}\n\nOutput files are available in '{output_directory}'."
         title = "Translation Complete"
         icon = QMessageBox.Information
 

@@ -112,11 +112,7 @@ class TranslationWorker(QObject):
     def emit_retry_status(self, message: str):
         """Emit retry status updates to GUI."""
         if message and "Connection interrupted" in message and self._total_languages:
-            message = (
-                f"{message}\n"
-                f"{self._completed_languages} of {self._total_languages} "
-                f"languages translated so far."
-            )
+            message = f"{message}\n{self._completed_languages} of {self._total_languages} languages translated so far."
         self.retry_status.emit(message)
 
     # === Logging bridge ===
@@ -326,12 +322,14 @@ class TranslationWorker(QObject):
             if self.is_stopped():
                 self.logger.info("Translation stopped by user request before completion")
 
-                self.translation_completed.emit({
-                    "cancelled": True,
-                    "completed": 0,
-                    "failed": 0,
-                    "failed_languages": [],
-                })
+                self.translation_completed.emit(
+                    {
+                        "cancelled": True,
+                        "completed": 0,
+                        "failed": 0,
+                        "failed_languages": [],
+                    }
+                )
                 return
 
             # Capture stdout output and chunk if large
@@ -423,8 +421,7 @@ class TranslationWorker(QObject):
                             evaluated_count = len(coverage.get("evaluated") or [])
                             requested_count = len(coverage.get("requested") or []) or evaluated_count
                             self.logger.warning(
-                                "Evaluation completed with partial coverage: %d/%d languages "
-                                "(missing: %s)",
+                                "Evaluation completed with partial coverage: %d/%d languages (missing: %s)",
                                 evaluated_count,
                                 requested_count,
                                 ", ".join(missing),
@@ -436,9 +433,7 @@ class TranslationWorker(QObject):
                             )
                         else:
                             self.logger.info("Evaluation completed successfully")
-                            progress_msg = (
-                                f"Evaluation completed successfully for batch: {latest_batch.name}"
-                            )
+                            progress_msg = f"Evaluation completed successfully for batch: {latest_batch.name}"
                         self._throttled_emit(self.progress_updated, progress_msg)
 
                         # Emit signal with all report paths
@@ -468,11 +463,13 @@ class TranslationWorker(QObject):
             # Expected operational/runtime errors:
             # show concise GUI-safe logs without traceback noise
             if details["title"] != "Translation failed":
-                self.logger.error("Translation failed: %s",details["title"],)
+                self.logger.error(
+                    "Translation failed: %s",
+                    details["title"],
+                )
             else:
-                self.logger.exception( "Unexpected internal translation failure")
+                self.logger.exception("Unexpected internal translation failure")
             # Emit error via signal (thread-safe)
             self.translation_error.emit(details)
         finally:
             self._stop_logging_bridge()
-

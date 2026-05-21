@@ -31,9 +31,7 @@ class TranslationSection(QGroupBox):
         # Cost estimation
         cost_layout = QHBoxLayout()
         cost_label = QLabel("Estimated Cost:")
-        cost_label.setToolTip(
-            "Estimated cost is approximate value."
-        )
+        cost_label.setToolTip("Estimated cost is approximate value.")
         cost_label.setObjectName("costLabel")
         self.cost_estimate = QLabel("$0.00")
         self.cost_estimate.setObjectName("costEstimate")
@@ -108,9 +106,7 @@ class TranslationSection(QGroupBox):
         """Connect button signals to callbacks"""
         self.translate_btn.clicked.connect(translate_callback)
         if retry_failed_callback:
-            self.retry_failed_btn.clicked.connect(
-                retry_failed_callback
-            )
+            self.retry_failed_btn.clicked.connect(retry_failed_callback)
         if cancel_callback:
             self.cancel_btn.clicked.connect(cancel_callback)
         if open_html_callback:

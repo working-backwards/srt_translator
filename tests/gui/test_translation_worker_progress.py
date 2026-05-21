@@ -43,9 +43,7 @@ def test_message_passes_through_unchanged(worker):
     worker._completed_languages = 2
     worker.emit_retry_status("Connection issue, retrying in 5s (attempt 1/5)...")
 
-    worker.retry_status.emit.assert_called_once_with(
-        "Connection issue, retrying in 5s (attempt 1/5)..."
-    )
+    worker.retry_status.emit.assert_called_once_with("Connection issue, retrying in 5s (attempt 1/5)...")
 
 
 def test_message_gets_progress_suffix(worker):

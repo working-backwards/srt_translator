@@ -34,8 +34,7 @@ def _make_temp_batch(tmp_path: Path) -> Path:
     # 2) Zero-width space U+200B inside token + fullwidth right paren U+FF09
     write_utf8(
         batch / "de" / "Operating Plan Module 1.de.srt",
-        f"1\n00:00:00,000 --> 00:00:02,000\n"
-        f"Hallo __DNT{chr(0x200B)}TERM_6__{chr(0xFF09)} und willkommen.\n",
+        f"1\n00:00:00,000 --> 00:00:02,000\nHallo __DNT{chr(0x200B)}TERM_6__{chr(0xFF09)} und willkommen.\n",
     )
     # 3) Out-of-range index → removal
     write_utf8(

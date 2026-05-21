@@ -257,7 +257,9 @@ def test_stop_check_breaks_loop_between_languages(tmp_path):
         calls["n"] += 1
         return calls["n"] > 1  # False on the first iteration, True after
 
-    with patch("srt_translator.core.main.SRTTranslator", side_effect=_make_factory({"es": None, "fr": None, "de": None})):
+    with patch(
+        "srt_translator.core.main.SRTTranslator", side_effect=_make_factory({"es": None, "fr": None, "de": None})
+    ):
         summary = translate_srt_files(
             file_paths=[str(next(iter(cfg.files)))],
             config=cfg,
@@ -298,9 +300,9 @@ def test_on_language_done_callback_fires_per_success(tmp_path):
         calls["n"] += 1
 
     outcomes = {
-        "es": None,                            # success → callback should fire
-        "fr": RuntimeError("simulated"),       # failure → callback should NOT fire
-        "de": None,                            # success → callback should fire
+        "es": None,  # success → callback should fire
+        "fr": RuntimeError("simulated"),  # failure → callback should NOT fire
+        "de": None,  # success → callback should fire
     }
     with patch("srt_translator.core.main.SRTTranslator", side_effect=_make_factory(outcomes)):
         summary = translate_srt_files(
@@ -373,7 +375,9 @@ def test_stop_check_is_polled_before_every_language(tmp_path):
         calls["n"] += 1
         return False
 
-    with patch("srt_translator.core.main.SRTTranslator", side_effect=_make_factory({"es": None, "fr": None, "de": None})):
+    with patch(
+        "srt_translator.core.main.SRTTranslator", side_effect=_make_factory({"es": None, "fr": None, "de": None})
+    ):
         translate_srt_files(
             file_paths=[str(next(iter(cfg.files)))],
             config=cfg,

@@ -187,9 +187,7 @@ def translate_srt_files(
                     )
 
                 successful_translations += 1
-                successful_languages.append(
-                    {"language": lang_name, "code": lang_code, "status": "success"}
-                )
+                successful_languages.append({"language": lang_name, "code": lang_code, "status": "success"})
                 logger.info("Successfully translated to %s", lang_name)
                 if on_language_done is not None:
                     try:
@@ -226,11 +224,9 @@ def translate_srt_files(
 
             except RateLimitError as e:
                 detail = str(e).lower()
-                if ("insufficient_quota" in detail
-                        or "quota" in detail
-                        or "billing" in detail
-                ):
-                    logger.error("OpenAI quota exhausted for %s: %s",
+                if "insufficient_quota" in detail or "quota" in detail or "billing" in detail:
+                    logger.error(
+                        "OpenAI quota exhausted for %s: %s",
                         lang_name,
                         e,
                     )

@@ -58,7 +58,6 @@ def test_settings_manager():
     logger.info("SettingsManager tests passed!\n")
 
 
-
 def test_ai_config_generator():
     """Test the AIConfigGenerator basic functionality."""
     logger = logging.getLogger(__name__)

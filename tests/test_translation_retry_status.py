@@ -218,7 +218,8 @@ def test_no_retry_callback_emitted_when_first_call_succeeds(no_sleep):
 
 
 def my_callback(_msg: str) -> None:
-        pass
+    pass
+
 
 # --------------------------------------------------------------------------- #
 # Threading: callback flows worker → api.Translator → main → SRTTranslator
@@ -251,7 +252,6 @@ def test_translate_srt_files_threads_callback_to_srt_translator(tmp_path):
         files=(src,),
         retry_status_callback=my_callback,
     )
-
 
     received_kwargs = {}
 
@@ -303,7 +303,6 @@ def test_api_translator_threads_callback_to_translate_srt_files(tmp_path):
         retry_status_callback=my_callback,
     )
 
-
     fake_summary = {
         "total_files": 1,
         "unique_languages": 1,
@@ -317,9 +316,9 @@ def test_api_translator_threads_callback_to_translate_srt_files(tmp_path):
         "batch_directory": str(out / "batch"),
     }
     with patch.object(
-            TranslationConfig,
-            "run",
-            return_value=fake_summary,
+        TranslationConfig,
+        "run",
+        return_value=fake_summary,
     ) as patched:
         Translator(cfg).run()
 

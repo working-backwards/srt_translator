@@ -259,7 +259,7 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
     normalized = {
         "version": config.get("version", "unknown"),
         "timestamp": config.get("timestamp", "unknown"),
-        "target_languages": config.get("target_languages", []),# RECOMMENDATIONS: Warn if empty
+        "target_languages": config.get("target_languages", []),  # RECOMMENDATIONS: Warn if empty
         "dnt_terms": config.get("dnt_terms", []),
         "termbase": {},
     }
@@ -274,8 +274,7 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
             normalized["termbase"][lang] = []
 
     logger.info(
-        "Loaded config from ai_config.json: version=%s, "
-        "target_languages=%d, dnt_terms=%d, termbase_languages=%d",
+        "Loaded config from ai_config.json: version=%s, target_languages=%d, dnt_terms=%d, termbase_languages=%d",
         normalized["version"],
         len(normalized["target_languages"]),
         len(normalized["dnt_terms"]),
@@ -334,7 +333,8 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
         logger.error("No valid language directories found")
         return False
 
-    logger.info("Batch structure validation passed with %d/%d languages",
+    logger.info(
+        "Batch structure validation passed with %d/%d languages",
         len(available_langs),
         len(target_langs),
     )
@@ -610,8 +610,7 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
         if tb_per_lang:
             # NOTE: audit mirror only — not used by evaluation in v1.0
             tb_final_dict = {
-                lang_code: {t["source"]: t["target"] for t in tb_list}
-                for lang_code, tb_list in tb_per_lang.items()
+                lang_code: {t["source"]: t["target"] for t in tb_list} for lang_code, tb_list in tb_per_lang.items()
             }
 
             (out_dir / "termbase_summary.json").write_text(
