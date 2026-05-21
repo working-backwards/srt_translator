@@ -72,6 +72,16 @@ class SettingsDialog(QDialog):
         api_row.addWidget(self.test_btn)
         layout.addLayout(api_row)
 
+        # Storage disclosure — visible at the moment the user pastes the key,
+        # so the local-plaintext storage characteristic is impossible to miss.
+        api_storage_note = QLabel(
+            "Stored locally in app settings (not encrypted). Rotate the key at platform.openai.com if exposed."
+        )
+        api_storage_note.setObjectName("storageDisclosureLabel")
+        api_storage_note.setStyleSheet("color: #64748B; font-size: 11px;")
+        api_storage_note.setWordWrap(True)
+        layout.addWidget(api_storage_note)
+
         # API status
         self.api_status_label = QLabel("")
         self.api_status_label.setObjectName("statusLabel")
