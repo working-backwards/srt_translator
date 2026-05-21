@@ -4,13 +4,74 @@ on:
   pull_request:
     branches: [main, develop]
   push:
-    branches: [main, develop]
+    # Run on direct pushes to integration branches AND every feature/bug/fix
+    # branch so client-side pre-commit hook bypasses are caught server-side
+    # before they propagate. Without this, --no-verify pushes to a feature
+    # branch only get checked at PR-open time, by which point the branch
+    # may already have been touched by multiple contributors (see
+    # 7eecebd which landed 3 hook violations on bugs/validation).
+    branches:
+      - main
+      - develop
+      - 'bugs/**'
+      - 'feature/**'
+      - 'feat/**'
+      - 'issue/**'
+      - 'fix/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  pre-commit:
+    # Server-side enforcement of .pre-commit-config.yaml. The repo has
+    # ruff/mypy/bandit hooks installed locally per contributor, but they
+    # only run if `pre-commit install` was executed and not bypassed by
+    # `git commit --no-verify`. This job catches both cases.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install pre-commit and project deps
+        run: |
+          python -m pip install -U pip
+          python -m pip install pre-commit
+          # mypy hook needs the project's import graph to resolve
+          python -m pip install -e ".[dev,gui]"
+      - name: Run pre-commit on all files
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  wheel-install-smoke:
+    # Catches packaging regressions like the model_config.json bug
+    # (4504c71, 2026-03-11) that editable installs hide. Builds a wheel
+    # and verifies critical imports + resource files outside editable
+    # mode. Runs on both Windows and macOS because PyInstaller --add-data
+    # uses different separators (; vs :) and the original bug also
+    # affected scripts/build_app.py.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.11']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - name: Install build deps
+        shell: bash
+        run: |
+          python -m pip install -U pip
+          python -m pip install build
+      - name: Run wheel smoke test
+        shell: bash
+        run: python scripts/smoke_test_wheel.py
+
   lint-type-test:
     runs-on: ${{ matrix.os }}
     strategy:
