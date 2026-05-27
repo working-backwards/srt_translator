@@ -26,107 +26,314 @@ With this tool, you stay in control of your content and ensure your subtitles ar
 
 When you open the application, the main window guides you through these steps (in order):
 
-1. **Original Language SRT Files**
+1. **Files**
 2. **Target Languages**
-3. **API Configuration**
-4. **Translation Settings**
-5. **Files & Output**
-6. **Translation**
+3. **Translation Settings**
+4. **Translate**
+5. **Settings**
 
 ---
 
-## 1. Original Language SRT Files
+## 1. Files
 
-- Click **Browse Files** to select your `.srt` files directly.
-- You can select multiple files at once using your system's file dialog.
+- Click **Browse Files** to select one or more `.srt` subtitle files.
+- Multiple subtitle files can be selected at the same time using your system file dialog.
 - After adding files, you can:
-  - Click individual files to select/deselect them
   - Click **Select All** to select all loaded files
-  - Click **Clear All** to remove all files
+  - Click **Clear All** to remove all loaded files
 
-This ensures you're working with the right source files before translation.
+### Output Directory
+
+After selecting your subtitle files, choose an **Output Directory**.
+
+- Translated `.srt` files will be written to this location.
+- The application automatically creates organized output folders for translation batches.
+- Each target language receives its own translated output files.
+
+Typical workflow:
+
+1. Select one or more `.srt` files
+2. Choose target languages
+3. Configure translation settings
+4. Select an output directory
+5. Start translation
+
+The original subtitle files are never modified.
 
 ---
 
 ## 2. Target Languages
 
-- Choose the **languages you want to translate into**.
-- You can pick one or many.
-- The app shows language **names** (e.g., “Japanese”), not codes (like `ja`).
-- Internally, the tool maps names to codes for you, so you don’t need to worry about technical details.
+- Choose the target languages you want to translate into.
+- You can select one or multiple target languages.
+- The application displays readable language names (for example, “Japanese”) instead of technical language codes (such as `ja`).
+- Language names are automatically mapped internally, so no manual configuration is required.
+
+### Language Selection Features
+
+The Languages panel also supports:
+- Multi-language selection
+- Popular language shortcuts
+- Language search and filtering
+- Review of currently selected languages
+
+The application avoids generating duplicate translations when the source and target language are the same.
+---
+
+
+## 3. Translation Settings
+
+Here you can control how the translator handles **terminology**:
+
+- **Do Not Translate (DNT)** — These are words or phrases that should never be translated (e.g., brand names like “iPhone” or proper names such as video authors or character names). DNT terms remain exactly the same in each language translation. There can be up to one DNT list per translation batch.
+
+- **Termbase** — A termbase is a glossary of approved translations for important terms in your video. It helps maintain consistency (e.g., “cloud computing” → always translated the same way) across translations. Termbases are especially useful for specialized vocabulary such as medical, legal, technical, or company-specific terminology. Each target language can have up to one termbase.
+
+- You do not need to create these manually — the SRT app can generate sensible defaults that you can later review and edit. To generate DNT terms or termbases automatically, first select your original language SRT files and target languages, then click the **Regenerate** button. When generation is complete, click **Edit/View Settings** to review or modify the generated configuration.
+
+### Translation Settings Actions
+
+The Translation Settings panel also includes tools for importing, exporting, generating, and editing translation terminology and configuration.
+
+#### Import Termbase
+
+Import an approved glossary of translated terms to maintain consistent terminology across subtitle translations.
+
+#### Import DNT Terms
+
+Import a Do Not Translate (DNT) list containing words or phrases that must remain unchanged during translation.
+
+Examples include:
+- Product names
+- Brand names
+- Character names
+- Technical identifiers
+
+#### Edit/View Settings
+
+Open the detailed translation configuration editor to:
+- Review generated settings
+- Edit DNT terms
+- Edit termbase entries
+- Adjust language-specific translation behavior
+
+#### Export
+
+Export the current translation settings configuration for reuse, backup, or sharing.
+
+You can export:
+- DNT terms
+- Termbase entries
+- Generated translation configuration
+
+This is useful when:
+- Reusing settings across projects
+- Sharing approved terminology with a team
+- Backing up translation configurations
+
+#### Regenerate
+
+Regenerate translation settings using the currently selected:
+- Source subtitle files
+- Target languages
+- Tone selection
+
+This refreshes:
+- Suggested DNT terms
+- Suggested termbases
+- AI-generated translation configuration
+
+#### Translation Settings Status
+
+A status indicator appears beside Translation Settings:
+
+- “Configured”
+
+This indicates that the translation configuration has been successfully prepared and is ready for translation.
+
+While DNT terms, termbases, and Tone are optional, using them will typically produce higher-quality and more consistent translations.
+
+### Tone
+
+Choose the translation register for your content:
+
+- **Casual** — Informal, conversational style suitable for vlogs and personal channels
+- **Neutral (recommended)** — Professional and approachable style recommended for general content and business training
+- **Formal** — Polite, official style suitable for corporate communications and professional presentations
+
+The Tone setting affects how the translator approaches formality and politeness. Some languages (such as Chinese, Japanese, German, and French) automatically apply language-specific tone hints based on the selected option. These hints are automatic and not user-configurable.
 
 ---
 
-## 3. API Configuration
+## 4. Translate
 
-This section is where you enter your **OpenAI API key**.
+The final section is where translations are started and monitored.
+
+Features include:
+
+- **Estimated Cost** — Displays an estimated OpenAI usage cost before translation begins.
+- **Translate All Files** — Starts translation for all selected subtitle files and target languages.
+- **Cancel Translation** — Allows an active translation session to be stopped safely. Completed translations are preserved.
+- **Progress Bar** — Displays translation progress while processing is active.
+- **Logs Window** — Shows real-time translation progress, status updates, retry activity, and warnings.
+- **Open HTML Report** — Opens the generated translation evaluation report after translation completes. The button is enabled only when a report was successfully generated.
+- **Automatic Retry Recovery** — Temporary OpenAI, API, timeout, and network interruptions are automatically retried using exponential backoff delays.
+
+- **Inline Connection Status** — During temporary connection failures, the application displays live retry progress messages such as:
+  - “Connection issue, retrying in 5s (attempt 1/5)…”
+  - “Connection interrupted — retrying every 30s…”
+
+- **Retry Failed Languages** — Failed target languages can be retried without retranslating successful languages.
+- **Partial Completion Handling** — Successfully translated languages are preserved even if some target languages fail.
+- **User-Friendly Error Dialogs** — Authentication failures, quota exhaustion, rate limits, invalid models, and connection failures display clear recovery dialogs instead of raw technical exceptions.
+
+### Translation Recovery Behavior
+
+The translator automatically attempts to recover from temporary failures including:
+- API connection interruptions
+- Timeout failures
+- OpenAI throttling
+- Temporary OpenAI service instability
+
+Retry delays increase automatically between attempts to reduce unnecessary request spam.
+
+### Translation Results
+
+When translation completes, the application displays:
+- Successful languages
+- Failed languages
+- Failure reasons
+- Output directory location
+- Retry options for failed languages
+
+The original subtitle files are never modified.
+
+---
+
+
+## 5. Settings
+
+The Settings window is accessed using the gear icon in the upper-right corner of the application.
+
+The Settings window contains API configuration and advanced translation settings.
+
+### API Configuration
+
+The API Configuration section is used to connect the application to OpenAI.
+
+Features include:
+- API key entry
+- Secure masked API key storage
+- Test Connection button
+- API key validation
+- API key update and replacement
+
+#### Test Connection
 
 - An API key is like a password that lets the translator connect securely to OpenAI’s translation models.
 - You can get an API key by creating an account at [platform.openai.com](https://platform.openai.com/) and going to your **API Keys** page.
 - Copy your key and paste it into the app.
 - You can test your key and update it at any time.
 
-### API Key Security
+### API Key Storage
 
-The SRT Translator takes your API key security seriously:
+Your API key is stored locally on your computer in the app's settings file. **It is not encrypted.** Local app settings are protected by your operating system account; treat the key the same way you'd treat any other credential saved in plaintext config (e.g., a `.env` file or an IDE's saved credentials).
 
-- **Secure Storage**: Your API key is stored securely in your system's registry (Windows) or preferences (macOS/Linux) using Qt's built-in [settings system]( https://doc.qt.io/qt-6/qsettings.html)
-- **Masked Input**: The key is hidden with dots as you type it
-- **No Logging**: Your API key is never written to log files or reports
-- **HTTPS Only**: The key is only transmitted over secure HTTPS connections to OpenAI
-- **Easy Management**: You can update or clear your API key at any time through the app settings
+What the app does with your key:
 
-Your API key stays on your computer and is only used to communicate with OpenAI's translation services.
+- **Sent only to OpenAI**: The key is used solely to authenticate translation and termbase requests to OpenAI's API over HTTPS. It is never sent anywhere else.
+- **Never logged**: The key is never written to log files, error messages, or terminal output.
+- **Never in outputs**: The key is never written to translated SRT files, evaluation reports, batch artifacts (`ai_config.json`, `manifest.json`, etc.), or any other file the app produces.
+- **Never shared between machines**: It stays in your local app settings unless you explicitly copy them.
+- **Masked input**: The input field hides the key with dots as you type it.
 
----
+If you suspect your key has been exposed, rotate it at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) — OpenAI keys are revocable, and rotation is the recommended recovery action.
 
-## 4. Translation Settings
+You can update or clear the key at any time from the app's settings dialog.
 
-Here you can control how the translator handles **terminology**:
+The **Test Connection** button verifies:
+- Your API key is valid
+- OpenAI is reachable
+- Your account can access the selected model
+- The selected model exists
 
-- **Do Not Translate (DNT)** - These are words or phrases that should never be translated (e.g., brand names like “iPhone” or proper names, like the author of the video). DNT terms will remain exactly the same in each laguage translation. There can be up to one DNT list per translation batch.
+If validation succeeds, the application confirms that the connection is ready for translation.
 
-- **Termbase**  - Termbase is a glossary of approved translations for important terms in your video. They are used to ensure consistency (e.g., “cloud computing” → always translated the same way) across translations. Termbases are useful your content has specialized vocabulary (like medicine, law, or company-specific terms). Each target language can have up to one termbase.
+### Advanced Settings
 
-**Good news:**
-- You don’t need to create these yourself — the SRT app can provide sensible defaults that can you can view and edit. If you want to the SRT app to generate a DNT or Termbases for you, choose your original language SRT files, the target languages, then click on the "Regenerate" button. The SRT app will send the first 12,500 tokens (about 9,000 - 10,000 English words) to the AI translator. When finished, click on the "Edit Settings" button to view and/or change them.
+The Advanced Settings section contains model and translation behavior controls.
 
-While DNT, Termbases, and Tone are optional, using them will typically yield a higher quality translation.
+#### Generation Model
 
-### Tone
+The **Generation Model** dropdown controls which OpenAI model is used for subtitle translation.
 
-Choose the translation register for your content:
+Available models may include:
+- `gpt-4o-mini`
+- `gpt-4o`
+- `gpt-4.1-mini`
+- `gpt-5-mini`
 
-- **Casual**: Informal, conversational style suitable for vlogs, personal channels
-- **Neutral (recommended)**: Professional and approachable — recommended for business training
-- **Formal**: Polite, official style for corporate communications (may use honorifics in some languages like Japanese)
+Different models may provide different:
+- Translation quality
+- Speed
+- Cost characteristics
 
-The Tone setting affects how the translator approaches formality and politeness. Some languages (like Chinese, Japanese, German, French) have automatic language-specific hints applied based on tone selection. These hints are automatic and not user-configurable.
+If the selected model:
+- does not exist,
+- is unavailable,
+- or your account does not have permission to access it,
 
----
+the application displays a user-friendly recovery dialog.
 
-## 5. Files & Output
+#### Fix Aggressiveness
 
-- After selecting your input files and target languages, you choose an **output folder**.
-- The translated `.srt` files will be written here.
-- The workflow is:
-  1. Pick an input folder.
-  2. Select one or more `.srt` files.
-  3. Choose an output folder.
-  4. The app saves your translated subtitles into subfolders for each language.
+The **Fix Aggressiveness** slider controls how aggressively the subtitle repair and cleanup system modifies translated subtitles after generation.
 
----
+Higher values:
+- Apply stronger cleanup behavior
+- More aggressively repair formatting and subtitle issues
 
-## 6. Translation
+Lower values:
+- Preserve more of the original AI-generated output
+- Apply lighter cleanup behavior
 
-The final section is where you run the translations.
+#### Reset to Defaults
 
-Features include:
-- **Estimated Cost** — shows you an estimate of OpenAI usage cost before you begin.
-- **Translate All Files** button — runs translations for all selected files.
-- **Progress Bar** — shows progress while translations are running.
-- **Logs Window** — shows real-time progress messages.
-- **Open HTML Report** button — once translations finish, you can open a detailed evaluation report (helpful for quality checks).
+The **Reset to Defaults** button restores the default application configuration for:
+- Generation model
+- Fix aggressiveness
+- Advanced translation settings
+
+#### Settings Persistence
+
+Application settings are automatically saved between sessions, including:
+- API key
+- Selected generation model
+- Fix aggressiveness value
+
+### API Error Handling
+
+The application converts technical OpenAI and network exceptions into user-friendly recovery dialogs.
+
+Examples include:
+
+| Error Type | User Dialog |
+|---|---|
+| Invalid API key | “Your API key was rejected” |
+| Quota exhausted | “Your OpenAI account is out of credits” |
+| Permission denied | “Permission denied” |
+| Invalid model | “Model not found” |
+| Connection failure | “Internet connection lost” |
+| Timeout | “Request timed out” |
+| Rate limit | “OpenAI is throttling requests” |
+
+Some failures are considered permanent and stop immediately:
+- Invalid API key
+- Missing OpenAI credits
+- Invalid model selection
+- Permission denied
+
+Temporary failures are retried automatically using exponential backoff recovery.
 
 ---
 
@@ -137,13 +344,13 @@ These steps describe a typical translation workflow in complete sentences.
 1. Open the application. Select your original language SRT files.
 2. Select your Output Directory.
 3. Choose your target languages.
-4. Open the API Configuration box, enter your OpenAI API key, and click on the "Test Connection" button.
-5. (Optional) Open Translations Setting box, click on the "Regenerate" button to build your DNT and Termbases.
+4. Open Settings using the gear icon, enter your OpenAI API key, choose your generation model if needed, then click "Test Connection".
+5. (Optional) Open the Translation Settings panel, click on the "Regenerate" button to build your DNT and Termbases.
 6. (Optional) Click on the "Edit Settings" button, then review your DNT and Termbases. Edit, if necessary. Usually the default is fine.
-6. Click Translate All Files. Watch the progress bar and the live log. The application creates a separate translated SRT for each target language.
-7. The application automatically runs fixes after each SRT file is translated to all languages. You will see "Running automatic fixes for [filename]..." in the log.
-8. When the translation completes, click on the Open HTML Report" button to view and fix any translation issues. Remember SRT files are just text files, so you can make any minor changes with our favorite text editor.
-9. Go to your Output Directory. A new folder will be created for each translation batch. Upload your newly translated SRT files in your video hosting system!
+7. Click Translate All Files. Watch the progress bar and the live log. If temporary connection problems occur, the application automatically retries translation requests and displays live retry status updates. The application creates a separate translated SRT file for each target language. If only some languages fail, the application preserves successful outputs and allows retrying failed languages separately. If you need to stop the run, click the **Cancel Translation** button — the in-flight request finishes, then the loop stops between languages and the partial output is kept.
+8. The application automatically runs fixes after each SRT file is translated to all languages. You will see "Running automatic fixes for [filename]..." in the log.
+9. When the translation completes, click on the "Open HTML Report" button to view and fix any translation issues. Remember SRT files are just text files, so you can make any minor changes with your favorite text editor.
+10. Go to your Output Directory. A new folder will be created for each translation batch. Upload your newly translated SRT files in your video hosting system!
 
 ---
 
@@ -300,6 +507,35 @@ A recent translation of 9 modules (ranging from 1–27 minutes each) into **12 l
 
 ## Troubleshooting
 
+### The application says “Connection interrupted — retrying...”
+
+This message means the application temporarily lost connection to the OpenAI API or your network connection became unstable.
+The translator automatically retries requests using exponential backoff. In many cases, translation resumes automatically without user intervention.
+If the connection does not recover after all retry attempts are exhausted, the affected language will be marked as failed while successful languages are preserved.
+
+### I see “Translation complete with errors.”
+
+The final summary dialog appears at the end of every run, even when some languages failed. It contains:
+
+- A line listing the languages that succeeded by code, e.g. *"Successfully translated 8 languages: en, es, fr, de, ja, pt-BR, vi, zh-Hans"*.
+- A list of failed languages grouped by error type, e.g. *"Failed 4 languages: - ar, az, id, tr (APIConnectionError)"*.
+- An **Open Output Folder** button that opens the batch directory in your file manager so you can inspect what was kept.
+- A **Retry Failed Languages** button, shown only when at least one failure is in the retryable set: `APIConnectionError`, `APITimeoutError`, `RateLimitError`, `InternalServerError`. Clicking it reruns just the affected languages.
+
+Authentication, permission, and bad-model errors do **not** appear in this dialog because they abort the whole run instead and surface.
+
+### I see an OpenAI quota or billing error.
+
+If your OpenAI account has run out of credits, the application shows a dialog:
+
+- Title: *"Your OpenAI account is out of credits"*.
+- Message: *"OpenAI rejected the request because the quota is exhausted."*
+- Button: **Open platform.openai.com** — opens the OpenAI billing page in your default browser so you can add credits.
+
+This is distinct from a temporary throttling event. If you see the title *"OpenAI is throttling requests"* with a **Wait and Retry** button, the API is rate-limiting your requests but your account is fine — wait a minute and click Retry.
+
+The quota dialog appears almost immediately when your account is exhausted. The application detects the *"insufficient_quota"* marker in OpenAI's response and skips the retry budget for this case, since retrying the same call against an empty quota would never succeed. You won't have to wait ~1.5 minutes of pointless retries before the dialog shows up.
+
 ### I do not see any translations.
 
 Please confirm your API key in the API Configuration section. Make sure your internet connection is stable. Check the log for any error messages. If the log reports an authentication error, you may need to create a new key.
@@ -330,9 +566,74 @@ If a translation fails completely, the application will attempt to fall back to 
 
 The log files will show exactly what happened and where the process failed.
 
+### Cancelling a translation run
+
+While a run is active a **Cancel Translation** button is visible next to the Translate button. Cancellation is cooperative:
+
+- The in-flight OpenAI request finishes (so no token charge is wasted mid-call).
+- The per-language loop then stops between languages — languages that hadn't started yet are skipped.
+- Languages that already finished keep their output files on disk in the batch directory.
+- The final results dialog still appears so you can see what was kept and decide whether to retry the rest later.
+
+Cancel takes effect at the next language boundary; for a long single-file run it may take a few seconds to settle.
+
+### Authentication, permission, or model errors abort the whole batch
+
+These errors are guaranteed to fail every target language, so the application aborts the run immediately instead of cycling through the same failure for every language. Each one produces a  dialog with a single primary action button:
+
+| Problem                                 | Dialog title                                       | Action button |
+|-----------------------------------------|----------------------------------------------------|---|
+| Wrong API key                           | *"Your API key was rejected"*                      | **Open Settings** |
+| API key lacks model access              | *"Permission denied"*                              | **Open Settings** |
+| Saved generation model is no longer available | *"Model not found"* / *"Invalid generation model"* | **Open Settings** |
+
+After you fix the cause in Settings, return to the Translate tab and click Translate All Files again.
+
+### Internet connection lost during a long batch
+
+The application makes up to 5 silent retry attempts on connection / timeout / rate-limit errors before surfacing a dialog:
+
+- **First three attempts** show the  inline status: *"Connection issue, retrying in Ns (attempt N/5)…"*
+- **Fourth attempt and beyond** escalate to the  banner: *"Connection interrupted — retrying every Ns…"* with a second line showing *"N of M languages translated so far."*
+- If all five attempts exhaust without recovery, the  dialog *"Internet connection lost"* appears with **Retry** and **Cancel** buttons.
+
+Total silent budget is roughly 2.5 minutes (5 attempts × 30s cap). For rate-limit responses the application also honors OpenAI's `Retry-After` header when present (clamped to 60s so a misbehaving server can't park the run indefinitely).
+
+### Other  error dialogs
+
+When the silent-retry budget exhausts on something other than a generic connection drop, you may see one of these less common dialogs. Each has a distinct title so the cause is clear from a glance, and a single primary action button matched to the recovery path:
+
+| Cause | Dialog title | Message | Primary button |
+|---|---|---|---|
+| Request didn't return in time (after 5 retries) | *"Request timed out"* | "OpenAI did not respond in time." | **Retry** (Cancel also available) |
+| OpenAI server-side outage (HTTP 500) | *"OpenAI server issue"* | "OpenAI is currently experiencing server problems." | **Retry** |
+| Request itself was invalid (HTTP 400 — content too long, malformed, content policy) | *"Invalid translation request"* | The raw OpenAI rejection message | **OK** (no retry — same input would fail again) |
+
+**Timeout** and **server issue** behave like any other transient error — clicking Retry reruns the whole batch from the start, which will retranslate already-completed files (Phase 1 cost trade-off; see FAQ). **Invalid translation request** has no Retry button because the underlying problem (input too long, content policy violation, etc.) won't be fixed by trying again with the same input. Check the dialog's message and the log for the specific reason, then adjust your source files, DNT list, or model selection before starting a new run.
+
 ---
 
 ## Frequently Asked Questions
+
+### What happens if only one language fails?
+
+Successful language translations are preserved automatically.
+The failed language appears in the final summary dialog, and you can retry only the failed languages using the **Retry Failed Languages** button — available both inside the results dialog itself and on the Translate tab after the dialog is dismissed.
+
+Only **transient** failures are retryable (connection issues, timeouts, rate-limit / throttling, OpenAI server errors). Authentication, permission, and bad-model errors abort the whole batch instead and are not offered for retry — you must fix the underlying cause in Settings and click Translate All Files again.
+
+### Can I retry after an authentication error?
+
+No, not directly. Authentication failures (bad key, permission denied, invalid model) produce a  dialog with an **Open Settings** button. Open Settings, fix the API key or model, then return to the Translate tab and click Translate All Files. The application doesn't offer a one-click retry for these because retrying the exact same call would just hit the same failure.
+
+### What does the `Retry-After` header do?
+
+For rate-limit (HTTP 429) responses, OpenAI may send a `Retry-After` hint telling the client how many seconds to wait before retrying. The application honors this hint (clamped to 60 seconds so a misbehaving server can't park you for minutes). When OpenAI's hint is shorter than the application's exponential backoff, the backoff wins; when the hint is longer, the hint wins. This makes rate-limit recovery faster and more accurate than a fixed schedule.
+
+### Why was one selected language skipped automatically?
+
+The translator automatically skips target languages that match the detected source language.
+For example, if the source subtitles are already in English and English is selected as a target language, the application removes it automatically to prevent duplicate output files.
 
 ### Where do my new files go?
 
@@ -406,6 +707,17 @@ The application now organizes all output files in one convenient location:
 - Automatic fallback to individual subtitle translation if batch translation fails
 - Detailed logging of all operations and decisions
 - Phantom placeholder detection to prevent AI hallucinations
+
+### Behavior summary
+
+The application reacts to errors at four levels, matching the severity of the problem to how much it bothers you:
+
+| State | What you see | Action available |
+|---|---|---|
+| transient (≤30s) | Inline retry status line, e.g. *"Connection issue, retrying in 5s (attempt 1/5)…"* | None — silent recovery |
+| sustained (30s–5min) | Banner escalates to *"Connection interrupted — retrying every Ns…"* with *"N of M languages translated so far."* | Cancel Translation button |
+| account-level | Modal dialog with title, plain-English message, and one primary action button | Open Settings / Open platform.openai.com / Wait and Retry / Retry-Cancel / Retry / OK |
+| run complete | Final results dialog listing succeeded and failed languages | Open Output Folder / Retry Failed Languages / OK |
 
 ### Performance Optimizations
 - Single-file processing ensures consistent performance

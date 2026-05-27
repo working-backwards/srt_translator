@@ -23,10 +23,6 @@ from srt_translator.eval.tools import (
 BATCH_RE = re.compile(r"translation-batch-([^/\\]+)$")
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
 def _load_rubric() -> dict:
     """Return parsed rubric from packaged resources."""
     return load_evaluation_rubric()
@@ -189,6 +185,26 @@ def _extract_dnt_terms(dnt_json: dict[str, Any]) -> list[str]:
     return terms if isinstance(terms, list) else []
 
 
+def _extract_source_language_info(source_language: Any) -> dict[str, str]:
+    """Unpack the source_language payload (as persisted in ai_config.json) into
+    the {"code": ..., "name": ...} shape the rollup and manifest both expect.
+
+    Accepts the per-batch source_language dict written by core/main.py
+    (mirrors TranslationConfig.source_language). Keys checked, in order:
+      - code: normalized_code -> detected_code
+      - name: normalized_name -> name -> code (as a fallback)
+
+    Returns {} when no usable code is present.
+    """
+    if not isinstance(source_language, dict) or not source_language:
+        return {}
+    code = (source_language.get("normalized_code") or source_language.get("detected_code") or "").strip()
+    if not code:
+        return {}
+    name = (source_language.get("normalized_name") or source_language.get("name") or code).strip() or code
+    return {"code": str(code), "name": str(name)}
+
+
 def _extract_tb_map(tb_json: dict[str, Any], lang: str) -> dict[str, str]:
     """
     Accepts {'languages': {'az': {...}}} or legacy {'az': {...}}.
@@ -259,23 +275,30 @@ def _load_batch_config(batch_root: Path, logger) -> dict[str, Any]:
     normalized = {
         "version": config.get("version", "unknown"),
         "timestamp": config.get("timestamp", "unknown"),
-        "target_languages": config.get("target_languages", []),# RECOMMENDATIONS: Warn if empty
+        "target_languages": config.get("target_languages", []),  # RECOMMENDATIONS: Warn if empty
         "dnt_terms": config.get("dnt_terms", []),
         "termbase": {},
+        # source_language carried through verbatim so the eval runner can
+        # extract code/name without needing a runtime TranslationConfig.
+        "source_language": config.get("source_language", {}) or {},
     }
 
-    # Normalize termbase from per-language maps to lists of {source, target} pairs
+    # Keep termbase as the on-disk dict-of-dicts shape so the downstream
+    # tb_map lookup at runner.py:625-627 and _extract_tb_map can use it
+    # directly. (Earlier versions normalized to list-of-pairs here; the
+    # downstream consumers expected dict, so tb_map silently became empty
+    # for all batches with termbase entries. See the regression test
+    # TestTermbaseReachesGenerateEval.)
     raw_termbase = config.get("termbase", {})
     for lang, term_map in raw_termbase.items():
         if isinstance(term_map, dict):
-            normalized["termbase"][lang] = [{"source": src, "target": tgt} for src, tgt in term_map.items()]
+            normalized["termbase"][lang] = {str(src): str(tgt) for src, tgt in term_map.items() if src and tgt}
         else:
             logger.warning("Invalid termbase format for %s, skipping", lang)
-            normalized["termbase"][lang] = []
+            normalized["termbase"][lang] = {}
 
     logger.info(
-        "Loaded config from ai_config.json: version=%s, "
-        "target_languages=%d, dnt_terms=%d, termbase_languages=%d",
+        "Loaded config from ai_config.json: version=%s, target_languages=%d, dnt_terms=%d, termbase_languages=%d",
         normalized["version"],
         len(normalized["target_languages"]),
         len(normalized["dnt_terms"]),
@@ -309,7 +332,7 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
         logger.error("No target languages specified in ai_config.json")
         return False
 
-    # Check that target language directories exist and contain SRT files
+    available_langs = []
     missing_langs = []
     for lang in target_langs:
         lang_dir = batch_root / lang
@@ -321,12 +344,24 @@ def _validate_batch_structure(batch_root: Path, logger, config: dict[str, Any]) 
         srt_files = list(lang_dir.glob("*.srt"))
         if not srt_files:
             missing_langs.append(f"{lang} (no SRT files)")
+            continue
+        available_langs.append(lang)
 
     if missing_langs:
-        logger.error("Missing or empty target language directories: %s", missing_langs)
+        logger.warning(
+            "Missing or empty target language directories: %s",
+            missing_langs,
+        )
+
+    if not available_langs:
+        logger.error("No valid language directories found")
         return False
 
-    logger.info("Batch structure validation passed")
+    logger.info(
+        "Batch structure validation passed with %d/%d languages",
+        len(available_langs),
+        len(target_langs),
+    )
     return True
 
 
@@ -357,23 +392,9 @@ def _ensure_manifest_fields(batch_root: Path, log) -> None:
         if ai_cfg.exists():
             try:
                 ai = json.loads(ai_cfg.read_text(encoding="utf-8"))
-                info = ai.get("source_language") or {}
-                code = (info.get("normalized_code") or info.get("detected_code") or "").strip()
-                name = (info.get("normalized_name") or "").strip()
-                if code and not name:
-                    # Use LanguageConfig to get friendly name
-                    try:
-                        project_root = _project_root()
-                        languages_file = project_root / "config" / "languages.json"
-                        if languages_file.exists():
-                            data = json.loads(languages_file.read_text(encoding="utf-8"))
-                            config = LanguageConfig(data)
-                            name = config.get_language_name(code)
-                    except Exception as e:
-                        # Fallback to code if language lookup fails
-                        print(f"Warning: Failed to load language name for {code}: {e}")  # noqa: T201
-                if code or name:
-                    manifest["original_language"] = {"code": code, "name": name}
+                info = _extract_source_language_info(ai.get("source_language"))
+                if info:
+                    manifest["original_language"] = info
             except Exception as ex:
                 log.warning("Could not patch original_language from ai_config.json: %s", ex)
 
@@ -455,15 +476,28 @@ def _ensure_batch_log_handler(batch_root: Path, logger) -> None:
         logger.warning("Failed to add batch log file handler: %s", e)
 
 
-def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None = None) -> dict[str, Any] | None:
+def run_batch_evaluation(batch_root: Path, logger, **_legacy_kwargs: Any) -> dict[str, Any] | None:
     """
     Run batch evaluation on translated files.
 
     Args:
         batch_root: Path to the translation batch directory
         logger: Logger instance for evaluation output
-        language_config: Optional TranslationConfig object containing source_language info
+
+    The evaluator reads everything it needs from the batch artifacts
+    (originals/, target language dirs, artifacts/ai_config.json,
+    manifest.json) — by design. A prior `language_config` keyword
+    accepted a runtime TranslationConfig for source-language metadata;
+    that field is now persisted to ai_config.json by core/main.py and
+    read from there. The `**_legacy_kwargs` catch-all accepts and
+    discards `language_config` so callers can be updated incrementally
+    without breaking the contract during migration.
     """
+    if _legacy_kwargs:
+        logger.debug(
+            "run_batch_evaluation ignoring legacy kwargs: %s",
+            sorted(_legacy_kwargs.keys()),
+        )
     log = logger.getChild("runner")
     batch_root = Path(batch_root)
 
@@ -496,54 +530,6 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
 
     language_dirs = _collect_language_dirs(batch_root)
 
-    # Friendly source language from TranslationConfig (if available)
-    src_lang_info = {}
-    if log.isEnabledFor(logging.DEBUG):
-        log.debug("language_config type: %s", type(language_config))
-
-    if language_config:
-        if log.isEnabledFor(logging.DEBUG):
-            try:
-                log.debug("language_config attributes: %s", dir(language_config))
-            except Exception:
-                log.debug("language_config attributes: <unavailable>")
-        if hasattr(language_config, "source_language"):
-            src_lang = language_config.source_language
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug("source_language type: %s, value: %s", type(src_lang), src_lang)
-            if src_lang and isinstance(src_lang, dict):
-                if log.isEnabledFor(logging.DEBUG):
-                    try:
-                        log.debug("source_language keys: %s", list(src_lang.keys()))
-                    except Exception:
-                        log.debug("source_language keys: <unavailable>")
-                # Check for normalized_code first, then detected_code
-                code = src_lang.get("normalized_code") or src_lang.get("detected_code")
-                if code:
-                    name = src_lang.get("normalized_name") or src_lang.get("name") or str(code)
-                    src_lang_info = {"code": str(code), "name": str(name)}
-                    if log.isEnabledFor(logging.DEBUG):
-                        log.debug("Using code: %s, name: %s", code, name)
-                else:
-                    if log.isEnabledFor(logging.DEBUG):
-                        log.debug("No valid code found in source_language")
-            else:
-                if log.isEnabledFor(logging.DEBUG):
-                    log.debug("source_language is not a dict or is empty")
-        else:
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug("language_config has no source_language attribute")
-    else:
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug("No language_config provided")
-
-    if src_lang_info:
-        log.info(
-            "Source language: %s (%s)",
-            src_lang_info.get("name"),
-            src_lang_info.get("code"),
-        )
-
     # ensure manifest is complete (source name, versions)
     _ensure_manifest_fields(batch_root, log)
 
@@ -553,6 +539,19 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
     except (FileNotFoundError, ValueError) as e:
         log.error("Failed to load batch configuration: %s", e)
         return None
+
+    # Source language is read from the persisted ai_config.json — no runtime
+    # TranslationConfig needed. This is what makes evaluation reproducible
+    # from artifacts alone.
+    src_lang_info = _extract_source_language_info(batch_config.get("source_language"))
+    if src_lang_info:
+        log.info(
+            "Source language: %s (%s)",
+            src_lang_info.get("name"),
+            src_lang_info.get("code"),
+        )
+    else:
+        log.debug("No source_language present in ai_config.json")
 
     # Validate batch structure
     if not _validate_batch_structure(batch_root, log, batch_config):
@@ -597,14 +596,11 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
                 encoding="utf-8",
             )
         if tb_per_lang:
-            # NOTE: audit mirror only — not used by evaluation in v1.0
-            tb_final_dict = {
-                lang_code: {t["source"]: t["target"] for t in tb_list}
-                for lang_code, tb_list in tb_per_lang.items()
-            }
-
+            # NOTE: audit mirror only — not used by evaluation in v1.0.
+            # tb_per_lang is already dict-of-dicts (see _load_batch_config);
+            # dump directly without the legacy list-to-dict conversion.
             (out_dir / "termbase_summary.json").write_text(
-                json.dumps(tb_final_dict, ensure_ascii=False, indent=2),
+                json.dumps(tb_per_lang, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
 
@@ -789,6 +785,17 @@ def run_batch_evaluation(batch_root: Path, logger, language_config: Any | None =
             "cps_hard": cps_hard_cap,
             "files": per_files,
         }
+
+    # Coverage: which requested languages actually produced an evaluation.
+    # Consumed by the GUI worker to distinguish "fully successful" from
+    # "evaluation ran but some languages were missing".
+    requested_langs = batch_config.get("target_languages", []) or []
+    evaluated_langs = list(rollup["languages"].keys())
+    rollup["coverage"] = {
+        "requested": requested_langs,
+        "evaluated": evaluated_langs,
+        "missing": [lang for lang in requested_langs if lang not in evaluated_langs],
+    }
 
     # Note: eval_report.json is now written by the report module with strict EvalReportV1 format
 

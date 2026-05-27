@@ -26,6 +26,10 @@ class Translator:
                 "failed": summary["errors"],
                 "total_files": summary["total_files"],
                 "output_directory": str(self.config.output_directory),  # Include actual output directory
+                "successful_languages": summary["successful_languages"],
+                "failed_languages": summary["failed_languages"],
+                "batch_directory": summary["batch_directory"],
+                "cancelled": summary.get("cancelled", False),
             }
         except Exception as e:
             logging.error("Translation failed: %s", e)

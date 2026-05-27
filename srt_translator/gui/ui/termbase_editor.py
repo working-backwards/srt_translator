@@ -175,7 +175,7 @@ class TermbaseEditor(QWidget):
             # Source term (read-only) in column 0
             source_item = QTableWidgetItem(source_term)
             source_item.setFlags(source_item.flags() & ~Qt.ItemIsEditable)  # type: ignore[attr-defined]
-            source_item.setBackground(QColor(240, 240, 240))
+            source_item.setBackground(QColor(26, 29, 38))  # #1A1D26 — dark read-only bg
             self.table.setItem(row, 0, source_item)
 
             # Translations for each language in columns 1-N
@@ -225,9 +225,7 @@ class TermbaseEditor(QWidget):
                 self.update_button_states()
                 self.termbase_changed.emit(self.termbase)
                 QMessageBox.information(
-                    self,
-                    "Term Added",
-                    f"The term '{source_term}' was successfully added to the termbase."
+                    self, "Term Added", f"The term '{source_term}' was successfully added to the termbase."
                 )
 
     def edit_selected_term(self):
@@ -270,9 +268,7 @@ class TermbaseEditor(QWidget):
             self.termbase_changed.emit(self.termbase)
 
             QMessageBox.information(
-                self,
-                "Term edited",
-                f"The term '{source_term}' was successfully edited the termbase."
+                self, "Term edited", f"The term '{source_term}' was successfully edited the termbase."
             )
 
     def remove_selected_term(self):
@@ -311,9 +307,7 @@ class TermbaseEditor(QWidget):
             self.termbase_changed.emit(self.termbase)
 
             QMessageBox.information(
-                self,
-                "Term removed",
-                f"The term '{source_term}' was successfully removed from the termbase."
+                self, "Term removed", f"The term '{source_term}' was successfully removed from the termbase."
             )
 
     def clear_all_terms(self):

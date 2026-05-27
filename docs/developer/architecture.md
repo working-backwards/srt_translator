@@ -109,7 +109,7 @@ The evaluator **MUST NOT** import or depend on `TranslationConfig` objects. It r
 
 ### Configuration Isolation
 - CLI reads API key from environment or .env file
-- GUI stores API key using OS-native secure storage (QSettings)
+- GUI stores API key in local app settings via QSettings (`IniFormat`, plaintext); the SRT Translator does not use OS credential storage
 - All translation configuration frozen in batch artifacts
 - No external API calls during evaluation
 

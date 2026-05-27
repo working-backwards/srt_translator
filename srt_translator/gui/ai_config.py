@@ -11,9 +11,9 @@ import random
 import re
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
 from srt_translator.config.model_config_loader import (
     build_call_params,
@@ -26,6 +26,9 @@ from srt_translator.core.constants import (
     ANCHOR_TOLERANCE_MIN,
     CHARS_PER_TOKEN,
     DEFAULT_GENERATION_MODEL,
+    GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS,
+    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
+    GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
     JITTER_SLEEP_HIGH,
     JITTER_SLEEP_LOW,
     MAX_COMPLETION_TOKENS_DNT,
@@ -46,6 +49,7 @@ from srt_translator.core.constants import (
     TERMBASE_FILL_CHUNK_SIZE,
     TOPUP_OVERSAMPLE_DIVISOR,
 )
+from srt_translator.core.retry import compute_retry_delay, parse_retry_after
 from srt_translator.core.services.language_detection import detect_source_language
 from srt_translator.core.terminology_utils import is_hard_preserve, is_numeric_like
 from srt_translator.core.translator.srt_parser import SRTParser
@@ -65,6 +69,204 @@ class BatchAIConfig:
     dnt_terms: list[str]
     termbase: dict[str, dict[str, str]]  # lang -> {source_term: mapped_translation}
     source_language: dict[str, object] | None = None
+    # Language codes the AI generation pipeline could not produce a termbase
+    # for (after retries). Empty in the happy path. Surfaced to the GUI so
+    # creators see partial failures instead of just the success count.
+    failed_languages: list[str] = field(default_factory=list)
+
+
+_RETRYABLE_OPENAI_ERRORS: tuple[type[Exception], ...] = (
+    APITimeoutError,
+    APIConnectionError,
+    RateLimitError,
+)
+
+
+def _call_with_retry(
+    create_fn,
+    *,
+    context: str,
+    logger: logging.Logger,
+    attempts: int = GENERATION_PER_LANGUAGE_RETRY_ATTEMPTS,
+    base_backoff_s: float = GENERATION_PER_LANGUAGE_RETRY_BACKOFF_BASE_S,
+    cap_backoff_s: float = GENERATION_PER_LANGUAGE_RETRY_BACKOFF_CAP_S,
+    sleep_fn=time.sleep,
+):
+    """Call create_fn() with exponential backoff on transient OpenAI errors.
+
+    Retries on APITimeoutError, APIConnectionError, RateLimitError up to
+    `attempts` times. Other exceptions propagate immediately. After the
+    final attempt, the last retryable exception is re-raised.
+
+    Args:
+        create_fn: Zero-arg callable that performs the API call.
+        context: Human-readable identifier (e.g. language code) used in
+            log messages so creators can see which call retried.
+        logger: Logger to write WARNING-level retry notices to.
+        attempts: Number of retries after the initial attempt.
+        base_backoff_s: Backoff for retry 1; subsequent retries double up
+            to `cap_backoff_s`.
+        cap_backoff_s: Maximum backoff between retries.
+        sleep_fn: Injected for tests so they don't actually sleep.
+
+    Returns:
+        Whatever create_fn returns on success.
+    """
+    for attempt in range(attempts + 1):
+        try:
+            return create_fn()
+        except _RETRYABLE_OPENAI_ERRORS as ex:
+            if isinstance(ex, RateLimitError):
+                detail = str(ex).lower()
+                if "insufficient_quota" in detail or "current quota" in detail:
+                    raise
+            if attempt == attempts:
+                raise
+            backoff = compute_retry_delay(
+                attempt + 1,
+                base=base_backoff_s,
+                cap=cap_backoff_s,
+                retry_after=parse_retry_after(ex),
+            )
+            logger.warning(
+                "[%s] %s on attempt %d/%d; retrying in %.1fs: %s",
+                context,
+                type(ex).__name__,
+                attempt + 1,
+                attempts + 1,
+                backoff,
+                ex,
+            )
+            sleep_fn(backoff)
+
+
+def _build_pass_assignment(
+    response_pass1: list,
+    response_pass2: list,
+) -> dict[str, str]:
+    """Build a term-lower -> 'pass1' | 'pass2' lookup from the model's response.
+
+    Used so the local term-validation loop can preserve the model's own
+    pass categorization instead of re-deriving it from the `reason` text.
+    Re-derivation by English-keyword matching (the previous approach) silently
+    failed when the model wrote reasons in the target language — for example
+    a zh-Hans run came back with reasons in Chinese, so no English keyword
+    matched and every term collapsed into Pass 1 in the diagnostic logs.
+
+    On duplicate terms (same surface form in both arrays), Pass 2 wins —
+    "confusable" is the more specific category, so if the model thought a
+    term was confusable it should be reported as such.
+    """
+    assignment: dict[str, str] = {}
+    for it in response_pass1 or []:
+        if isinstance(it, dict):
+            term = (it.get("term") or "").strip().lower()
+            if term:
+                assignment[term] = "pass1"
+    for it in response_pass2 or []:
+        if isinstance(it, dict):
+            term = (it.get("term") or "").strip().lower()
+            if term:
+                assignment[term] = "pass2"
+    return assignment
+
+
+def _filter_termbase_response(
+    tb: object,
+    allowed_terms: list[dict],
+    dnt_set: set[str],
+) -> tuple[dict[str, str], dict[str, int]]:
+    """Filter the raw termbase dict from a model response.
+
+    Drops entries that are:
+      - empty (no key or value)
+      - DNT collisions (key matches a do-not-translate term)
+      - self-references (source key equal to target value, case-insensitive)
+      - unknown keys (key not present in allowed_terms)
+      - case-only duplicates of an already-kept key
+
+    Surviving keys are normalized to the canonical surface form from
+    allowed_terms (the first-encountered casing in cleaned_terms). This
+    matters because the downstream post-fill step does a case-sensitive
+    `tb_dict.get(src_term)` against cleaned_terms — without normalization,
+    `cleaned_terms=["fulfillment center"]` plus model-returned
+    `tb={"Fulfillment center": ...}` would miss the lookup, post-fill would
+    generate a fresh translation for "fulfillment center", and the saved
+    JSON would end up with both case variants pointing at the same concept.
+
+    The self-reference and unknown-key filters defend against malformed model
+    output where the source key is in the target language (e.g. Japanese
+    `2ピザチーム` → `2ピザチーム` for a Japanese-target call). Such entries
+    are dead weight: they never match English source text.
+
+    The case-duplicate filter defends against the model emitting the same
+    surface form in multiple casings within its own tb response. Termbase
+    lookup at translation time uses `re.IGNORECASE`, so case variants are
+    functionally one entry — only the first-iterated regex pattern matches;
+    the rest are dead. Worse, when the model emits conflicting translations
+    across the case variants, all but one are silently orphaned.
+
+    Args:
+        tb: The raw termbase value from the model response. Expected to be a
+            dict, but typed as object so callers can pass through whatever
+            json.loads returned.
+        allowed_terms: List of {"term": str, ...} dicts representing the
+            canonical kept set of source terms. The caller should pass the
+            post-cap, post-prune `cleaned_terms` list — passing the full
+            uncapped pass1+pass2 response bypasses the size band the
+            anchor mechanism is enforcing. If empty, the unknown-key filter
+            is skipped and key normalization is also skipped (no canonical
+            reference to normalize toward).
+        dnt_set: Set of lowercased DNT terms.
+
+    Returns:
+        (filtered_dict, drop_counts) where drop_counts has integer keys
+        "dnt_collision", "self_reference", "unknown_key", "case_duplicate".
+    """
+    filtered: dict[str, str] = {}
+    drops = {"dnt_collision": 0, "self_reference": 0, "unknown_key": 0, "case_duplicate": 0}
+
+    if not isinstance(tb, dict):
+        return filtered, drops
+
+    # Build lower -> canonical surface form from allowed_terms (first wins,
+    # matching cleaned_terms's own first-seen-wins dedup).
+    lower_to_surface: dict[str, str] = {}
+    for t in allowed_terms:
+        if isinstance(t, dict):
+            term = str(t.get("term", "")).strip()
+            if term:
+                lower_to_surface.setdefault(term.lower(), term)
+
+    seen_lower: set[str] = set()
+    for k, v in tb.items():
+        if not k or not v:
+            continue
+        k_clean = str(k).strip()
+        v_clean = str(v).strip()
+        if not k_clean or not v_clean:
+            continue
+        k_lower = k_clean.lower()
+        if k_lower in dnt_set:
+            drops["dnt_collision"] += 1
+            continue
+        if k_lower == v_clean.lower():
+            drops["self_reference"] += 1
+            continue
+        if lower_to_surface and k_lower not in lower_to_surface:
+            drops["unknown_key"] += 1
+            continue
+        if k_lower in seen_lower:
+            drops["case_duplicate"] += 1
+            continue
+        seen_lower.add(k_lower)
+        # Normalize to canonical surface form so post-fill's case-sensitive
+        # lookup against cleaned_terms succeeds. Falls back to the model's
+        # casing when allowed_terms is empty (no canonical reference).
+        surface = lower_to_surface.get(k_lower, k_clean)
+        filtered[surface] = v_clean
+
+    return filtered, drops
 
 
 class AIConfigGenerator:
@@ -220,7 +422,7 @@ class AIConfigGenerator:
         target_languages: list[str],
         dnt_terms: list[str] | None = None,
         source_language: dict[str, object] | None = None,
-    ) -> dict[str, dict[str, str]]:
+    ) -> tuple[dict[str, dict[str, str]], list[str]]:
         """
         Generate a termbase per target language using a per‑language TWO‑PASS approach:
           Pass 1: ~20 topic‑critical & likely‑risky source‑language terms
@@ -228,7 +430,13 @@ class AIConfigGenerator:
         Then translate those to the target language. DNT takes precedence; any term
         present in DNT is excluded from selection and filtered out if it slips through.
 
-        If a language's TB fails, it is skipped. TB is optional by design.
+        Returns:
+          (termbase, failed_languages) — termbase maps lang_code -> {source: target},
+          failed_languages lists the codes that did not produce a termbase (after
+          retries). A language can fail because its API call kept timing out, the
+          model returned an empty result, or any other exception bubbled up from
+          generate_language_termbase_two_pass. Surfacing this list lets the GUI
+          show partial-failure summaries rather than silently dropping languages.
         """
         try:
             supported_languages = self.get_supported_languages()
@@ -240,10 +448,11 @@ class AIConfigGenerator:
                 self.logger.warning("No valid target languages provided")
                 self.logger.warning("Input languages: %s", target_languages)
                 self.logger.warning("Supported languages sample: %s", supported_languages[:10])
-                return {}
+                return {}, []
 
             dnt_set = {term.lower().strip() for term in (dnt_terms or [])}
             termbase: dict[str, dict[str, str]] = {}
+            failed_languages: list[str] = []
 
             # --- soft alignment anchor (first successful TB) ---
             anchor_count: int | None = None
@@ -273,6 +482,7 @@ class AIConfigGenerator:
                 lang_name = self._lang_cfg.get_language_name(lang_code)
                 if not lang_name:
                     self.logger.warning("Could not get language name for %s, skipping", lang_code)
+                    failed_languages.append(lang_code)
                     continue
                 try:
                     # compute soft band (clamped to defaults)
@@ -313,6 +523,7 @@ class AIConfigGenerator:
                     )
                     if not tb_dict:
                         self.logger.warning("Empty termbase for %s; skipping", lang_code)
+                        failed_languages.append(lang_code)
                         continue
                     # DNT wins: aggressively drop any collisions that slipped in.
                     cleaned = self._drop_dnt_from_termbase(tb_dict, dnt_set)
@@ -338,10 +549,18 @@ class AIConfigGenerator:
                             )
                 except Exception as e:
                     self.logger.error("Failed to generate termbase for %s: %s", lang_code, e)
+                    failed_languages.append(lang_code)
                     continue
 
             self.logger.info("Generated termbase for %s languages (per‑language two‑pass)", len(termbase))
-            return termbase
+            if failed_languages:
+                self.logger.warning(
+                    "AI termbase generation failed for %d of %d languages: %s",
+                    len(failed_languages),
+                    len(valid_languages),
+                    ", ".join(sorted(failed_languages)),
+                )
+            return termbase, failed_languages
         except Exception as e:
             self.logger.error("Error generating termbase: %s", e)
             raise
@@ -386,15 +605,25 @@ class AIConfigGenerator:
                 ),
             }
 
-            response = self.client.chat.completions.create(**params)
+            response = _call_with_retry(
+                lambda: self.client.chat.completions.create(**params),
+                context=lang_code,
+                logger=self.logger,
+            )
             raw = (response.choices[0].message.content or "").strip()
             data = json.loads(raw)
             exhausted = bool(data.get("exhausted") or False)
             exhaustion_reason = data.get("exhaustion_reason")
-            pass1_terms = data.get("pass1_terms", []) or []
-            pass2_terms = data.get("pass2_terms", []) or []
-            extracted = pass1_terms + pass2_terms
+            response_pass1 = data.get("pass1_terms", []) or []
+            response_pass2 = data.get("pass2_terms", []) or []
+            extracted = response_pass1 + response_pass2
             tb = data.get("termbase", {}) or {}
+            # Capture the model's own pass assignment now, before the local
+            # `pass1_terms` / `pass2_terms` accumulators below shadow these
+            # names. Used in place of English-keyword matching on the reason
+            # text, which silently miscategorizes when the model writes
+            # reasons in the target language.
+            _response_pass_assignment = _build_pass_assignment(response_pass1, response_pass2)
 
             # Domain-agnostic post-filtering constants and functions
             GENERIC_SINGLETONS = {
@@ -473,29 +702,15 @@ class AIConfigGenerator:
                     continue
                 seen_terms.add(kl)
 
-                # Categorize by pass based on reason content
-                reason_lower = reason.lower()
                 # Debug: log a few reasons to see what the AI is actually writing
                 if len(cleaned_terms) < 3:
                     self.logger.debug("Sample reason for '%s': '%s'", term, reason)
 
-                if any(
-                    keyword in reason_lower
-                    for keyword in [
-                        "confusable",
-                        "near-homophone",
-                        "orthography",
-                        "mistranslate",
-                        "over-literal",
-                        "confused",
-                        "similar",
-                        "hard to translate",
-                        "difficult",
-                        "ambiguous",
-                        "literal",
-                        "misunderstood",
-                    ]
-                ):
+                # Categorize using the model's own pass assignment from the
+                # response. Default to pass1 if the term isn't in either
+                # response array (e.g. terms added later by the top-up path,
+                # which doesn't carry pass info).
+                if _response_pass_assignment.get(term.lower()) == "pass2":
                     pass2_terms.append({"term": term, "reason": reason})
                 else:
                     pass1_terms.append({"term": term, "reason": reason})
@@ -568,15 +783,25 @@ class AIConfigGenerator:
             # Update cleaned_terms with filtered results
             cleaned_terms = filtered_cleaned_terms
 
-            # Filter DNT collisions from TB keys
-            tb_dict = {}
-            if isinstance(tb, dict):
-                for k, v in tb.items():
-                    if not k or not v:
-                        continue
-                    if k.strip().lower() in dnt_set:
-                        continue
-                    tb_dict[k.strip()] = str(v).strip()
+            # Filter the raw termbase response. Validate against cleaned_terms,
+            # not the model's full pass1+pass2 response — otherwise terms the
+            # cap dropped or prune_generics removed would still leak into the
+            # saved tb_dict. (Observed leak: zh-Hans returning ~49 entries
+            # under a soft_hi of ~30 because the model over-generated and the
+            # filter validated against the uncapped extracted list.)
+            tb_dict, _tb_drops = _filter_termbase_response(tb, cleaned_terms, dnt_set)
+            if any(_tb_drops.values()):
+                self.logger.warning(
+                    "[%s] Dropped %d malformed termbase entries from model response: "
+                    "%d DNT collisions, %d self-references, %d unknown keys (not in cleaned terms), "
+                    "%d case-only duplicates",
+                    lang_code,
+                    sum(_tb_drops.values()),
+                    _tb_drops["dnt_collision"],
+                    _tb_drops["self_reference"],
+                    _tb_drops["unknown_key"],
+                    _tb_drops["case_duplicate"],
+                )
 
             # --- ensure translations exist for ALL cleaned terms ---
             src_terms = [t["term"] for t in cleaned_terms]
@@ -896,65 +1121,6 @@ class AIConfigGenerator:
             self.logger.error("Error generating termbase for %s: %s", lang_code, e)
             raise
 
-    def get_error_details(self, error: Exception) -> dict:
-        """Get detailed error information for GUI display"""
-        error_msg = str(error).lower()
-
-        # Check for context length exceeded first (before "invalid" check)
-        if (
-            "context length" in error_msg
-            or "maximum context length" in error_msg
-            or "context_length_exceeded" in error_msg
-        ):
-            return {
-                "type": "context_length_exceeded",
-                "title": "Content Too Large for Analysis",
-                "message": "The selected files contain too much text for the AI generation model to process at once",
-                "suggestion": "Try selecting fewer files or use the content truncation feature",
-            }
-        elif "invalid" in error_msg and "authentication" in error_msg:
-            return {
-                "type": "invalid_api_key",
-                "title": "Invalid API Key",
-                "message": "Please check your API key at platform.openai.com",
-                "suggestion": "Get your key at: platform.openai.com",
-            }
-        elif "quota" in error_msg or "billing" in error_msg or "credits" in error_msg:
-            return {
-                "type": "insufficient_credits",
-                "title": "Insufficient API Credits",
-                "message": "Please add credits to your OpenAI account",
-                "suggestion": "Add credits at: platform.openai.com",
-            }
-        elif "rate" in error_msg:
-            return {
-                "type": "rate_limit",
-                "title": "Rate Limit Exceeded",
-                "message": "Please wait a moment and try again",
-                "suggestion": "Wait 1-2 minutes before retrying",
-            }
-        elif "network" in error_msg or "connection" in error_msg:
-            return {
-                "type": "network_error",
-                "title": "Network Connection Issue",
-                "message": "Please check your internet connection",
-                "suggestion": "Check your internet connection and try again",
-            }
-        elif "content" in error_msg and ("too small" in error_msg or "insufficient" in error_msg):
-            return {
-                "type": "insufficient_content",
-                "title": "Insufficient Content for Analysis",
-                "message": "Selected files contain very little text for analysis",
-                "suggestion": "Try selecting larger files or more files from your course",
-            }
-        else:
-            return {
-                "type": "unknown_error",
-                "title": "AI Configuration Failed",
-                "message": f"An error occurred: {str(error)}",
-                "suggestion": "Please check your settings and try again",
-            }
-
     def generate_batch_ai_config(
         self,
         source_file_paths: list[str],
@@ -1025,12 +1191,11 @@ class AIConfigGenerator:
             len(transcript_sample),
         )
 
-        # 2) Detect source language
+        # 2) Detect source language. Detection uses DEFAULT_DETECTION_MODEL
+        # (not the user's generation model) — see language_detection.py.
         source_lang = detect_source_language(
             transcript_sample,
             chat=self.client,
-            generation_model_name=self.generation_model_name,
-            temperature=self.temperature,
             language_config=self._lang_cfg,
         )
         self.logger.info(
@@ -1043,7 +1208,7 @@ class AIConfigGenerator:
         self.logger.info("Generated %s DNT terms (batch-level)", len(dnt_terms))
 
         # 4) Generate termbase using the new two-stage pipeline
-        termbase_by_lang = self.generate_termbase(
+        termbase_by_lang, failed_languages = self.generate_termbase(
             transcript_sample,
             target_lang_codes,
             dnt_terms=dnt_terms,
@@ -1051,7 +1216,12 @@ class AIConfigGenerator:
         )
         self.logger.info("Generated termbase for %s languages (batch-level)", len(termbase_by_lang))
 
-        return BatchAIConfig(dnt_terms=dnt_terms, termbase=termbase_by_lang, source_language=source_lang)
+        return BatchAIConfig(
+            dnt_terms=dnt_terms,
+            termbase=termbase_by_lang,
+            source_language=source_lang,
+            failed_languages=failed_languages,
+        )
 
     @staticmethod
     def _strip_srt_markup(raw: str) -> str:

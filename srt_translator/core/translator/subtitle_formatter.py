@@ -18,9 +18,7 @@ class SubtitleFormatter:
         self.language_config = language_config
         self.logger = logging.getLogger(__name__)
 
-    def apply_per_subtitle_formatting(
-        self, text: str, start_ms: int, end_ms: int, lang: str
-    ) -> str:
+    def apply_per_subtitle_formatting(self, text: str, start_ms: int, end_ms: int, lang: str) -> str:
         """
         Apply per-subtitle formatting rules to translated text.
 
@@ -42,9 +40,7 @@ class SubtitleFormatter:
             return text
 
         cps_cap = self.language_config.get_cps_cap(lang)
-        return format_subtitle_text(
-            lang_code=lang, text=text, start_ms=start_ms, end_ms=end_ms, cps_cap=cps_cap
-        )
+        return format_subtitle_text(lang_code=lang, text=text, start_ms=start_ms, end_ms=end_ms, cps_cap=cps_cap)
 
 
 # --- helper: normalize spaces -------------------
@@ -62,9 +58,7 @@ def _duration_seconds(start_ms: int, end_ms: int) -> float:
     return max(0.001, (end_ms - start_ms) / 1000.0)
 
 
-def format_subtitle_text(
-    *, lang_code: str, text: str, start_ms: int, end_ms: int, cps_cap: int
-) -> str:
+def format_subtitle_text(*, lang_code: str, text: str, start_ms: int, end_ms: int, cps_cap: int) -> str:
     """Normalize spaces; warn if CPS exceeds cap; never reflow or trim."""
     s = _normalize_spaces(text or "")
     if not s:

@@ -1,13 +1,14 @@
 import json
-from pathlib import Path
+from importlib.resources import as_file, files
 from typing import Any
 
-from srt_translator.core.constants import MAX_INLINE_TOKENS
+from srt_translator.core.constants import MAX_INLINE_TOKENS, REASONING_MODEL_COMPLETION_TOKEN_FLOOR
 
-CONFIG_FILE = Path(__file__).parent / "model_config.json"
-
-with open(CONFIG_FILE, encoding="utf-8") as f:
-    MODEL_CONFIG: dict[str, dict[str, Any]] = json.load(f)
+# Resource-based load (not Path(__file__)) so this works identically in
+# editable installs, built wheels, Windows onefile EXE, and macOS .app.
+# See srt_translator/config/resources.py for the same pattern.
+with as_file(files("srt_translator.config") / "model_config.json") as _p:
+    MODEL_CONFIG: dict[str, dict[str, Any]] = json.loads(_p.read_text(encoding="utf-8"))
 
 
 def get_model_config(model_name: str) -> dict[str, Any]:
@@ -37,11 +38,20 @@ def build_call_params(
     (sized for reasoning models) without causing API errors on standard
     models whose output ceiling is lower.
 
+    For reasoning models (those with a `reasoning_effort` setting), the
+    budget is also raised to at least REASONING_MODEL_COMPLETION_TOKEN_FLOOR
+    because reasoning tokens and visible output share the same bucket. A
+    tiny budget (e.g. 120) on a reasoning model causes the model to exhaust
+    its budget on internal reasoning and return empty content.
+
     Callers may freely add extra keys (e.g. 'stop', 'response_format')
     to the returned dict after the call.
     """
     cfg = get_model_config(model_name)
-    safe_limit = min(max_completion_tokens, cfg.get("max_output_tokens", 16384))
+    output_ceiling = cfg.get("max_output_tokens", 16384)
+    safe_limit = min(max_completion_tokens, output_ceiling)
+    if cfg.get("reasoning_effort") is not None:
+        safe_limit = min(max(safe_limit, REASONING_MODEL_COMPLETION_TOKEN_FLOOR), output_ceiling)
     params: dict[str, Any] = {"max_completion_tokens": safe_limit}
 
     if cfg.get("supports_temperature", True) and temperature is not None:

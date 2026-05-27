@@ -3,7 +3,7 @@
 Typed configuration models for SRT Translator.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -37,6 +37,10 @@ class SummaryDict(TypedDict):
     errors: int
     error_details: list[str]
     batch_directory: str
+
+    successful_languages: list[dict[str, str]]
+    failed_languages: list[dict[str, str]]
+    cancelled: bool
 
 
 @dataclass(frozen=True)
@@ -80,6 +84,9 @@ class TranslationConfig:
 
     # Translation tone/register: casual, neutral, or formal
     tone: str = DEFAULT_TONE
+    retry_status_callback: Callable[[str], None] | None = None
+    stop_check: Callable[[], bool] | None = None
+    on_language_done: Callable[[], None] | None = None
 
     def run(self) -> SummaryDict:
         """Run the translation with this configuration and return summary."""
@@ -91,6 +98,9 @@ class TranslationConfig:
         return translate_srt_files(
             file_paths=[str(f) for f in self.files],
             config=self,
+            retry_status_callback=self.retry_status_callback,
+            stop_check=self.stop_check,
+            on_language_done=self.on_language_done,
         )
 
     @classmethod
@@ -137,7 +147,7 @@ class TranslationConfig:
         translation_model_name = raw.get("translation_model_name") or DEFAULT_TRANSLATION_MODEL
 
         # Validate aggressiveness
-        raw_agg = raw.get("Temperature")
+        raw_agg = raw.get("aggressiveness")
         try:
             temperature = float(raw_agg) if raw_agg is not None else DEFAULT_TEMPERATURE
             if not 0.0 <= temperature <= 1.0:

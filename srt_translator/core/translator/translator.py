@@ -9,7 +9,7 @@ import random
 import re
 import time
 from collections import deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from re import Match, Pattern
 from typing import (
@@ -18,12 +18,17 @@ from typing import (
     cast,
 )
 
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    NotFoundError,
+    OpenAI,
+    PermissionDeniedError,
+    RateLimitError,
+)
+
 # OpenAI client
-from openai import AuthenticationError as OpenAIAuthenticationError
-from openai import NotFoundError as OpenAINotFoundError
-from openai import OpenAI
-from openai import PermissionDeniedError as OpenAIPermissionDeniedError
-from openai import RateLimitError as OpenAIRateLimitError
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionDeveloperMessageParam,
@@ -55,10 +60,13 @@ from srt_translator.core.constants import (
     STRICT_RETRY_TOKEN_CAP,
     STRICT_RETRY_TOKEN_FLOOR,
     STRICT_RETRY_TOKEN_MULTIPLIER,
+    TRANSLATION_CONNECTION_RETRY_BASE_S,
+    TRANSLATION_CONNECTION_RETRY_CAP_S,
+    TRANSLATION_MAX_CONNECTION_RETRIES,
 )
+from srt_translator.core.retry import compute_retry_delay, parse_retry_after
 from srt_translator.core.translator.diagnostics import (
     MalformedProbeBudget,
-    build_oversize_probe_question,
     estimate_tokens,
     looks_like_repetitive_loop,
     probe_malformed_json_with_translator,
@@ -67,7 +75,7 @@ from srt_translator.core.translator.diagnostics import (
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
 from srt_translator.core.translator.term_handler import TermHandler
 from srt_translator.core.utils.log_types import LoggerLike
-from srt_translator.prompts.diagnostics import build_oversize_diagnostic_system_prompt
+from srt_translator.prompts.diagnostics import build_oversize_diagnostic_system_prompt, build_oversize_probe_question
 from srt_translator.prompts.translation import (
     build_placeholder_fixer_prompt,
     build_single_string_fallback_prompt,
@@ -228,13 +236,20 @@ def strip_invented_placeholders(text: str, invented_ids: set[str], ph_regex: Pat
     return ph_regex.sub(_sub, text or "")
 
 
-def _is_invalid_translation(text: str) -> bool:
+def _is_invalid_translation(text: str, src: str | None = None) -> bool:
     if not text:
         return True
     t = text.strip()
     if not t:
         return True
     if re.fullmatch(r"[\W\d_]+", t):
+        # Punctuation/digit-only output is usually a model failure (collapsed
+        # placeholder, dropped content). Exception: when the source itself is
+        # punctuation/digit-only (isolated year, dollar amount, ellipsis,
+        # chapter marker), returning it unchanged IS the correct translation.
+        # Strict identity match — partial matches still count as failures.
+        if src is not None and t == src.strip():
+            return False
         return True
     return False
 
@@ -294,6 +309,10 @@ def _format_and_append_subtitles(
 # ---------------------------
 
 
+class TranslationCancelledError(Exception):
+    """Raised when translation is cancelled by user."""
+
+
 class SRTTranslator:
     # Explicit attribute types to avoid "Cannot determine type of X"
     logger: LoggerLike
@@ -322,6 +341,8 @@ class SRTTranslator:
         temperature: float | None = None,
         language_config: LanguageConfig,
         tone: str = "neutral",
+        retry_status_callback: Callable[[str], None] | None = None,
+        stop_check: Callable[[], bool] | None = None,
     ) -> None:
         if logger is None:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
@@ -375,6 +396,8 @@ class SRTTranslator:
         # Simple per-file/lang circuit breaker for repeated JSON failures
         self._consecutive_decode_failures = 0
         self._model_invalid = False
+        self.retry_status_callback = retry_status_callback
+        self.stop_check = stop_check
 
     def _strict_retry_kwargs(self, src_items: list[str]) -> dict[str, Any]:
         """
@@ -397,6 +420,14 @@ class SRTTranslator:
         # Optional: stop right after JSON; remove if provider doesn't support 'stop'
         base["stop"] = ["]}"]
         return base
+
+    def _emit_retry_status(self, message: str) -> None:
+        """Emit retry status to GUI if callback exists."""
+        try:
+            if self.retry_status_callback:
+                self.retry_status_callback(message)
+        except Exception as exc:
+            self.logger.debug("retry_status_callback raised: %s", exc)
 
     def _setup_file_logging(
         self: SRTTranslator, input_filepath: str, target_lang: str
@@ -523,6 +554,7 @@ class SRTTranslator:
 
         # Restore DNT placeholders and termbase substitutions
         tgt_texts = [self.term_handler.restore_all(t, target_lang) for t in tgt_texts]
+        self.logger.debug("FINAL OUTPUT: %s", tgt_texts)
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
@@ -734,6 +766,15 @@ class SRTTranslator:
         cps_cap = self.language_config.get_cps_cap(target_lang)
 
         for bi, batch in enumerate(batches, start=1):
+            if self.stop_check is not None and self.stop_check():
+                file_logger.info(
+                    "Translation cancelled during batch processing (file=%s lang=%s batch=%s/%s)",
+                    os.path.basename(input_filepath),
+                    target_lang,
+                    bi,
+                    len(batches),
+                )
+                raise TranslationCancelledError("Translation cancelled by user")
             # Batch-scoped logger with correlation ids
             batch_logger = logging.LoggerAdapter(file_logger, {"batch": bi, "ids": [s.idx for s in batch]})
 
@@ -1330,6 +1371,7 @@ class SRTTranslator:
             return []
 
         results: list[dict[str, Any] | None] = [None] * total
+        transient_retry = 0
 
         # Queue holds (start, end, depth, retries)
         work_q: deque[tuple[int, int, int, int]] = deque()
@@ -1381,16 +1423,18 @@ class SRTTranslator:
                 for offset, obj in enumerate(items):
                     tgt = (obj.get("tgt") or "").strip()
 
-                    if _is_invalid_translation(tgt):
+                    if _is_invalid_translation(tgt, src=seg_src[offset]):
                         raise RuntimeError(f"Invalid translation at cue id={seg_ids[offset]}: {tgt!r}")
                     results[start + offset] = {
                         "id": obj.get("id"),
                         "tgt": obj.get("tgt", ""),
                     }
                 self._consecutive_decode_failures = 0  # reset breaker on success
+                transient_retry = 0
+                self._emit_retry_status("")
                 continue
 
-            except OpenAINotFoundError as ex:
+            except NotFoundError as ex:
                 self._model_invalid = True
                 logger.error(
                     "Invalid translation model '%s': %s. Check the translator model name in your settings.",
@@ -1402,16 +1446,56 @@ class SRTTranslator:
                     f"Valid examples: gpt-4o-mini, gpt-4o, gpt-4.1-mini, gpt-5-mini"
                 ) from ex
 
-            except (OpenAIAuthenticationError, OpenAIPermissionDeniedError) as ex:
-                logger.error("Auth/permission error (non-retriable): %s", ex)
+            except (AuthenticationError, PermissionDeniedError):
+                logger.error("Authentication failed: API key or permissions invalid.")
                 raise
 
-            except OpenAIRateLimitError as ex:
-                self._consecutive_decode_failures += 1
-                wait = min(self._MICRO_BACKOFF_CAP_S, self._MICRO_BACKOFF_BASE_S * (2**retries))
-                logger.warning("Rate-limited; backing off %.1fs: %s", wait, ex)
-                time.sleep(wait)
-                work_q.appendleft((start, end, depth, retries + 1))
+            except (
+                APIConnectionError,
+                APITimeoutError,
+                RateLimitError,
+            ) as ex:
+                detail = str(ex).lower()
+
+                if "insufficient_quota" in detail or "quota" in detail or "billing" in detail:
+                    raise
+                transient_retry += 1
+                if transient_retry > TRANSLATION_MAX_CONNECTION_RETRIES:
+                    logger.error(
+                        "Transient API retries exhausted after %s attempts: %s",
+                        TRANSLATION_MAX_CONNECTION_RETRIES,
+                        ex,
+                    )
+                    self._emit_retry_status("")
+                    raise
+
+                delay = compute_retry_delay(
+                    transient_retry,
+                    base=TRANSLATION_CONNECTION_RETRY_BASE_S,
+                    cap=TRANSLATION_CONNECTION_RETRY_CAP_S,
+                    retry_after=parse_retry_after(ex),
+                    max_total=TRANSLATION_CONNECTION_RETRY_CAP_S * 2,
+                )
+                logger.warning(
+                    "Transient API error. Retrying in %.1fs (attempt %s/%s): %s",
+                    delay,
+                    transient_retry,
+                    TRANSLATION_MAX_CONNECTION_RETRIES,
+                    ex,
+                )
+                if transient_retry >= 3:
+                    status_msg = (
+                        f"Connection interrupted — retrying every {int(delay)}s "
+                        f"(attempt {transient_retry}/{TRANSLATION_MAX_CONNECTION_RETRIES})..."
+                    )
+                else:
+                    status_msg = (
+                        f"Connection issue, retrying in {int(delay)}s "
+                        f"(attempt {transient_retry}/{TRANSLATION_MAX_CONNECTION_RETRIES})..."
+                    )
+                self._emit_retry_status(status_msg)
+                time.sleep(delay)
+                work_q.appendleft((start, end, depth, retries))
                 continue
 
             except Exception as ex:

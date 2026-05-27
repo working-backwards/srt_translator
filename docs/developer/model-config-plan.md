@@ -32,6 +32,17 @@ subset of termbase entries — a small, bounded prompt. Context window size is i
 What matters is **cost and latency**, since this call runs dozens to hundreds of times per
 course. `gpt-4o-mini` is the right fit.
 
+**Detection model** (called **once per course**):
+
+A short classification call ("what language is this transcript?") returning a small JSON
+object (~50 visible tokens). Detection is intentionally decoupled from both the generation
+and translation model choices — creators have no basis for picking a detection model, and
+the task does not benefit from reasoning effort or large context. `gpt-4o-mini` is
+hardcoded via `DEFAULT_DETECTION_MODEL` in `constants.py`. Reasoning models are a poor fit:
+their `max_completion_tokens` budget is shared between hidden reasoning tokens and visible
+output, so even a short JSON response can be silently truncated to empty if the budget is
+small (see the post-implementation note below for a real incident).
+
 ### Problems the current code has
 
 | Problem | Impact |
@@ -509,6 +520,38 @@ output was empty subtitles. **Fix:** Add `MAX_COMPLETION_TOKENS_TRANSLATION_BATC
 in `constants.py` and use it in `translator.py` for (1) the non-strict batch path and
 (2) the placeholder-fixer path. Leave `MAX_COMPLETION_TOKENS` (120) only for paths that
 truly need a small cap (e.g. diagnostic/fallback).
+
+### Post-implementation fix: language detection silent failure on reasoning models
+
+`MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION = 120` was carried over verbatim from the old
+hardcoded `max_tokens=120` value when detection was migrated to `build_call_params()`.
+That value was correct under the old API semantics (visible-token cap) but broke the
+moment `DEFAULT_GENERATION_MODEL` was switched to `gpt-5-mini`, because detection then
+ran on the user's generation model and `max_completion_tokens=120` for a reasoning model
+is a shared budget that gets consumed entirely by internal reasoning before any visible
+output is emitted. The function silently returned all-`None`, which cascaded into a
+weaker termbase-extraction prompt (the source-language hint at `prompts/config.py:88-92`
+is only included when detection succeeds) and produced malformed termbase entries where
+the source key was in the target language.
+
+**Fix (three changes):**
+
+1. **Decouple detection from the user's model choice.** Add `DEFAULT_DETECTION_MODEL`
+   in `constants.py`, hardcoded to a non-reasoning model (`gpt-4o-mini`). Detection is
+   a deterministic classification task — there is no creator-facing benefit to making
+   it user-tunable, and exposing it as a knob lets a generation-model swap silently
+   break detection again.
+2. **Lift `MAX_COMPLETION_TOKENS_LANGUAGE_DETECTION` to 256** for headroom over the
+   ~50-token visible JSON output.
+3. **Enforce a reasoning floor in `build_call_params()`.** When the target model has a
+   `reasoning_effort` setting, `max_completion_tokens` is raised to at least
+   `REASONING_MODEL_COMPLETION_TOKEN_FLOOR` (4096), clamped to the model's
+   `max_output_tokens`. This is defense-in-depth so the next caller that mistakenly
+   targets a reasoning model with a tiny budget does not silently fail.
+
+Detection now also logs WARNING-level diagnostics on every failure path (empty input,
+empty model response, unparseable JSON, normalization failure, API exception) so the
+next regression is visible rather than silent.
 
 ---
 

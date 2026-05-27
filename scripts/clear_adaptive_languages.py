@@ -28,9 +28,7 @@ from srt_translator.gui.settings_manager import SettingsManager  # noqa: E402
 def main():
     """Clear adaptive language settings."""
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logger = logging.getLogger(__name__)
 
     try:
@@ -39,6 +37,7 @@ def main():
         # Initialize settings manager
         language_config = LanguageConfig({"languages": {}})
         settings_manager = SettingsManager(language_config)
+        settings_manager.migrate_from_native_if_needed()
 
         # Clear adaptive language data
         settings_manager.reset_adaptive_popular_languages()

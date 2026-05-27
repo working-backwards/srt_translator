@@ -3,11 +3,8 @@ from srt_translator.core.constants import DEFAULT_GENERATION_MODEL
 from srt_translator.gui.settings_manager import SettingsManager
 
 
-def test_settings_manager_round_trip_and_defaults(tmp_path, monkeypatch):
+def test_settings_manager_round_trip_and_defaults():
     """Basic smoke test for SettingsManager and config defaults."""
-    # Isolate QSettings storage to a temp directory
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-
     language_config = LanguageConfig({"languages": {}})
     settings_manager = SettingsManager(language_config)
 
@@ -33,5 +30,3 @@ def test_settings_manager_round_trip_and_defaults(tmp_path, monkeypatch):
     # Test default generation model name uses constant
     settings_manager.settings.remove("generation_model_name")
     assert settings_manager.load_generation_model_name() == DEFAULT_GENERATION_MODEL
-
-

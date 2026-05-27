@@ -6,9 +6,6 @@ from typing import TYPE_CHECKING
 from srt_translator.prompts.diagnostics import (
     build_malformed_json_probe,
 )
-from srt_translator.prompts.diagnostics import (
-    build_oversize_probe_question as build_oversize_probe_question,
-)
 
 if TYPE_CHECKING:
     from srt_translator.core.translator.translator import (
@@ -46,10 +43,6 @@ def snip(text: str, limit: int = 400) -> str:
         return ""
     t = text.replace("\n", " ").replace("\r", " ")
     return t if len(t) <= limit else t[:limit] + "…"
-
-
-# build_oversize_probe_question is imported from srt_translator.prompts.diagnostics
-# and re-exported here for backward compatibility (translator.py imports from this module).
 
 
 class MalformedProbeBudget:
