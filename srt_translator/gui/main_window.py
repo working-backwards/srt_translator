@@ -16,7 +16,7 @@ from pathlib import Path
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -140,9 +140,22 @@ class SRTTranslatorMainWindow(QMainWindow):
     def setup_window(self):
         """Set up window properties."""
         self.setWindowTitle("SRT Translator")
-        self.resize(820, 760)
-        self.setMinimumSize(800, 720)
-        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint)
+        screen = QGuiApplication.primaryScreen()
+        geometry = screen.availableGeometry()
+
+        width = int(geometry.width() * 0.55)
+        height = int(geometry.height() * 0.90)
+
+        self.resize(width, height)
+
+        self.setMinimumSize(600, 400)
+
+        self.setWindowFlags(
+            Qt.Window
+            | Qt.WindowCloseButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+        )
 
     # ------------------------------------------------------------------ #
     #  UI construction
