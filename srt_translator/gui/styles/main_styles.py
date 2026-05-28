@@ -698,6 +698,10 @@ MAIN_STYLESHEET = """
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
+     QTabWidget::tab-bar {
+        alignment: center;
+    }
+
     QTabBar::tab:selected {
         background-color: #1E2028;
         color: #E5E7EB;
