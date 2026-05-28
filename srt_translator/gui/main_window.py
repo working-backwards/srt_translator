@@ -151,10 +151,7 @@ class SRTTranslatorMainWindow(QMainWindow):
         self.setMinimumSize(600, 400)
 
         self.setWindowFlags(
-            Qt.Window
-            | Qt.WindowCloseButtonHint
-            | Qt.WindowMinimizeButtonHint
-            | Qt.WindowMaximizeButtonHint
+            Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
         )
 
     # ------------------------------------------------------------------ #
