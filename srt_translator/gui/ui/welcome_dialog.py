@@ -94,8 +94,7 @@ class WelcomeApiKeyDialog(QDialog):
         # Storage disclosure — mirror SettingsDialog wording so the
         # local-plaintext characteristic is visible at the moment of entry.
         storage_note = QLabel(
-            "Stored locally in app settings (not encrypted). Rotate the key at "
-            "platform.openai.com if exposed."
+            "Stored locally in app settings (not encrypted). Rotate the key at platform.openai.com if exposed."
         )
         storage_note.setObjectName("storageDisclosureLabel")
         storage_note.setStyleSheet("color: #64748B; font-size: 11px;")
