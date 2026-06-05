@@ -18,6 +18,10 @@ Welcome to the SRT Translator Developer Guide. This section is for **developers*
 
 - **[Post-Translation Pipeline](post-translation.md)** - Evaluation workflow and report generation
 
+## Testing & QA
+
+- **[Testing a Clean / First-Run State](testing-clean-state.md)** - Reset settings to reproduce the new-user experience of a built `.exe`/`.dmg`
+
 ## CI/CD & Security
 
 - **[CI Guardrails](ci-guardrails.md)** - Continuous integration setup
