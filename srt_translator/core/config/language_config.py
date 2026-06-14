@@ -227,10 +227,14 @@ class LanguageConfig:
         return lang_info.get("family", "")
 
     def get_sentence_endings(self, code: str) -> list[str]:
-        """Get sentence ending punctuation for a language"""
+        """Get sentence ending punctuation for a language.
+
+        The default (used when a language declares none) includes the ellipsis
+        so source-side batch-boundary detection treats '…' as a sentence end.
+        """
         languages = self.get_all_languages()
         lang_info = languages.get(code, {})
-        return lang_info.get("sentence_endings", [".", "!", "?"])
+        return lang_info.get("sentence_endings", [".", "!", "?", "…"])
 
     def get_tone_hint(self, lang_code: str, tone: str) -> str | None:
         """

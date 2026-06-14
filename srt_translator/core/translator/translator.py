@@ -341,6 +341,7 @@ class SRTTranslator:
         temperature: float | None = None,
         language_config: LanguageConfig,
         tone: str = "neutral",
+        source_lang: str | None = None,
         retry_status_callback: Callable[[str], None] | None = None,
         stop_check: Callable[[], bool] | None = None,
     ) -> None:
@@ -354,6 +355,7 @@ class SRTTranslator:
         self.batch_size = min(MAX_BATCH_SIZE, max(1, int(batch_size)))
         self.error_policy = error_policy.upper()
         self.tone = tone.lower() if tone else "neutral"
+        self.source_lang = source_lang
         self.temperature = max(0.0, min(2.0, temperature if temperature is not None else DEFAULT_TEMPERATURE))
 
         # Log the tone setting for debugging
@@ -558,12 +560,42 @@ class SRTTranslator:
         return tgt_texts
 
     # --- Sentence-aware batching ----------------------------
+    def _source_sentence_endings(self) -> tuple[str, ...]:
+        """Sentence-ending punctuation for the SOURCE language, used to pick
+        batch boundaries.
+
+        Batching groups SOURCE cues, so terminators must come from the source
+        language, not the target. (Previously this looked up the TARGET
+        language's endings and applied them to source text; CJK targets never
+        matched English source, so every batch was force-cut at max_size.)
+
+        Uses get_sentence_endings(), which defaults to a generic Latin set when
+        a language declares none -- unlike get_language_rules(), whose empty
+        list used to overwrite the default and disable breaks entirely. Falls
+        back to that generic set when the source is unknown or mixed.
+        """
+        default = (".", "!", "?", "…")
+        try:
+            src = getattr(self, "source_lang", None)
+            if self.language_config and src:
+                endings = self.language_config.get_sentence_endings(src)
+                # Non-empty only: an empty list must not clobber the default.
+                if endings:
+                    return tuple(endings)
+        except (AttributeError, TypeError, KeyError) as exc:
+            self.logger.debug(
+                "No source sentence_endings for %s (%s: %s)",
+                getattr(self, "source_lang", None),
+                type(exc).__name__,
+                exc,
+            )
+        return default
+
     def _create_batches(
         self,
         subtitles: list[Subtitle],
         target_size: int,
         max_size: int,
-        target_lang: str,
     ) -> list[list[Subtitle]]:
         """
         Group consecutive subtitles into batches that prefer ending at a natural
@@ -576,22 +608,8 @@ class SRTTranslator:
         batches: list[list[Subtitle]] = []
         current: list[Subtitle] = []
 
-        # Pull language-specific rules from the injected language_config, if present.
-        # Falls back to a generic set if not available.
-        sentence_endings = (".", "!", "?", "…")
-        try:
-            if self.language_config:
-                rules = self.language_config.get_language_rules(target_lang) or {}
-                if isinstance(rules.get("sentence_endings"), list):
-                    sentence_endings = tuple(rules["sentence_endings"])
-        except (AttributeError, TypeError, KeyError) as exc:
-            # Fallback to defaults; log at debug so we can diagnose config shape issues.
-            self.logger.debug(
-                "No language-specific sentence_endings for %s (%s: %s)",
-                target_lang,
-                type(exc).__name__,
-                exc,
-            )
+        # Sentence endings are a SOURCE-side decision (we batch source cues).
+        sentence_endings = self._source_sentence_endings()
 
         for sub in subtitles:
             current.append(sub)
@@ -605,7 +623,7 @@ class SRTTranslator:
             # If we've reached the target size, prefer to break on a sentence end.
             if len(current) >= target_size:
                 text = (sub.text or "").strip()
-                if any(text.endswith(end) for end in sentence_endings):
+                if text.endswith(sentence_endings):  # str.endswith accepts a tuple
                     batches.append(current)
                     current = []
 
@@ -627,15 +645,26 @@ class SRTTranslator:
             subtitles=src_subs,
             target_size=int(self.batch_size),
             max_size=self.MAX_BATCH_SIZE,
-            target_lang=target_lang,
         )
 
+        # Report whether sentence-aware breaks actually fired (vs. forced max_size cuts).
+        endings = self._source_sentence_endings()
+        forced = sum(
+            1
+            for b in batches
+            if len(b) >= self.MAX_BATCH_SIZE and not (b[-1].text or "").strip().endswith(endings)
+        )
+        natural = len(batches) - forced
         file_logger.info(
-            "Using sentence-aware batching for %s → %s (%d subtitles → %d batches; target=%d, max=%d)",
+            "Sentence-aware batching %s → %s: %d subs → %d batches "
+            "(%d natural, %d forced; src_lang=%s, target=%d, max=%d)",
             os.path.basename(getattr(file_logger, "extra", {}).get("file", "unknown")),
             target_lang,
             len(src_subs),
             len(batches),
+            natural,
+            forced,
+            getattr(self, "source_lang", None),
             self.batch_size,
             self.MAX_BATCH_SIZE,
         )
