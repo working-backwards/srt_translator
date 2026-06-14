@@ -37,10 +37,7 @@ def _shim(source_lang):
 
 def _srt(lines):
     """Build minimal SRT text from a list of cue strings."""
-    blocks = [
-        f"{i}\n00:00:{i:02d},000 --> 00:00:{i:02d},900\n{t}"
-        for i, t in enumerate(lines, 1)
-    ]
+    blocks = [f"{i}\n00:00:{i:02d},000 --> 00:00:{i:02d},900\n{t}" for i, t in enumerate(lines, 1)]
     return "\n\n".join(blocks) + "\n"
 
 
@@ -84,6 +81,7 @@ ZH_SENTENCES = _srt([f"这是第{i}个子句" if i % 3 else f"这是一个完整
 
 
 # ---- tests ----------------------------------------------------------------
+
 
 def test_latin_source_breaks_on_sentence_end():
     # Bug 1 regression: an English source must produce sub-max, sentence-aware batches.

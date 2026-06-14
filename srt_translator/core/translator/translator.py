@@ -650,9 +650,7 @@ class SRTTranslator:
         # Report whether sentence-aware breaks actually fired (vs. forced max_size cuts).
         endings = self._source_sentence_endings()
         forced = sum(
-            1
-            for b in batches
-            if len(b) >= self.MAX_BATCH_SIZE and not (b[-1].text or "").strip().endswith(endings)
+            1 for b in batches if len(b) >= self.MAX_BATCH_SIZE and not (b[-1].text or "").strip().endswith(endings)
         )
         natural = len(batches) - forced
         file_logger.info(
