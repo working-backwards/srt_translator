@@ -45,6 +45,7 @@ from srt_translator.gui.ui.file_section import FileSection
 from srt_translator.gui.ui.language_section import LanguageSection
 from srt_translator.gui.ui.settings_dialog import SettingsDialog
 from srt_translator.gui.ui.translation_section import TranslationSection
+from srt_translator.gui.ui.welcome_dialog import WelcomeApiKeyDialog
 from srt_translator.gui.utils.error_classifier import get_error_details
 from srt_translator.gui.utils.termbase_merger import (
     load_dnt_terms_from_file,
@@ -323,6 +324,18 @@ class SRTTranslatorMainWindow(QMainWindow):
         """Open the application-level settings dialog."""
         dialog = SettingsDialog(self.settings_manager, parent=self)
         dialog.exec()
+
+    def prompt_for_api_key_if_missing(self) -> None:
+        """First-run onboarding: if no API key is stored yet, prompt for one.
+
+        Called once after the window is shown (see gui/app.py). The app cannot
+        generate settings or translate without a key, so we guide the user to
+        set one up front instead of letting them hit a downstream "No API Key"
+        error. Editing the key afterwards stays in the gear/SettingsDialog.
+        """
+        if self.settings_manager.load_api_key().strip():
+            return
+        WelcomeApiKeyDialog(self.settings_manager, parent=self).exec()
 
     # ------------------------------------------------------------------ #
     #  Signal wiring

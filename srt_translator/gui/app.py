@@ -69,6 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationVersion(_ver)
     win = SRTTranslatorMainWindow()
     win.show()
+    # First-run onboarding: prompt for the (required) OpenAI API key once the
+    # window is visible, so a new user isn't left hunting for the settings gear.
+    win.prompt_for_api_key_if_missing()
     return int(app.exec())
 
 
