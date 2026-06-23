@@ -93,6 +93,12 @@ def translate_srt_files(
         if source_lang is not None and isinstance(source_lang, dict):
             source_code = (source_lang.get("normalized_code") or source_lang.get("detected_code") or "").strip()
 
+        # Sentence-aware batching keys off the SOURCE language (a source-side decision).
+        # Use None for a mixed-language source so batching falls back to a generic terminator set.
+        batching_source_code = source_code or None
+        if isinstance(source_lang, dict) and source_lang.get("mixed"):
+            batching_source_code = None
+
         # Compute the active target languages for this run without mutating config
         if source_code:
             # Compare case-insensitively against requested target codes
@@ -155,6 +161,7 @@ def translate_srt_files(
                     error_policy=config.error_policy,  # Pass error policy
                     language_config=language_config,  # Pass language configuration
                     tone=config.tone,  # Pass tone setting
+                    source_lang=batching_source_code,
                     retry_status_callback=retry_status_callback,
                     stop_check=stop_check,
                 )
