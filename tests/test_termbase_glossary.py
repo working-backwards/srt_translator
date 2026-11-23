@@ -11,6 +11,7 @@ import pytest
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.term_handler import TermHandler, ensure_flat_termbase
 from srt_translator.core.translator.translator import SRTTranslator, _is_english_code, build_termbase_block
+from srt_translator.prompts.translation import build_single_string_fallback_prompt
 
 # --- TermHandler restore ---------------------------------------------------------------
 
@@ -201,3 +202,50 @@ def test_glossary_order_follows_termbase_and_accepts_proxy() -> None:
 
 def test_glossary_ignores_blank_keys() -> None:
     assert build_termbase_block({"  ": "X"}, ["anything"]) == "(none)"
+
+
+# --- plain-string fallback --------------------------------------------------------------
+
+_FALLBACK_NO_GLOSSARY = (
+    "Translate to fr.\n\n"
+    "DNT PLACEHOLDERS:\n"
+    "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
+    "- Do not invent or drop placeholders.\n\n"
+    "TEXT:\nHello\n"
+)
+
+
+def test_fallback_prompt_unchanged_without_glossary() -> None:
+    _sys, usr = build_single_string_fallback_prompt("fr", "Hello")
+    assert usr == _FALLBACK_NO_GLOSSARY
+    _sys, usr = build_single_string_fallback_prompt("fr", "Hello", "(none)")
+    assert usr == _FALLBACK_NO_GLOSSARY
+
+
+def test_fallback_prompt_includes_glossary() -> None:
+    _sys, usr = build_single_string_fallback_prompt("fr", "Hello", "- deck → présentation")
+    assert usr.startswith("Translate to fr.\n\nTERMINOLOGY:\n")
+    assert "- deck → présentation\n\nDNT PLACEHOLDERS:" in usr
+
+
+def test_malformed_single_item_falls_back_with_glossary() -> None:
+    t = _mk_translator({"fulfillment center": "centre de distribution"}, source_lang="en")  # plural needs English
+    calls: list[dict] = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        system = kwargs["messages"][0]["content"]
+        content = "Bonjour" if "Reply with the translation ONLY" in system else "not json at all"
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    t.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    items = t._translate_batch_json(
+        src_items=["Our fulfillment centers"],
+        target_lang="fr",
+        termbase=t.termbase,
+        batch_ids=[1],
+    )
+    assert items == [{"id": 1, "tgt": "Bonjour"}]
+    fallback = [c for c in calls if "Reply with the translation ONLY" in c["messages"][0]["content"]]
+    assert len(fallback) == 1
+    assert "- fulfillment center → centre de distribution" in fallback[0]["messages"][1]["content"]

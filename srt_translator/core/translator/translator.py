@@ -1247,6 +1247,7 @@ class SRTTranslator:
                     fallback_txt = self._translate_single_string_fallback(
                         _src_text=src_items[0],
                         target_lang=target_lang,
+                        termbase_block=termbase_block,
                     )
                     wrapped = [{"id": (batch_ids[0] if batch_ids else 1), "tgt": fallback_txt}]
                     return wrapped
@@ -1257,12 +1258,14 @@ class SRTTranslator:
             self.logger.error("Translation model did not return JSON; cannot recover without shape lock.")
             raise RuntimeError("Translation failed: translation model did not return valid JSON format") from None
 
-    def _translate_single_string_fallback(self, *, _src_text: str, target_lang: str) -> str:
+    def _translate_single_string_fallback(
+        self, *, _src_text: str, target_lang: str, termbase_block: str = "(none)"
+    ) -> str:
         """
         Minimal escape hatch for repeated JSON truncation in size=1 strict retries.
         Returns ONLY a translated string; caller will wrap into JSON.
         """
-        sys, usr = build_single_string_fallback_prompt(target_lang, _src_text)
+        sys, usr = build_single_string_fallback_prompt(target_lang, _src_text, termbase_block)
         params = {
             "model": self.translation_model_name,
             "messages": cast(

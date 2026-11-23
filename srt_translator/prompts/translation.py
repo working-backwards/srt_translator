@@ -92,12 +92,15 @@ INPUT ITEMS:
 def build_single_string_fallback_prompt(
     target_lang: str,
     src_text: str,
+    termbase_block: str = "(none)",
 ) -> tuple[str, str]:
     """Build the single-string fallback prompts (no JSON wrapper).
 
     Args:
         target_lang: Target language code.
         src_text: Source text to translate.
+        termbase_block: The batch's prompt glossary (from build_termbase_block);
+            omitted from the prompt when "(none)".
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -106,8 +109,10 @@ def build_single_string_fallback_prompt(
         "You are a professional subtitle translator. "
         "Reply with the translation ONLY—no JSON, no code, no quotes, no commentary."
     )
-    usr = (
-        f"Translate to {target_lang}.\n\n"
+    usr = f"Translate to {target_lang}.\n\n"
+    if termbase_block and termbase_block != "(none)":
+        usr += f"TERMINOLOGY:\nUse these business term mappings when present (source → target):\n{termbase_block}\n\n"
+    usr += (
         "DNT PLACEHOLDERS:\n"
         "- If you see placeholders like __DNT_TERM_7__, keep them EXACTLY as written.\n"
         "- Do not invent or drop placeholders.\n\n"
