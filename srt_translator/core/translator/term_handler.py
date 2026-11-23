@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
+from typing import Any
 
 # Public, stable placeholder regex — Fixer depends on this exact shape.
 PH_RE = re.compile(r"__DNT_TERM_(\d+)__", re.UNICODE)
@@ -33,35 +35,60 @@ def _compile_word_safe_pattern(term: str) -> re.Pattern:
     return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.UNICODE)
 
 
+def ensure_flat_termbase(termbase: Mapping[str, Any] | None) -> dict[str, str]:
+    """Validate one language's termbase and return a plain-dict copy.
+
+    The translator works on a single language's entries, ``{source_term: target_term}``.
+    ``TranslationConfig`` stores them as read-only ``MappingProxyType`` objects, so any
+    ``Mapping`` is accepted. A nested ``{language: {source: target}}`` mapping is rejected:
+    it is the configuration shape, not the translator's, and passing it used to merge
+    every language's entries into one table.
+
+    Raises:
+        TypeError: if ``termbase`` is not a mapping, a value is itself a mapping, or an
+            entry is not a string.
+    """
+    if termbase is None:
+        return {}
+    if not isinstance(termbase, Mapping):
+        raise TypeError(f"termbase must be a mapping of source term to target term, got {type(termbase).__name__}")
+    flat: dict[str, str] = {}
+    for source, target in termbase.items():
+        if isinstance(target, Mapping):
+            raise TypeError(
+                "termbase must be a flat {source: target} mapping for one language; "
+                f"got a nested mapping under {source!r}. Pass config.termbase.get(lang_code, {{}})."
+            )
+        if not isinstance(source, str) or not isinstance(target, str):
+            raise TypeError(f"termbase entries must be strings, got {source!r}: {target!r}")
+        flat[source] = target
+    return flat
+
+
 class TermHandler:
     """
-    Central place for DNT + termbase logic.
-    - Builds and owns the placeholder map (term -> __DNT_TERM_i__).
-    - Applies placeholders pre-translation, restores post-translation.
+    Central place for termbase find-and-replace and DNT placeholders, for ONE language.
+    - Takes that language's flat termbase {source_term: target_term}.
+    - apply_all(): replaces termbase terms with their target strings, then DNT terms
+      with placeholders (term -> __DNT_TERM_i__), before translation.
+    - restore_all(): restores DNT placeholders after translation.
     - Exposes `placeholder_regex` so other modules (Fixer/logs) can detect them.
+    The prompt glossary is built separately (translator.build_termbase_block).
     """
 
     def __init__(
         self,
         dnt_terms: list[str] | None = None,
-        termbase: dict[str, dict[str, str]] | None = None,
+        termbase: Mapping[str, str] | None = None,
         lang_code: str | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self.logger = logger or logging.getLogger(__name__)
         self.lang_code = (lang_code or "").lower()
-        self.termbase = termbase or {}
-        self.term_map: dict[str, str] = {}
+        # One language's entries: {source_term: target_term}
+        self.termbase: dict[str, str] = ensure_flat_termbase(termbase)
+        self.term_map: dict[str, str] = dict(self.termbase)
         self.termbase_patterns: list[tuple[re.Pattern, str]] = []
-
-        # Flatten the termbase into term_map for easy lookup
-        for key, value in self.termbase.items():
-            if isinstance(value, dict):
-                for sub_key, sub_val in value.items():
-                    self.term_map[sub_key] = sub_val
-            elif isinstance(value, str):
-                self.term_map[key] = value
-
         for term, replacement in sorted(self.term_map.items(), key=lambda x: len(x[0]), reverse=True):
             pat = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
             self.termbase_patterns.append((pat, replacement))
@@ -84,7 +111,7 @@ class TermHandler:
             "TermHandler initialized (lang=%s): %d DNT terms, %d TB entries",
             self.lang_code,
             len(self._ordered_terms),
-            sum(len(v) for v in self.termbase.values()),
+            len(self.termbase),
         )
 
     # Expose for Fixer & logs

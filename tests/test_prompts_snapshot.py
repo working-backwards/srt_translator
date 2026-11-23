@@ -46,7 +46,7 @@ def _mk_translator():
     }
     t = SRTTranslator(
         dnt_terms=[],
-        termbase={"fr": {"Amazon": "Amazon"}},
+        termbase={"Amazon": "Amazon"},
         api_key="sk-test",
         translation_model_name="gpt-4o-mini",
         logger=logger,

@@ -14,8 +14,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
-
 from srt_translator.core.config.models import TranslationConfig
 from srt_translator.core.main import translate_srt_files
 
@@ -67,7 +65,6 @@ def _prompts_for(calls: list[dict], lang: str) -> str:
     return "\n".join(c["messages"][-1]["content"] for c in calls if marker in c["messages"][-1]["content"])
 
 
-@pytest.mark.xfail(strict=True, reason="B1/B2: prompt glossary is always '(none)'; fixed in Task 3")
 def test_each_language_prompt_lists_only_its_own_relevant_entries(tmp_path: Path) -> None:
     src = tmp_path / "lesson.srt"
     src.write_text(SRT, encoding="utf-8")

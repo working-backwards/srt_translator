@@ -114,13 +114,13 @@ def test_golden_structure_and_invariants(tmp_path: Path, caplog, filename, langu
 
     # Common config
     language_config = LanguageConfig({"languages": {}})  # use your real config loader in app; tests use minimal stub
-    termbase = {"es": TERMS_ES}  # non-ES languages may have empty mappings
+    termbases = {"es": TERMS_ES}  # per language; other languages get no entries
 
     for target_lang in languages:
         # Translator with overrides
         t = SRTTranslator(
             dnt_terms=overrides.get("dnt_terms", []),
-            termbase=termbase,
+            termbase=termbases.get(target_lang, {}),
             api_key="sk-test",
             translation_model_name="gpt-4o-mini",
             logger=logging.getLogger(f"test.golden.{filename}.{target_lang}"),

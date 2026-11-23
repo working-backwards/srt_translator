@@ -1,6 +1,7 @@
 # srt_translator/core/translator/translator.py
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import math
@@ -73,7 +74,7 @@ from srt_translator.core.translator.diagnostics import (
     snip,
 )
 from srt_translator.core.translator.subtitle_formatter import format_subtitle_text
-from srt_translator.core.translator.term_handler import TermHandler
+from srt_translator.core.translator.term_handler import TermHandler, ensure_flat_termbase
 from srt_translator.core.utils.log_types import LoggerLike
 from srt_translator.prompts.diagnostics import build_oversize_diagnostic_system_prompt, build_oversize_probe_question
 from srt_translator.prompts.translation import (
@@ -192,16 +193,63 @@ def render_srt(subs: Sequence[Subtitle]) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
-def build_termbase_block(termbase: dict[str, dict[str, str]], lang_code: str) -> str:
-    lang = lang_code.lower()
-    if not termbase or lang not in termbase:
-        return "(none)"
-    pairs = termbase[lang]
-    if not pairs:
-        return "(none)"
-    # Render as "source → target" lines
-    lines = [f"- {src} → {tgt}" for src, tgt in pairs.items()]
-    return "\n".join(lines)
+def _is_english_code(code: str | None) -> bool:
+    """True for "en" and regional variants such as "en-US" (case-insensitive)."""
+    return (code or "").strip().lower().split("-")[0] == "en"
+
+
+@functools.lru_cache(maxsize=1024)
+def _glossary_pattern(term: str, english_suffixes: bool) -> Pattern[str]:
+    """Relevance pattern for one termbase source term (prompt glossary only).
+
+    Case-insensitive; the term's words may be separated by any whitespace; the match must
+    start and end at a word boundary. With ``english_suffixes`` (English sources only), an
+    optional plural ending "s" or "es" may follow: "processes" matches "process",
+    "processor" does not. Otherwise only the exact phrase matches, because the app does
+    not assume an English source. Possessives never get here: find-and-replace already
+    matches the singular before an apostrophe. Irregular plurals and hyphen variants are
+    not handled.
+    """
+    words = [re.escape(w) for w in term.split()]
+    suffix = r"(?:s|es)?" if english_suffixes else ""
+    return re.compile(r"(?<!\w)" + r"\s+".join(words) + suffix + r"(?!\w)", re.IGNORECASE)
+
+
+def build_termbase_block(
+    termbase: Mapping[str, str],
+    src_items: Sequence[str],
+    *,
+    english_source: bool = False,
+) -> str:
+    """Render the prompt's TERMINOLOGY glossary for one batch.
+
+    Args:
+        termbase: One language's flat ``{source_term: target_term}`` mapping.
+        src_items: The batch's source texts AFTER termbase substitution and DNT
+            placeholders. A term the find-and-replace already handled is no longer
+            present and is not repeated.
+        english_source: True only when the detected source language is English;
+            enables the plural endings "s"/"es". Unknown or mixed sources: False.
+
+    An entry is listed when its source term still appears in at least one item, checked
+    item by item (never across items, because the prompt treats each item as an
+    independent subtitle). Entries that differ only in capitalisation and share a target
+    are listed once. Returns "(none)" when nothing is relevant.
+    """
+    lines: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for source, target in termbase.items():
+        term = source.strip()
+        if not term:
+            continue
+        key = (term.casefold(), target.strip())
+        if key in seen:
+            continue
+        pattern = _glossary_pattern(term, english_source)
+        if any(pattern.search(item or "") for item in src_items):
+            seen.add(key)
+            lines.append(f"- {source} → {target}")
+    return "\n".join(lines) if lines else "(none)"
 
 
 # DNT placeholder validation helpers
@@ -331,7 +379,7 @@ class SRTTranslator:
         self,
         *,
         dnt_terms: list[str],
-        termbase: dict[str, dict[str, str]],
+        termbase: Mapping[str, str],
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
         translation_model_name: str,
@@ -348,7 +396,8 @@ class SRTTranslator:
             raise ValueError("SRTTranslator requires an application logger (non-None).")
 
         self.dnt_terms = dnt_terms or []
-        self.termbase = termbase or {}
+        # One language's flat termbase {source_term: target_term}; rejects the nested config shape.
+        self.termbase: dict[str, str] = ensure_flat_termbase(termbase)
         self.translation_model_name = translation_model_name
         self.batch_size = min(MAX_BATCH_SIZE, max(1, int(batch_size)))
         self.error_policy = error_policy.upper()
@@ -938,7 +987,7 @@ class SRTTranslator:
         *,
         src_items: list[str],
         target_lang: str,
-        termbase: dict[str, dict[str, str]],
+        termbase: Mapping[str, str],
         batch_ids: list[int],
         strict: bool = False,
     ) -> list[dict[str, Any]]:
@@ -946,7 +995,15 @@ class SRTTranslator:
         Ask for JSON ONLY: {"items":[{"id":<int>,"tgt":"..."}]}
         One item per input, same order and ids.
         """
-        termbase_block = build_termbase_block(termbase, target_lang)
+        # self.source_lang is the detected source code ("en", "fr", ...) or None when unknown/mixed.
+        termbase_block = build_termbase_block(termbase, src_items, english_source=_is_english_code(self.source_lang))
+        if termbase_block != "(none)":
+            self.logger.debug(
+                "Glossary entries for batch (lang=%s, ids=%s): %d",
+                target_lang,
+                batch_ids,
+                termbase_block.count("\n") + 1,
+            )
 
         lang_hint = self.language_config.get_tone_hint(target_lang, self.tone)
         if lang_hint:
@@ -1376,7 +1433,7 @@ class SRTTranslator:
         self,
         src_items: list[str],
         target_lang: str,
-        termbase: dict[str, dict[str, str]],
+        termbase: Mapping[str, str],
         batch_ids: list[int],
         logger: LoggerLike,
         strict: bool = False,
