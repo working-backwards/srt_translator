@@ -550,7 +550,7 @@ Add those exact phrases to the DNT Terms list and run the translation again. The
 
 ### A business term needs a specific translation.
 
-Add the term and its preferred translation to your termbase for that language. Then translate again. The app substitutes your preference wherever the exact term appears in a subtitle and, for English source subtitles, hints it to the AI for plurals. A term split across two subtitles is not matched.
+Add the term and its preferred translation to your termbase for that language. Then translate again. The app substitutes your preference wherever the exact term appears in a subtitle. If the source language was detected as English (the app detects it when you click **Regenerate**), plurals of the term are also hinted to the AI. A term split across two subtitles is not matched.
 
 ### I get an error about "batch in progress."
 

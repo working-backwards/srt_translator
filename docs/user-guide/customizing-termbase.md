@@ -149,7 +149,7 @@ When customizing a termbase:
 
 - **Capitalization variants are unnecessary.** Matching ignores case.
 - **Hyphenation variants are needed** ("single-threaded" and "single threaded"). Add each as its own key.
-- **Plurals** are hinted to the AI automatically when only the singular is listed and the source language is English. If the plural must be forced (for example, where the target language's plural differs, or the source isn't English), add it as its own key with the plural translation.
+- **Plurals** are hinted to the AI automatically when only the singular is listed and the source language was detected as English. The GUI detects it when you click **Regenerate**; the command line doesn't detect it, so command-line runs get no plural hints. If the plural must be forced (for example, where the target language's plural differs, or the source isn't English or wasn't detected), add it as its own key with the plural translation.
 - **Possessives** ("center's") are replaced by find-and-replace like the singular, which leaves the apostrophe ending after the translation.
 - **Entries whose translation is the same as the English** (names to keep in English) are hints only, because find-and-replace cannot change the text. To keep a name exactly as written, add it to the DNT list instead. DNT matching is exact, including capitalization, and a termbase entry for a word inside the DNT phrase is applied first and can break it.
 
