@@ -27,8 +27,9 @@ for the system prompt, generation instructions, and output tokens.
 
 **Translation model** (called **once per 5–8 cues**, many times per course):
 
-Each call receives only 5–8 subtitle cues, the DNT list (~30 phrases), and the matching
-subset of termbase entries — a small, bounded prompt. Context window size is irrelevant.
+Each call receives only 5–8 subtitle cues (termbase terms already substituted, DNT phrases
+replaced by placeholders) and a short glossary of any termbase entries still present — a
+small, bounded prompt. Context window size is irrelevant.
 What matters is **cost and latency**, since this call runs dozens to hundreds of times per
 course. `gpt-4o-mini` is the right fit.
 

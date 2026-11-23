@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-app disclosure label adjacent to the API key input field, stating that the key is stored locally and unencrypted, with a pointer to rotate at platform.openai.com if exposed.
 - Regression tests (`tests/test_api_key_audit.py`) that fail if any code path leaks the API key into log output or batch artifacts.
 
+### Fixed
+- **The termbase glossary now reaches the AI.** Since August 2025 the TERMINOLOGY section of the translation instructions was always "(none)": the translator received each language's termbase in a different shape from the one the glossary builder expected, and the builder also lowercased the language code. The glossary now lists the termbase entries still present in each batch after find-and-replace (mainly plurals of English source terms, and keep-in-English entries), and the plain-string fallback gets the same list. Expect small changes in translations where these occur.
+- The translator now rejects a nested `{language: {term: translation}}` termbase at its boundary with a clear `TypeError`, instead of merging languages.
+
+### Removed
+- The post-translation termbase "restore" step, which never had an effect in the app.
+- The unused `allow_global_termbase_fallback` translator parameter.
+
 ## [1.0.0] - 2025-02-12
 
 Initial public release of SRT Translator.

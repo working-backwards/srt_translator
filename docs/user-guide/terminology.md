@@ -187,7 +187,7 @@ The system provides detailed logging for troubleshooting:
 ### Architecture
 - **Terminology Utils**: Core filtering and validation logic
 - **Language Config**: Script and language metadata
-- **Term Handler**: DNT replacement and restoration
+- **Term Handler**: termbase find-and-replace, plus DNT placeholder replacement and restoration (the prompt glossary is built in `translator.py`)
 - **AI Config**: AI-powered terminology generation
 
 ### Performance

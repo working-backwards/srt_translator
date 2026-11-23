@@ -45,32 +45,18 @@ The SRT Translator includes advanced quality hardening features that automatical
 - Flexibility to translate domain terms while protecting technical codes
 - Clear hierarchy: Hard-preserve DNT > Termbase > Soft-preserve DNT > Default translation
 
-### 3. Relevant Termbase Injection
+### 3. Relevant Termbase Glossary
 
-**Problem**: Injecting all termbase entries can cause AI hallucinations and reduce relevance.
+Termbase entries reach the AI in two ways:
 
-**Solution**: Only inject termbase entries that are actually present in the current subtitle text.
+1. **Find-and-replace, before translation.** Each termbase source term found in a subtitle is replaced with its translation before the subtitle is sent. Matching ignores case and uses whole words. The AI sees the replacement as input and usually keeps it, but can still reword it, so this is strong guidance rather than a guarantee. A possessive ("center's") is replaced too, leaving the apostrophe ending after the translation.
+2. **Glossary hint, in the AI's instructions.** The instructions list the termbase entries whose source term is still present in a subtitle of the batch after step 1. These are mainly plurals of English source terms ("fulfillment centers"), and entries whose translation is the same as the source term, which find-and-replace cannot enforce. Terms already replaced are not repeated. If nothing is relevant, the list reads "(none)".
 
-**Example**:
-- **Full termbase**: 50 terms across all business domains
-- **Current subtitle**: Only contains 15 relevant terms
-- **Result**: Only 15 relevant terms are injected, improving translation quality
+**How the glossary matches**: one subtitle at a time (a term split across two subtitles is not matched); ignoring case; allowing any spacing between words; starting and ending at word boundaries. **For English source subtitles only**, the term may end with `s` or `es`: "processes" matches `process`, "processor" does not. For other source languages, or if the source language wasn't detected, only the exact phrase matches. Irregular plurals and hyphen variants are not matched.
 
 **Benefits**:
-- Reduced AI hallucinations
-- More focused and relevant translations
-- Better performance and cost efficiency
-
-### 4. Termbase Size Capping
-
-**Problem**: Very large termbases can overwhelm the AI and reduce translation quality.
-
-**Solution**: Automatic capping at 30 terms per language, prioritizing important terms.
-
-**Benefits**:
-- Consistent translation quality
-- Predictable API costs
-- Focus on most important terminology
+- Small, focused instructions: most batches carry no glossary at all
+- Plurals and keep-in-English entries are hinted instead of ignored
 
 ## Technical Implementation
 

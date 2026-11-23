@@ -87,7 +87,7 @@ Here you can control how the translator handles **terminology**:
 
 - **Do Not Translate (DNT)** — These are words or phrases that should never be translated (e.g., brand names like “iPhone” or proper names such as video authors or character names). DNT terms remain exactly the same in each language translation. There can be up to one DNT list per translation batch.
 
-- **Termbase** — A termbase is a glossary of approved translations for important terms in your video. It helps maintain consistency (e.g., “cloud computing” → always translated the same way) across translations. Termbases are especially useful for specialized vocabulary such as medical, legal, technical, or company-specific terminology. Each target language can have up to one termbase.
+- **Termbase** — A termbase is a glossary of approved translations for important terms in your video. It helps maintain consistency (e.g., “cloud computing” → always translated the same way) across translations. Termbases are especially useful for specialized vocabulary such as medical, legal, technical, or company-specific terminology. Each target language can have up to one termbase. During translation, the app replaces each termbase term it finds in a subtitle with your preferred translation before sending it to the AI, and lists any remaining relevant terms (such as plurals) as hints in the AI's instructions. The AI usually follows both, but can still change the wording, so check important terms.
 
 - You do not need to create these manually — the SRT app can generate sensible defaults that you can later review and edit. To generate DNT terms or termbases automatically, first select your original language SRT files and target languages, then click the **Regenerate** button. When generation is complete, click **Edit/View Settings** to review or modify the generated configuration.
 
@@ -372,13 +372,13 @@ A DNT list is a set of tokens we preserve exactly across languages—brand names
 - **Technical strings:** Ctrl+C, CUDA, render_settings.json
 - **Part numbers / SKUs:** XC-200, M2-MAX
 
-The SRT Translator passes your DNT list to the AI and also pre-protects it so it survives translation intact.
+The SRT Translator protects each DNT phrase before translation by swapping it for a placeholder the AI must keep, then puts the phrase back afterwards. Matching is exact, including capitalization, so add each spelling you use (for example, both "SKU" and "SKUs"). If a word inside a DNT phrase also has a termbase entry, the termbase entry is applied first and can break the phrase.
 
 #### Custom Termbase
 
 A Termbase is your curated glossary mapping each source term to its preferred translations for each target language.
 
-Unlike the DNT list, the Termbase tells the translator how to translate important terms, ensuring consistency across all your videos.
+Unlike the DNT list, the Termbase tells the translator how to translate important terms. The app substitutes your preferred translation before translation and hints any remaining matches (such as plurals) in the AI's instructions, which keeps terminology consistent across your videos.
 
 **Example Termbase:**
 
@@ -411,7 +411,7 @@ Subtitles have timecodes, line-length constraints, and reading-speed limits. Tha
 3. **Subtitle-based processing** — We now translate each subtitle individually while maintaining perfect timing alignment. This provides better context for accurate translation while maintaining exact timing.
    - **GUI users:** Subtitle processing is automatic and optimized
    - **CLI (expert) users:** Can configure error policies and concurrency settings
-4. **Translate with instructions** — The AI receives your DNT list, Termbase, and subtitle-specific constraints
+4. **Translate with instructions** — Termbase terms are substituted and DNT phrases are protected as placeholders; the AI receives the subtitles, a short glossary of any remaining relevant termbase entries, and subtitle-specific constraints
 5. **Reassemble & retime** — We map translated text back to subtitles, allowing minimal merge/split, then snap results to your original timecodes
 6. **Quality passes** — After translation, we:
    - Search for DNT terms and ensure they are present in the correct sentence order
@@ -546,11 +546,11 @@ The application now uses subtitle-based processing that preserves exact timing. 
 
 ### Some terms should have stayed in English.
 
-Add those exact phrases to the DNT Terms list and run the translation again. The translator will keep those phrases as written.
+Add those exact phrases to the DNT Terms list and run the translation again. The translator will keep those phrases as written. Matching is exact, including capitalization. If a word inside the phrase also has a termbase entry, remove or adjust that entry, because it is applied first and can break the phrase.
 
 ### A business term needs a specific translation.
 
-Add the term and its preferred translation to your termbase for that language. Then translate again. The translator will apply your preference whenever it finds the term.
+Add the term and its preferred translation to your termbase for that language. Then translate again. The app substitutes your preference wherever the exact term appears in a subtitle and, for English source subtitles, hints it to the AI for plurals. A term split across two subtitles is not matched.
 
 ### I get an error about "batch in progress."
 

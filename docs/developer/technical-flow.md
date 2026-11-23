@@ -14,6 +14,11 @@ This page documents the **actual** end-to-end pipeline the app runs **today** us
      - 5 input subtitles → 1 batch of 5 subtitles (context preserved)
             │
             ▼
+  1b) Terminology (per subtitle)
+     - Termbase find-and-replace, then DNT placeholders
+     - Prompt glossary: termbase entries still present, else "(none)"
+            │
+            ▼
   2) JSON-Formatted Batch Request
      - {"items":[{"id":1,"src":"..."},...]} with strict 1:1 mapping requirement
             │

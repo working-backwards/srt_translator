@@ -32,8 +32,10 @@ translate_file()
 
 ## DNT placeholders & termbase
 
-- Pre-translation: source cue text is passed through DNT placeholder application (`__DNT_TERM_n__`).
-- Post-translation: placeholders are restored back into the translated text.
+- The translator receives one language's flat termbase `{source: target}` (from `config.termbase.get(lang_code, {})`). A nested `{language: {source: target}}` mapping raises `TypeError` (`ensure_flat_termbase`).
+- Pre-translation, per subtitle: termbase find-and-replace (case-insensitive, whole word, longest first), then DNT placeholder application (`__DNT_TERM_n__`, exact case).
+- Prompt: the TERMINOLOGY glossary (`build_termbase_block`) lists termbase entries still present in at least one subtitle of the batch after substitution, matched per subtitle, exact phrase only, plus optional `s`/`es` endings when the detected source language is English (`_is_english_code(self.source_lang)`). Otherwise it is "(none)". The plain-string fallback prompt receives the same glossary.
+- Post-translation: DNT placeholders are restored. Termbase substitutions are not re-applied to the output; substitution is model input, not output enforcement.
 - Pair-retry (in-batch) always uses **placeholder-applied** source strings.
 
 ---
