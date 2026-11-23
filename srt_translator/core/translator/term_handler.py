@@ -53,14 +53,6 @@ class TermHandler:
         self.termbase = termbase or {}
         self.term_map: dict[str, str] = {}
         self.termbase_patterns: list[tuple[re.Pattern, str]] = []
-        self.termbase_target_map: dict[str, dict[str, str]] = {}
-
-        for lang, entries in self.termbase.items():
-            if isinstance(entries, dict):
-                self.termbase_target_map[lang] = entries.copy()
-            else:
-                # wrap single string entry into a dict with itself as key/value
-                self.termbase_target_map[lang] = {entries: entries}
 
         # Flatten the termbase into term_map for easy lookup
         for key, value in self.termbase.items():
@@ -173,31 +165,19 @@ class TermHandler:
             out = pat.sub(replacement, out)
         return out
 
-    def restore_termbase(self, text: str, lang_code: str) -> str:
-        """
-        Restore termbase replacements for a target language.
-        Replaces source-language keys in translated text with corresponding target-language values.
-        """
-        if not text or lang_code not in self.termbase_target_map:
-            return text
-
-        tb_map = self.termbase_target_map[lang_code]
-        out = text
-        for src_term, tgt_term in tb_map.items():
-            # Only replace full word matches
-            pat = re.compile(rf"\b{re.escape(src_term)}\b", re.IGNORECASE)
-            out = pat.sub(tgt_term, out)
-        return out
-
     def apply_all(self, text: str) -> str:
         """Apply termbase substitutions then DNT placeholders (correct order)."""
         termbase_substituted = self.apply_termbase(text)
         return self.apply_dnt_placeholders(termbase_substituted)
 
-    def restore_all(self, text: str, lang_code: str) -> str:
-        """Restore DNT placeholders then termbase substitutions (correct order)."""
-        dnt_terms_restored = self.restore_dnt_placeholders(text)
-        return self.restore_termbase(dnt_terms_restored, lang_code)
+    def restore_all(self, text: str) -> str:
+        """Restore DNT placeholders in translated text.
+
+        Termbase substitutions are not re-applied to model output: the find-and-replace
+        runs on the source before translation, so the model already sees the preferred
+        target strings.
+        """
+        return self.restore_dnt_placeholders(text)
 
     # Optional artifacts/metrics helpers
     def placeholder_count(self) -> int:

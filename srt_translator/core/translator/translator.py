@@ -334,7 +334,6 @@ class SRTTranslator:
         termbase: dict[str, dict[str, str]],
         api_key: str,
         logger: logging.Logger,  # Required - no fallback allowed
-        allow_global_termbase_fallback: bool = False,
         translation_model_name: str,
         batch_size: int,
         error_policy: str = "STRICT",
@@ -350,7 +349,6 @@ class SRTTranslator:
 
         self.dnt_terms = dnt_terms or []
         self.termbase = termbase or {}
-        self.allow_global_termbase_fallback = allow_global_termbase_fallback
         self.translation_model_name = translation_model_name
         self.batch_size = min(MAX_BATCH_SIZE, max(1, int(batch_size)))
         self.error_policy = error_policy.upper()
@@ -554,8 +552,8 @@ class SRTTranslator:
                             self.term_handler.placeholder_regex,
                         )
 
-        # Restore DNT placeholders and termbase substitutions
-        tgt_texts = [self.term_handler.restore_all(t, target_lang) for t in tgt_texts]
+        # Restore DNT placeholders
+        tgt_texts = [self.term_handler.restore_all(t) for t in tgt_texts]
         self.logger.debug("FINAL OUTPUT: %s", tgt_texts)
         return tgt_texts
 
@@ -730,7 +728,7 @@ class SRTTranslator:
                     if isinstance(pair_items, list) and len(pair_items) >= 1:
                         candidate = pair_items[0].get("tgt", "")
                         if candidate and candidate.strip():
-                            tgt_texts[i] = self.term_handler.restore_all(candidate, target_lang)
+                            tgt_texts[i] = self.term_handler.restore_all(candidate)
                             batch_logger.debug("Pair retry filled idx=%s successfully.", sid)
                             filled = True
                 except Exception as ex:
@@ -829,7 +827,7 @@ class SRTTranslator:
                         )
                         fixed = pair_tgts[0].get("text", "") if pair_tgts else ""
                         if fixed:
-                            fixed = self.term_handler.restore_all(fixed, target_lang)
+                            fixed = self.term_handler.restore_all(fixed)
                         if fixed.strip():
                             all_tgt_subs[deferred_tail_retry["out_index"]].text = fixed
                             batch_logger.debug(
