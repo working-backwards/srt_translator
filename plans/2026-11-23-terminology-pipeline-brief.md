@@ -96,7 +96,7 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
 
 | Decision | Choice | Why |
 |---|---|---|
-| Glossary contents | **Relevant entries only, matched within each subtitle** | With the final rule, over 1,422 batches per language, **5.6%** (zh-Hans) and **9.2%** (pt-BR) of requests carry any entry, at most 3 lines. Measurement shows the size of a full list (35–60 lines on every request), not its quality effect; the choice keeps prompts focused and avoids wrong-sense hints. |
+| Glossary contents | **Relevant entries only, matched within each subtitle** | With the final rule, over 1,422 batches per language, **5.6%** (zh-Hans, 80 batches) and **9.2%** (pt-BR, 131 batches) of requests carry any entry, at most 2 entries per batch (re-measured with the final `build_termbase_block`). Measurement shows the size of a full list (35–60 lines on every request), not its quality effect; the choice keeps prompts focused and avoids wrong-sense hints. |
 | Cross-cue matching | **Cut** (reviewer) | Worth only 2–4 batches across five courses, and it conflicts with the prompt's independent-subtitle rule. Revisit alongside the separate line-alignment work. Known cross-cue term failures stay in the output evaluation set (§6), and are handed to the semantic output review (§10). |
 | Restore step | **Remove** | It never had an effect; removing it changes no output. Making it work would be new behaviour. |
 | Identity entries | **Hints only**; measure retention first (reviewer Q1) | Promoting them to DNT raises case, overlap and preservation-policy questions. |
