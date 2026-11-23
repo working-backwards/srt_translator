@@ -8,14 +8,15 @@
 | Revision | Commit | Change |
 |---|---|---|
 | 1 | `40bebd2` | First version, sent for review. |
-| 3 | this commit | Second review round: names the source-approval and terminology-review dependencies (§10), adds a fixed semantic evaluation set (§6), and lists what this branch must not add. No change to the code design. |
+| 4 | this commit | Plan review: plural endings apply only to a detected English source (the app supports other source languages); exact matching otherwise. The `'s`/`’s` endings are dropped, because find-and-replace already handles possessives. The end-to-end test also asserts that both translations succeed. |
+| 3 | `3ec61bf` | Second review round: names the source-approval and terminology-review dependencies (§10), adds a fixed semantic evaluation set (§6), and lists what this branch must not add. No change to the code design. |
 | 2 | `4566366` | Review adopted. Glossary matches within each subtitle only (cross-cue matching cut). Glossary added to the plain-string fallback. Validation accepts the `MappingProxyType` the app actually passes. Tests go through the real config boundary. Factual corrections and re-measured figures. |
 
 ---
 
 ## 1. Background
 
-SRT Translator lets a user supply a **termbase**: per-language `{English term: preferred translation}` pairs, alongside a **DNT** (do-not-translate) list. A review of translated output showed terms not being applied as configured. Tracing the code found that the termbase reaches the model by only one of the two routes it was designed to use, and that the documentation describes behaviour the code doesn't have.
+SRT Translator lets a user supply a **termbase**: per-language `{source term: preferred translation}` pairs, alongside a **DNT** (do-not-translate) list. A review of translated output showed terms not being applied as configured. Tracing the code found that the termbase reaches the model by only one of the two routes it was designed to use, and that the documentation describes behaviour the code doesn't have.
 
 **This brief covers only the termbase plumbing in this repo.** Separate, related work elsewhere:
 - a post-translation script that re-cuts Chinese subtitle lines (a separate repo, with its own brief later);
@@ -27,7 +28,7 @@ SRT Translator lets a user supply a **termbase**: per-language `{English term: p
 ```
 English cue ──► (1) termbase find-and-replace ──► (2) DNT → placeholders ──► prompt ──► model
                     per cue, case-insensitive          case-sensitive              │
-                    English term replaced by           __DNT_TERM_n__              │
+                    source term replaced by            __DNT_TERM_n__              │
                     the TARGET-language string                                     ▼
                                                            (3) "TERMINOLOGY:" glossary section
                                                                ALWAYS "(none)"  ← bug
@@ -36,7 +37,7 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
 
 | Step | Code | Today |
 |---|---|---|
-| 1. Hard find-and-replace | `TermHandler.apply_termbase`, `srt_translator/core/translator/term_handler.py:164` | **Works.** Each English term in a cue is replaced with its target-language string *before* the model sees it. The model therefore does see the substituted translations, but it can still rewrite them: this is input, not enforcement of the output. |
+| 1. Hard find-and-replace | `TermHandler.apply_termbase`, `srt_translator/core/translator/term_handler.py:164` | **Works.** Each source term in a cue is replaced with its target-language string *before* the model sees it. The model therefore does see the substituted translations, but it can still rewrite them: this is input, not enforcement of the output. |
 | 2. DNT placeholders | `TermHandler.apply_dnt_placeholders`, `term_handler.py:118` | Works, but runs *after* step 1, so a termbase entry inside a DNT phrase breaks the phrase first (§3, B8). |
 | 3. Prompt glossary | `build_termbase_block`, `srt_translator/core/translator/translator.py:195`; `srt_translator/prompts/translation.py:64` | **Broken.** The explicit glossary section is always `(none)`. |
 | 4. DNT restore | `TermHandler.restore_dnt_placeholders` | Works. |
@@ -70,7 +71,9 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
    - Change: `build_termbase_block(termbase, src_items)`.
    - An entry is listed only if its English still appears in **at least one subtitle of the batch**, checked one subtitle at a time, **after** step 1. Terms already replaced aren't repeated.
    - **No matching across subtitles.** A term split over two cues is not listed. This avoids conflicting with the prompt rule that each subtitle is translated independently.
-   - **Matching rule.** Case-insensitive. Words of a multi-word term may be separated by any whitespace. The term must start at a Unicode word boundary (`(?<!\w)`). It may be followed by one optional suffix (`s`, `es`, `'s` or `’s`), then must end at a word boundary (`(?!\w)`). So "processes" and "Fulfillment Centers" match; "processor" and "processing" don't. Irregular plurals and hyphen variants are not handled; this is an English-oriented heuristic.
+   - **Matching rule.** Case-insensitive. Words of a multi-word term may be separated by any whitespace. The term must start at a Unicode word boundary (`(?<!\w)`) and end at one (`(?!\w)`).
+   - **English plural endings, only for an English source.** The app does not assume English input. When the detected source language is English (`en`, `en-US`, …), an optional `s` or `es` may follow the term, so "processes" and "Fulfillment Centers" match, while "processor" and "processing" don't. For any other source language, or when the source is unknown or mixed, only the exact phrase matches. Otherwise French `car` ("because") would match "cars" ("buses").
+   - **Possessives are not a glossary case.** Find-and-replace already matches the singular before an apostrophe ("center's" → "订单履约中心's"), so a possessive never reaches the glossary. A plural possessive ("centers'") matches through the plural `s`. Irregular plurals and hyphen variants are not handled.
    - **Entries that differ only in capitalisation and have the same translation** are listed once.
    - If nothing is relevant, the section stays `(none)`, as today.
 3. **Glossary in the plain-string fallback.** The same block is passed to the fallback prompt, so behaviour doesn't depend on which recovery path succeeded.
@@ -108,9 +111,10 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
   - empty mapping → `(none)`;
   - unrelated term → excluded;
   - term already replaced → excluded;
-  - plural, possessive (`'s` and `’s`) → listed;
+  - English source: plural (`s`, `es`) → listed; `processor` / `processing` → not listed;
+  - non-English or unknown source: exact phrase only (French `car` is not listed for "cars");
   - extra whitespace or a line break inside a term → listed;
-  - `processor` / `processing` → not listed;
+  - through the real find-and-replace: a possessive is substituted, so not listed; a plural possessive is listed;
   - a term split across two items → **not** listed;
   - identity entry → listed;
   - capitalisation duplicates → listed once;
@@ -128,8 +132,9 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
   - a fake-client test drives `_translate_batch_json` into the fallback and checks the glossary reaches that prompt.
 
 **New `tests/test_termbase_pipeline.py`:**
-- Build the configuration with `TranslationConfig.from_raw()`, with a two-language termbase (`zh-Hans`, `pt-BR`).
+- Build the configuration with `TranslationConfig.from_raw()`, with a two-language termbase (`zh-Hans`, `pt-BR`) and an English source language.
 - Run the real `translate_srt_files()`, mocking only the OpenAI client.
+- Assert from its summary that both translations succeeded: 2 successes, 0 errors, no failed languages. It catches errors per language, so prompts alone don't prove success.
 - Assert each language's prompts list only that language's entries: the plural and identity entries appear, and the other language's translations don't.
 - This is the test that would have caught B1.
 
@@ -157,9 +162,9 @@ The glossary-size figures in §5 are re-measured with the final implementation.
 
 | File | Change |
 |---|---|
-| `docs/user-guide/quality-features.md` | §3: describe the actual rule (after find-and-replace, within each subtitle, plurals and possessives). §4: remove the "30 terms per language" cap, which doesn't exist. |
+| `docs/user-guide/quality-features.md` | §3: describe the actual rule (after find-and-replace, within each subtitle, plural endings for English sources only). §4: remove the "30 terms per language" cap, which doesn't exist. |
 | `docs/user-guide/gui-manual.md` | The termbase is described as both a find-and-replace and a glossary hint. "The AI receives your DNT list": correct it (DNT terms are protected as placeholders; the list itself isn't sent). Qualify "applies your preference whenever it finds the term", and the DNT advice (exact case; an overlapping termbase entry can break a DNT phrase). |
-| `docs/user-guide/customizing-termbase.md` | Variant advice: capitalisation variants are unnecessary. Plurals and possessives are hinted; add a plural key to force one. Identity entries are hints. DNT protects exact-case phrases unless a termbase entry overlaps them. |
+| `docs/user-guide/customizing-termbase.md` | Variant advice: capitalisation variants are unnecessary. Plurals are hinted for English sources; add a plural key to force one. Possessives are substituted, leaving the source's apostrophe ending after the translation. Identity entries are hints. DNT protects exact-case phrases unless a termbase entry overlaps them. |
 | `docs/user-guide/terminology.md` | The TermHandler description gains the termbase steps. |
 | `docs/developer/translation-core.md`, `docs/developer/technical-flow.md` | Add steps 1 and 3 to the flow; note that substitution is input, not output enforcement. |
 | `docs/developer/model-config-plan.md` | Correct the per-call payload description. |
@@ -180,7 +185,7 @@ Verdict: **approve with changes.** All changes are adopted in §3–§7.
 - **Q1:** keep identity entries as hints; measure.
 - **Q2:** defer find-and-replace changes.
 - **Q3:** remove the restore step (its documented intent was a safety net for terms surviving translation; never effective in the app).
-- **Q4:** the suffix rule is acceptable as a documented English-oriented heuristic, specified precisely (§4.2).
+- **Q4:** the suffix rule is acceptable as a documented English-only heuristic, specified precisely (§4.2).
 - **Q5:** cut cross-cue matching.
 
 **Second round (revision 2 → 3), same verdict.** No change to the code design. Adopted:
@@ -189,7 +194,15 @@ Verdict: **approve with changes.** All changes are adopted in §3–§7.
 - the explicit hand-off of cross-cue terms to semantic review;
 - the list of things this branch must not add (§10).
 
+**Plan review (revision 3 → 4).** Adopted:
+- plural endings gated on a detected English source;
+- possessives removed from the glossary rule;
+- the end-to-end test asserts success from the run summary;
+- the cleanup check is limited to production files.
+
 ## 9. Follow-ups (not in this change)
+
+- Possessives: find-and-replace leaves the source's apostrophe ending after the translation ("订单履约中心's"). The model usually smooths this over; it's worth measuring before changing anything.
 
 - **B8 DNT/termbase overlap.** Extend the merge containment check in `srt_boundary_review` (`08492aa`) to flag a termbase key inside a DNT phrase. Separately, consider running DNT protection before the termbase.
 - Hard/soft DNT precedence at runtime, or delete `build_effective_dnt`.

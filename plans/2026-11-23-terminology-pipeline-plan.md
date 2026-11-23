@@ -152,12 +152,19 @@ def test_each_language_prompt_lists_only_its_own_relevant_entries(tmp_path: Path
             "api_key": "sk-test-offline",
             "files": (src,),
             "language_policies": _policies(),
+            # English source: plural endings ("centers") are only hinted for English sources.
+            "source_language": {"normalized_code": "en", "detected_code": "en", "mixed": False},
         },
         mode="GUI",
     )
     calls: list[dict] = []
     with patch("srt_translator.core.translator.translator.OpenAI", side_effect=_fake_openai_factory(calls)):
-        translate_srt_files(file_paths=[str(src)], config=cfg)
+        summary = translate_srt_files(file_paths=[str(src)], config=cfg)
+
+    # translate_srt_files catches per-language errors, so prompts alone don't prove success.
+    assert summary["successes"] == 2, summary
+    assert summary["errors"] == 0, summary
+    assert summary["failed_languages"] == [], summary
 
     zh = _prompts_for(calls, "zh-Hans")
     pt = _prompts_for(calls, "pt-BR")
@@ -176,7 +183,7 @@ def test_each_language_prompt_lists_only_its_own_relevant_entries(tmp_path: Path
 - [ ] **Step 2: Run it and confirm it fails for the right reason**
 
 Run: `venv/bin/python -m pytest tests/test_termbase_pipeline.py -v -rx`
-Expected: `1 xfailed`. To see the underlying assertion, temporarily run with `--runxfail`. Expect `AssertionError` on `"- fulfillment center → 订单履约中心" in zh`, because the prompt shows `(none)`. If it fails for any other reason (an import error, a crash in `translate_srt_files`, or no calls recorded), fix the test before continuing.
+Expected: `1 xfailed`. To see the underlying assertion, temporarily run with `--runxfail`. The three summary assertions must pass, and the failure must be the `AssertionError` on `"- fulfillment center → 订单履约中心" in zh`, because the prompt shows `(none)`. If it fails for any other reason (an import error, a summary assertion, or no calls recorded), fix the test before continuing.
 
 - [ ] **Step 3: Run the full suite**
 
@@ -308,7 +315,7 @@ Delete the line `allow_global_termbase_fallback=config.mode == "CLI",  # GUI: no
 
 Run: `venv/bin/python -m pytest tests/test_termbase_glossary.py -v` → 3 passed.
 Run: `venv/bin/python -m pytest -q` → `308 passed, 1 xfailed`.
-Run: `grep -rn "restore_termbase\|termbase_target_map\|allow_global_termbase_fallback" srt_translator tests` → no output.
+Run: `grep -rn --include='*.py' "restore_termbase\|termbase_target_map\|allow_global_termbase_fallback" srt_translator` → no output. (Production code only; the new tests mention these names on purpose.)
 
 - [ ] **Step 7: Commit**
 
@@ -340,8 +347,9 @@ This is the core fix.
 - Consumes: `TermHandler.restore_all(text)` from Task 2.
 - Produces:
   - `ensure_flat_termbase(termbase: Mapping[str, Any] | None) -> dict[str, str]` in `term_handler.py`. Raises `TypeError` on a non-mapping, a nested mapping value, or non-string entries.
-  - `build_termbase_block(termbase: Mapping[str, str], src_items: Sequence[str]) -> str` in `translator.py`. Returns `"(none)"` or lines `"- {source} → {target}"` joined by `"\n"`.
-  - `_glossary_pattern(term: str) -> Pattern[str]` (module-private, cached).
+  - `build_termbase_block(termbase: Mapping[str, str], src_items: Sequence[str], *, english_source: bool = False) -> str` in `translator.py`. Returns `"(none)"` or lines `"- {source} → {target}"` joined by `"\n"`. Plural endings (`s`, `es`) are allowed only when `english_source` is True.
+  - `_glossary_pattern(term: str, english_suffixes: bool) -> Pattern[str]` (module-private, cached).
+  - `_is_english_code(code: str | None) -> bool` (module-private): True for `en` and `en-*`.
   - `SRTTranslator.termbase: dict[str, str]`.
 
 - [ ] **Step 1: Append the failing unit tests to `tests/test_termbase_glossary.py`**
@@ -350,13 +358,13 @@ Add these imports to the top import block (keep `inspect`, `TermHandler`, `SRTTr
 
 ```python
 import logging
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
 from srt_translator.core.config.language_config import LanguageConfig
 from srt_translator.core.translator.term_handler import ensure_flat_termbase
-from srt_translator.core.translator.translator import build_termbase_block
+from srt_translator.core.translator.translator import _is_english_code, build_termbase_block
 ```
 
 Append:
@@ -401,7 +409,7 @@ def test_term_handler_flat_proxy_replaces_whole_words_case_insensitively() -> No
     assert th.apply_all("The Share Price fell.") == "The 股价 fell."
 
 
-def _mk_translator(termbase) -> SRTTranslator:
+def _mk_translator(termbase, source_lang: str | None = None) -> SRTTranslator:
     return SRTTranslator(
         dnt_terms=[],
         termbase=termbase,
@@ -410,6 +418,7 @@ def _mk_translator(termbase) -> SRTTranslator:
         logger=logging.getLogger("test.termbase"),
         batch_size=5,
         language_config=LanguageConfig({"languages": {"fr": {"name": "French"}}}),
+        source_lang=source_lang,
     )
 
 
@@ -438,26 +447,77 @@ def test_glossary_term_already_replaced_is_not_repeated() -> None:
     assert build_termbase_block({"share price": "股价"}, ["The 股价 fell."]) == "(none)"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Two fulfillment centers.",
-        "The FULFILLMENT CENTER's dock.",
-        "The fulfillment center’s dock.",
-        "fulfillment  \n center",
-    ],
-)
-def test_glossary_lists_plural_possessive_case_and_whitespace_variants(text: str) -> None:
-    assert build_termbase_block({"fulfillment center": "订单履约中心"}, [text]) == "- fulfillment center → 订单履约中心"
+FC = {"fulfillment center": "订单履约中心"}
 
 
-def test_glossary_es_plural() -> None:
-    assert build_termbase_block({"process": "流程"}, ["Our processes"]) == "- process → 流程"
+@pytest.mark.parametrize("text", ["Two fulfillment centers.", "The FULFILLMENT CENTERS are full."])
+def test_glossary_english_source_lists_plurals_any_case(text: str) -> None:
+    assert build_termbase_block(FC, [text], english_source=True) == "- fulfillment center → 订单履约中心"
+
+
+def test_glossary_whitespace_inside_term() -> None:
+    assert build_termbase_block(FC, ["fulfillment  \n center"]) == "- fulfillment center → 订单履约中心"
+
+
+def test_glossary_english_source_es_plural() -> None:
+    assert build_termbase_block({"process": "流程"}, ["Our processes"], english_source=True) == "- process → 流程"
 
 
 @pytest.mark.parametrize("text", ["a processor", "processing data", "preprocess"])
 def test_glossary_rejects_other_words_containing_the_term(text: str) -> None:
-    assert build_termbase_block({"process": "流程"}, [text]) == "(none)"
+    assert build_termbase_block({"process": "流程"}, [text], english_source=True) == "(none)"
+
+
+def test_glossary_non_english_source_matches_exact_phrase_only() -> None:
+    # French "car" means "because"; "cars" means "buses". No English plural rule for French.
+    assert build_termbase_block({"car": "因为"}, ["Les cars arrivent."]) == "(none)"
+    assert build_termbase_block({"car": "因为"}, ["Je reste, car il pleut."]) == "- car → 因为"
+
+
+def test_glossary_unknown_source_gets_no_plural_rule() -> None:
+    assert build_termbase_block(FC, ["Two fulfillment centers."]) == "(none)"
+
+
+def test_possessive_is_substituted_before_the_glossary_sees_it() -> None:
+    th = TermHandler(dnt_terms=[], termbase=FC)
+    singular = [th.apply_all("The fulfillment center's dock.")]
+    assert singular == ["The 订单履约中心's dock."]
+    assert build_termbase_block(FC, singular, english_source=True) == "(none)"
+    plural = [th.apply_all("The fulfillment centers' docks.")]
+    assert build_termbase_block(FC, plural, english_source=True) == "- fulfillment center → 订单履约中心"
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [("en", True), ("en-US", True), ("EN-gb", True), ("eng", False), ("fr", False), (None, False), ("", False)],
+)
+def test_is_english_code(code, expected) -> None:
+    assert _is_english_code(code) is expected
+
+
+@pytest.mark.parametrize(
+    ("source_lang", "text", "termbase", "expected_line"),
+    [
+        ("en", "Two fulfillment centers.", FC, "- fulfillment center → 订单履约中心"),
+        ("fr", "Les cars arrivent.", {"car": "因为"}, None),
+    ],
+)
+def test_translator_gates_plural_endings_on_source_language(source_lang, text, termbase, expected_line) -> None:
+    t = _mk_translator(termbase, source_lang=source_lang)
+    prompts: list[str] = []
+
+    def create(**kwargs):
+        prompts.append(kwargs["messages"][1]["content"])
+        content = '{"items": [{"id": 1, "tgt": "x"}]}'
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    t.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    t._translate_batch_json(src_items=[text], target_lang="fr", termbase=t.termbase, batch_ids=[1])
+    block = prompts[0].split("TERMINOLOGY:", 1)[1].split("DNT PLACEHOLDERS:", 1)[0]
+    if expected_line:
+        assert expected_line in block
+    else:
+        assert "(none)" in block
 
 
 def test_glossary_never_matches_across_items() -> None:
@@ -571,20 +631,34 @@ from srt_translator.core.translator.term_handler import TermHandler, ensure_flat
 Replace the whole `build_termbase_block` function with:
 
 ```python
+def _is_english_code(code: str | None) -> bool:
+    """True for "en" and regional variants such as "en-US" (case-insensitive)."""
+    return (code or "").strip().lower().split("-")[0] == "en"
+
+
 @functools.lru_cache(maxsize=1024)
-def _glossary_pattern(term: str) -> Pattern[str]:
+def _glossary_pattern(term: str, english_suffixes: bool) -> Pattern[str]:
     """Relevance pattern for one termbase source term (prompt glossary only).
 
     Case-insensitive; the term's words may be separated by any whitespace; the match must
-    start at a word boundary and may end with one English plural or possessive suffix
-    (s, es, 's, ’s) before a word boundary. "processes" matches "process"; "processor"
-    does not. Irregular plurals and hyphen variants are not handled.
+    start and end at a word boundary. With ``english_suffixes`` (English sources only), an
+    optional plural ending "s" or "es" may follow: "processes" matches "process",
+    "processor" does not. Otherwise only the exact phrase matches, because the app does
+    not assume an English source. Possessives never get here: find-and-replace already
+    matches the singular before an apostrophe. Irregular plurals and hyphen variants are
+    not handled.
     """
     words = [re.escape(w) for w in term.split()]
-    return re.compile(r"(?<!\w)" + r"\s+".join(words) + r"(?:s|es|'s|’s)?(?!\w)", re.IGNORECASE)
+    suffix = r"(?:s|es)?" if english_suffixes else ""
+    return re.compile(r"(?<!\w)" + r"\s+".join(words) + suffix + r"(?!\w)", re.IGNORECASE)
 
 
-def build_termbase_block(termbase: Mapping[str, str], src_items: Sequence[str]) -> str:
+def build_termbase_block(
+    termbase: Mapping[str, str],
+    src_items: Sequence[str],
+    *,
+    english_source: bool = False,
+) -> str:
     """Render the prompt's TERMINOLOGY glossary for one batch.
 
     Args:
@@ -592,6 +666,8 @@ def build_termbase_block(termbase: Mapping[str, str], src_items: Sequence[str]) 
         src_items: The batch's source texts AFTER termbase substitution and DNT
             placeholders. A term the find-and-replace already handled is no longer
             present and is not repeated.
+        english_source: True only when the detected source language is English;
+            enables the plural endings "s"/"es". Unknown or mixed sources: False.
 
     An entry is listed when its source term still appears in at least one item, checked
     item by item (never across items, because the prompt treats each item as an
@@ -607,7 +683,7 @@ def build_termbase_block(termbase: Mapping[str, str], src_items: Sequence[str]) 
         key = (term.casefold(), target.strip())
         if key in seen:
             continue
-        pattern = _glossary_pattern(term)
+        pattern = _glossary_pattern(term, english_source)
         if any(pattern.search(item or "") for item in src_items):
             seen.add(key)
             lines.append(f"- {source} → {target}")
@@ -628,7 +704,10 @@ In `_translate_with_simple_shape_lock` and `_translate_batch_json`, change the p
 In `_translate_batch_json`, replace `termbase_block = build_termbase_block(termbase, target_lang)` with:
 
 ```python
-        termbase_block = build_termbase_block(termbase, src_items)
+        # self.source_lang is the detected source code ("en", "fr", ...) or None when unknown/mixed.
+        termbase_block = build_termbase_block(
+            termbase, src_items, english_source=_is_english_code(self.source_lang)
+        )
         if termbase_block != "(none)":
             self.logger.debug(
                 "Glossary entries for batch (lang=%s, ids=%s): %d",
@@ -654,7 +733,7 @@ Run: `venv/bin/python -m pytest tests/test_termbase_glossary.py tests/test_termb
 Expected: all pass, with no xfail.
 
 Run: `venv/bin/python -m pytest -q`
-Expected: `334 passed`, `0 failed`, `0 xfailed`. That is 305 baseline + 1 pipeline + 3 from Task 2 + 25 from Task 3, counting each parametrized case. If the count differs, confirm that only these new tests account for it.
+Expected: `345 passed`, `0 failed`, `0 xfailed`. That is 305 baseline + 1 pipeline + 3 from Task 2 + 36 from Task 3, counting each parametrized case. If the count differs, confirm that only these new tests account for it.
 
 - [ ] **Step 7: Lint and types**
 
@@ -674,8 +753,10 @@ one, and it also lowercased the language code. The translator boundary
 now accepts exactly one language's flat mapping (any Mapping, including
 the MappingProxyType the config supplies) and rejects the nested shape.
 The glossary lists entries still present in a subtitle after
-find-and-replace (plurals, possessives, keep-in-English entries),
-matched per subtitle. Tests now use the shape the app uses.
+find-and-replace (plurals of English source terms, keep-in-English
+entries), matched per subtitle; plural endings apply only when the
+detected source language is English. Tests now use the shape the app
+uses.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -697,11 +778,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Append the failing tests**
 
-Add to the imports in `tests/test_termbase_glossary.py`:
+Add to the imports in `tests/test_termbase_glossary.py` (`SimpleNamespace` was already imported in Task 3):
 
 ```python
-from types import SimpleNamespace
-
 from srt_translator.prompts.translation import build_single_string_fallback_prompt
 ```
 
@@ -733,7 +812,7 @@ def test_fallback_prompt_includes_glossary() -> None:
 
 
 def test_malformed_single_item_falls_back_with_glossary() -> None:
-    t = _mk_translator({"fulfillment center": "centre de distribution"})
+    t = _mk_translator({"fulfillment center": "centre de distribution"}, source_lang="en")  # plural needs English
     calls: list[dict] = []
 
     def create(**kwargs):
@@ -828,7 +907,7 @@ At the call site in `_translate_batch_json` (the `# LAST-CHANCE FALLBACK` block)
 - [ ] **Step 5: Run the tests, lint, types**
 
 Run: `venv/bin/python -m pytest tests/test_termbase_glossary.py -v` → all pass.
-Run: `venv/bin/python -m pytest -q` → `337 passed`, `0 failed`.
+Run: `venv/bin/python -m pytest -q` → `348 passed`, `0 failed`.
 Run: `venv/bin/ruff check srt_translator tests` → `All checks passed!`
 Run: `venv/bin/ruff format --check srt_translator/prompts/translation.py srt_translator/core/translator/translator.py tests/test_termbase_glossary.py` → clean (format those files if not).
 Run: the mypy command from Global Constraints → `Success`.
@@ -865,10 +944,10 @@ Replace the whole `### 3. Relevant Termbase Injection` section, from its heading
 
 Termbase entries reach the AI in two ways:
 
-1. **Find-and-replace, before translation.** Each English termbase term found in a subtitle is replaced with its translation before the subtitle is sent. Matching ignores case and uses whole words. The AI sees the replacement as input and usually keeps it, but can still reword it, so this is strong guidance rather than a guarantee.
-2. **Glossary hint, in the AI's instructions.** The instructions list the termbase entries whose English is still present in a subtitle of the batch after step 1. These are mainly plurals and possessives ("fulfillment centers", "the deck's"), and entries whose translation is the same as the English, which find-and-replace cannot enforce. Terms already replaced are not repeated. If nothing is relevant, the list reads "(none)".
+1. **Find-and-replace, before translation.** Each termbase source term found in a subtitle is replaced with its translation before the subtitle is sent. Matching ignores case and uses whole words. The AI sees the replacement as input and usually keeps it, but can still reword it, so this is strong guidance rather than a guarantee. A possessive ("center's") is replaced too, leaving the apostrophe ending after the translation.
+2. **Glossary hint, in the AI's instructions.** The instructions list the termbase entries whose source term is still present in a subtitle of the batch after step 1. These are mainly plurals of English source terms ("fulfillment centers"), and entries whose translation is the same as the source term, which find-and-replace cannot enforce. Terms already replaced are not repeated. If nothing is relevant, the list reads "(none)".
 
-**How the glossary matches**: one subtitle at a time (a term split across two subtitles is not matched); ignoring case; allowing any spacing between words. The term must start at a word boundary and may end with `s`, `es`, `'s` or `’s`: "processes" matches `process`, "processor" does not. Irregular plurals and hyphen variants are not matched.
+**How the glossary matches**: one subtitle at a time (a term split across two subtitles is not matched); ignoring case; allowing any spacing between words; starting and ending at word boundaries. **For English source subtitles only**, the term may end with `s` or `es`: "processes" matches `process`, "processor" does not. For other source languages, or if the source language wasn't detected, only the exact phrase matches. Irregular plurals and hyphen variants are not matched.
 
 **Benefits**:
 - Small, focused instructions: most batches carry no glossary at all
@@ -912,7 +991,7 @@ Unlike the DNT list, the Termbase tells the translator how to translate importan
 (f) Under `### A business term needs a specific translation.`, replace `The translator will apply your preference whenever it finds the term.` with:
 
 ```markdown
-The app substitutes your preference wherever the exact term appears in a subtitle, and hints it to the AI for plurals and possessives. A term split across two subtitles is not matched.
+The app substitutes your preference wherever the exact term appears in a subtitle and, for English source subtitles, hints it to the AI for plurals. A term split across two subtitles is not matched.
 ```
 
 - [ ] **Step 3: `docs/user-guide/customizing-termbase.md`**
@@ -924,7 +1003,8 @@ When customizing a termbase:
 
 - **Capitalization variants are unnecessary.** Matching ignores case.
 - **Hyphenation variants are needed** ("single-threaded" and "single threaded"). Add each as its own key.
-- **Plurals and possessives** are hinted to the AI automatically when only the singular is listed. If the plural must be forced (for example, where the target language's plural differs), add it as its own key with the plural translation.
+- **Plurals** are hinted to the AI automatically when only the singular is listed and the source language is English. If the plural must be forced (for example, where the target language's plural differs, or the source isn't English), add it as its own key with the plural translation.
+- **Possessives** ("center's") are replaced by find-and-replace like the singular, which leaves the apostrophe ending after the translation.
 - **Entries whose translation is the same as the English** (names to keep in English) are hints only, because find-and-replace cannot change the text. To keep a name exactly as written, add it to the DNT list instead. DNT matching is exact, including capitalization, and a termbase entry for a word inside the DNT phrase is applied first and can break it.
 
 The AI prompt that generates termbases already asks for variants, but double-check the results.
@@ -945,7 +1025,7 @@ Replace the bullet list under `## DNT placeholders & termbase` (the three bullet
 ```markdown
 - The translator receives one language's flat termbase `{source: target}` (from `config.termbase.get(lang_code, {})`). A nested `{language: {source: target}}` mapping raises `TypeError` (`ensure_flat_termbase`).
 - Pre-translation, per subtitle: termbase find-and-replace (case-insensitive, whole word, longest first), then DNT placeholder application (`__DNT_TERM_n__`, exact case).
-- Prompt: the TERMINOLOGY glossary (`build_termbase_block`) lists termbase entries still present in at least one subtitle of the batch after substitution, matched per subtitle, with optional `s`/`es`/`'s`/`’s` endings. Otherwise it is "(none)". The plain-string fallback prompt receives the same glossary.
+- Prompt: the TERMINOLOGY glossary (`build_termbase_block`) lists termbase entries still present in at least one subtitle of the batch after substitution, matched per subtitle, exact phrase only, plus optional `s`/`es` endings when the detected source language is English (`_is_english_code(self.source_lang)`). Otherwise it is "(none)". The plain-string fallback prompt receives the same glossary.
 - Post-translation: DNT placeholders are restored. Termbase substitutions are not re-applied to the output; substitution is model input, not output enforcement.
 - Pair-retry (in-batch) always uses **placeholder-applied** source strings.
 ```
@@ -1000,7 +1080,7 @@ Immediately before the line `## [1.0.0] - 2025-02-12`, insert:
 
 ```markdown
 ### Fixed
-- **The termbase glossary now reaches the AI.** Since August 2025 the TERMINOLOGY section of the translation instructions was always "(none)": the translator received each language's termbase in a different shape from the one the glossary builder expected, and the builder also lowercased the language code. The glossary now lists the termbase entries still present in each batch after find-and-replace (mainly plurals, possessives and keep-in-English entries), and the plain-string fallback gets the same list. Expect small changes in translations where these occur.
+- **The termbase glossary now reaches the AI.** Since August 2025 the TERMINOLOGY section of the translation instructions was always "(none)": the translator received each language's termbase in a different shape from the one the glossary builder expected, and the builder also lowercased the language code. The glossary now lists the termbase entries still present in each batch after find-and-replace (mainly plurals of English source terms, and keep-in-English entries), and the plain-string fallback gets the same list. Expect small changes in translations where these occur.
 - The translator now rejects a nested `{language: {term: translation}}` termbase at its boundary with a clear `TypeError`, instead of merging languages.
 
 ### Removed
@@ -1074,9 +1154,52 @@ Don't push, open a PR or merge; those are the owner's decisions. After merging, 
 
 ---
 
+### Task 7: Course evaluation set (private; does not block the merge)
+
+The unit tests prove the **code** passes the right glossary. This task measures whether real **translations** improve. It lives entirely in the owner's private localization repo, because every case is built from course text and native-speaker review findings. Nothing from it enters this repo.
+
+**Where (private repo):** `reviews/analysis-zh-Hans-sentence-splits/`
+- `eval_cases.json`: the cases;
+- `eval_set.py`: the checker (Python standard library, read-only);
+- `eval-baseline-2026-08-19.md`: the result on the live batch before any change.
+
+**Case format** (one JSON object per case):
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable identifier, e.g. `zh-forbid-07` |
+| `lang` | Target language (`zh-Hans`, `pt-BR`) |
+| `kind` | `forbid_course`: none of `strings` may appear anywhere in the course output. `forbid_cue`: none may appear in the cue matched by `anchor` or its neighbours. `require_cue`: at least one must appear there. `retention`: the count of `strings[0]` in the output divided by its count in the English. `judge`: no automatic check; listed for a human reader. |
+| `lesson` | Lesson number (the filename prefix) for cue-level kinds |
+| `anchor` | An English substring that identifies the cue. Matched by text, so it survives renumbering; it must be unique in the lesson. |
+| `strings` | The renderings to forbid or require (or count) |
+| `note` | Why the case exists, and which review item it comes from |
+
+**Kinds of case:**
+- **Automatic must-not-appear:** known wrong renderings flagged in review.
+- **Automatic must-appear:** exact app identifiers, DNT names, keep-in-English names.
+- **Judgement:** ambiguous verbs, business-sense distinctions, quantities and time boundaries, and meaning lost at subtitle splits, including the cross-cue term failures.
+
+The automatic checks catch only *known* failures; passing them does not prove a translation is correct.
+
+**When:** after each production re-translation of the course, which itself waits for English source approval and the course terminology review (brief §10).
+
+- [ ] **Step 1: Build and baseline (done 2026-11-23, private)**
+
+Built from the review's still-wrong items, with every anchor confirmed unique against the current English. The baseline was run on the live batch and committed with the cases.
+
+- [ ] **Step 2: After the production re-translation**
+
+From the private repo root:
+`python3 -I reviews/analysis-zh-Hans-sentence-splits/eval_set.py reviews/analysis-zh-Hans-sentence-splits reviews/analysis-zh-Hans-sentence-splits/eval_cases.json --en <new English source dir> --zh <new zh-Hans dir> --pt <new pt-BR dir> > <report>.md`
+
+Compare the report with the baseline. Any anchor that no longer matches after an English correction is reported as `ANCHOR-MISSING`; update that anchor rather than deleting the case. A native reader then reviews the `judge` cases.
+
+---
+
 ## Out of scope (tracked in the brief, §9)
 
 - DNT/termbase overlap (B8): the reverse containment check in `srt_boundary_review`, and DNT-before-termbase ordering.
 - The separate docs-only change for unimplemented DNT features.
-- Before/after translation-quality measurement on a real course (brief §6). It happens at the next planned re-translation, which waits for two things: English source approval, and the course terminology review that removes unsafe forced mappings (brief §10). It uses a small fixed evaluation set kept in the owner's private files.
+- Before/after translation-quality measurement on a real course (brief §6). It happens at the next planned re-translation, which waits for two things: English source approval, and the course terminology review that removes unsafe forced mappings (brief §10). It uses the private evaluation set described in Task 7.
 - The output review after re-translation (meaning errors, exact identifiers, cross-cue terms), alongside the separate Chinese line-alignment work.
