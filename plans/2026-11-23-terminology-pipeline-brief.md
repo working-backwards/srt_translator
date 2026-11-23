@@ -8,7 +8,8 @@
 | Revision | Commit | Change |
 |---|---|---|
 | 1 | `40bebd2` | First version, sent for review. |
-| 2 | this commit | Review adopted. Glossary matches within each subtitle only (cross-cue matching cut). Glossary added to the plain-string fallback. Validation accepts the `MappingProxyType` the app actually passes. Tests go through the real config boundary. Factual corrections and re-measured figures. |
+| 3 | this commit | Second review round: names the source-approval and terminology-review dependencies (§10), adds a fixed semantic evaluation set (§6), and lists what this branch must not add. No change to the code design. |
+| 2 | `4566366` | Review adopted. Glossary matches within each subtitle only (cross-cue matching cut). Glossary added to the plain-string fallback. Validation accepts the `MappingProxyType` the app actually passes. Tests go through the real config boundary. Factual corrections and re-measured figures. |
 
 ---
 
@@ -93,7 +94,7 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
 | Decision | Choice | Why |
 |---|---|---|
 | Glossary contents | **Relevant entries only, matched within each subtitle** | With the final rule, over 1,422 batches per language, **5.6%** (zh-Hans) and **9.2%** (pt-BR) of requests carry any entry, at most 3 lines. Measurement shows the size of a full list (35–60 lines on every request), not its quality effect; the choice keeps prompts focused and avoids wrong-sense hints. |
-| Cross-cue matching | **Cut** (reviewer) | Worth only 2–4 batches across five courses, and it conflicts with the prompt's independent-subtitle rule. Revisit alongside the separate line-alignment work. |
+| Cross-cue matching | **Cut** (reviewer) | Worth only 2–4 batches across five courses, and it conflicts with the prompt's independent-subtitle rule. Revisit alongside the separate line-alignment work. Known cross-cue term failures stay in the output evaluation set (§6), and are handed to the semantic output review (§10). |
 | Restore step | **Remove** | It never had an effect; removing it changes no output. Making it work would be new behaviour. |
 | Identity entries | **Hints only**; measure retention first (reviewer Q1) | Promoting them to DNT raises case, overlap and preservation-policy questions. |
 | Find-and-replace | **Unchanged** for now (reviewer Q2) | Changing it would confound the evaluation of this repair. |
@@ -136,9 +137,16 @@ model output ──► (4) restore DNT placeholders ──► (5) restore_termba
 - The snapshot test uses the flat shape; the expected prompt text is unchanged.
 - The golden test passes each language only its own entries (`termbase.get(target_lang, {})`).
 
-**Measurement before relying on it.** The next planned re-translation of one course (zh-Hans and pt-BR) is compared with the current output, holding source, terminology and model settings constant:
+**Measurement before relying on it.** This is separate from the deterministic code tests above.
+
+Preconditions for the production re-run of one course (zh-Hans and pt-BR):
+- the course's English source corrections are approved;
+- the course terminology review has removed or narrowed unsafe forced mappings (§10). A working glossary cannot repair English that find-and-replace already replaced with the wrong sense.
+
+Compare the new output with the current output, holding the model settings constant:
 - identity-entry retention (today 3 of 71);
 - consistency of plural terms;
+- a **small fixed evaluation set** drawn from the native-speaker review, kept in the owner's private files: ambiguous verbs forced into a noun sense, business-sense distinctions, exact software identifiers, quantities and time boundaries, and the known cross-cue term failures;
 - **no regression** in Chinese line drift, using the existing private measurement scripts.
 
 The glossary-size figures in §5 are re-measured with the final implementation.
@@ -175,6 +183,12 @@ Verdict: **approve with changes.** All changes are adopted in §3–§7.
 - **Q4:** the suffix rule is acceptable as a documented English-oriented heuristic, specified precisely (§4.2).
 - **Q5:** cut cross-cue matching.
 
+**Second round (revision 2 → 3), same verdict.** No change to the code design. Adopted:
+- the source-approval and terminology-review dependencies, and the output review (§10);
+- the fixed semantic evaluation set (§6);
+- the explicit hand-off of cross-cue terms to semantic review;
+- the list of things this branch must not add (§10).
+
 ## 9. Follow-ups (not in this change)
 
 - **B8 DNT/termbase overlap.** Extend the merge containment check in `srt_boundary_review` (`08492aa`) to flag a termbase key inside a DNT phrase. Separately, consider running DNT protection before the termbase.
@@ -184,3 +198,20 @@ Verdict: **approve with changes.** All changes are adopted in §3–§7.
 - Irregular plurals and hyphen variants in glossary matching.
 - Making `under_ratio` / `oversize_ratio` act instead of only logging at debug (`translator.py:1113–1133`).
 - Version reporting: three different version numbers in the package, the batch manifests and the release tag.
+
+## 10. Dependencies and companion work (outside this repo)
+
+This branch repairs the plumbing. These workflow steps are needed for good translations, and none of them expands the app's terminology architecture.
+
+| Responsibility | What it covers | Relation to this branch |
+|---|---|---|
+| **English source approval** | The owner's checklist of English caption corrections, settled against the lesson videos, released as a new approved English version. | A precondition for the production re-run (§6), not for merging this branch. |
+| **Course terminology review** | Remove or narrow unsafe forced mappings (e.g. a single English word that is both a verb and a noun, forced to one noun translation). Approve business translations. Verify app identifiers (field names, config keys) against the version shown in the course. | A precondition for the production re-run. Data, not code. |
+| **Output review after re-translation** | Check the remaining meaning errors, exact identifiers and cross-cue terms, alongside the separate Chinese line-alignment pass. | After the re-run. Re-cutting Chinese lines cannot recover meaning that was mistranslated or omitted. |
+
+**Not in this branch.** Don't add any of these, even as small extras:
+- automatic identifier detection;
+- a hard/soft terminology schema;
+- first-mention explanations;
+- generalized or case-tolerant DNT matching;
+- stemming or general morphology in glossary matching.
